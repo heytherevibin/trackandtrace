@@ -1,26 +1,421 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ============================================================
+   TRACK & TRACE — "THE DESTINY CLOCK" world tokens
+   Instrument ground · dial bone · steel hairlines ·
+   signal aspects (go/watch/stop) as functional roles
+   ============================================================ */
+
+@theme {
+  /* Grounds — lacquered instrument metal, not blue-black sci-fi */
+  --color-ink-0: #06080b;
+  --color-ink-1: #0b0e12;
+  --color-ink-2: #10141a;
+  --color-ink-3: #161b23;
+  --color-ink-4: #1e2530;
+
+  /* Dial bone — luminous markings on dark faces */
+  --color-bone: #ece4d2;
+  --color-bone-dim: #c2b9a4;
+
+  /* Steel — engraving, readouts, neutral text */
+  --color-steel: #7e8894;
+  --color-steel-2: #adb7c2;
+
+  /* Signal aspects (railway semantics) */
+  --color-go: #2fbf71;
+  --color-go-bright: #5fe39b;
+  --color-watch: #f2a93b;
+  --color-stop: #e5484d;
+  --color-stop-bright: #ff6b6f;
+
+  /* Alpha tints for chips and lamps */
+  --color-go-t10: rgba(47, 191, 113, 0.1);
+  --color-go-t30: rgba(47, 191, 113, 0.3);
+  --color-watch-t10: rgba(242, 169, 59, 0.1);
+  --color-watch-t30: rgba(242, 169, 59, 0.3);
+  --color-stop-t10: rgba(229, 72, 77, 0.1);
+  --color-stop-t30: rgba(229, 72, 77, 0.3);
+
+  /* Brass — sparing, machined detailing only */
+  --color-brass: #c9a25f;
+
+  /* Typography — Archivo display, JetBrains Mono body+data */
+  --font-sans: var(--font-jetbrains-mono), ui-monospace, "SFMono-Regular", monospace;
+  --font-display: var(--font-archivo), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, "SFMono-Regular", monospace;
+
+  /* Motion — instrument-grade easing, no linear, no ease-in */
+  --ease-out-strong: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+
+  /* Radii — one scale, used everywhere */
+  --radius-bezel: 1.5rem; /* major instrument panels */
+  --radius-panel: 1rem; /* inner plates, mid-size cards */
+  --radius-field: 0.75rem; /* inputs, wells, selects */
+  --radius-chip: 999px; /* pills */
+
+  /* Hairlines */
+  --line: rgba(236, 228, 210, 0.09);
+  --line-2: rgba(236, 228, 210, 0.16);
+  --line-3: rgba(236, 228, 210, 0.28);
+
+  --shadow-plate: 0 1px 0 rgba(236, 228, 210, 0.07) inset,
+    0 24px 48px -20px rgba(0, 0, 0, 0.75),
+    0 4px 12px -4px rgba(0, 0, 0, 0.4);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+@layer base {
+  html {
+    color-scheme: dark;
+    scrollbar-color: #2a313c #06080b;
+  }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  body {
+    background: var(--color-ink-0);
+    color: var(--color-bone);
+    font-family: var(--font-sans);
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Display face — mixed case, heavier weight for hierarchy */
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    text-transform: none;
+    letter-spacing: -0.02em;
+  }
+
+  h1 { font-weight: 800; }
+  h2 { font-weight: 700; }
+  h3 { font-weight: 600; }
+
+  /* Strong/bold text gets a heavier mono weight */
+  strong, b {
+    font-weight: 700;
+  }
+
+  /* Paragraphs get lighter weight for reading comfort */
+  p {
+    font-weight: 400;
+    letter-spacing: 0.02em;
+    line-height: 1.75;
+  }
+
+  /* Links inherit but get medium weight */
+  a {
+    font-weight: 500;
+  }
+
+  button,
+  .plate-label {
+    font-family: var(--font-display);
+    font-weight: 600;
+  }
+
+  /* PNR input stays mixed-case */
+  input,
+  textarea {
+    text-transform: none;
+  }
+
+  .font-display {
+    font-family: var(--font-display);
+  }
+
+  ::selection {
+    background: rgba(236, 228, 210, 0.92);
+    color: #0b0e12;
+  }
+
+  /* One focus language everywhere — luminous signal ring, never removed */
+  :focus-visible {
+    outline: 2px solid var(--color-go-bright);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      transition-duration: 0.01ms !important;
+    }
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer utilities {
+  /* ---- Type helpers ---- */
+  .font-data {
+    font-family: var(--font-mono);
+    font-feature-settings: "tnum" 1, "zero" 1;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+  }
+
+  .plate-label {
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    font-weight: 600;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--color-brass);
+  }
+
+  .readout {
+    font-family: var(--font-mono);
+    font-feature-settings: "tnum" 1;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+  }
+
+  /* ---- Surfaces ---- */
+  .bezel {
+    position: relative;
+    border-radius: var(--radius-bezel);
+    background: linear-gradient(180deg, #191f28 0%, #10141a 100%);
+    border: 1px solid var(--line-2);
+    box-shadow: var(--shadow-plate), 0 0 0 1px rgba(6, 8, 11, 0.6) inset;
+  }
+  .bezel::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    box-shadow: inset 0 1px 0 rgba(236, 228, 210, 0.12),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+  }
+
+  .bezel-plate {
+    border-radius: calc(var(--radius-bezel) - 6px);
+    border: 1px solid rgba(6, 8, 11, 0.55);
+    background: linear-gradient(180deg, #13181f 0%, #0c1015 100%);
+    box-shadow: inset 0 1px 0 rgba(201, 162, 95, 0.06),
+      inset 0 0 0 0.5px rgba(236, 228, 210, 0.04);
+  }
+
+  .panel {
+    border-radius: var(--radius-panel);
+    border: 1px solid var(--line);
+    background: linear-gradient(180deg, #151a22 0%, #0e1218 100%);
+    box-shadow: 0 8px 24px -12px rgba(0, 0, 0, 0.5);
+  }
+
+  .field {
+    border-radius: var(--radius-field);
+    border: 1px solid var(--line-2);
+    background: linear-gradient(180deg, #060910 0%, #0a0e14 100%);
+    box-shadow: inset 0 3px 14px rgba(0, 0, 0, 0.6),
+      inset 0 1px 2px rgba(0, 0, 0, 0.4),
+      inset 0 -1px 0 rgba(201, 162, 95, 0.06);
+    transition: border-color 200ms ease, box-shadow 200ms ease;
+  }
+  .field:focus-within {
+    border-color: rgba(95, 227, 155, 0.5);
+    box-shadow: inset 0 3px 14px rgba(0, 0, 0, 0.6),
+      inset 0 1px 2px rgba(0, 0, 0, 0.4),
+      0 0 0 3px rgba(47, 191, 113, 0.12);
+  }
+
+  .hairline-b {
+    border-bottom: 1px solid var(--line);
+  }
+  .hairline-t {
+    border-top: 1px solid var(--line);
+  }
+
+  /* Engraved input well */
+  .well {
+    border-radius: var(--radius-field);
+    border: 1px solid rgba(236, 228, 210, 0.1);
+    background: linear-gradient(180deg, #060910 0%, #0a0e14 100%);
+    box-shadow: inset 0 3px 14px rgba(0, 0, 0, 0.6),
+      inset 0 1px 2px rgba(0, 0, 0, 0.4),
+      inset 0 -1px 0 rgba(201, 162, 95, 0.06);
+    transition: border-color 200ms ease, box-shadow 200ms ease;
+  }
+  .well:focus-within {
+    border-color: rgba(95, 227, 155, 0.5);
+    box-shadow: inset 0 3px 14px rgba(0, 0, 0, 0.6),
+      inset 0 1px 2px rgba(0, 0, 0, 0.4),
+      0 0 0 3px rgba(47, 191, 113, 0.12);
+  }
+
+  .vignette::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(
+      120% 90% at 50% 0%,
+      transparent 40%,
+      rgba(4, 6, 8, 0.55) 100%
+    );
+  }
+
+  .scanline {
+    background: repeating-linear-gradient(
+      to bottom,
+      transparent 0 2px,
+      rgba(236, 228, 210, 0.016) 2px 3px
+    );
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---- Buttons ---- */
+  .btn-press {
+    transition: transform 140ms var(--ease-out), box-shadow 140ms var(--ease-out),
+      background-color 180ms ease, border-color 180ms ease, color 180ms ease;
+  }
+  .btn-press:active {
+    transform: scale(0.97);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .btn-press:hover {
+      transform: translateY(-1px);
+    }
+  }
+
+  /* ---- Status chips ---- */
+  .chip-glow {
+    box-shadow: 0 0 0 1px currentColor inset;
+  }
+  .led {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 999px;
+    display: inline-block;
+    flex: none;
+  }
+
+  /* ---- Motion primitives ---- */
+  .reveal {
+    opacity: 0;
+    transform: translateY(14px);
+    transition: opacity 700ms var(--ease-out-strong),
+      transform 700ms var(--ease-out-strong);
+    transition-delay: var(--reveal-delay, 0ms);
+    will-change: opacity, transform;
+  }
+  .reveal.is-in {
+    opacity: 1;
+    transform: none;
+  }
+
+  .stagger-item {
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 480ms var(--ease-out), transform 480ms var(--ease-out);
+  }
+  .stagger-item.is-in {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* Dial hand / needle motion — driven by CSS custom property, GPU only */
+  .hand {
+    transform: rotate(var(--hand-angle, 0deg));
+    transform-origin: var(--hand-origin, 50% 100%);
+    transition: transform 900ms var(--ease-out-strong);
+  }
+  .needle-settle {
+    transition: transform 1600ms var(--ease-out-strong);
+  }
+
+  .count-up {
+    transition: opacity 200ms ease;
+  }
+
+  /* Blinking signal lamp — only until settled, stoppable */
+  @keyframes lamp-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
+  .lamp-live {
+    animation: lamp-blink 1.1s ease-in-out infinite;
+  }
+
+  /* Char scan on PNR resolve */
+  @keyframes char-scan {
+    0% { opacity: 0; }
+    12% { opacity: 1; }
+    24% { opacity: 0.15; }
+    36% { opacity: 1; }
+    52% { opacity: 0.25; }
+    70% { opacity: 1; }
+    100% { opacity: 1; }
+  }
+  .scan-char {
+    animation: char-scan 420ms linear both;
+  }
+
+  /* Moving-train ticker on the telemetry strip */
+  @keyframes ticker {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+  .ticker-track {
+    animation: ticker 36s linear infinite;
+  }
+
+  @keyframes shake-x {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-7px); }
+    40% { transform: translateX(6px); }
+    60% { transform: translateX(-4px); }
+    80% { transform: translateX(3px); }
+  }
+
+  .tick-ring {
+    transform-origin: center;
+    transform: rotate(0deg);
+  }
+}
+
+/* ---- Reduced motion: strip movement, keep opacity/color ---- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .reveal,
+  .stagger-item {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .ticker-track {
+    animation: none;
+  }
+}
+
+/* Only allow hover-affordances on fine pointers */
+@media (hover: hover) and (pointer: fine) {
+  .hover-lift {
+    transition: border-color 200ms ease, background-color 200ms ease,
+      transform 200ms var(--ease-out);
+  }
+  .hover-lift:hover {
+    border-color: var(--line-3);
+    transform: translateY(-2px);
+  }
 }
