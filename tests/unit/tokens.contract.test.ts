@@ -103,8 +103,6 @@ const LEGACY_VOCABULARY = /\brounded-(sm|md|lg|xl|2xl)\b|\b(bg|text|border|divid
 const LEGACY_ALLOWLIST = new Set<string>([
   "src/app/account/account-view.tsx",
   "src/app/login/login-form.tsx",
-  "src/app/not-found.tsx",
-  "src/app/pnr/[pnr]/not-found.tsx",
   "src/app/watchlist/loading.tsx",
   "src/app/watchlist/watchlist-view.tsx",
   "src/components/landing/availability.tsx",
@@ -113,14 +111,8 @@ const LEGACY_ALLOWLIST = new Set<string>([
   "src/components/landing/hero.tsx",
   "src/components/landing/how-it-works.tsx",
   "src/components/landing/track-divider.tsx",
-  "src/components/pnr/journey-details.tsx",
-  "src/components/pnr/passenger-table.tsx",
   "src/components/pnr/pnr-field.tsx",
-  "src/components/pnr/pnr-result-skeleton.tsx",
-  "src/components/pnr/pnr-result-view.tsx",
-  "src/components/pnr/provenance-panel.tsx",
   "src/components/pnr/recent-checks.tsx",
-  "src/components/pnr/status-band.tsx",
 ]);
 const SPACING_STEPS = new Set(["0", "0.5", "1", "1.5", "2", "2.5", "3", "3.5", "4", "5", "6", "8", "10", "12", "14", "16", "18", "20", "24"]);
 
