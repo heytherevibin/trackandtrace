@@ -91,17 +91,6 @@
   animation: sweep-x 1s linear infinite;
 }
 
-/* Reveal on view: visible by default; JS marks below-fold sections pending until they enter */
-[data-reveal] {
-  transition:
-    opacity 420ms var(--ease-out-expo),
-    transform 420ms var(--ease-out-expo);
-}
-[data-reveal][data-pending] {
-  opacity: 0;
-  transform: translateY(12px);
-}
-
 @media (prefers-reduced-motion: reduce) {
   *,
   ::before,
@@ -120,9 +109,5 @@
   .skeleton::after,
   .sweep {
     animation: none;
-  }
-  [data-reveal][data-pending] {
-    opacity: 1;
-    transform: none;
   }
 }

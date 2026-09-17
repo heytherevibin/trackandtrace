@@ -39,7 +39,7 @@ export function WatchlistRow({ entry, busy, onRecheck, onRemove }: WatchlistRowP
       <td className={CELL}>
         {last ? (
           <span className="inline-flex flex-wrap items-center gap-2">
-            <Badge variant="accent" title={statusDescription(last.status)} data-status={last.status} className="border-0 leading-normal">
+            <Badge variant="accent" title={statusDescription(last.status)} data-status={last.status}>
               {statusLabel(last.status, last.position)}
             </Badge>
             <span className="sr-only">{statusDescription(last.status)}</span>

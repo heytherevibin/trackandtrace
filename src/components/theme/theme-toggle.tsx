@@ -37,7 +37,7 @@ export function ThemeToggle({ className }: { readonly className?: string }) {
           key={value}
           value={value}
           className={cn(
-            "cursor-pointer bg-transparent px-2.5 py-[5px] font-display text-2xs font-semibold uppercase leading-normal tracking-caps text-ink-1/70",
+            "cursor-pointer bg-transparent px-2.5 py-[5px] font-display text-2xs font-semibold uppercase leading-[normal] tracking-caps text-ink-1/70",
             "not-first:border-l not-first:border-line hover:bg-accent/12 data-[pressed]:bg-accent/16 data-[pressed]:text-accent-text",
           )}
         >

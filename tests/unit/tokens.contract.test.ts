@@ -99,13 +99,6 @@ const HEX_ALLOWLIST = new Set([
 ]);
 // Rhythm Machine vocabulary (rounded caps, signal tones, key and readout tokens, silkscreen, lamps with bloom).
 const LEGACY_VOCABULARY = /\brounded-(sm|md|lg|xl|2xl)\b|\b(bg|text|border|divide|ring|outline)-(go|watch|stop|neutral|key-[a-z]+|readout|surface-sunken|surface-inverse|accent-hover)\b|\bshadow-key|\bfont-mono\b|\btrack-[hv]\b|\bsilk\b|\bkey-cap\b|\bled-(go|watch|stop|key)\b|["'`\s]panel["'`\s]/;
-// Surfaces still awaiting their Industry rewrite. Shrinks to empty when the redesign lands.
-const LEGACY_ALLOWLIST = new Set<string>([
-  "src/app/account/account-view.tsx",
-  "src/app/login/login-form.tsx",
-  "src/app/watchlist/loading.tsx",
-  "src/app/watchlist/watchlist-view.tsx",
-]);
 const SPACING_STEPS = new Set(["0", "0.5", "1", "1.5", "2", "2.5", "3", "3.5", "4", "5", "6", "8", "10", "12", "14", "16", "18", "20", "24"]);
 
 describe("component discipline", () => {
@@ -128,7 +121,7 @@ describe("component discipline", () => {
   });
 
   it("speaks only the Industry vocabulary: square, mono steel, no instrument tokens", () => {
-    const offenders = files.filter((f) => f.endsWith(".tsx") && !LEGACY_ALLOWLIST.has(f) && LEGACY_VOCABULARY.test(readFileSync(join(ROOT, f), "utf8")));
+    const offenders = files.filter((f) => f.endsWith(".tsx") && LEGACY_VOCABULARY.test(readFileSync(join(ROOT, f), "utf8")));
     expect(offenders).toEqual([]);
   });
 

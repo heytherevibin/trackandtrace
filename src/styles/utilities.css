@@ -75,16 +75,6 @@
   text-transform: uppercase;
   color: var(--ink-3);
 }
-/* Deprecated alias for legend-md; kept so unmigrated markup still reads as a legend. */
-@utility silk {
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 0.75rem;
-  line-height: 1rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-}
 
 /* Kicker: "02 · How it works", in the readable steel step */
 @utility kicker {
@@ -104,11 +94,6 @@
 
 /* Blueprint object: square, hairline, transparent. Pair with <Corners /> for the registration marks. */
 @utility blueprint {
-  position: relative;
-  border: 1px solid var(--line);
-}
-/* Deprecated alias for blueprint */
-@utility panel {
   position: relative;
   border: 1px solid var(--line);
 }

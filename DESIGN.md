@@ -53,7 +53,7 @@ Tracking: `tracking-caps` .08em (legends), `brand` .06em (wordmark, digits), `he
 | Primitive | Grammar |
 | --- | --- |
 | `Corners` | The four registration marks. Every plate, figure, dialog, and state block wears them. |
-| `Plate` (+ `PlateHeader`) | `blueprint` object with an optional title-block header row: a title cell and meta cells behind hairlines ("Form T&T-02", "Sheet 01 of 04", "Sample data"). Padding none/sm/md/lg. `Panel` is its compatibility face. |
+| `Plate` (+ `PlateHeader`) | `blueprint` object with an optional title-block header row: a title cell and meta cells behind hairlines ("Form T&T-02", "Sheet 01 of 04", "Sample data"). Padding none/sm/md/lg; cells tight/regular/wide. |
 | `SectionHeader` | Kicker "02 · How it works" → hairline rule → 32px condensed capital `h2` → optional lead and actions. |
 | `PageHeader` | Optional back link and kicker, `text-page` capital `h1`, 16px lead, legend meta line, actions right. |
 | `Button` | Square, hairline, condensed, sentence case. `primary` solid steel; `secondary` hairline; `ghost` steel text; `danger` solid deep steel. Sizes sm 32 · md 36 · lg 44. |
