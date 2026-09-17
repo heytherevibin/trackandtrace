@@ -50,6 +50,7 @@ The result page renders server-first: `pnr/[pnr]/page.tsx` validates, then a Sus
 ## Testing
 
 - `tests/unit` — pure logic and jsdom component tests (Vitest projects; `.test.ts` node, `.test.tsx` jsdom).
-- `tests/unit/tokens.contract.test.ts` — the design-system guard: AA contrast in both themes, banned arbitrary classes, spacing rhythm, no raw hex, 500-line cap.
+- `tests/unit/tokens.contract.test.ts` — the design-system guard: AA contrast for every text role on every surface in both faces, the design-locked steel pairing held at 3:1, parity with `brand-colors.ts`, the Industry vocabulary (no rounded corners, signal tones, or instrument tokens), banned arbitrary size classes, spacing rhythm, no raw hex, 500-line cap.
+- `tests/unit/utils/cn.test.ts` — class merging keeps the custom type scale (`text-label`, `text-body`, …) beside colours.
 - `tests/integration` — route handlers against an in-memory Supabase fake.
-- `tests/e2e` — Playwright, desktop + mobile, fixture mode, axe scans on every surface.
+- `tests/e2e` — Playwright, desktop + mobile, fixture mode; `axe.spec.ts` scans every route in both faces, with the design-locked steel pairing as the only exemption.
