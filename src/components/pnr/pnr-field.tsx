@@ -1,249 +1,221 @@
 "use client";
 
-import { DismissRegular } from "@/components/icons";
-import { useReducedMotion } from "motion/react";
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
-import { messages } from "@/messages";
+import { useCallback, useState, type AnimationEvent, type KeyboardEvent, type Ref } from "react";
 import { Button } from "@/components/ui/button";
-import { IconButton } from "@/components/ui/icon-button";
 import { Led } from "@/components/ui/led";
-import { SegmentReadout } from "@/components/ui/segment-readout";
-import type { Tone } from "@/types/ui";
+import { SweepBar } from "@/components/ui/sweep-bar";
+import { messages } from "@/messages";
 import { cn } from "@/utils/cn";
 import { formatPnr, normalizePnr } from "@/utils/pnr";
+import { caretIndex, hintFor, lampFor, type FieldStatus } from "./pnr-terminal-state";
 
-// The signature control, laid out like the hardware it quotes:
-//   header strip — silkscreen label · stage lamps · segment readout
-//   the row      — ten step keys (3-3-4), position numbers above, LED lens in
-//                  each cap, bank rulers below
-//   action strip — hint · clear · the RUN key
-// One real input carries the value for assistive tech; the keys are its face.
-
-export type PnrFieldStatus = "idle" | "partial" | "ready" | "invalid" | "running";
-export type PnrStage = "input" | "validate" | "source" | "result";
+// The entry block of the check plate, as drawn: a steel legend and "N / 10"
+// counter, one visually hidden input that carries the value, and its face —
+// ten 52px cells punched 3-3-4 with a caret and the group rulers under them.
 
 const GROUPS = [
-  { keys: [0, 1, 2], colour: "red", label: messages.check.groups.one },
-  { keys: [3, 4, 5], colour: "orange", label: messages.check.groups.two },
-  { keys: [6, 7, 8, 9], colour: "yellow", label: messages.check.groups.three },
+  { keys: [0, 1, 2], label: messages.check.groups.one, flex: "flex-[3_1_0%]" },
+  { keys: [3, 4, 5], label: messages.check.groups.two, flex: "flex-[3_1_0%]" },
+  { keys: [6, 7, 8, 9], label: messages.check.groups.three, flex: "flex-[4_1_0%]" },
 ] as const;
 
-// Colour stays in a thin strip at the top of each cell; the cell itself is a quiet tile.
-const STRIP: Record<"red" | "orange" | "yellow", string> = { red: "bg-key-red", orange: "bg-key-orange", yellow: "bg-key-yellow" };
+const RULER_LABEL = "px-[3px] font-display text-2xs font-semibold leading-normal tracking-caps text-ink-1/70 tnum";
 
-const STAGE_INDEX: Record<PnrStage, number> = { input: 1, validate: 4, source: 7, result: 9 };
-
-export interface PnrFieldProps {
-  readonly value: string;
-  readonly onChange: (digits: string) => void;
-  readonly onSubmit?: () => void;
-  readonly onClear?: () => void;
-  readonly status: PnrFieldStatus;
-  readonly stage?: PnrStage;
-  readonly errorMessage?: string;
-  readonly id?: string;
-  readonly autoFocus?: boolean;
-  readonly disabled?: boolean;
-  readonly shakeToken?: number;
-  readonly compact?: boolean;
+export function hintIdFor(inputId: string): string {
+  return `${inputId}-hint`;
 }
 
-function hintFor(status: PnrFieldStatus, digits: string, errorMessage?: string, stage?: PnrStage): string {
-  switch (status) {
-    case "idle":
-      return messages.check.helper;
-    case "partial":
-      return messages.check.progress(digits.length);
-    case "ready":
-      return messages.check.ready;
-    case "invalid":
-      return errorMessage ?? messages.check.errorInvalid;
-    case "running":
-      return `${messages.check.submitting}: ${messages.check.stages[stage ?? "input"]}`;
-  }
-}
-
-interface StageLamp {
-  readonly label: string;
-  readonly lit: boolean;
-  readonly tone: Tone | "key";
-}
-
-function stageLamps(status: PnrFieldStatus, digitCount: number): readonly StageLamp[] {
-  const s = messages.check.stages;
-  return [
-    { label: s.input, lit: digitCount > 0, tone: "go" },
-    { label: s.validate, lit: status === "ready" || status === "invalid", tone: status === "invalid" ? "stop" : "go" },
-    { label: s.source, lit: status === "running", tone: "watch" },
-    { label: s.result, lit: false, tone: "neutral" },
-  ];
-}
-
-export function PnrField({ value, onChange, onSubmit, onClear, status, stage, errorMessage, id, autoFocus, disabled, shakeToken = 0, compact = false }: PnrFieldProps) {
-  const generated = useId();
-  const inputId = id ?? `pnr-${generated}`;
-  const hintId = `${inputId}-hint`;
-  const inputRef = useRef<HTMLInputElement>(null);
-  const reduceMotion = useReducedMotion();
-  const digits = normalizePnr(value);
-  const caret = Math.min(digits.length, 9);
-  const running = status === "running";
-
-  // Chase light: sweeps the cap lenses in tempo while running; reduced motion parks it on the current stage.
-  const [chase, setChase] = useState(0);
-  useEffect(() => {
-    if (!running || reduceMotion) return;
-    const timer = window.setInterval(() => setChase((c) => (c + 1) % 10), 110);
-    return () => window.clearInterval(timer);
-  }, [running, reduceMotion]);
-
-  const litIndex = running ? (reduceMotion ? STAGE_INDEX[stage ?? "input"] : chase) : status === "ready" ? -1 : caret;
-  const allLit = status === "ready" && !running;
-
-  // Derived shake: a new token starts the animation; animationend clears it.
-  const [prevShakeToken, setPrevShakeToken] = useState(shakeToken);
-  const [shaking, setShaking] = useState(false);
-  if (shakeToken !== prevShakeToken) {
-    setPrevShakeToken(shakeToken);
-    setShaking(true);
-  }
-
-  const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      if (status === "ready") onSubmit?.();
-    }
-  };
-
+/** The face of the input: decorative cells; a click anywhere focuses the real input. */
+export function PnrCells({ digits, status, onActivate, className }: { readonly digits: string; readonly status: FieldStatus; readonly onActivate: () => void; readonly className?: string }) {
+  const caret = caretIndex(digits, status);
   return (
-    <div className={cn("flex flex-col", compact ? "gap-4" : "gap-6", shaking && "shake")} data-status={status} onAnimationEnd={() => setShaking(false)}>
-      {/* Header strip: label · stage lamps · readout */}
-      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
-        <label htmlFor={inputId} className="silk">
-          {messages.check.label}
-        </label>
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-          {!compact ? (
-            <div className="hidden items-center gap-4 md:flex" aria-hidden="true">
-              {stageLamps(status, digits.length).map((lamp) => (
-                <span key={lamp.label} className="flex items-center gap-1.5">
-                  <Led tone={lamp.tone} lit={lamp.lit} size="sm" />
-                  <span className="silk text-ink-3">{lamp.label}</span>
+    <div
+      aria-hidden="true"
+      onClick={onActivate}
+      className={cn(
+        "flex cursor-text items-end",
+        "peer-focus-visible:outline-2 peer-focus-visible:outline-offset-4 peer-focus-visible:outline-focus peer-focus-visible:outline-solid",
+        className,
+      )}
+    >
+      {GROUPS.map((group, gi) => (
+        <div key={group.label} className={cn("flex min-w-0 flex-col", group.flex, gi > 0 && "ml-3.5")}>
+          <div className="flex gap-1">
+            {group.keys.map((k) => {
+              const digit = digits[k] ?? "";
+              const here = caret === k;
+              return (
+                <span
+                  key={k}
+                  data-cell={k + 1}
+                  data-filled={digit !== "" || undefined}
+                  data-caret={here || undefined}
+                  className={cn("relative flex h-[52px] min-w-0 flex-1 items-center justify-center border", here ? "border-accent" : "border-line", digit !== "" ? "bg-accent-wash" : "bg-transparent")}
+                >
+                  <span className="font-display text-3xl font-semibold leading-none text-ink-1">{digit}</span>
+                  {here ? <span className="caret-blink absolute bottom-2 left-1/4 right-1/4 h-0.5 bg-accent" /> : null}
                 </span>
-              ))}
-            </div>
-          ) : null}
-          <SegmentReadout value={digits.length > 0 ? formatPnr(digits) : "- - -"} label={messages.check.readoutLabel(formatPnr(digits))} size={compact ? "sm" : "md"} />
+              );
+            })}
+          </div>
+          <div className="mt-1.5 flex items-center gap-1">
+            <span className="h-[5px] w-px bg-line" />
+            <span className="h-px flex-1 bg-line" />
+            <span className={RULER_LABEL}>{group.label}</span>
+            <span className="h-px flex-1 bg-line" />
+            <span className="h-[5px] w-px bg-line" />
+          </div>
         </div>
-      </div>
-
-      <input
-        ref={inputRef}
-        id={inputId}
-        name="pnr"
-        className="sr-only text-base"
-        inputMode="numeric"
-        pattern="[0-9]*"
-        autoComplete="off"
-        autoCorrect="off"
-        spellCheck={false}
-        maxLength={12}
-        value={formatPnr(digits)}
-        onChange={(event) => onChange(normalizePnr(event.target.value))}
-        onKeyDown={onKeyDown}
-        aria-invalid={status === "invalid" || undefined}
-        aria-describedby={hintId}
-        autoFocus={autoFocus}
-        disabled={disabled}
-      />
-
-      {/* The row. Click anywhere on it to type; the caps are the input's face. */}
-      <div
-        className="flex flex-col rounded-lg focus-within:outline-2 focus-within:outline-offset-4 focus-within:outline-focus"
-        onClick={() => inputRef.current?.focus()}
-        aria-hidden="true"
-      >
-        <div className="flex items-end">
-          {GROUPS.map((group, gi) => (
-            <div key={group.label} className={cn("flex min-w-0 flex-col", gi > 0 && "ml-2 sm:ml-4")} style={{ flex: `${group.keys.length} 1 0%` }}>
-              {/* Position numbers, as silkscreened above the caps */}
-              <div className="mb-1.5 flex gap-1 sm:gap-2">
-                {group.keys.map((k) => (
-                  <span key={k} className={cn("silk flex-1 text-center", k === litIndex && !running ? "text-ink-1" : "text-ink-3")}>
-                    {k + 1}
-                  </span>
-                ))}
-              </div>
-              {/* The caps */}
-              <div className="flex gap-1 sm:gap-2">
-                {group.keys.map((k) => {
-                  const digit = digits[k] ?? "";
-                  const armed = digit !== "";
-                  const lit = armed || allLit || (running && k === litIndex);
-                  const caretHere = !running && !allLit && k === litIndex;
-                  return (
-                    <span
-                      key={k}
-                      data-key={k + 1}
-                      data-armed={armed || undefined}
-                      className={cn(
-                        "key-cap relative flex min-w-0 flex-1 flex-col items-center overflow-hidden border bg-surface-2",
-                        compact ? "h-12" : "h-16 sm:h-20",
-                        caretHere ? "border-focus" : "border-line",
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "absolute inset-x-0 top-0 h-1 transition-opacity duration-(--duration-fast)",
-                          STRIP[group.colour],
-                          lit ? "opacity-100" : "opacity-30",
-                        )}
-                      />
-                      <span className={cn("flex flex-1 items-center font-display font-semibold leading-none", armed ? "text-ink-1" : "text-ink-3", compact ? "text-lg" : "text-2xl sm:text-3xl")}>{digit}</span>
-                    </span>
-                  );
-                })}
-              </div>
-              {/* Bank ruler */}
-              <div className="mt-1.5 flex items-center gap-1">
-                <span className="h-1.5 w-px bg-line-strong" />
-                <span className="h-px flex-1 bg-line" />
-                <span className="silk px-1 text-ink-3">{group.label}</span>
-                <span className="h-px flex-1 bg-line" />
-                <span className="h-1.5 w-px bg-line-strong" />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Action strip: hint · clear · RUN */}
-      <div className="flex flex-wrap items-center gap-3">
-        <p
-          id={hintId}
-          className={cn("min-w-0 flex-1 text-sm", status === "invalid" ? "font-medium text-stop" : status === "ready" ? "text-go" : "text-ink-2")}
-          role={status === "invalid" ? "alert" : undefined}
-          aria-live={status === "invalid" ? undefined : "polite"}
-        >
-          {hintFor(status, digits, errorMessage, stage)}
-        </p>
-        <div className="flex items-center gap-3">
-          {digits.length > 0 && !running ? (
-            <IconButton
-              label={messages.check.clear}
-              icon={<DismissRegular className="size-5" aria-hidden="true" />}
-              onClick={() => {
-                onChange("");
-                onClear?.();
-                inputRef.current?.focus();
-              }}
-            />
-          ) : null}
-          <Button type="submit" variant="run" size={compact ? "md" : "lg"} loading={running} disabled={disabled} className={compact ? "min-w-28" : "min-w-36"}>
-            {messages.check.submit}
-          </Button>
-        </div>
-      </div>
+      ))}
     </div>
   );
+}
+
+export interface PnrInputProps {
+  readonly id: string;
+  readonly digits: string;
+  readonly status: FieldStatus;
+  readonly onDigits: (digits: string) => void;
+  readonly onEnter: () => void;
+  /** Set when no visible label is drawn (the closing plate). */
+  readonly ariaLabel?: string;
+  readonly inputRef?: Ref<HTMLInputElement>;
+  readonly autoFocus?: boolean;
+}
+
+/** The one real input: visually hidden, numeric, formatted 3-3-4, Enter runs the check. */
+export function PnrInput({ id, digits, status, onDigits, onEnter, ariaLabel, inputRef, autoFocus }: PnrInputProps) {
+  const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    onEnter();
+  };
+  return (
+    <input
+      ref={inputRef}
+      id={id}
+      name="pnr"
+      className="peer sr-only"
+      inputMode="numeric"
+      enterKeyHint="go"
+      autoComplete="off"
+      autoCorrect="off"
+      spellCheck={false}
+      maxLength={12}
+      value={formatPnr(digits)}
+      readOnly={status === "running"}
+      onChange={(event) => onDigits(normalizePnr(event.target.value))}
+      onKeyDown={onKeyDown}
+      aria-label={ariaLabel}
+      aria-invalid={status === "invalid" || undefined}
+      aria-describedby={hintIdFor(id)}
+      autoFocus={autoFocus}
+    />
+  );
+}
+
+/** The hint line: an alert when the digits are refused, a polite live line otherwise. */
+export function PnrHint({ inputId, digits, status, sampleMode, className }: { readonly inputId: string; readonly digits: string; readonly status: FieldStatus; readonly sampleMode: boolean; readonly className?: string }) {
+  const invalid = status === "invalid";
+  return (
+    <p id={hintIdFor(inputId)} role={invalid ? "alert" : undefined} aria-live={invalid ? undefined : "polite"} className={cn("m-0 text-sm", invalid ? "text-ink-alert" : "text-ink-1/74", className)}>
+      {hintFor(status, digits, sampleMode)}
+    </p>
+  );
+}
+
+export interface PnrFieldProps extends Omit<PnrInputProps, "ariaLabel"> {
+  readonly sampleMode: boolean;
+  /** Focuses the real input; defaults to nothing when no ref is wired. */
+  readonly onActivate?: () => void;
+}
+
+/** The hero entry block: legend and counter, the hidden input, the cells, the hint. */
+export function PnrField({ id, digits, status, sampleMode, onActivate, ...input }: PnrFieldProps) {
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <label htmlFor={id} className="font-display text-label font-semibold uppercase leading-normal tracking-caps text-accent-text">
+          {messages.check.label}
+        </label>
+        <span className="text-label leading-normal text-ink-1/70 tnum">{messages.check.counter(digits.length)}</span>
+      </div>
+      <PnrInput id={id} digits={digits} status={status} {...input} />
+      <PnrCells digits={digits} status={status} onActivate={onActivate ?? (() => document.getElementById(id)?.focus())} />
+      <PnrHint inputId={id} digits={digits} status={status} sampleMode={sampleMode} className="leading-5" />
+    </div>
+  );
+}
+
+/** Clear (ghost) and Run (primary, 120px floor), as both plates draw them. */
+export function PnrActions({
+  running,
+  showClear,
+  onClear,
+  onRun,
+  runType = "button",
+}: {
+  readonly running: boolean;
+  readonly showClear: boolean;
+  readonly onClear: () => void;
+  readonly onRun?: () => void;
+  readonly runType?: "button" | "submit";
+}) {
+  const m = messages.check;
+  return (
+    <>
+      {showClear ? (
+        <Button variant="ghost" onClick={onClear}>
+          {m.clear}
+        </Button>
+      ) : null}
+      <Button type={runType} variant="primary" onClick={onRun} className="min-w-[120px]">
+        {running ? m.submitting : m.submit}
+      </Button>
+    </>
+  );
+}
+
+/** The ticket stub under the perforation: the lamp and its label, Clear, Run, and the sweep while running. */
+export function PnrStub({
+  status,
+  showClear,
+  onClear,
+  onRun,
+  runType = "button",
+}: {
+  readonly status: FieldStatus;
+  readonly showClear: boolean;
+  readonly onClear: () => void;
+  readonly onRun?: () => void;
+  readonly runType?: "button" | "submit";
+}) {
+  const lamp = lampFor(status);
+  const running = status === "running";
+  return (
+    <>
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="inline-flex min-w-[180px] flex-1 items-center gap-2.5">
+          <Led lit={lamp.state === "lit"} busy={lamp.state === "busy"} />
+          <span className="font-display text-label font-semibold uppercase leading-normal tracking-caps text-ink-1/70">{lamp.label}</span>
+        </span>
+        <PnrActions running={running} showClear={showClear} onClear={onClear} onRun={onRun} runType={runType} />
+      </div>
+      {running ? <SweepBar className="mt-3.5" /> : null}
+    </>
+  );
+}
+
+/** The invalid-entry shake: restartable, and cleared when the plate's own animation ends. */
+export function useShake(): { readonly shaking: boolean; readonly shake: () => void; readonly onAnimationEnd: (event: AnimationEvent<HTMLElement>) => void } {
+  const [shaking, setShaking] = useState(false);
+  const shake = useCallback(() => {
+    setShaking(false);
+    const nextFrame = typeof window.requestAnimationFrame === "function" ? (fn: () => void) => window.requestAnimationFrame(fn) : (fn: () => void) => window.setTimeout(fn, 16);
+    nextFrame(() => setShaking(true));
+  }, []);
+  const onAnimationEnd = useCallback((event: AnimationEvent<HTMLElement>) => {
+    if (event.target === event.currentTarget) setShaking(false);
+  }, []);
+  return { shaking, shake, onAnimationEnd };
 }
