@@ -12,19 +12,23 @@ describe("TopNav", () => {
     nav.pathname = "/";
   });
 
-  it("gives every landing link an icon beside its visible label, and leaves the section anchors to the footer", () => {
+  it("lists Check a PNR with the product links on the landing, and sets Sign in apart on the right", () => {
     render(<TopNav />);
     const primary = screen.getByRole("navigation", { name: "Primary" });
-    for (const name of ["How it works", "The record", "Sources", "Roadmap", "FAQ"]) {
+    for (const name of ["How it works", "The record", "Sources", "Roadmap", "FAQ", "Sign in"]) {
       expect(within(primary).queryByRole("link", { name }), name).toBeNull();
     }
-    for (const name of ["Watchlist", "Pre-booking", "Accuracy", "Sign in"]) {
+    for (const name of ["Check a PNR", "Watchlist", "Pre-booking", "Accuracy"]) {
       const link = within(primary).getByRole("link", { name });
       expect(link.querySelector("svg"), name).not.toBeNull();
-      const label = within(link).getByText(name);
-      expect(label, name).not.toHaveClass("sr-only");
+      expect(within(link).getByText(name), name).not.toHaveClass("sr-only");
     }
-    expect(screen.getByRole("link", { name: "Check a PNR" })).toHaveAttribute("href", "#terminal");
+    const check = within(primary).getByRole("link", { name: "Check a PNR" });
+    expect(check).toHaveAttribute("href", "#terminal");
+    expect(check).toHaveAttribute("aria-current", "page");
+    const signIn = screen.getByTestId("sign-in");
+    expect(primary).not.toContainElement(signIn);
+    expect(signIn).toHaveClass("uppercase");
   });
 
   it("keeps the theme cells in the masthead, with icons and labels", () => {
@@ -39,9 +43,10 @@ describe("TopNav", () => {
     nav.pathname = "/watchlist";
     render(<TopNav />);
     const primary = screen.getByRole("navigation", { name: "Primary" });
-    for (const name of ["Check", "Watchlist", "Pre-booking", "Accuracy"]) {
+    for (const name of ["Check a PNR", "Watchlist", "Pre-booking", "Accuracy"]) {
       expect(within(primary).getByRole("link", { name }).querySelector("svg"), name).not.toBeNull();
     }
+    expect(within(primary).getByRole("link", { name: "Check a PNR" })).toHaveAttribute("href", "/");
     expect(within(primary).getByRole("link", { name: "Watchlist" })).toHaveAttribute("aria-current", "page");
     const signIn = screen.getByTestId("sign-in");
     expect(signIn).toHaveAccessibleName("Sign in");

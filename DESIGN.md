@@ -71,8 +71,8 @@ Tracking: `tracking-caps` .08em (legends), `brand` .06em (wordmark, digits), `he
 
 ## Shell
 
-- **Masthead** (`TopNav`): sticky, `surface-0`, hairline bottom, wraps on narrow screens exactly as drawn (no phone tab bar). Wordmark (mark + "TRACK & TRACE" 18px `tracking-brand`). On `/` the nav lists the landing anchors (`#how #record #sources #roadmap #faq`, steel), a hairline divider, then Watchlist / Pre-booking / Accuracy / Sign in (text 70%); right: Auto · Day · Night, primary "Check a PNR" → `#terminal`. On app pages: Check / Watchlist / Pre-booking / Accuracy with a 2px steel underline on the current page; right: Auto · Day · Night, secondary "Sign in" (or the account menu). `/login` is not sticky and shows brand and theme only.
-- **Footer**: `/` gets the enterprise footer (brand + disclaimer, Product, Company, Status lamps read from real flags, © and IST clock). App pages get one line: disclaimer · © and the IST clock.
+- **Masthead** (`TopNav`), the same on every page: sticky, `surface-0`, hairline bottom. Wordmark (mark + "TRACK & TRACE" 18px `tracking-brand`); the nav CHECK A PNR · WATCHLIST · PRE-BOOKING · ACCURACY, each a Fluent **Filled** icon at 20px beside its 13px capital label, the current page underlined in steel (on `/`, Check a PNR is current and jumps to `#terminal`); the Auto · Day · Night cells with their Filled icons; and SIGN IN (capitals, person icon) as its own secondary button on the right, or the account menu. From `xl` it is one row; below `xl` it is two aligned tiers (brand and SIGN IN, then the nav with the theme cells, scrolling sideways on phones). `/login` is not sticky and shows the brand only.
+- **Footer**: `/` gets the enterprise footer (brand + disclaimer; Sections — the landing's anchors How it works, The record, Sources, Roadmap, FAQ with Filled icons; Product; Company; Status lamps read from real flags; © and IST clock). App pages get one line: disclaimer · © and the IST clock.
 
 ## Page anatomy
 

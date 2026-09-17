@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Suspense } from "react";
-import { PersonRegular, SignOutRegular } from "@/components/icons";
+import { PersonFilled, SignOutRegular } from "@/components/icons";
 import { messages } from "@/messages";
 import { useUser } from "@/components/session/session-provider";
 import { Avatar } from "@/components/ui/avatar";
@@ -21,7 +21,7 @@ function UserMenuInner() {
   if (!user) {
     return (
       <Link href="/login" className={buttonClassName({ variant: "secondary", className: "gap-2 text-label uppercase tracking-caps" })} data-testid="sign-in">
-        <PersonRegular className="size-4 shrink-0" aria-hidden="true" />
+        <PersonFilled className="size-5 shrink-0" aria-hidden="true" />
         {messages.shell.nav.signIn}
       </Link>
     );

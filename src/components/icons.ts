@@ -33,4 +33,17 @@ export {
   FlowchartRegular,
   QuestionCircleRegular,
   RoadRegular,
+  // Filled: the navigation set (masthead, footer sections, theme cells, sign in)
+  CalendarClockFilled,
+  DatabaseFilled,
+  DesktopFilled,
+  DocumentTableFilled,
+  FlowchartFilled,
+  GaugeFilled,
+  PersonFilled,
+  QuestionCircleFilled,
+  RoadFilled,
+  TicketDiagonalFilled,
+  WeatherMoonFilled,
+  WeatherSunnyFilled,
 } from "@fluentui/react-icons";
