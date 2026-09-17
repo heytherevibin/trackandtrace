@@ -12,6 +12,7 @@ export type PlatePadding = "none" | "sm" | "md" | "lg";
 export type PlateCells = "tight" | "regular" | "wide";
 
 const PAD: Record<PlatePadding, string> = { none: "", sm: "p-4", md: "p-5", lg: "p-6" };
+const MIN_CH = { 12: "min-w-[12ch]", 14: "min-w-[14ch]", 16: "min-w-[16ch]" } as const;
 const CELL: Record<PlateCells, string> = { tight: "px-5 py-2.5", regular: "px-5 py-3", wide: "px-6 py-3" };
 
 export interface PlateProps extends Omit<HTMLAttributes<HTMLElement>, "title"> {
@@ -26,6 +27,8 @@ export interface PlateProps extends Omit<HTMLAttributes<HTMLElement>, "title"> {
   readonly actions?: ReactNode;
   readonly padding?: PlatePadding;
   readonly cells?: PlateCells;
+  /** Minimum width of the title cell before meta cells wrap; the sheets draw 16ch, the specimen 12ch. */
+  readonly titleMinCh?: 12 | 14 | 16;
   readonly corners?: boolean;
   readonly bodyClassName?: string;
   readonly children?: ReactNode;
@@ -38,11 +41,12 @@ export function PlateHeader({
   meta = [],
   actions,
   cells = "regular",
-}: Pick<PlateProps, "title" | "titleId" | "headingLevel" | "meta" | "actions" | "cells">) {
+  titleMinCh = 16,
+}: Pick<PlateProps, "title" | "titleId" | "headingLevel" | "meta" | "actions" | "cells" | "titleMinCh">) {
   const Heading = headingLevel === 2 ? "h2" : headingLevel === 3 ? "h3" : "span";
   return (
     <div className="flex flex-wrap items-stretch border-b border-line">
-      <Heading id={titleId} className={cn("legend min-w-[16ch] flex-1 leading-6 text-ink-1", CELL[cells])}>
+      <Heading id={titleId} className={cn("legend flex-1 leading-6 text-ink-1", MIN_CH[titleMinCh], CELL[cells])}>
         {title}
       </Heading>
       {meta.map((cell, i) => (
@@ -64,6 +68,7 @@ export function Plate({
   actions,
   padding = "md",
   cells,
+  titleMinCh,
   corners = true,
   className,
   bodyClassName,
@@ -74,7 +79,7 @@ export function Plate({
   return (
     <Tag className={cn("blueprint", className)} aria-labelledby={hasHeader && titleId && headingLevel ? titleId : undefined} {...rest}>
       {corners ? <Corners /> : null}
-      {hasHeader ? <PlateHeader title={title} titleId={titleId} headingLevel={headingLevel} meta={meta} actions={actions} cells={cells} /> : null}
+      {hasHeader ? <PlateHeader title={title} titleId={titleId} headingLevel={headingLevel} meta={meta} actions={actions} cells={cells} titleMinCh={titleMinCh} /> : null}
       {children !== undefined ? <div className={cn(PAD[padding], bodyClassName)}>{children}</div> : null}
     </Tag>
   );

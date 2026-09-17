@@ -37,7 +37,7 @@ export function SourceStatusTable({ variant = "board" }: { readonly variant?: "b
   const td = cn("border-b border-line", board ? "px-6 py-3" : "px-5 py-[11px]");
   return (
     <div className="overflow-x-auto" role="region" aria-label={m.caption} tabIndex={0}>
-      <table className={cn("w-full min-w-[560px] border-collapse text-body", !board && "leading-normal")}>
+      <table className="w-full min-w-[560px] border-collapse text-body leading-normal">
         <caption className="sr-only">{m.caption}</caption>
         <thead>
           <tr>

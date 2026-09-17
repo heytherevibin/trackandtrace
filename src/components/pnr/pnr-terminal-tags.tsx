@@ -6,7 +6,7 @@ import { messages } from "@/messages";
 /** Tags as the sheet draws them: 11px on a 1.5 line; the filled tag has no edge, the outline tag a steel one. */
 export function SheetTag({ variant, title, children }: { readonly variant: "accent" | "outline"; readonly title?: string; readonly children: string }) {
   return (
-    <Badge variant={variant} title={title} className={variant === "accent" ? "border-0 leading-normal" : "leading-normal"}>
+    <Badge variant={variant} title={title}>
       {children}
     </Badge>
   );

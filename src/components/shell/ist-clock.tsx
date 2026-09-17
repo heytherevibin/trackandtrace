@@ -34,7 +34,7 @@ export function IstClock({ size = "sm", framed = false, className }: { readonly 
       aria-label={`${time} ${messages.common.ist}`}
       className={cn("inline-flex gap-2", framed ? "items-center border border-line px-3 py-1.5" : "items-baseline", className)}
     >
-      <span key={time} aria-hidden="true" className={cn("font-data inline-block tracking-brand", size === "md" ? "text-xl" : "text-body", tick.turned && "flip")}>
+      <span key={time} aria-hidden="true" className={cn("font-data inline-block tracking-brand", size === "md" ? "text-xl leading-normal" : "text-body", tick.turned && "flip")}>
         {time}
       </span>
       <span aria-hidden="true" className="font-display text-2xs font-semibold uppercase tracking-caps text-ink-1/70">

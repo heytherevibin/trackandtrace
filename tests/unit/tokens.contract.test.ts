@@ -105,14 +105,6 @@ const LEGACY_ALLOWLIST = new Set<string>([
   "src/app/login/login-form.tsx",
   "src/app/watchlist/loading.tsx",
   "src/app/watchlist/watchlist-view.tsx",
-  "src/components/landing/availability.tsx",
-  "src/components/landing/claims.tsx",
-  "src/components/landing/closing-cta.tsx",
-  "src/components/landing/hero.tsx",
-  "src/components/landing/how-it-works.tsx",
-  "src/components/landing/track-divider.tsx",
-  "src/components/pnr/pnr-field.tsx",
-  "src/components/pnr/recent-checks.tsx",
 ]);
 const SPACING_STEPS = new Set(["0", "0.5", "1", "1.5", "2", "2.5", "3", "3.5", "4", "5", "6", "8", "10", "12", "14", "16", "18", "20", "24"]);
 

@@ -21,7 +21,7 @@ export function SourcesBoard() {
         </div>
         <div className="flex items-center gap-3">
           {/* The drawn clock box is 44px: 20px figures on a 1.5 line inside 6px × 12px. */}
-          <IstClock size="md" framed className="min-h-[44px]" />
+          <IstClock size="md" framed />
           <Link href="/accuracy" className={buttonClassName({ variant: "secondary" })}>
             {m.policy}
           </Link>
