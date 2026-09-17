@@ -1,60 +1,46 @@
 # DESIGN.md — Track & Trace
 
-World: **The Destiny Clock** (grounded direction #5, concept-seed key `06ec86fe`). Indian Railways as a precision instrument: every read is a race against chart time, resolved on twin dials. Recorded from the built world (M1 prototype, code-led).
+World: **Verified Operations**. A calm enterprise data product for railway reservation records. The interface prioritizes source truth, provenance, structured tables, status bands, request timelines, and clear unavailable states over decorative instruments.
 
-## Direction contract (as embedded in `src/app/layout.tsx`)
+## Direction contract
 
-- **THESIS** — Railway time decides every ticket; the product is a precision instrument that reads a PNR and shows, on one master clock, whether the seat frees before chart time.
-- **OWN-WORLD** — Lacquered instrument grounds, dial-bone luminous markings, steel hairlines, brass sparingly; signal aspects (green/amber/red) are destiny states, never decoration; every data value is set in the mono instrument face; no stock chrome.
-- **STORY** — Ten digits in, one honest light out: the odds dial sweeps, the chart hand races, and the reasoning behind the number reads as a factored ledger.
-- **FIRST VIEWPORT** — Twin faces (CONFIRMATION ODDS / TIME TO CHART) flank an engraved PNR terminal; submit resolves both instruments.
-- **FORM** — Grounded list #5, raised by five declined challengers (parametric needle, one ruling time axis, packet→instrument deployment, frame-reflowing dial, focus-reveals-detail).
-- **FINISH** — This build is documented; M2+ (backend) proceeds per PRODUCT.md.
+- **THESIS** — A reservation interface should never imply certainty beyond the source response.
+- **OWN-WORLD** — Graphite surfaces, bone text, steel metadata, brass labels, and functional signal colors. No decorative dashboard instrumentation where a table or status band communicates better.
+- **STORY** — Enter a PNR, validate the request, query the verified source, and present the returned record. If any step cannot complete, explain exactly why.
+- **FIRST VIEWPORT** — Left: product/data policy. Right: live PNR request terminal. No sample gauges or demo records.
+- **FINISH** — All visible data is source-backed or explicitly unavailable.
 
-## Tokens (`src/app/globals.css`)
+## Tokens
 
-| Group | Values |
-| --- | --- |
-| Grounds | `ink-0 #06080b` page · `ink-1 #0b0e12` · `ink-2 #10141a` · `ink-3 #161b23` · `ink-4 #1e2530` |
-| Luminous | `bone #ece4d2` · `bone-dim #c2b9a4` |
-| Steel | `steel #7e8894` · `steel-2 #adb7c2` |
-| Signal | `go #2fbf71` · `watch #f2a93b` · `stop #e5484d` (+ t10/t30 alpha tints) |
-| Brass | `brass #c9a25f` (machined detailing only) |
-| Radii | `bez-el 24px` panels · `panel 16px` mid cards · `field 12px` inputs/wells · `chip ∞` pills |
-| Type | Display: **Archivo** (weight 400–900) · Body: **Inter** · Data: **IBM Plex Mono** (`font-data`, tabular) |
-| Motion | `--ease-out-strong cubic-bezier(0.16,1,0.3,1)` · `--ease-out cubic-bezier(0.23,1,0.32,1)` · UI < 300 ms · instrument resolves ≤ 1.6 s |
+Tokens remain in `src/app/globals.css`: graphite grounds, bone/steel text, signal green/amber/red, brass labels, Figtree/Inter/JetBrains Mono, shared bezel/panel/field radii, and reduced-motion support.
 
-One scale rule: *bez-el → panel → field* maps to *major instrument → inner card/strip → input*, and every surface obeys it. No one-off radii, paddings, or `!` overrides.
+## Enterprise component grammar
 
-## Component grammar
+- **PageHead** — shared kicker, title, lead, and optional action slot.
+- **PanelHead** — shared section header for data panels.
+- **Status band** — current source-backed state, provenance, retrieval time, and key fields.
+- **Data table** — semantic responsive overflow table for passenger, journey, account, and source records.
+- **Request timeline** — ordered validation/source/presentation lifecycle.
+- **SourceUnavailable** — explicit no-result state with response, provenance, and fallback status.
+- **SkeletonBlock / PnrResultSkeleton** — contextual loading shapes that match the data surface.
+- **SelectField / Button / Chip** — shared controls with consistent sizing, focus, and responsive behavior.
 
-- **Bezel** — double-bezel: outer shell ring + inset plate with concentric radius and inner top-highlight. All major panels.
-- **PlateLabel** — 10px uppercase tracked micro-label; the only kicker voice.
-- **Button** — pill, three sizes (`sm/md/lg`), `:active` scale 0.97, trailing **ButtonIcon** capsule; variants primary (bone), outline, ghost.
-- **Chip** — pill status chips with signal tones + LED dot; sizes `sm/md`.
-- **ArrowIcon** — one drawn arrow glyph (rotatable) used for every directional affordance; no text arrows.
-- **SelectField** — engraved well + drawn chevron; the only dropdown treatment.
-- **Focus** — one luminous `go-bright` focus-visible ring everywhere; inputs use a `well:focus-within` ring instead of removing focus.
+## Data policy
 
-## Instruments & data-viz (hand-rolled SVG, no chart library)
+Strict real-only mode. No demo PNRs, invented train catalogs, modeled percentages, synthetic trends, fake coach occupancy, placeholder route comparisons, or unsupported accuracy figures. Data source failures fail closed.
 
-- **ProbabilityDial** — 240° arc, signal-colored value arc, needle settle, mono center readout with count-up; numeric label beside it (a11y).
-- **CountdownRing** — 24h window ring, 6h/12h markers, IST ticking MM:HH:SS, red in final approach.
-- **MiniDial** — compact odds ring for cards/rows.
-- **AspectLamps** — GO/WATCH/STOP lamps, active one lit (blinks until settled).
-- **TrendBars** — modeled 5-day confirm rate; bars animate `scaleY` (transform only).
-- **MovementPanel** — your recorded checks (solid) over the modeled path to chart (dashed); labeled "demo".
-- **FactorRows** — ±points with `scaleX` impact bars, staggered in.
-- **CoachMap** — 3A 64-berth bay grid, occupancy reconstructed from PNR seed; labeled indicative.
+## Page anatomy
 
-## Motion grammar
+Every operational surface uses `max-w-6xl`, `pt-28 sm:pt-32`, `pb-20`, a shared `PageHead`, and `gap-4`/`gap-5` panel rhythm. Tables use horizontal overflow on narrow screens; status bands wrap into stacked key-value groups; action controls remain reachable on mobile.
 
-Transform + opacity only (detector-verified). Entrances: reveal fade-up via IntersectionObserver; result surfaces stagger 30–80 ms. Resolves: dial needle/arc 1.4–1.6 s `ease-out-strong`. Press feedback 140 ms. `prefers-reduced-motion` strips movement, keeps opacity/color. Hover affordances gated to `(hover:hover) and (pointer:fine)`. No animation on keyboard-initiated or high-frequency actions (re-check, notifications).
+## State grammar
 
-## States & provenance
+- **Loading** — contextual skeleton matching the eventual table/panel layout.
+- **Empty** — clear explanation plus the next valid action.
+- **Unavailable** — source status, no fabricated fallback, optional policy link.
+- **Error** — precise cause, retry action where meaningful, no generic success copy.
+- **Ready** — source-backed records with provenance and checked-at timestamp.
 
-Loading → scanning (PNR digit sweep) → settled; error/empty/not-found states in the same bezel grammar. Every read carries provenance: `DEMO PREDICTION` chips, modeled-trend labels, and the accuracy page's synthetic calibration ledger. Real claims are never fabricated; live status lands behind the `PnrDataSource` seam (M3).
+## Motion
 
-## Page anatomy (consistent across surfaces)
-
-Header: `PlateLabel` kicker + 4xl/5xl `tracking-[-0.02em]` title + 15px steel lead, right slot for actions. Page shell: `pt-28 sm:pt-32`, `pb-20`, `max-w-6xl`; hero exempt (owns its rhythm). Results in bezel panels on a `gap-4` grid.
+Keep motion purposeful and restrained: opacity/transform for state changes, skeleton shimmer during network waits, reduced-motion support, no decorative gauge animation for unavailable or unsupported data.

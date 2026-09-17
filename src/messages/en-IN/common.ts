@@ -1,0 +1,24 @@
+import type { MessageTree } from "../types";
+
+export const common = {
+  productName: "Track & Trace",
+  descriptor: "PNR status from the source",
+  notAffiliated: "Not affiliated with IRCTC or Indian Railways.",
+  ist: "IST",
+  retry: "Retry",
+  cancel: "Cancel",
+  close: "Close",
+  back: "Back",
+  loading: "Loading",
+  notReturned: "Not returned",
+  sampleData: "Sample data",
+  sampleDataHint: "Development fixture. Not a real reservation.",
+  copy: "Copy",
+  copied: "Copied",
+  share: "Share",
+  clear: "Clear",
+  run: "Run",
+  undo: "Undo",
+  dismiss: "Dismiss",
+  skipToContent: "Skip to content",
+} as const satisfies MessageTree;

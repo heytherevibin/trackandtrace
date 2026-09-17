@@ -6,48 +6,57 @@
 
 web
 
-## Stack
-
-Next.js (App Router) + TypeScript + Tailwind CSS, npm. Deploy target: Vercel (serverless monolith). Persistence: serverless Postgres (e.g., Neon/Supabase) + Prisma, schema written in v1. Cache/rate-limiting/queues: Redis (Upstash). Auth: Auth.js (email magic-link + Google OAuth). All stack choices confirmed by the user in planning; the user's directive also pins enterprise-grade polish, PWA support, and latest-2026 design-language fluency for the UI.
-
 ## Users
 
-Primary: Indian rail travelers holding waitlisted (WL/RAC) tickets who need to know their confirmation odds and what to do about it. Secondary: travelers deciding whether to book (pre-booking analysis) and groups tracking several PNRs. Operating scene: mobile-first, often at a station or in transit, low attention, chart-prep anxiety; the interface must be instantly legible and feel precise.
+Indian rail travelers checking a 10-digit PNR on a phone: on a crowded platform in harsh daylight, or in a moving berth at night, one hand free, low attention. They want to know whether a waitlisted or RAC ticket confirmed before the reservation chart is prepared. No secondary audience is confirmed; "enterprise-grade" describes the quality bar, not a B2B buyer.
 
 ## Product Purpose
 
-Enter a 10-digit PNR → current status plus an explainable, calibrated confirmation probability; before booking, analyze a train/date/class/quota context and compare routes. Success means users trust the probability because they can see its reasoning, and they make better go/no-go travel decisions with less manual checking.
+Accept a 10-digit PNR, request the current reservation record from a verified railway data source, and show exactly the fields that source returned, with its name and retrieval time. Optionally keep a watchlist of saved PNRs on the device and, with an account, across devices. Success is a traveler reading their status correctly in one glance and never being misled by an invented value.
 
 ## Positioning
 
-Calibrated probability with per-factor explainability — "a number, and the why behind it." Category competitors return a percentage; TrackAndTrace shows the reasoning: quota, WL position, time-to-chart, day-of-week, and train-level demand as ±point factor contributions, with honest confidence buckets and a transparency page. Presentation is a futuristic mission-control world with enterprise-grade polish — never hype, never generic.
+Only fields returned by a verified source are shown, each with provenance and retrieval time; no fabricated confirmation odds, trends, or route rankings. Checking is free and needs no account. PNRs and passenger names are never written to logs. A neighboring product that predicts confirmation cannot truthfully make the first claim.
 
 ## Operating Context
 
-Phone-first web app. Users re-check repeatedly as chart preparation approaches (chart ≈ 4h before departure, IST). A watchlist with scheduled re-checks and browser notifications reduces manual checking. Every result shows its data provenance ("Live status" vs "Demo prediction"). Countdowns and scheduling are IST-correct.
+- Indian Standard Time everywhere; chart preparation (about four hours before departure) is the deadline travelers care about.
+- Installable PWA; used repeatedly for the same PNR over days.
+- Anonymous-first: the check works without sign-in; an account only adds a synced watchlist.
+- Development uses a clearly labeled sample-data fixture (`PNR_SOURCE=fixture`); production refuses it. Every fixture result is badged "Sample data".
+- Accounts and the synced watchlist run on Supabase (Auth + Postgres); data access is server-side with row-level security.
 
 ## Capabilities and Constraints
 
-v1: PNR checker (probability gauge, explainable factors, WL-movement curve, modeled 5-day trend, coach/berth map); pre-booking single + multi-route compare; account-backed watchlist with browser notifications; accuracy/trust page; auth (magic-link + Google); ToS/Privacy pages; account deletion and data export.
+Confirmed: PNR validation and the 3-3-4 digit entry control; a verified-source seam that resolves to an explicit unavailable state until a provider is connected; result surface (status band, passenger table, journey details, provenance timeline); local watchlist with account sync, merge, and undo; recent checks; share and copy of a result link; account export and deletion; pre-booking form with no inventory source; accuracy page with no records; privacy and terms pages.
 
-Constraints: Indian Railways offers no public API. Data comes from a synthetic demo engine (documented deterministic demo PNRs, clearly labeled) plus a live adapter (server-side enquiry of indianrail.gov.in, budget-guarded, degrading to labeled synthetic) whose viability is verified by a build-time probe. Accuracy claims are never fabricated; trend charts render modeled priors labeled "modeled trend" until a community ledger supplies real counts. PNRs and passenger identifiers are never logged.
+Constraints: strict real-only data policy; prediction, trend, and factor fields exist in the type layer but are never rendered; passenger names are never stored or rendered; no railway provider is wired yet (identity undecided); English only for now with a locale-ready string structure (Hindi launch undecided).
+
+Stack: Next.js 16 App Router, TypeScript strict, Tailwind CSS v4, Supabase (Auth + Postgres via supabase-js and @supabase/ssr), Base UI primitives, Sonner, Motion, Vitest, Testing Library, Playwright. Deploy target Vercel.
 
 ## Brand Commitments
 
-Name: TrackAndTrace (working, brandable later). Aesthetic (user-pinned brief): futuristic, enterprise-grade polish, advanced UX/UI, butter-smooth motion, fully responsive, PWA, aligned with current (2026) design languages; explicitly no generic colors, no emojis, no basic structures. Honesty is a brand commitment: demo data is always labeled, accuracy claims are never invented.
+- Name: Track & Trace (kept). The former tagline "Journey intelligence" implies inference the product forbids and is retired in favor of a factual descriptor.
+- Honesty is a brand commitment: sample data is always labeled; accuracy is never invented; unavailable states are explained, not hidden.
+- Quality bar: Stripe/Linear-level system discipline in app surfaces, Airbnb-level warmth on the landing page.
+- Light and dark themes, following the system, with a user toggle.
+- Not affiliated with IRCTC or Indian Railways; stated on every surface footer.
 
 ## Evidence on Hand
 
-None real — greenfield project: no user data, no testimonials, no press. Demo PNRs are synthetic and documented. Accuracy figures shown are model outputs from the labeled demo engine, never verified claims.
+- No verified railway provider is connected; every live request resolves to an unavailable state.
+- No testimonials, customer names, usage metrics, ratings, or accuracy records exist. None may be fabricated.
+- No logo, icon, or social image assets exist; the mark is designed in this redesign.
+- The development fixture (deterministic sample records keyed by PNR digits) is design and test material only and must never be presented as real.
 
 ## Product Principles
 
-1. Explainability before numbers — every probability decomposes into visible, per-factor reasoning.
-2. Honesty over hype — calibrated outputs, labeled provenance, transparent limits.
-3. Speed and precision — a decision tool; the UI feels instant and surgical.
-4. Phone-first, ops-room clarity — designed for the station platform, not the office.
-5. Enterprise-grade craft — tokens-only design system, world-consistent components, motion that compounds rather than decorates.
+1. Fail closed: no source, no claim.
+2. Provenance over inference: every value names where it came from and when.
+3. Anonymous first: the check never needs an account; an account only adds sync.
+4. Explicit save: nothing persists without the traveler's action.
+5. Legible under stress: one glance, one thumb, daylight or night.
 
 ## Accessibility & Inclusion
 
-WCAG AA, full keyboard flow, visible focus, prefers-reduced-motion support, color never the sole indicator, gauge always carries a numeric label, i18n architecture from day one (हिन्दी in a later phase).
+WCAG AA: keyboard navigation, visible focus, semantic tables, status announcements through live regions, reduced-motion support, color never the sole status indicator, 44px touch targets, 16px inputs on mobile, and a string structure ready for Indian languages.

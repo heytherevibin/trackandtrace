@@ -39,3 +39,16 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# keep the template
+!.env.example
+.impeccable/review/
+test-results/
+playwright-report/
+.env.supabase.local
+supabase/.temp/
+
+# local agent/tooling scrap
+.freebuff/
+.claude-flow/
+.impeccable/questions/

@@ -1,0 +1,35 @@
+import type { MessageTree } from "../types";
+
+export const watchlist = {
+  title: "Watchlist",
+  count: (n: number) => (n === 1 ? "1 saved" : `${n} saved`),
+  anonLead: "Saved on this device. Sign in to keep it across devices.",
+  signedLead: "Saved to your account.",
+  columns: { pnr: "PNR", journey: "Journey", status: "Last status", checked: "Checked", actions: "Actions" },
+  noChecks: "Not checked yet",
+  checksCount: (n: number) => (n === 1 ? "1 check" : `${n} checks`),
+  recheck: "Re-check",
+  remove: "Remove",
+  clearLocal: "Clear all on this device",
+  removed: (pnr: string) => `Removed ${pnr}`,
+  restored: "Restored",
+  removeFailed: "Could not remove it. The entry is back.",
+  recheckUpdated: (from: string, to: string) => `${from} → ${to}`,
+  recheckSame: (label: string) => `Still ${label}`,
+  recheckFailed: "The source did not answer.",
+  loadError: "Your watchlist could not be loaded.",
+  empty: { action: "Run a check" },
+  merge: {
+    title: (n: number) => (n === 1 ? "Move 1 saved PNR to your account?" : `Move ${n} saved PNRs to your account?`),
+    detail: "They are saved on this device only. Moving them keeps them with your account across devices.",
+    move: "Move to account",
+    notNow: "Not now",
+    dontAsk: "Do not ask again",
+    moved: (n: number) => (n === 1 ? "1 PNR moved" : `${n} PNRs moved`),
+    failed: "The entries could not be moved. They are still on this device.",
+  },
+  recent: {
+    title: "Recent on this device",
+    clear: "Clear recent",
+  },
+} as const satisfies MessageTree;

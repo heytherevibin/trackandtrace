@@ -1,29 +1,28 @@
+import type { NextRequest } from "next/server";
 import { z } from "zod";
-import { currentUser } from "@/lib/session";
-import { getPrisma } from "@/lib/db";
-import { AppError, toApiError } from "@/lib/errors";
+import { jsonError, jsonOk } from "@/services/api-response";
+import { AppError } from "@/services/errors";
+import { readBody } from "@/services/request-body";
+import { requireUser } from "@/services/session";
+import { createAdminSupabase } from "@/services/supabase/admin";
+import { deleteAllForUser } from "@/services/watchlist-repo";
 
-const deleteBody = z.object({
-  confirm: z.literal(true, { message: "Confirm account deletion with { confirm: true }." }),
-});
+export const dynamic = "force-dynamic";
 
-export async function DELETE(req: Request) {
+const deleteBodySchema = z.object({ confirm: z.literal(true) });
+
+/** DELETE /api/account — remove the watchlist, then the auth user, then the session. Irreversible. */
+export async function DELETE(req: NextRequest): Promise<Response> {
   try {
-    const user = await currentUser();
-    if (!user) throw new AppError("UNAUTHENTICATED", "Sign in to manage your account.");
-    const prisma = getPrisma();
-    if (!prisma) throw new AppError("SOURCE_UNAVAILABLE", "Database not configured.");
-
-    const json = await req.json();
-    const parsed = deleteBody.safeParse(json);
-    if (!parsed.success) {
-      throw new AppError("INVALID_INPUT", parsed.error.issues[0]?.message ?? "Invalid input");
-    }
-
-    await prisma.user.delete({ where: { id: user.id } });
-    return Response.json({ ok: true, message: "Account deleted." });
+    const { user, db } = await requireUser();
+    await readBody(req, deleteBodySchema);
+    await deleteAllForUser(db, user.id);
+    const admin = createAdminSupabase();
+    const { error } = await admin.auth.admin.deleteUser(user.id);
+    if (error) throw new AppError("INTERNAL", "The account could not be deleted. Nothing else was changed.");
+    await db.auth.signOut();
+    return jsonOk({ ok: true, message: "Your account and saved records were deleted." });
   } catch (err) {
-    const body = toApiError(err);
-    return Response.json(body, { status: (err as AppError).status ?? 500 });
+    return jsonError(err);
   }
 }

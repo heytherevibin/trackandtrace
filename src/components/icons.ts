@@ -1,0 +1,32 @@
+"use client";
+
+// Fluent icons are client-only modules. Re-exporting them from a client
+// boundary lets server components reference them as client components.
+export {
+  ArrowLeftRegular,
+  ArrowRightRegular,
+  BookmarkRegular,
+  BookmarkFilled,
+  CalendarClockRegular,
+  CheckmarkRegular,
+  ChevronDownRegular,
+  CopyRegular,
+  DesktopRegular,
+  DismissRegular,
+  ErrorCircleRegular,
+  GaugeRegular,
+  InfoRegular,
+  PersonRegular,
+  ArrowSyncRegular,
+  ShareRegular,
+  SignOutRegular,
+  TicketDiagonalRegular,
+  WarningRegular,
+  WeatherMoonRegular,
+  WeatherSunnyRegular,
+  ArrowDownloadRegular,
+  DeleteRegular,
+  ArrowExportRegular,
+  EyeTrackingRegular,
+  DatabaseRegular,
+} from "@fluentui/react-icons";

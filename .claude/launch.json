@@ -9,6 +9,18 @@
         "dev"
       ],
       "port": 4210
+    },
+    {
+      "name": "dev:fixture",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev:fixture",
+        "--",
+        "--port",
+        "3100"
+      ],
+      "port": 3100
     }
   ]
 }

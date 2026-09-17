@@ -1,36 +1,51 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Track & Trace
 
-## Getting Started
+Check an Indian Railways PNR and read exactly what the source returned — every field labelled with its provenance and retrieval time. Free, no account needed. Not affiliated with IRCTC or Indian Railways.
 
-First, run the development server:
+**Data policy (the product's spine):** strict real-only. If a verified railway source did not return a field, the interface says "not returned" — it never guesses, never invents confirmation odds, and fails closed when the source is silent. PNRs and passenger names are never written to logs.
+
+## Stack
+
+Next.js 16 (App Router) · TypeScript strict · Tailwind CSS v4 · Supabase (Auth + Postgres) · Base UI · Sonner · Motion · Vitest + Testing Library · Playwright.
+
+## Quick start
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+scripts/setup.sh          # installs deps, creates .env.local, optionally starts local Supabase
+npm run dev:fixture       # dev server with deterministic, clearly labelled sample data
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Sample PNRs (fixture mode only; every result is badged "Sample data"):
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| PNR | Story |
+| --- | --- |
+| `2345678901` | Confirmed, coach and berth allotted |
+| `2345678903` | RAC 1 |
+| `2345678905` | Waitlist 5 (GN) |
+| `2345678908` | Cancelled |
+| `2345678909` | Three passengers: CNF / RAC / WL |
+| `2345678900` | No record at the source |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Production refuses `PNR_SOURCE=fixture` at boot. With `PNR_SOURCE=live` and no provider adapter connected, every check resolves to an explicit unavailable state — by design.
 
-## Learn More
+## Scripts
 
-To learn more about Next.js, take a look at the following resources:
+| Command | Does |
+| --- | --- |
+| `npm run dev` / `dev:fixture` | Dev server (port 3000), without / with sample data |
+| `npm run check` | typecheck → lint → unit tests → production build |
+| `npm run test:unit` / `test:e2e` | Vitest / Playwright (desktop 1280 + mobile 390) |
+| `npm run db:start` / `db:reset` / `db:types` | Local Supabase stack, migrations + seed, generated DB types |
+| `npm run screenshots` | Full-page review screenshots into `.impeccable/review/` |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Environment
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Copy `.env.example` to `.env.local` and fill what you use. Accounts (sign-in, synced watchlist) need the three Supabase keys; everything else works without them. `PNR_SOURCE=fixture` belongs in `.env.development.local` only.
 
-## Deploy on Vercel
+## Documentation
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- [docs/architecture.md](docs/architecture.md) — layers, real-only enforcement points, failure modes
+- [docs/api-reference.md](docs/api-reference.md) — every route handler with envelopes and status codes
+- [docs/onboarding.md](docs/onboarding.md) — first-day setup, Supabase provisioning, conventions
+- [DESIGN.md](DESIGN.md) — the visual world and component grammar
+- [PRODUCT.md](PRODUCT.md) — product truth: users, purpose, principles

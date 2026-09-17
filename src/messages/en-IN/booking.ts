@@ -1,0 +1,35 @@
+import type { MessageTree } from "../types";
+
+export const booking = {
+  title: "Availability before booking",
+  lead: "Pick class, quota, and date. Live availability appears here only when a timetable and inventory source is connected.",
+  train: { label: "Train", notConnected: "Train search: not connected" },
+  cls: "Class",
+  quota: "Quota",
+  date: "Journey date",
+  submit: "Check availability",
+  classes: {
+    "1A": "1A · First AC",
+    "2A": "2A · AC 2-tier",
+    "3A": "3A · AC 3-tier",
+    SL: "SL · Sleeper",
+    CC: "CC · AC chair car",
+    EC: "EC · Executive chair",
+    "2S": "2S · Second sitting",
+  },
+  quotas: {
+    GN: "GN · General",
+    PQWL: "PQWL · Pooled",
+    RLWL: "RLWL · Remote location",
+    TQWL: "TQWL · Tatkal waitlist",
+    LD: "LD · Ladies",
+    TQ: "TQ · Tatkal",
+  },
+  requested: (cls: string, quota: string, date: string) => `Requested: ${cls} · ${quota} · ${date}`,
+  unavailableTitle: "No availability returned",
+  unavailableDetail: "No timetable or inventory source is connected. Nothing was estimated.",
+  pastDate: "Pick today or a later date.",
+  lifecycle: "Availability request lifecycle",
+  steps: { input: "Request entered", validate: "Request validated", source: "Inventory source", result: "Result" },
+  stepStates: { pending: "Awaiting a connected source", unavailable: "Unavailable until connected" },
+} as const satisfies MessageTree;

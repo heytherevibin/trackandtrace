@@ -1,3 +1,5 @@
+> **Superseded on 2026-09-17.** Historical record of the Destiny Clock build. The product was redesigned (Rhythm Machine world), moved to Supabase, and re-documented in README.md, docs/, PRODUCT.md, and DESIGN.md. Details below no longer describe the codebase.
+
 # TrackAndTrace — Handoff (M3 Accounts Milestone, mid-implementation)
 
 **Written for:** the next agent session continuing Phase 3 (accounts milestone) of the TrackAndTrace build.

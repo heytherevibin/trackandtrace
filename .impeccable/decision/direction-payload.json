@@ -1,0 +1,148 @@
+{
+  "title": "Choose the visual world for Track & Trace",
+  "question": "The roll assigned Trains at a Glance. Keep it, take the pick or the alternate, re-roll safer or bolder, or take the category standard.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "Trains at a Glance",
+      "kicker": "THE ROLL",
+      "lineage": "Indian Railways' printed timetable: the annual book on every station bookstall and the ruled timetable posters on platform walls",
+      "thesis": "Your PNR is one row in the railway's own timetable: set in columns, ruled, and footnoted with where every figure came from.",
+      "palette": ["#FAFAF7", "#111111", "#C9C9C4", "#1F3A93", "#1B7F4C", "#B45309", "#B3261E"],
+      "materials": ["thin timetable paper", "black column rules", "tabular lining numerals", "footnote daggers", "one spot-colour column head"],
+      "viewport": "A ruled sheet fills the viewport. A title strip sets the product name like a table heading. The PNR entry is the first ruled row: ten numeral cells in 3-3-4 with a hairline between groups and 'Check status' as the row's action. Beneath, the three assurances are set as footnotes with dagger marks. On a phone the sheet is portrait and the row spans the screen.",
+      "risk": "Density can become a wall on a phone; every table must reflow to labelled rows, and the numeral columns need real tabular figures or the world reads as a spreadsheet.",
+      "raised": [
+        { "from": "clouds-storms-auroras-iridescent-cloud-edge", "raise": "Colour lives only in band edges and status pills; the text field stays achromatic." },
+        { "from": "signals-instruments-drum-machine-step-row", "raise": "The ten-digit row is one unbroken line that scales and never wraps, and the request lifecycle shows a moving 'now' mark." },
+        { "from": "posters-covers-sleeves-exploitation-combo-sheet", "raise": "Provenance and the not-affiliated notice are set as a designed agate foot on every result, small print as content." },
+        { "from": "galaxies-nebulae-deep-time-accretion-disk-threshold", "raise": "One accent role, spent only on the primary action; status colours stay semantic." },
+        { "from": "brand-identity-canon-village-coffeehouse-identity", "raise": "Every control is built from the sheet's own material (ruled cells, footnote marks, column heads), never a stock widget." }
+      ],
+      "wireframe": { "cols": 12, "rows": 10, "regions": [
+        { "label": "title strip", "x": 0, "y": 0, "w": 12, "h": 1 },
+        { "label": "PNR row 3-3-4", "x": 0, "y": 2, "w": 9, "h": 2, "accent": true },
+        { "label": "Check status", "x": 9, "y": 2, "w": 3, "h": 2, "accent": true },
+        { "label": "footnote assurances", "x": 0, "y": 5, "w": 12, "h": 1 },
+        { "label": "three ruled columns: how it works", "x": 0, "y": 7, "w": 12, "h": 3 }
+      ] }
+    },
+    {
+      "id": "model-pick",
+      "label": "Station Name Board",
+      "kicker": "IMPECCABLE’S PICK",
+      "lineage": "The yellow enamel station boards with black bilingual lettering and the height-above-sea-level line, read from a moving train",
+      "thesis": "Every station announces itself the same way, and so does every status: a black-bordered board, one fact, two scripts, legible at speed.",
+      "palette": ["#F2C218", "#141414", "#FBFBF6", "#1B7F4C", "#B45309", "#B3261E"],
+      "materials": ["enamel", "thick black border", "bilingual block lettering", "chipped edge"],
+      "viewport": "A yellow board fills the first screen with the product name in black block letters. Below the border, the PNR entry is a black slab with ten yellow cells. Status boards stack as you scroll, each carrying exactly one fact.",
+      "risk": "Yellow saturates fast and collides with the amber warning role; the board form can flatten a dense passenger table into a poster. It is also the familiar destination for this category's bolder runs.",
+      "wireframe": { "cols": 12, "rows": 10, "regions": [
+        { "label": "yellow board: product name", "x": 0, "y": 0, "w": 12, "h": 4, "accent": true },
+        { "label": "black slab: PNR entry", "x": 0, "y": 4, "w": 12, "h": 2 },
+        { "label": "status boards", "x": 0, "y": 7, "w": 12, "h": 3 }
+      ] }
+    },
+    {
+      "id": "challenger-variable-font",
+      "label": "Variable Type Specimen",
+      "verdict": "competitive",
+      "lineage": "interactive type specimens",
+      "thesis": "The status is the specimen: one giant status word, every detail in tiny mono labels.",
+      "palette": ["#FAFAFA", "#111111", "#0047FF"],
+      "materials": ["paper", "ink", "one foundry accent", "strict baseline grid"],
+      "viewport": "A grid of ten PNR digits at display size; after the check the status word sets enormous while mono readouts list train, date, and provenance.",
+      "case": "Holds clarity: hierarchy by scale alone and a strict baseline grid make the status readable from across a platform. Loses identification: no traveler reads their ticket as a type specimen.",
+      "risk": "A typographic conceit that leaves journey data as a footnote.",
+      "hero": "https://impeccable.style/worlds/cards/variable-font-specimen-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/variable-font-specimen.webp"
+    },
+    {
+      "id": "challenger-drum-machine",
+      "label": "Rhythm Machine Step Row",
+      "verdict": "declined",
+      "lineage": "early-80s drum machine step rows",
+      "thesis": "The PNR is sixteen keys under a chase light; the check runs when the light comes round.",
+      "palette": ["#2B2B2B", "#E5352B", "#F28C28", "#F2C218", "#FFFFFF"],
+      "materials": ["charcoal panel", "candy step keys", "lit LEDs", "silkscreen labels"],
+      "viewport": "A single unbroken row of ten keys across the screen; typing arms keys, submit sweeps a chase light through validation, source, and result.",
+      "case": "The ten-key row is a striking entry, but lit keys on charcoal drift straight back into the dark console this redesign leaves behind.",
+      "kept": "One unbroken row that scales instead of wrapping, with a visible 'now' mark.",
+      "risk": "Playful hardware tone for a document people read under stress.",
+      "hero": "https://impeccable.style/worlds/cards/signals-instruments-drum-machine-step-row-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/signals-instruments-drum-machine-step-row.webp"
+    },
+    {
+      "id": "challenger-cloud-edge",
+      "label": "Iridescent Cloud Edge",
+      "verdict": "declined",
+      "lineage": "diffraction at a forming cloud edge",
+      "thesis": "An achromatic sheet with colour only at the hairline edge of the status band.",
+      "palette": ["#FFFFFF", "#4A4F57", "#9FE3C8", "#F5B8C8", "#B9A6F2"],
+      "materials": ["cloud white", "slate ink", "pastel hairline fringe"],
+      "viewport": "Wide white margins, thin humanist type, a narrow mint-rose-violet fringe along the status band edge.",
+      "case": "Thin humanist type fails on a sunlit platform, and no traveler identifies with a cloud edge.",
+      "kept": "Colour confined to band edges while the text field stays achromatic.",
+      "risk": "Too quiet to persuade and too thin to read in daylight.",
+      "hero": "https://impeccable.style/worlds/cards/clouds-storms-auroras-iridescent-cloud-edge-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/clouds-storms-auroras-iridescent-cloud-edge.webp"
+    },
+    {
+      "id": "challenger-accretion-disk",
+      "label": "Accretion Disk Threshold",
+      "verdict": "declined",
+      "lineage": "black-hole accretion disks",
+      "thesis": "Chart time as an event horizon: the ticket approaches, reddens, and either crosses or holds.",
+      "palette": ["#000000", "#8FB8FF", "#E0522B", "#D8A93A"],
+      "materials": ["void black", "graded disk light", "photon-ring gold arc"],
+      "viewport": "Concentric ring bands with the PNR at its current radius from chart time.",
+      "case": "Concentric rings cannot carry a passenger table, and travelers do not identify with a horizon.",
+      "kept": "One accent, spent on exactly one active element.",
+      "risk": "Cosmic drama over plain railway facts.",
+      "hero": "https://impeccable.style/worlds/cards/galaxies-nebulae-deep-time-accretion-disk-threshold-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/galaxies-nebulae-deep-time-accretion-disk-threshold.webp"
+    },
+    {
+      "id": "challenger-exploitation-sheet",
+      "label": "Double-Feature One-Sheet",
+      "verdict": "declined",
+      "lineage": "exploitation double-bill posters",
+      "thesis": "Two titles shouting over a collage, with a wall of agate at the foot.",
+      "palette": ["#F5D400", "#C8102E", "#111111", "#F2ECD8"],
+      "materials": ["process yellow", "blood red", "misregistered offset", "visible halftone"],
+      "viewport": "A huge distressed title, a second half its size, promises wedged into corners, agate billing at the foot.",
+      "case": "A shouting hierarchy contradicts an honesty product, and misregistration hurts numeral legibility.",
+      "kept": "A designed agate foot that carries the small print as content.",
+      "risk": "Hype language the brand forbids.",
+      "hero": "https://impeccable.style/worlds/cards/posters-covers-sleeves-exploitation-combo-sheet-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/posters-covers-sleeves-exploitation-combo-sheet.webp"
+    },
+    {
+      "id": "challenger-coffeehouse",
+      "label": "Village Coffeehouse Identity",
+      "verdict": "declined",
+      "lineage": "nineties earthy corporate identities",
+      "thesis": "A woodcut mark over torn kraft, olive and terracotta, humanist caps letterspaced wide.",
+      "palette": ["#C9713D", "#6B7A3A", "#D9A441", "#D7C7A8"],
+      "materials": ["recycled kraft", "torn edges", "woodcut mark"],
+      "viewport": "Torn-edge tiles as sections, a woodcut sun stamped in the header.",
+      "case": "Torn kraft tiles and woodcut marks say artisan cafe, not railway, and tile edges eat data clarity.",
+      "kept": "Total material commitment: every control is built from the world's own material.",
+      "risk": "Nostalgia with no railway in it.",
+      "hero": "https://impeccable.style/worlds/cards/brand-identity-canon-village-coffeehouse-identity-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/brand-identity-canon-village-coffeehouse-identity.webp"
+    }
+  ],
+  "reroll": { "registers": ["safer", "bolder"] },
+  "steer": true,
+  "canon": true,
+  "canonCard": {
+    "label": "Category standard",
+    "thesis": "The PNR checker this category ships, executed impeccably: a clean light utility page.",
+    "palette": ["#FFFFFF", "#0F172A", "#2563EB"],
+    "materials": ["clean grid", "plain input", "result card", "blue primary button"],
+    "viewport": "A large PNR input on top, a status card below, a row of feature tiles, a footer.",
+    "risk": "Indistinguishable from the competition by design."
+  },
+  "buildPath": { "value": "code", "toggle": false }
+}

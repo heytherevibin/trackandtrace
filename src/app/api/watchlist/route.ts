@@ -1,77 +1,48 @@
+import type { NextRequest } from "next/server";
 import { z } from "zod";
-import { Prisma } from "@prisma/client";
-import { currentUser } from "@/lib/session";
-import { getPrisma } from "@/lib/db";
-import { AppError, toApiError } from "@/lib/errors";
-import { isValidPnr } from "@/lib/engine";
+import { jsonError, jsonOk } from "@/services/api-response";
+import { readBody } from "@/services/request-body";
+import { requireUser } from "@/services/session";
+import { deleteEntry, listEntries, upsertEntry } from "@/services/watchlist-repo";
+import { assertWriteAllowed } from "@/services/write-limit";
+import { watchlistUpsertSchema } from "@/types/schemas";
+import { pnrSchema } from "@/utils/pnr";
 
-const upsertBody = z.object({
-  pnr: z.string().refine(isValidPnr, "A PNR is 10 digits and never starts with 0 or 1."),
-  label: z.string().min(1).max(200),
-  checks: z.unknown().optional(),
-});
+export const dynamic = "force-dynamic";
 
-const deleteBody = z.object({
-  pnr: z.string().refine(isValidPnr, "A PNR is 10 digits and never starts with 0 or 1."),
-});
+const deleteBodySchema = z.object({ pnr: pnrSchema });
 
-async function requireAuth() {
-  const user = await currentUser();
-  if (!user) throw new AppError("UNAUTHENTICATED", "Sign in to access your watchlist.");
-  const prisma = getPrisma();
-  if (!prisma) throw new AppError("SOURCE_UNAVAILABLE", "Database not configured.");
-  return { user, prisma };
-}
-
-export async function GET() {
+/** GET /api/watchlist — the signed-in user's saved PNRs, newest first. */
+export async function GET(): Promise<Response> {
   try {
-    const { user, prisma } = await requireAuth();
-    const entries = await prisma.watchlistEntry.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: "desc" },
-    });
-    return Response.json({ ok: true, data: entries });
+    const { user, db } = await requireUser();
+    return jsonOk({ ok: true, data: await listEntries(db, user.id) });
   } catch (err) {
-    const body = toApiError(err);
-    return Response.json(body, { status: (err as AppError).status ?? 500 });
+    return jsonError(err);
   }
 }
 
-export async function POST(req: Request) {
+/** POST /api/watchlist — save or update one PNR on the account. */
+export async function POST(req: NextRequest): Promise<Response> {
   try {
-    const { user, prisma } = await requireAuth();
-    const json = await req.json();
-    const parsed = upsertBody.safeParse(json);
-    if (!parsed.success) {
-      throw new AppError("INVALID_INPUT", parsed.error.issues[0]?.message ?? "Invalid input");
-    }
-    const { pnr, label, checks } = parsed.data;
-    const entry = await prisma.watchlistEntry.upsert({
-      where: { userId_pnr: { userId: user.id, pnr } },
-      create: { userId: user.id, pnr, label, checks: checks ?? Prisma.DbNull },
-      update: { label, checks: checks ?? undefined },
-    });
-    return Response.json({ ok: true, data: entry }, { status: 200 });
+    const { user, db } = await requireUser();
+    await assertWriteAllowed(user.id);
+    const input = await readBody(req, watchlistUpsertSchema);
+    return jsonOk({ ok: true, data: await upsertEntry(db, user.id, input) });
   } catch (err) {
-    const body = toApiError(err);
-    return Response.json(body, { status: (err as AppError).status ?? 500 });
+    return jsonError(err);
   }
 }
 
-export async function DELETE(req: Request) {
+/** DELETE /api/watchlist — remove one PNR from the account. */
+export async function DELETE(req: NextRequest): Promise<Response> {
   try {
-    const { user, prisma } = await requireAuth();
-    const json = await req.json();
-    const parsed = deleteBody.safeParse(json);
-    if (!parsed.success) {
-      throw new AppError("INVALID_INPUT", parsed.error.issues[0]?.message ?? "Invalid input");
-    }
-    await prisma.watchlistEntry.deleteMany({
-      where: { userId: user.id, pnr: parsed.data.pnr },
-    });
-    return Response.json({ ok: true });
+    const { user, db } = await requireUser();
+    await assertWriteAllowed(user.id);
+    const { pnr } = await readBody(req, deleteBodySchema);
+    await deleteEntry(db, user.id, pnr);
+    return jsonOk({ ok: true });
   } catch (err) {
-    const body = toApiError(err);
-    return Response.json(body, { status: (err as AppError).status ?? 500 });
+    return jsonError(err);
   }
 }

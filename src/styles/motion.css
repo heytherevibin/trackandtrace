@@ -1,0 +1,99 @@
+@keyframes skeleton-sheen {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* Invalid entry: the row shakes, once, short */
+@keyframes shake-x {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-6px);
+  }
+  40% {
+    transform: translateX(6px);
+  }
+  60% {
+    transform: translateX(-4px);
+  }
+  80% {
+    transform: translateX(4px);
+  }
+}
+
+/* Route transitions: React ViewTransition classes (wrapped in each page, never the layout) */
+::view-transition {
+  pointer-events: none;
+}
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 180ms;
+  animation-timing-function: var(--ease-out-expo);
+}
+::view-transition-old(.nav-forward) {
+  animation: 120ms var(--ease-in) both vt-fade-out;
+}
+::view-transition-new(.nav-forward) {
+  animation: 180ms var(--ease-out-expo) both vt-fade-in;
+}
+::view-transition-old(.nav-back) {
+  animation: 120ms var(--ease-in) both vt-fade-out;
+}
+::view-transition-new(.nav-back) {
+  animation: 180ms var(--ease-out-expo) both vt-fade-in;
+}
+@keyframes vt-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes vt-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+  .skeleton::after {
+    animation: none;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@utility spin {
+  animation: spin 800ms linear infinite;
+}
+
+@utility shake {
+  animation: shake-x 380ms var(--ease-out);
+}
+
+/* Reveal on view: visible by default; JS marks below-fold sections pending until they enter */
+[data-reveal] {
+  transition: opacity var(--duration-reveal) var(--ease-out-expo), transform var(--duration-reveal) var(--ease-out-expo);
+}
+[data-reveal][data-pending] {
+  opacity: 0;
+  transform: translateY(12px);
+}

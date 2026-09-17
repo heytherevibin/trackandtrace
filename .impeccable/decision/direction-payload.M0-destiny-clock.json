@@ -1,0 +1,148 @@
+{
+  "title": "Choose the visual world for TrackAndTrace",
+  "question": "The roll assigned The Destiny Clock. Keep it, take Railway Mission Control (the pick), Teletext Service, the category standard — or re-roll.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "The Destiny Clock",
+      "kicker": "THE ROLL",
+      "lineage": "Indian railway clocks — twin-faced tower clocks over junctions and the platform clock every waiting traveler watches",
+      "thesis": "Railway time decides every ticket; the product is a precision instrument that reads a PNR and shows, on one master clock, whether your seat frees before chart time.",
+      "palette": ["#0B0E12", "#F0E9D6", "#8A93A0", "#E5484D", "#2FBF71"],
+      "materials": ["machined bezels", "engraved hairlines", "dial enamel", "brushed instrument panels", "one red sweep hand"],
+      "viewport": "A twin-face master dial fills the stage — left face TIME TO CHART, right face CONFIRMATION ODDS. The PNR entry is engraved beneath the dials; submit sweeps both hands at once, the red second hand racing the chart.",
+      "risk": "A clock motif can read decorative or nostalgic; only instrument-grade restraint and a functionally true red-hand countdown keep it honest.",
+      "raised": [
+        {
+          "from": "variable-font-specimen",
+          "raise": "The odds hand is continuously parametric — live WL movement makes it breathe in real time, never a static needle."
+        },
+        {
+          "from": "ocean-depth-dive",
+          "raise": "One ruling time axis owns the whole page — the countdown is the composition, never an ornament in a corner."
+        },
+        {
+          "from": "miura-orbit-sheet",
+          "raise": "The full analysis deploys from the compact PNR chip in one gesture: packet to open instrument."
+        },
+        {
+          "from": "zoo-gardens-map",
+          "raise": "On narrow screens the master dial reflows along the frame instead of stacking into boxes."
+        },
+        {
+          "from": "streaming-wall",
+          "raise": "Focus reveals detail in place — activating any factor expands it without navigation."
+        }
+      ]
+    },
+    {
+      "id": "model-pick",
+      "label": "Railway Mission Control",
+      "kicker": "IMPECCABLE’S PICK",
+      "lineage": "Indian railway signalling — the green/amber/red aspects every traveler already reads as destiny",
+      "thesis": "Every outcome is a signal aspect; the product is a signal tower where a PNR resolves into one honest light plus the reasoning that earned it.",
+      "palette": ["#121816", "#2FBF71", "#F5A623", "#E5484D", "#EDEBE2"],
+      "materials": ["signal enamel", "junction lamps", "engraved control plates", "telemetry hairline grids"],
+      "viewport": "A control console: the PNR entry sits on an engraved plate; on submit the board resolves through an amber flicker to a solid green/amber/red aspect while a telemetry readout lists each factor's contribution.",
+      "risk": "The direction this category drifts toward — dark console plus status lights — so it must carry the railway's real hardware language to avoid the generic ops-dashboard rut."
+    },
+    {
+      "id": "challenger-teletext",
+      "label": "Teletext Service",
+      "verdict": "competitive",
+      "lineage": "broadcast teletext magazines",
+      "thesis": "The PNR is a page number — every ticket is a three-digit address on a live broadcast index.",
+      "palette": ["#000000", "#FFFF00", "#00FFFF", "#FF0000", "#FFFFFF"],
+      "materials": ["block mosaic", "phosphor", "rigid 40×24 character grid"],
+      "viewport": "Keying PNR 302 resolves like a teletext page — status assembles from mosaic blocks while the factors wait behind a REVEAL key.",
+      "case": "Fuses cleanly — readouts, page addresses, and a REVEAL for factor detail are native to it; loses on audience identification with today's Indian traveler.",
+      "risk": "Reads as retro novelty unless the character-cell grid is kept absolutely strict.",
+      "hero": "https://impeccable.style/worlds/cards/broadcast-programming-teletext-service-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/broadcast-programming-teletext-service.webp"
+    },
+    {
+      "id": "challenger-variable-font",
+      "label": "Variable Type Specimen",
+      "verdict": "declined",
+      "lineage": "interactive type specimens",
+      "thesis": "One giant PNR digit fills the screen and thickens as the odds rise — confidence as a live variable axis.",
+      "palette": ["#F5F1E8", "#111111", "#C8452F"],
+      "materials": ["paper", "ink", "one foundry accent"],
+      "viewport": "The ten PNR digits sit in a specimen grid; moving an axis sweeps weight through every glyph while a mono readout counts the value.",
+      "risk": "A typographic conceit that can leave the ticket data feeling like a footnote.",
+      "kept": "Continuous parametric response — one live value morphs the whole instrument.",
+      "hero": "https://impeccable.style/worlds/cards/variable-font-specimen-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/variable-font-specimen.webp"
+    },
+    {
+      "id": "challenger-ocean-depth",
+      "label": "Mesophotic Descent",
+      "verdict": "declined",
+      "lineage": "ocean-depth deep dives",
+      "thesis": "Checking a PNR is a descent toward chart time — the deeper you go the closer the answer, and waitlist is decompression.",
+      "palette": ["#02070D", "#0B2430", "#2EC4B6", "#F5F7F2"],
+      "materials": ["abyssal ink", "marine snow", "thermocline band"],
+      "viewport": "A vertical dive profile rules the page; the PNR sits at its current depth between the surface and the chart at turnaround depth.",
+      "risk": "Poetic pressure that can sink the plain data readouts this tool lives on.",
+      "kept": "One ruling vertical axis that every line of the page sits on.",
+      "hero": "https://impeccable.style/worlds/cards/rivers-tides-ocean-depths-mesophotic-deep-dive-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/rivers-tides-ocean-depths-mesophotic-deep-dive.webp"
+    },
+    {
+      "id": "challenger-miura",
+      "label": "Miura Deployable",
+      "verdict": "declined",
+      "lineage": "deployable origami structures",
+      "thesis": "The PNR is a folded packet; one pull deploys the full analysis as a rigid, crease-linked sheet.",
+      "palette": ["#F7F5EF", "#2C2A26", "#C9A227", "#8FB3C4"],
+      "materials": ["matte sheet", "ink", "gold packet accent", "valley creases"],
+      "viewport": "A gold chip holds the PNR; tug its corners and the whole analysis unfolds along diagonal seams.",
+      "risk": "The fold metaphor can make routine checking theatrical.",
+      "kept": "Deployment as state — detail unfolds from the compact object in one gesture.",
+      "hero": "https://impeccable.style/worlds/cards/paper-folds-pleats-deployable-miura-orbit-sheet-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/paper-folds-pleats-deployable-miura-orbit-sheet.webp"
+    },
+    {
+      "id": "challenger-zoo-map",
+      "label": "Gardens Guide Map",
+      "verdict": "declined",
+      "lineage": "zoo and gardens guide maps",
+      "thesis": "The journey is a map of coloured lobes; confirmation lives on one headland that swells to fill the screen.",
+      "palette": ["#F5F1E4", "#2C2E2A", "#8ED462", "#F5E211", "#FF705D"],
+      "materials": ["flat colour", "one SVG coastline"],
+      "viewport": "Each PNR is a lobe on the map; the checked ticket swells until its coast leaves the frame on two sides.",
+      "risk": "Flat-colour map language is the wrong register for a precision data instrument.",
+      "kept": "One continuous composition that reflows along the frame instead of stacking.",
+      "hero": "https://impeccable.style/worlds/cards/aww2-zoo-gardens-guide-map-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/aww2-zoo-gardens-guide-map.webp"
+    },
+    {
+      "id": "challenger-streaming-wall",
+      "label": "Streaming Title Wall",
+      "verdict": "declined",
+      "lineage": "streaming catalog walls",
+      "thesis": "PNRs as a wall of rails; the tile you land on lifts and tells its story while the room dims behind it.",
+      "palette": ["#0E1116", "#1B2027", "#E5484D", "#EDEBE2"],
+      "materials": ["poster tiles", "deep neutral ground"],
+      "viewport": "Watchlist as a wall of ticket tiles — the focused one expands to reveal status, odds, and the next check.",
+      "risk": "Entertainment-catalog pacing is wrong for high-frequency status checking.",
+      "kept": "Progressive disclosure — focus reveals detail in place, without navigation.",
+      "hero": "https://impeccable.style/worlds/cards/pop-culture-shelf-streaming-title-card-wall-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/pop-culture-shelf-streaming-title-card-wall.webp"
+    }
+  ],
+  "reroll": {
+    "registers": ["safer", "bolder"]
+  },
+  "canon": true,
+  "canonCard": {
+    "label": "Category standard",
+    "thesis": "The PNR checker this category ships, executed impeccably and honestly — a clean, light utility page.",
+    "palette": ["#FFFFFF", "#0F172A", "#2563EB"],
+    "materials": ["clean grid", "plain input", "result card"],
+    "viewport": "A light utility page: a large PNR input on top, a status-and-probability card below.",
+    "risk": "Indistinguishable from the competition by design."
+  },
+  "steer": true,
+  "buildPath": { "value": "code" }
+}

@@ -1,0 +1,192 @@
+/* Press feedback: mouse and touch only; keyboard activation never animates */
+@utility press {
+  transition: transform var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out);
+  &:active:not(:focus-visible):not(:disabled) {
+    transform: scale(0.97);
+  }
+}
+
+/* Data: tabular numerals in the mono face (PNR digits, times, coach and berth, counts) */
+@utility font-data {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* Silkscreen legend: the panel's label voice. Short labels only, never body copy. */
+@utility silk {
+  font-family: var(--font-label);
+  font-weight: 600;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+/* Panel section: a raised plate on the instrument face */
+@utility panel {
+  background: var(--surface-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elevation-1);
+}
+
+/* Panel seam between sections */
+@utility seam {
+  border-top: 1px solid var(--line);
+}
+
+/* Readout window: dark glass with lit segments */
+@utility readout {
+  background: var(--readout-bg);
+  color: var(--readout-fg);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line-strong);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.6);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Physical key cap */
+@utility key-cap {
+  border-radius: var(--radius-md);
+  box-shadow: var(--key-shadow);
+  transition: transform var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out);
+  &:active:not(:focus-visible):not(:disabled) {
+    transform: translateY(1px) scale(0.99);
+    box-shadow: var(--key-shadow-pressed);
+  }
+}
+
+/* LED: a small lamp; lit variants add a modest bloom sized to the lamp */
+@utility led {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: var(--key-led-dim);
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.5);
+  transition: background-color var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out);
+}
+@utility led-go {
+  background: var(--go-fg);
+  box-shadow: 0 0 4px 1px color-mix(in srgb, var(--go-fg) 60%, transparent);
+}
+@utility led-watch {
+  background: var(--watch-fg);
+  box-shadow: 0 0 4px 1px color-mix(in srgb, var(--watch-fg) 60%, transparent);
+}
+@utility led-stop {
+  background: var(--stop-fg);
+  box-shadow: 0 0 4px 1px color-mix(in srgb, var(--stop-fg) 60%, transparent);
+}
+@utility led-key {
+  background: var(--key-led);
+  box-shadow: 0 0 4px 1px color-mix(in srgb, var(--key-led) 60%, transparent);
+}
+
+/* Base UI popups: origin-aware, transform and opacity only */
+@utility popup-motion {
+  transform-origin: var(--transform-origin);
+  transition: transform var(--duration-base) var(--ease-out), opacity var(--duration-base) var(--ease-out);
+  &[data-starting-style],
+  &[data-ending-style] {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  &[data-ending-style] {
+    transition-duration: var(--duration-fast);
+    transition-timing-function: var(--ease-in);
+  }
+}
+
+/* Skeleton: transform-only sheen */
+@utility skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--skeleton-base);
+  border-radius: var(--radius-sm);
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, var(--skeleton-sheen), transparent);
+    animation: skeleton-sheen 1.6s var(--ease-in-out) infinite;
+  }
+}
+
+/* Key-value grid shared by lists and stacked tables */
+@utility kv-grid {
+  display: grid;
+  grid-template-columns: minmax(6rem, 35%) 1fr;
+  column-gap: calc(var(--spacing) * 4);
+  align-items: baseline;
+}
+
+/* Responsive table: below md, rows stack into labelled key-value pairs */
+@utility table-stack {
+  @media (max-width: 47.99rem) {
+    & thead {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+    }
+    & tr {
+      display: grid;
+      grid-template-columns: minmax(6rem, 35%) 1fr;
+      column-gap: calc(var(--spacing) * 4);
+      row-gap: calc(var(--spacing) * 1);
+      padding-block: calc(var(--spacing) * 3);
+      border-top: 1px solid var(--line);
+    }
+    & td {
+      display: contents;
+    }
+    & td::before {
+      content: attr(data-label);
+      font-family: var(--font-label);
+      font-weight: 600;
+      font-size: 0.75rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--ink-2);
+    }
+  }
+}
+
+@utility z-nav {
+  z-index: var(--z-nav);
+}
+@utility z-sheet {
+  z-index: var(--z-sheet);
+}
+@utility z-dialog {
+  z-index: var(--z-dialog);
+}
+@utility z-popover {
+  z-index: var(--z-popover);
+}
+@utility z-toast {
+  z-index: var(--z-toast);
+}
+@utility z-skip {
+  z-index: var(--z-skip);
+}
+
+/* Twin rails with sleepers — the page's railway line, drawn from tokens */
+@utility track-h {
+  background:
+    linear-gradient(var(--line-strong), var(--line-strong)) left top / 100% 2px no-repeat,
+    linear-gradient(var(--line-strong), var(--line-strong)) left bottom / 100% 2px no-repeat,
+    repeating-linear-gradient(90deg, var(--line) 0 2px, transparent 2px 14px);
+}
+@utility track-v {
+  background:
+    linear-gradient(var(--line-strong), var(--line-strong)) left top / 2px 100% no-repeat,
+    linear-gradient(var(--line-strong), var(--line-strong)) right top / 2px 100% no-repeat,
+    repeating-linear-gradient(180deg, var(--line) 0 2px, transparent 2px 14px);
+}

@@ -1,0 +1,82 @@
+@layer base {
+  html {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    font-weight: 400;
+    font-size: 1rem;
+    line-height: 1.5;
+    color: var(--ink-1);
+    background: var(--surface-0);
+    text-transform: none;
+    letter-spacing: 0;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    text-wrap: balance;
+    letter-spacing: -0.01em;
+  }
+  h1 {
+    font-weight: 700;
+  }
+  h2,
+  h3 {
+    font-weight: 600;
+  }
+  p {
+    text-wrap: pretty;
+    max-width: 72ch;
+  }
+
+  table {
+    font-variant-numeric: tabular-nums;
+  }
+
+  input,
+  select,
+  textarea,
+  button {
+    font: inherit;
+    color: inherit;
+  }
+  /* 16px or Safari zooms on focus */
+  input,
+  select,
+  textarea {
+    font-size: 1rem;
+  }
+
+  ::selection {
+    background: var(--selection-bg);
+    color: var(--selection-fg);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline-offset: 0;
+  }
+
+  a {
+    text-underline-offset: 0.15em;
+    text-decoration-thickness: 1px;
+  }
+
+  #app-root {
+    isolation: isolate;
+  }
+}

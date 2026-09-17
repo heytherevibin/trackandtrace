@@ -1,0 +1,150 @@
+/* Theme attribute lives on <html>. Tokens swap per face, so `dark:` is rarely needed. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* Hover only for fine pointers: touch never gets a stuck hover state. */
+@custom-variant hover {
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      @slot;
+    }
+  }
+}
+
+@theme {
+  /* Only role tokens compile. Note: never write --font-*: initial (it clears --font-weight-*). */
+  --color-*: initial;
+  --radius-*: initial;
+  --shadow-*: initial;
+  --inset-shadow-*: initial;
+  --drop-shadow-*: initial;
+  --text-*: initial;
+  --tracking-*: initial;
+  --leading-*: initial;
+  --ease-*: initial;
+  --animate-*: initial;
+  --container-*: initial;
+  --font-serif: initial;
+
+  /* Type scale: text steps ×1.125 rounded, display steps wider. 12px is the floor (captions and silkscreen only). */
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1rem;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base: 1rem;
+  --text-base--line-height: 1.5rem;
+  --text-lg: 1.125rem;
+  --text-lg--line-height: 1.625rem;
+  --text-xl: 1.375rem;
+  --text-xl--line-height: 1.75rem;
+  --text-xl--letter-spacing: -0.005em;
+  --text-2xl: 1.75rem;
+  --text-2xl--line-height: 2rem;
+  --text-2xl--letter-spacing: -0.01em;
+  --text-3xl: 2.25rem;
+  --text-3xl--line-height: 2.5rem;
+  --text-3xl--letter-spacing: -0.015em;
+  --text-4xl: clamp(2.75rem, 1.9rem + 3.2vw, 4.5rem);
+  --text-4xl--line-height: 1.02;
+  --text-4xl--letter-spacing: -0.02em;
+
+  --tracking-tight: -0.015em;
+  --tracking-normal: 0em;
+  --tracking-wide: 0.04em; /* silkscreen caps only */
+
+  --leading-none: 1;
+  --leading-tight: 1.15;
+  --leading-snug: 1.3;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.65;
+
+  /* Radii: a squared instrument. sm chips and LED windows · md keys, buttons, inputs · lg panels, dialogs */
+  --radius-sm: 0.125rem;
+  --radius-md: 0.25rem;
+  --radius-lg: 0.5rem;
+  --radius-full: 9999px;
+
+  /* Easing: exponential out for enters, in for exits, in-out for two-way moves, linear for the chase light */
+  --ease-out: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.5, 0, 0.75, 0);
+  --ease-in-out: cubic-bezier(0.76, 0, 0.24, 1);
+  --ease-linear: linear;
+  --default-transition-duration: 150ms;
+  --default-transition-timing-function: var(--ease-out);
+
+  --container-page: 76rem; /* max-w-page */
+  --container-prose: 40rem; /* max-w-prose */
+  --container-narrow: 28rem; /* max-w-narrow */
+}
+
+@theme inline {
+  --color-surface-0: var(--surface-0);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-surface-inverse: var(--surface-inverse);
+  --color-ink-1: var(--ink-1);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-ink-inverse: var(--ink-inverse);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-go: var(--go-fg);
+  --color-go-bg: var(--go-bg);
+  --color-go-line: var(--go-line);
+  --color-watch: var(--watch-fg);
+  --color-watch-bg: var(--watch-bg);
+  --color-watch-line: var(--watch-line);
+  --color-stop: var(--stop-fg);
+  --color-stop-bg: var(--stop-bg);
+  --color-stop-line: var(--stop-line);
+  --color-neutral: var(--neutral-fg);
+  --color-neutral-bg: var(--neutral-bg);
+  --color-neutral-line: var(--neutral-line);
+  --color-key-red: var(--key-red);
+  --color-key-orange: var(--key-orange);
+  --color-key-yellow: var(--key-yellow);
+  --color-key-white: var(--key-white);
+  --color-key-cap: var(--key-cap);
+  --color-key-cap-ink: var(--key-cap-ink);
+  --color-key-window: var(--key-window);
+  --color-key-led: var(--key-led);
+  --color-key-led-dim: var(--key-led-dim);
+  --color-readout-bg: var(--readout-bg);
+  --color-readout: var(--readout-fg);
+  --color-focus: var(--focus-ring);
+  --color-backdrop: var(--backdrop);
+  --shadow-1: var(--elevation-1);
+  --shadow-2: var(--elevation-2);
+  --shadow-3: var(--elevation-3);
+  --shadow-key: var(--key-shadow);
+  --shadow-key-pressed: var(--key-shadow-pressed);
+
+  /* next/font sets the face variables on <html>; roles are mapped here */
+  --font-sans: var(--font-face-body), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-face-display), var(--font-face-body), ui-sans-serif, system-ui, sans-serif;
+  --font-label: var(--font-face-label), var(--font-face-body), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-face-mono), ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+:root {
+  --duration-fast: 120ms; /* press, LED lit, hover colour */
+  --duration-base: 180ms; /* menus, tooltips, popovers */
+  --duration-slow: 260ms; /* dialog, sheet */
+  --duration-reveal: 420ms; /* the one authored landing moment */
+  --chase-step: 110ms; /* chase light per key, clock-locked */
+  --z-nav: 40;
+  --z-sheet: 50;
+  --z-dialog: 60;
+  --z-popover: 70;
+  --z-toast: 80;
+  --z-skip: 100;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --nav-height: 4.75rem;
+  --tabbar-height: calc(3.75rem + var(--safe-bottom));
+}

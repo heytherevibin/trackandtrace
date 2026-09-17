@@ -1,110 +1,60 @@
 import type { Metadata, Viewport } from "next";
-import { Archivo, Inter, JetBrains_Mono } from "next/font/google";
-import { AppShell, PwaRegister } from "@/components/shell";
-import { Providers } from "@/components/providers";
 import "./globals.css";
-
-const archivo = Archivo({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800", "900"],
-  display: "swap",
-  variable: "--font-archivo",
-});
-
-const inter = Inter({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  display: "swap",
-  variable: "--font-inter",
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  display: "swap",
-  variable: "--font-jetbrains-mono",
-});
+import { DARK, LIGHT } from "@/components/brand/brand-colors";
+import { Providers } from "@/components/providers";
+import { AppShell } from "@/components/shell/app-shell";
+import { PwaRegister } from "@/components/shell/pwa-register";
+import { currentUser } from "@/services/session";
+import { fontVars } from "./fonts";
 
 export const metadata: Metadata = {
   title: {
-    default: "Track & Trace — PNR intelligence",
+    default: "Track & Trace — PNR status from the source",
     template: "%s · Track & Trace",
   },
   description:
-    "Enter a 10-digit PNR and get an honest, explainable read on whether your seat confirms before chart time. Journey intelligence for Indian Railways.",
+    "Enter a 10-digit Indian Railways PNR and read exactly what the verified source returned, with its name and retrieval time. Free, no account needed.",
   applicationName: "Track & Trace",
   manifest: "/manifest.webmanifest",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "black-translucent",
-    title: "Track & Trace",
-  },
-  icons: {
-    icon: "/icon.svg",
-  },
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "Track & Trace" },
   openGraph: {
-    title: "Track & Trace — PNR intelligence",
-    description:
-      "An honest, explainable confirmation read before chart time. Journey intelligence for Indian Railways.",
+    title: "Track & Trace — PNR status from the source",
+    description: "Only the fields the railway source returned, with provenance and retrieval time. Free, no account.",
     type: "website",
+    siteName: "Track & Trace",
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#06080b",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: LIGHT.surface0 },
+    { media: "(prefers-color-scheme: dark)", color: DARK.surface0 },
+  ],
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{ children: React.ReactNode }>) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  // Un-awaited on purpose: the shell streams and loading boundaries still show.
+  const userPromise = currentUser();
   return (
-    <html lang="en" className={`${archivo.variable} ${inter.variable} ${jetbrainsMono.variable} antialiased`}>
-      <body className="bg-ink-0 text-bone">
-        {/* The Destiny Clock — direction contract
-        THESIS: Railway time decides every ticket. The product is a precision
-          instrument that reads a PNR and shows, on one master clock, whether
-          the seat frees before chart time — refusing the category's plain
-          utility-page default.
-        OWN-WORLD: Lacquered instrument grounds, dial-bone luminous markings,
-          steel hairlines and brass detailing; signal aspects (green / amber /
-          red) used strictly as destiny states. Data is always set in a mono
-          instrument face. No stock chrome anywhere — every atom machined.
-        STORY: A traveler keys ten digits and watches one honest light resolve
-          — the odds dial sweeping, the chart hand racing — with the reasoning
-          that earned it laid out as a factored readout.
-        FIRST VIEWPORT: Twin instrument faces — CONFIRMATION ODDS and TIME TO
-          CHART — flanking an engraved PNR terminal; submit sweeps the needle
-          while the red hand races chart preparation.
-        FORM: Grounded direction #5 of seven from the Indian-rail cultural
-          world (concept-seed key 06ec86fe), raised by variable-font-specimen,
-          ocean-depth-dive, miura-orbit-sheet, zoo-gardens-map and
-          streaming-wall.
-        FINISH: unreviewed and undocumented is unfinished; this build ends
-          with the finish review, the verdict, and DESIGN.md */}
-        <Providers>
-        <PwaRegister />
-        <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-          <div
-            className="absolute inset-0"
-            style={{
-              background:
-                "radial-gradient(90% 60% at 50% -5%, rgba(236,228,210,0.06), transparent 55%)",
-            }}
-          />
-          <div
-            className="absolute -top-40 left-1/2 h-[560px] w-[560px] -translate-x-1/2 rounded-full opacity-[0.05]"
-            style={{
-              background:
-                "conic-gradient(from 0deg, transparent 0deg, var(--bone) 40deg, transparent 90deg, transparent 200deg, var(--bone) 250deg, transparent 300deg)",
-            }}
-          />
-          <div className="scanline absolute inset-0" />
-          <div className="vignette absolute inset-0" />
-        </div>
-        <AppShell>{children}</AppShell>
+    <html lang="en" className={fontVars} suppressHydrationWarning>
+      <body className="bg-surface-0 text-ink-1">
+        {/*
+IMPECCABLE DIRECTION CONTRACT — seed c2e5f350
+THESIS: A PNR check is a ten-step pattern you punch in and run; the machine shows exactly which step it is on and refuses the category's dashboard of guesses.
+OWN-WORLD: Matte instrument panel (808 charcoal by night, 909 cream by day), ten colour-quartered key caps in one unbroken row, red seven-segment readouts for digits, green/amber/red LEDs for status, silkscreen caps for every label; no cards, no glow beyond LEDs.
+STORY: The traveler types ten digits into the row, presses RUN, watches the chase light cross validation, source, and result, then reads the LED and the readout; if the source is silent, the light stops at SOURCE and says so.
+FIRST VIEWPORT: Header strip with the name and a plain descriptor; the full-width ten-key row with the chase-light strip above it and the RUN key at its end; a segmented readout echoing the digits; three silkscreen assurances beneath; on phones the row spans the screen.
+FORM: Rhythm Machine Step Row, a dealt challenger adopted by the user over the assigned Trains at a Glance; seed key c2e5f350.
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md.
+*/}
+        <Providers userPromise={userPromise}>
+          <PwaRegister />
+          <div id="app-root">
+            <AppShell>{children}</AppShell>
+          </div>
         </Providers>
       </body>
     </html>
