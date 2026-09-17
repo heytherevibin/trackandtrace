@@ -1,8 +1,8 @@
 import { expect, test } from "./fixtures";
 import { gotoReady } from "./helpers";
 
-// No phone tab bar: below xl the masthead is two tiers (brand and SIGN IN, then the nav strip with
-// the theme cells). The landing's section anchors live in the footer. These specs hold that on a phone.
+// No phone tab bar: below lg the masthead is two tiers (brand and SIGN IN, then the nav strip with
+// the theme button). The landing's section anchors live in the footer. These specs hold that on a phone.
 
 const PRODUCT = ["Check a PNR", "Watchlist", "Pre-booking", "Accuracy"] as const;
 const SECTIONS = ["How it works", "The record", "Sources", "Roadmap", "FAQ"] as const;

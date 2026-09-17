@@ -1,23 +1,25 @@
 import { expect, test } from "./fixtures";
 import { gotoReady } from "./helpers";
 
-// The masthead's Auto · Day · Night cells are toggle buttons in a "Theme" group.
-test("the theme choice persists and applies before paint", async ({ page }) => {
+// The masthead's theme control is one button showing the active mode; a click moves System → Day → Night.
+test("the theme choice cycles, persists, and applies before paint", async ({ page }) => {
   await gotoReady(page, "/");
-  const cell = (name: "Auto" | "Day" | "Night") => page.getByRole("group", { name: "Theme" }).getByRole("button", { name, exact: true });
+  const button = page.getByRole("banner").getByRole("button", { name: /^Theme:/ });
 
-  await cell("Day").click();
+  await expect(button).toHaveAccessibleName("Theme: System. Switch to Day");
+  await button.click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
-  await expect(cell("Day")).toHaveAttribute("aria-pressed", "true");
+  await expect(button).toHaveAccessibleName("Theme: Day. Switch to Night");
+
   await page.reload({ waitUntil: "domcontentloaded" });
   // Applied before paint: the attribute is already set before React hydrates.
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   // Clicks before hydration are swallowed by the dev server; wait before choosing again.
   await page.locator("html[data-hydrated]").waitFor({ timeout: 15_000 });
-  await expect(cell("Day")).toHaveAttribute("aria-pressed", "true");
+  await expect(button).toHaveAccessibleName("Theme: Day. Switch to Night");
 
-  await cell("Night").click();
+  await button.click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-  await expect(cell("Night")).toHaveAttribute("aria-pressed", "true");
-  await expect(cell("Day")).toHaveAttribute("aria-pressed", "false");
+  await expect(button).toHaveAccessibleName("Theme: Night. Switch to System");
+  await expect(button).toContainText("Night");
 });

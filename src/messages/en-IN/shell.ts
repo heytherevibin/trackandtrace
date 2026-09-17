@@ -22,9 +22,10 @@ export const shell = {
   },
   theme: {
     label: "Theme",
-    system: "Auto",
+    system: "System",
     light: "Day",
     dark: "Night",
+    cycle: (current: string, next: string) => `Theme: ${current}. Switch to ${next}`,
   },
   footer: {
     product: "Product",

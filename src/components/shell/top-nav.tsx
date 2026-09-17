@@ -14,9 +14,9 @@ const ITEM = "inline-flex shrink-0 items-center gap-2 whitespace-nowrap border-y
 /**
  * The masthead, the same on every page: brand; the nav (Check a PNR, Watchlist, Pre-booking,
  * Accuracy), each a Fluent Filled icon beside its capital label, the current page underlined in
- * steel; the Auto · Day · Night cells; and SIGN IN (or the account menu) as its own button on the
- * right. On the landing, Check a PNR jumps to the check plate. From xl it is one sticky hairline row;
- * below xl it is two aligned tiers (brand and sign in, then the nav with the theme cells, scrolling
+ * steel; the one theme button (System → Day → Night); and SIGN IN (or the account menu) as its own button on the
+ * right. On the landing, Check a PNR jumps to the check plate. From lg it is one sticky hairline row;
+ * below lg it is two aligned tiers (brand and sign in, then the nav with the theme cells, scrolling
  * sideways on a phone). The landing's section anchors live in the footer.
  */
 export function TopNav() {
@@ -27,12 +27,12 @@ export function TopNav() {
   return (
     <header className={cn("border-b border-line bg-surface-0", !minimal && "sticky top-0 z-nav")} style={{ viewTransitionName: "site-header" }}>
       <div className="page-frame flex flex-wrap items-center gap-x-6">
-        <Link href="/" className="mr-auto inline-flex h-16 items-center text-ink-1 no-underline hover:text-ink-1 xl:mr-2">
+        <Link href="/" className="mr-auto inline-flex h-16 items-center text-ink-1 no-underline hover:text-ink-1 lg:mr-2">
           <Wordmark />
         </Link>
         {minimal ? null : (
           <>
-            <div className="scrollbar-none order-last flex w-full items-center justify-between gap-6 overflow-x-auto border-t border-line py-2.5 xl:order-none xl:w-auto xl:flex-1 xl:overflow-visible xl:border-t-0 xl:py-0">
+            <div className="scrollbar-none order-last flex w-full items-center justify-between gap-6 overflow-x-auto border-t border-line py-2.5 lg:order-none lg:w-auto lg:flex-1 lg:overflow-visible lg:border-t-0 lg:py-0">
               <nav aria-label={messages.shell.nav.primaryLabel} className="flex items-center gap-5 font-display text-label font-semibold uppercase tracking-caps">
                 {PRIMARY_NAV.map(({ href, label, Icon }) => {
                   const check = href === "/";

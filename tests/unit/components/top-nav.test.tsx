@@ -31,12 +31,9 @@ describe("TopNav", () => {
     expect(signIn).toHaveClass("uppercase");
   });
 
-  it("keeps the theme cells in the masthead, with icons and labels", () => {
+  it("keeps the one theme button in the masthead", () => {
     render(<TopNav />);
-    const theme = screen.getByRole("group", { name: "Theme" });
-    for (const name of ["Auto", "Day", "Night"]) {
-      expect(within(theme).getByRole("button", { name }).querySelector("svg"), name).not.toBeNull();
-    }
+    expect(screen.getAllByRole("button", { name: /^Theme:/ })).toHaveLength(1);
   });
 
   it("marks the current app page and sets Sign in in capitals with its icon", () => {

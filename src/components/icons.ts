@@ -35,8 +35,8 @@ export {
   RoadRegular,
   // Filled: the navigation set (masthead, footer sections, theme cells, sign in)
   CalendarClockFilled,
+  DarkThemeFilled,
   DatabaseFilled,
-  DesktopFilled,
   DocumentTableFilled,
   FlowchartFilled,
   GaugeFilled,

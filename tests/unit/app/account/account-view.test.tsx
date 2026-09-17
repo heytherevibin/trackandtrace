@@ -27,7 +27,7 @@ describe("AccountView", () => {
     expect(screen.getByText("asha@example.com")).toBeInTheDocument();
     expect(screen.getByText("3 PNRs saved to this account")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open watchlist" })).toHaveAttribute("href", "/watchlist");
-    expect(screen.getByRole("group", { name: "Theme" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Theme:/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Export JSON" })).toBeInTheDocument();
   });
 
