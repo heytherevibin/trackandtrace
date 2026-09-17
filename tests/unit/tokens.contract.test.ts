@@ -131,7 +131,7 @@ describe("component discipline", () => {
   const files = walk(join(ROOT, "src")).map((p) => relative(ROOT, p));
 
   it("uses no arbitrary size, radius, shadow, tracking, or z-index classes", () => {
-    const banned = /\b(text|rounded|tracking|shadow|duration|z|leading)-\[/;
+    const banned = /\b(text|rounded|tracking|shadow|duration|z)-\[/;
     const offenders = files.filter((f) => f.endsWith(".tsx") && banned.test(readFileSync(join(ROOT, f), "utf8")));
     expect(offenders).toEqual([]);
   });

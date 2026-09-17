@@ -56,11 +56,14 @@
   --text-page--line-height: 1.06;
   --text-hero: clamp(2.75rem, 5.4vw, 4.75rem);
   --text-hero--line-height: 1.04;
+  --text-signin: clamp(2.125rem, 5vw, 3rem);
+  --text-signin--line-height: 1.06;
 
   --tracking-normal: 0em;
   --tracking-display: 0.01em; /* page and hero headings */
   --tracking-head: 0.02em; /* section headings, figures */
-  --tracking-brand: 0.06em; /* the wordmark, digits */
+  --tracking-wide: 0.04em; /* PNR figures in tables */
+  --tracking-brand: 0.06em; /* the wordmark, clock */
   --tracking-caps: 0.08em; /* every legend */
 
   --leading-none: 1;
