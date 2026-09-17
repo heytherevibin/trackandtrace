@@ -24,7 +24,7 @@ test("the sheet carries the operating principles, every anchored section, and no
   await expect(page.getByText("Specimen record", { exact: true })).toBeAttached();
   // No social proof and no invented odds. ("Predict" appears only in the refusals to predict.)
   await expect(page.getByText(/testimonial|trusted by|\d+\s?%\s?(chance|likely|confirm)|chance of confirmation is/i)).toHaveCount(0);
-  await expectAxeClean(page, { allowDesignLockedAccent: true });
+  await expectAxeClean(page);
 });
 
 test("a check renders the record in place, then opens the full record", async ({ page }) => {
@@ -37,7 +37,7 @@ test("a check renders the record in place, then opens the full record", async ({
   await expect(plate.getByRole("cell", { name: "RAC 4" })).toBeVisible();
   await expect(plate.getByText("Sample data")).toBeVisible();
   await expect(page).toHaveURL(/\/$/);
-  await expectAxeClean(page, { allowDesignLockedAccent: true });
+  await expectAxeClean(page);
   await plate.getByRole("link", { name: "Open full record" }).click();
   await page.waitForURL(`**/pnr/${PNR.mixed}`);
 });

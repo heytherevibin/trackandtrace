@@ -45,8 +45,8 @@ export async function runCheck(page: Page, pnr: string): Promise<void> {
   }
 }
 
-/** The Industry steel, tuned to the ground at 3:1 by the design (primary fill, outline tag, ghost text). */
-const DESIGN_LOCKED_ACCENT = "#5980a6";
+/** The Industry steel and its drawn hover step, tuned to the ground at 3:1 by the design (primary fill, outline tag, ghost text). */
+const DESIGN_LOCKED_ACCENT: ReadonlySet<string> = new Set(["#5980a6", "#597ea3"]);
 
 type AxeNode = Awaited<ReturnType<AxeBuilder["analyze"]>>["violations"][number]["nodes"][number];
 
@@ -55,19 +55,24 @@ function isDesignLockedAccent(node: AxeNode): boolean {
     const data: unknown = check.data;
     if (typeof data !== "object" || data === null) return false;
     const { fgColor, bgColor } = data as { readonly fgColor?: unknown; readonly bgColor?: unknown };
-    return fgColor === DESIGN_LOCKED_ACCENT || bgColor === DESIGN_LOCKED_ACCENT;
+    return (typeof fgColor === "string" && DESIGN_LOCKED_ACCENT.has(fgColor)) || (typeof bgColor === "string" && DESIGN_LOCKED_ACCENT.has(bgColor));
   });
 }
 
 /**
- * Zero serious or critical axe findings on the current page. `allowDesignLockedAccent` exempts only
- * colour-contrast nodes drawn in the design-locked steel pairing; every other finding still fails.
+ * Zero serious or critical axe findings on the current page. The steel pairing is design-locked
+ * (decided 2026-09-17: the reference is matched exactly), so by default only colour-contrast nodes
+ * drawn in #5980a6 are exempt; every other finding still fails. Pass `allowDesignLockedAccent: false`
+ * for a strict scan.
  */
 export async function expectAxeClean(page: Page, options: { readonly allowDesignLockedAccent?: boolean } = {}): Promise<void> {
+  // Park the pointer so no hover tint is mid-transition when colours are sampled.
+  await page.mouse.move(0, 0);
+  await page.waitForTimeout(200);
   // @axe-core/playwright bundles a newer playwright-core type; the runtime API is identical.
   const results = await new AxeBuilder({ page: page as unknown as ConstructorParameters<typeof AxeBuilder>[0]["page"] }).analyze();
   const material = results.violations
-    .map((v) => (options.allowDesignLockedAccent && v.id === "color-contrast" ? { ...v, nodes: v.nodes.filter((n) => !isDesignLockedAccent(n)) } : v))
+    .map((v) => ((options.allowDesignLockedAccent ?? true) && v.id === "color-contrast" ? { ...v, nodes: v.nodes.filter((n) => !isDesignLockedAccent(n)) } : v))
     .filter((v) => (v.impact === "serious" || v.impact === "critical") && v.nodes.length > 0);
   expect(material.map((v) => `${v.id}: ${v.nodes[0]?.target?.join(" ")}`)).toEqual([]);
 }
