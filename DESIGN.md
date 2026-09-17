@@ -71,7 +71,7 @@ Tracking: `tracking-caps` .08em (legends), `brand` .06em (wordmark, digits), `he
 
 ## Shell
 
-- **Masthead** (`TopNav`), the same on every page: sticky, `surface-0`, hairline bottom. Wordmark (mark + "TRACK & TRACE" 18px `tracking-brand`); the nav CHECK A PNR · WATCHLIST · PRE-BOOKING · ACCURACY, each a Fluent **Filled** icon at 20px beside its 13px capital label, the current page underlined in steel (on `/`, Check a PNR is current and jumps to `#terminal`); the Auto · Day · Night cells with their Filled icons; and SIGN IN (capitals, person icon) as its own secondary button on the right, or the account menu. From `xl` it is one row; below `xl` it is two aligned tiers (brand and SIGN IN, then the nav with the theme cells, scrolling sideways on phones). `/login` is not sticky and shows the brand only.
+- **Masthead** (`TopNav`), the same on every page: sticky, `surface-0`, hairline bottom. Wordmark (mark + "TRACK & TRACE" 18px `tracking-brand`); the nav CHECK A PNR · WATCHLIST · PRE-BOOKING · ACCURACY, each its own hairline box with a Fluent **Filled** icon at 20px beside its 13px capital label (Watchlist = eye), the current page tinted steel (on `/`, Check a PNR is current and jumps to `#terminal`); then, on the right, the theme icon button (one square 36px box showing the active mode's Filled icon; a click cycles System → Day → Night; the mode lives in its accessible name and tooltip) beside SIGN IN (capitals, person icon), or the account menu. Every masthead control shares one 36px box (13px capitals, 20px icons). From `lg` it is one row; below `lg` it is two aligned tiers (brand with the theme button and SIGN IN, then the nav, scrolling sideways on phones). `/login` is not sticky and shows the brand only.
 - **Footer**: `/` gets the enterprise footer (brand + disclaimer; Sections — the landing's anchors How it works, The record, Sources, Roadmap, FAQ with Filled icons; Product; Company; Status lamps read from real flags; © and IST clock). App pages get one line: disclaimer · © and the IST clock.
 
 ## Page anatomy
@@ -100,8 +100,14 @@ Hover is a tint. Press is the one app-wide movement: every button, button-styled
 box (`button`, `[role=button]`, `.press`) settles to 96% while held (90ms in) and eases back on
 release (200ms, no overshoot). It is a transform only, so layout never moves; keyboard activation and
 disabled controls never animate (rule in `src/styles/motion.css`, guarded by `tests/e2e/press.spec.ts`).
-The other movements: the theme button's turning icon and sliding label, the invalid shake, the
+The other movements: the theme button's turning icon, the invalid shake, the
 clock's flip, the digit caret, the running sweep, popup fades. All collapse under reduced motion.
+
+Stability rules (each guarded by `tests/e2e/smoothness.spec.ts`): anchor offsets use `scroll-margin-top`
+on targets, never `scroll-padding` on `<html>` (focusing a masthead control would smooth-scroll the page);
+`<html data-scroll-behavior="smooth">` so route changes land at the top without animating; theme switches
+suppress colour transitions only (`data-theme-switching`), never all transitions; AnimatePresence swaps
+overlap in a grid cell rather than using `popLayout`.
 
 ## Accessibility
 

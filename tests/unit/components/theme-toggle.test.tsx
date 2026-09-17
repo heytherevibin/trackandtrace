@@ -11,16 +11,15 @@ describe("ThemeToggle", () => {
     state.setTheme.mockReset();
   });
 
-  it("is one button that shows only the active mode, with its icon", () => {
+  it("is one square icon button: the active mode's icon, its name only for assistive tech and the tooltip", () => {
     state.theme = "system";
     render(<ThemeToggle />);
     const button = screen.getByRole("button", { name: "Theme: System. Switch to Day" });
     expect(screen.getAllByRole("button")).toHaveLength(1);
-    const visible = (text: string) => screen.queryAllByText(text).filter((el) => !el.classList.contains("invisible"));
-    expect(visible("System")).toHaveLength(1);
-    expect(visible("Day")).toHaveLength(0);
-    expect(visible("Night")).toHaveLength(0);
-    expect(button.querySelector("svg")).not.toBeNull();
+    expect(button).toHaveAttribute("title", "Theme: System. Switch to Day");
+    expect(button).toHaveClass("size-9");
+    expect(button.textContent).toBe("");
+    expect(button.querySelectorAll("svg")).toHaveLength(1);
   });
 
   it("marks the document as switching for two frames so colours land at once while the press still eases", () => {

@@ -16,10 +16,10 @@ const ITEM = cn(MASTHEAD_CONTROL, "press no-underline");
 /**
  * The masthead, the same on every page: brand; the nav (Check a PNR, Watchlist, Pre-booking,
  * Accuracy), each its own hairline box with a Fluent Filled icon beside its capital label, the current
- * page tinted steel; the one theme button (System → Day → Night); and SIGN IN (or the account menu) as its own button on the
+ * page tinted steel; the theme icon button (System → Day → Night) beside it; and SIGN IN (or the account menu) as its own button on the
  * right. On the landing, Check a PNR jumps to the check plate. From lg it is one sticky hairline row;
- * below lg it is two aligned tiers (brand and sign in, then the nav with the theme cells, scrolling
- * sideways on a phone). The landing's section anchors live in the footer.
+ * below lg it is two aligned tiers (brand with the theme button and sign in, then the nav,
+ * scrolling sideways on a phone). The landing's section anchors live in the footer.
  */
 export function TopNav() {
   const pathname = usePathname();
@@ -34,7 +34,7 @@ export function TopNav() {
         </Link>
         {minimal ? null : (
           <>
-            <div className="scrollbar-none order-last flex w-full items-center justify-between gap-5 overflow-x-auto border-t border-line py-2.5 lg:order-none lg:w-auto lg:flex-1 lg:overflow-visible lg:border-t-0 lg:py-0">
+            <div className="scrollbar-none order-last flex w-full items-center overflow-x-auto border-t border-line py-2.5 lg:order-none lg:w-auto lg:flex-1 lg:overflow-visible lg:border-t-0 lg:py-0">
               <nav aria-label={messages.shell.nav.primaryLabel} className="flex items-center gap-2">
                 {PRIMARY_NAV.map(({ href, label, Icon }) => {
                   const check = href === "/";
@@ -58,9 +58,9 @@ export function TopNav() {
                   );
                 })}
               </nav>
-              <ThemeToggle />
             </div>
-            <div className="flex h-16 items-center">
+            <div className="flex h-16 items-center gap-2">
+              <ThemeToggle />
               <UserMenu />
             </div>
           </>

@@ -45,11 +45,11 @@ function modeAfter(value: ThemeChoice): Mode {
 }
 
 /**
- * One theme button. It shows only the active mode, icon beside its capital label, and a click
- * moves to the next (System → Day → Night). The press is the app-wide one (motion.css); the old
- * icon turns out as the new one turns in, and the label slides up. Reduced motion (MotionConfig "user")
- * drops the movement and keeps the change. Until the stored choice is known it holds its size
- * without claiming a mode.
+ * One square theme icon button. It shows only the active mode's icon; the mode and the next one live in
+ * its accessible name and tooltip ("Theme: Day. Switch to Night"). A click moves System → Day → Night. The
+ * press is the app-wide one (motion.css); the old icon turns out as the new one turns in. Reduced motion
+ * (MotionConfig "user") drops the turn and keeps the change. Until the stored choice is known it holds its
+ * size without claiming a mode.
  */
 export function ThemeToggle({ className }: { readonly className?: string }) {
   const { theme, setTheme } = useTheme();
@@ -64,8 +64,10 @@ export function ThemeToggle({ className }: { readonly className?: string }) {
       onClick={() => switchTheme(setTheme, next.value)}
       aria-label={mounted ? label : messages.shell.theme.label}
       title={mounted ? label : undefined}
-      className={cn(MASTHEAD_CONTROL, "press cursor-pointer border-line bg-transparent text-accent-text hover:border-line-strong hover:bg-accent/12 active:bg-accent/20", className)}
+      className={cn(MASTHEAD_CONTROL, "press size-9 cursor-pointer justify-center border-line bg-transparent px-0 text-accent-text hover:border-line-strong hover:bg-accent/12 active:bg-accent/20", className)}
     >
+      {/* Entering and leaving icons overlap in one grid cell (no popLayout, which lifted the leaving icon out
+          of flow and flashed it outside the button on its last frame). */}
       <span aria-hidden="true" className="grid size-5 place-items-center">
         <AnimatePresence initial={false}>
           {mounted ? (
@@ -78,26 +80,6 @@ export function ThemeToggle({ className }: { readonly className?: string }) {
               transition={{ duration: 0.32, ease: EASE_OUT_EXPO }}
             >
               <current.Icon className="size-5" />
-            </m.span>
-          ) : null}
-        </AnimatePresence>
-      </span>
-      {/* The longest label reserves the width, so the button never changes size between modes. Entering and
-          leaving pieces overlap in one grid cell; no popLayout, which lifted the leaving piece out of flow
-          and flashed it far outside the button on its last frame. */}
-      <span aria-hidden="true" className="grid overflow-hidden">
-        <span className="invisible col-start-1 row-start-1">{messages.shell.theme.system}</span>
-        <AnimatePresence initial={false}>
-          {mounted ? (
-            <m.span
-              key={current.value}
-              className="col-start-1 row-start-1"
-              initial={{ y: "110%", opacity: 0 }}
-              animate={{ y: "0%", opacity: 1 }}
-              exit={{ y: "-110%", opacity: 0 }}
-              transition={{ duration: 0.28, ease: EASE_OUT_EXPO }}
-            >
-              {current.label}
             </m.span>
           ) : null}
         </AnimatePresence>

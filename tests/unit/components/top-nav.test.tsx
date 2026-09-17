@@ -48,12 +48,14 @@ describe("TopNav", () => {
     expect(PRIMARY_NAV.find((item) => item.href === "/watchlist")?.Icon).toBe(EyeFilled);
   });
 
-  it("keeps the one theme button in the masthead, the same height and type as the nav boxes", () => {
+  it("keeps the one theme icon button beside Sign in, outside the nav, at the nav boxes' height", () => {
     nav.pathname = "/watchlist";
     render(<TopNav />);
     const theme = screen.getAllByRole("button", { name: /^Theme:/ });
     expect(theme).toHaveLength(1);
-    expect(theme[0]).toHaveClass("h-9", "text-label");
+    expect(theme[0]).toHaveClass("size-9");
+    expect(screen.getByRole("navigation", { name: "Primary" })).not.toContainElement(theme[0]!);
+    expect(theme[0]!.parentElement).toContainElement(screen.getByTestId("sign-in"));
     expect(screen.getByTestId("sign-in")).toHaveClass("h-9", "text-label");
   });
 

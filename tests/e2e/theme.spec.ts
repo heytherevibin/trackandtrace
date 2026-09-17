@@ -1,7 +1,7 @@
 import { expect, test } from "./fixtures";
 import { gotoReady } from "./helpers";
 
-// The masthead's theme control is one button showing the active mode; a click moves System → Day → Night.
+// The masthead's theme control is one icon button showing the active mode; a click moves System → Day → Night.
 test("the theme choice cycles, persists, and applies before paint", async ({ page }) => {
   await gotoReady(page, "/");
   const button = page.getByRole("banner").getByRole("button", { name: /^Theme:/ });
@@ -21,5 +21,5 @@ test("the theme choice cycles, persists, and applies before paint", async ({ pag
   await button.click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await expect(button).toHaveAccessibleName("Theme: Night. Switch to System");
-  await expect(button).toContainText("Night");
+  await expect(button).toBeInViewport();
 });
