@@ -3,6 +3,7 @@ import { Mark } from "@/components/brand/mark";
 import { Led } from "@/components/ui/led";
 import { messages } from "@/messages";
 import { accountsConfigured, flags } from "@/services/env";
+import { FooterSections } from "./footer-sections";
 import { FooterSwitch } from "./footer-switch";
 import { IstClock } from "./ist-clock";
 import { PRIMARY_NAV } from "./nav-config";
@@ -31,6 +32,10 @@ function FullFooter() {
             </span>
           </span>
           <p className="mt-4 text-sm text-ink-1/74">{messages.common.footerDisclaimer}</p>
+        </div>
+        <div className="flex-[1_1_130px]">
+          <p className={COLUMN_HEAD}>{m.sections}</p>
+          <FooterSections />
         </div>
         <div className="flex-[1_1_130px]">
           <p className={COLUMN_HEAD}>{m.product}</p>
@@ -78,7 +83,7 @@ function FullFooter() {
         </div>
       </div>
       <div className="border-t border-line">
-        <div className="page-frame flex flex-wrap items-center justify-between gap-2 py-4">
+        <div className="page-frame flex flex-wrap items-center justify-between gap-x-6 gap-y-3 py-4">
           <p className="m-0 font-display text-xs font-semibold uppercase tracking-caps text-ink-1/70">{m.copyright(year)}</p>
           <IstClock />
         </div>
@@ -91,7 +96,7 @@ function FullFooter() {
 function CompactFooter() {
   const year = new Date().getFullYear();
   return (
-    <div className="page-frame flex flex-wrap items-center justify-between gap-2 py-4">
+    <div className="page-frame flex flex-wrap items-center justify-between gap-x-6 gap-y-3 py-4">
       <p className="m-0 text-label leading-normal text-ink-1/70">
         {messages.common.notAffiliated}
         {"  ·  "}

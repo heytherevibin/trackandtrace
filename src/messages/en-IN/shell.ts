@@ -38,6 +38,7 @@ export const shell = {
     notConnected: "Not connected",
     copyright: (year: number) => `© ${year} Track & Trace`,
     statusLabel: "Service status",
+    sections: "Sections",
   },
   install: {
     title: "Install Track & Trace",

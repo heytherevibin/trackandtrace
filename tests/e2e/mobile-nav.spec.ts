@@ -1,8 +1,8 @@
 import { expect, test } from "./fixtures";
 import { gotoReady } from "./helpers";
 
-// The B sheets draw no phone tab bar: the masthead wraps onto a second row and keeps
-// every link. These specs hold that on a phone.
+// No phone tab bar: below lg the masthead is two tiers (brand and action, then the nav strip with
+// the theme cells). The landing's section anchors live in the footer. These specs hold that on a phone.
 
 const PRODUCT = ["Check", "Watchlist", "Pre-booking", "Accuracy"] as const;
 const SECTIONS = ["How it works", "The record", "Sources", "Roadmap", "FAQ"] as const;
@@ -28,11 +28,13 @@ test("the wrapped masthead keeps the product links and marks the current page", 
   await page.waitForURL((url) => url.pathname === "/");
 });
 
-test("the landing masthead keeps its section anchors and the check on a phone", async ({ page, isMobile }) => {
+test("the landing keeps the check in the masthead and its section anchors in the footer on a phone", async ({ page, isMobile }) => {
   test.skip(!isMobile, "phone-only surface");
   await gotoReady(page, "/");
   const nav = page.getByRole("navigation", { name: "Primary" });
-  for (const name of SECTIONS) await expect(nav.getByRole("link", { name, exact: true })).toBeVisible();
+  for (const name of SECTIONS) await expect(nav.getByRole("link", { name, exact: true })).toHaveCount(0);
+  const sections = page.getByRole("contentinfo").getByRole("list", { name: "Sections" });
+  for (const name of SECTIONS) await expect(sections.getByRole("link", { name, exact: true })).toBeAttached();
 
   const check = page.getByRole("banner").getByRole("link", { name: "Check a PNR" });
   await expect(check).toBeVisible();

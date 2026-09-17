@@ -23,6 +23,13 @@
   padding-top: 3rem;
   padding-bottom: 3.75rem;
 }
+/* A sideways-scrolling row with no visible scrollbar (the phone nav strip) */
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
 @utility gutter {
   padding-inline: var(--gutter);
 }

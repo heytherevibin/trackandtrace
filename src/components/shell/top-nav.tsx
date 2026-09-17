@@ -9,26 +9,36 @@ import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { buttonClassName } from "@/components/ui/button";
 import { messages } from "@/messages";
 import { cn } from "@/utils/cn";
-import { LANDING_SECTIONS, MINIMAL_HEADER_ROUTES, PRIMARY_NAV, TERMINAL_ID, isActive } from "./nav-config";
+import { ACCOUNT_ITEM, MINIMAL_HEADER_ROUTES, PRIMARY_NAV, SIGN_IN_ITEM, TERMINAL_ID, isActive, type NavIcon } from "./nav-config";
 import { UserMenu } from "./user-menu";
 
-const NAV = "flex flex-wrap items-center gap-4 font-display text-label font-semibold uppercase tracking-caps";
-const MUTED = "text-ink-1/70 no-underline hover:text-ink-1/70";
+const ITEM = "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap border-y-2 border-transparent py-1 no-underline";
+const MUTED = "text-ink-1/70 hover:text-ink-1";
+
+function ItemBody({ Icon, label }: { readonly Icon: NavIcon; readonly label: string }) {
+  return (
+    <>
+      <Icon className="size-4 shrink-0" aria-hidden="true" />
+      <span>{label}</span>
+    </>
+  );
+}
 
 function AccountLink() {
-  const user = useUser();
+  const item = useUser() ? ACCOUNT_ITEM : SIGN_IN_ITEM;
   return (
-    <Link href={user ? "/account" : "/login"} className={MUTED}>
-      {user ? messages.shell.nav.account : messages.shell.nav.signIn}
+    <Link href={item.href} className={cn(ITEM, MUTED)}>
+      <ItemBody Icon={item.Icon} label={item.label} />
     </Link>
   );
 }
 
 /**
- * The masthead, as the B sheets draw it: a sticky hairline bar that wraps. The landing lists
- * its sections in steel, then the product pages muted, with "Check a PNR" on the right. App
- * pages list the product with a steel underline on the current one, and "Sign in" on the
- * right. Sign in shows the brand and the theme cells only.
+ * The masthead. Brand, the nav (icon and capital label on every item), the Auto · Day · Night cells,
+ * and the page's action. From lg it is one sticky hairline row; below lg it is two aligned tiers,
+ * brand and action on top, nav and theme cells beneath (scrolling sideways on a phone). The landing
+ * lists the product pages muted with "Check a PNR"; app pages mark the current page with a steel
+ * underline, with Sign in. The landing's section anchors live in the footer.
  */
 export function TopNav() {
   const pathname = usePathname();
@@ -37,60 +47,60 @@ export function TopNav() {
 
   return (
     <header className={cn("border-b border-line bg-surface-0", !minimal && "sticky top-0 z-nav")} style={{ viewTransitionName: "site-header" }}>
-      <div className="page-frame flex min-h-16 flex-wrap items-center gap-x-5 gap-y-2">
-        <Link href="/" className={cn("inline-flex items-center text-ink-1 no-underline hover:text-ink-1", minimal ? "mr-auto" : "mr-2")}>
+      <div className="page-frame flex flex-wrap items-center gap-x-6">
+        <Link href="/" className="mr-auto inline-flex h-16 items-center text-ink-1 no-underline hover:text-ink-1 lg:mr-2">
           <Wordmark />
         </Link>
-        {minimal ? null : onLanding ? (
-          <nav aria-label={messages.shell.nav.primaryLabel} className={NAV}>
-            {LANDING_SECTIONS.map((s) => (
-              <a key={s.id} href={`#${s.id}`} className="no-underline">
-                {s.label}
-              </a>
-            ))}
-            <span aria-hidden="true" className="h-4 w-px bg-line" />
-            {PRIMARY_NAV.slice(1).map(({ href, label }) => (
-              <Link key={href} href={href} className={MUTED}>
-                {label}
-              </Link>
-            ))}
-            <Suspense
-              fallback={
-                <Link href="/login" className={MUTED}>
-                  {messages.shell.nav.signIn}
-                </Link>
-              }
-            >
-              <AccountLink />
-            </Suspense>
-          </nav>
-        ) : (
-          <nav aria-label={messages.shell.nav.primaryLabel} className={NAV}>
-            {PRIMARY_NAV.map(({ href, label }) => {
-              const active = isActive(pathname, href);
-              return (
-                <Link
-                  key={href}
-                  href={href}
-                  aria-current={active ? "page" : undefined}
-                  className={cn("no-underline", active ? "border-b-2 border-accent text-accent-text hover:text-accent-text" : MUTED)}
-                >
-                  {label}
-                </Link>
-              );
-            })}
-          </nav>
+        {minimal ? null : (
+          <>
+            <div className="scrollbar-none order-last flex w-full items-center justify-between gap-6 overflow-x-auto border-t border-line py-2.5 lg:order-none lg:w-auto lg:flex-1 lg:overflow-visible lg:border-t-0 lg:py-0">
+              <nav aria-label={messages.shell.nav.primaryLabel} className="flex items-center gap-5 font-display text-label font-semibold uppercase tracking-caps">
+                {onLanding ? (
+                  <>
+                    {PRIMARY_NAV.slice(1).map(({ href, label, Icon }) => (
+                      <Link key={href} href={href} className={cn(ITEM, MUTED)}>
+                        <ItemBody Icon={Icon} label={label} />
+                      </Link>
+                    ))}
+                    <Suspense
+                      fallback={
+                        <Link href="/login" className={cn(ITEM, MUTED)}>
+                          <ItemBody Icon={SIGN_IN_ITEM.Icon} label={SIGN_IN_ITEM.label} />
+                        </Link>
+                      }
+                    >
+                      <AccountLink />
+                    </Suspense>
+                  </>
+                ) : (
+                  PRIMARY_NAV.map(({ href, label, Icon }) => {
+                    const active = isActive(pathname, href);
+                    return (
+                      <Link
+                        key={href}
+                        href={href}
+                        aria-current={active ? "page" : undefined}
+                        className={cn(ITEM, active ? "border-b-accent text-accent-text hover:text-accent-text" : MUTED)}
+                      >
+                        <ItemBody Icon={Icon} label={label} />
+                      </Link>
+                    );
+                  })
+                )}
+              </nav>
+              <ThemeToggle />
+            </div>
+            <div className="flex h-16 items-center">
+              {onLanding ? (
+                <a href={`#${TERMINAL_ID}`} className={buttonClassName({ variant: "primary" })}>
+                  {messages.shell.nav.cta}
+                </a>
+              ) : (
+                <UserMenu />
+              )}
+            </div>
+          </>
         )}
-        <div className={cn("flex items-center gap-3", !minimal && "ml-auto")}>
-          <ThemeToggle />
-          {minimal ? null : onLanding ? (
-            <a href={`#${TERMINAL_ID}`} className={buttonClassName({ variant: "primary" })}>
-              {messages.shell.nav.cta}
-            </a>
-          ) : (
-            <UserMenu />
-          )}
-        </div>
       </div>
     </header>
   );

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Suspense } from "react";
-import { SignOutRegular } from "@/components/icons";
+import { PersonRegular, SignOutRegular } from "@/components/icons";
 import { messages } from "@/messages";
 import { useUser } from "@/components/session/session-provider";
 import { Avatar } from "@/components/ui/avatar";
@@ -12,7 +12,7 @@ import { MenuContent, MenuItem, MenuLinkItem, MenuRoot, MenuSeparator, MenuTrigg
 import { signOutEverywhere } from "@/services/auth-client";
 
 function Placeholder() {
-  return <span className="inline-block h-[32.4px] w-[62px] border border-line" aria-hidden="true" />;
+  return <span className="inline-block h-[32.4px] w-[96px] border border-line" aria-hidden="true" />;
 }
 
 function UserMenuInner() {
@@ -20,7 +20,8 @@ function UserMenuInner() {
   const user = useUser();
   if (!user) {
     return (
-      <Link href="/login" className={buttonClassName({ variant: "secondary" })} data-testid="sign-in">
+      <Link href="/login" className={buttonClassName({ variant: "secondary", className: "gap-2 text-label uppercase tracking-caps" })} data-testid="sign-in">
+        <PersonRegular className="size-4 shrink-0" aria-hidden="true" />
         {messages.shell.nav.signIn}
       </Link>
     );

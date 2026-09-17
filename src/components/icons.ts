@@ -29,4 +29,8 @@ export {
   ArrowExportRegular,
   EyeTrackingRegular,
   DatabaseRegular,
+  DocumentTableRegular,
+  FlowchartRegular,
+  QuestionCircleRegular,
+  RoadRegular,
 } from "@fluentui/react-icons";
