@@ -1,54 +1,69 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
-import { messages } from "@/messages";
+import { useRef, useState, type FormEvent } from "react";
 import { recentStore } from "@/services/stores/recent-store";
 import { cn } from "@/utils/cn";
-import { isValidPnr, normalizePnr } from "@/utils/pnr";
-import { PnrField, type PnrFieldStatus } from "./pnr-field";
+import { PnrField, PnrStub, useShake } from "./pnr-field";
+import { fieldStatus } from "./pnr-terminal-state";
 
-/** The check form: owns the digits, validates on Run, and navigates to the result. */
+/**
+ * The check in navigate mode, for surfaces that are not the landing sheet (the not-found pages):
+ * the same entry block and stub as the plate, but Run records the check and opens the full record.
+ * Without JavaScript the form still submits to /check.
+ */
 export function PnrCheckForm({ id = "pnr", autoFocus = false, compact = false, className }: { readonly id?: string; readonly autoFocus?: boolean; readonly compact?: boolean; readonly className?: string }) {
   const router = useRouter();
-  const [value, setValue] = useState("");
+  const [digits, setDigits] = useState("");
   const [attempted, setAttempted] = useState(false);
   const [running, setRunning] = useState(false);
-  const [shakeToken, setShakeToken] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const { shaking, shake, onAnimationEnd } = useShake();
+  const status = fieldStatus({ digits, attempted, running });
 
-  const digits = normalizePnr(value);
-  const valid = isValidPnr(digits);
-  const status: PnrFieldStatus = running ? "running" : attempted && !valid ? "invalid" : valid ? "ready" : digits.length === 0 ? "idle" : "partial";
-
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
-    setAttempted(true);
-    if (!valid) {
-      setShakeToken((n) => n + 1);
+  const run = () => {
+    if (running) return;
+    if (digits.length !== 10) {
+      setAttempted(true);
+      shake();
       return;
     }
-    // Record the check the moment it runs; the result view enriches it with the status.
     recentStore.push({ pnr: digits, checkedAt: new Date().toISOString() });
     setRunning(true);
     router.push(`/pnr/${digits}`);
   };
 
+  const onSubmit = (event: FormEvent) => {
+    event.preventDefault();
+    run();
+  };
+
   return (
-    <form onSubmit={submit} action="/check" method="get" noValidate className={cn("w-full", className)} data-testid="pnr-check-form">
+    <form onSubmit={onSubmit} action="/check" method="get" noValidate className={cn("w-full", shaking && "shake", className)} onAnimationEnd={onAnimationEnd} data-testid="pnr-check-form">
       <PnrField
         id={id}
-        value={value}
-        onChange={(next) => {
-          setValue(next);
+        digits={digits}
+        status={status}
+        sampleMode={false}
+        onDigits={(next) => {
+          setDigits(next);
           setAttempted(false);
         }}
-        onSubmit={() => submit(new Event("submit") as unknown as FormEvent)}
-        status={status}
-        stage="validate"
-        errorMessage={digits.length < 10 ? messages.check.errorIncomplete : messages.check.errorInvalid}
+        onEnter={run}
+        inputRef={inputRef}
+        onActivate={() => inputRef.current?.focus()}
         autoFocus={autoFocus}
-        shakeToken={shakeToken}
-        compact={compact}
+      />
+      <div aria-hidden="true" className={compact ? "mt-4" : "perforation my-[18px]"} />
+      <PnrStub
+        status={status}
+        showClear={digits.length > 0 && !running}
+        onClear={() => {
+          setDigits("");
+          setAttempted(false);
+          inputRef.current?.focus();
+        }}
+        runType="submit"
       />
     </form>
   );

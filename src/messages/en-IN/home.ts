@@ -1,50 +1,115 @@
 import type { MessageTree } from "../types";
 
+// The landing sheet, verbatim from Landing Redesign B.
+
 export const home = {
   hero: {
-    title: "Check your PNR. Read what the railway returned.",
-    lead: "Ten digits from your ticket, one request to the source, every field labelled with where it came from and when.",
-    assurances: {
+    lineOne: "Your PNR,",
+    lineTwo: "as the railway records it.",
+    lead: "Ten digits from your ticket, one live request to the source. Every field is shown exactly as returned, labelled with where it came from and when — never a guess, never an invented confirmation chance.",
+    tags: {
       free: "Free",
       noAccount: "No account needed",
       notLogged: "PNR never logged",
+      failsClosed: "Fails closed",
     },
   },
-  how: {
-    title: "Three steps, nothing hidden",
-    steps: [
-      { title: "Enter the PNR", detail: "The 10-digit number printed top-left on your ticket, or in your booking SMS." },
-      { title: "Run the request", detail: "One live request to the railway source at the moment you press Run. Nothing pre-computed, nothing filled in." },
-      { title: "Read what came back", detail: "Status, coach and berth, train and journey. Every field carries its source and the time it was retrieved." },
-    ],
-  },
-  claims: {
-    title: "What you can count on",
+  principles: {
+    title: "Track & Trace — operating principles",
+    code: "TT-100",
+    sheet: "Sheet 01 of 04",
+    label: "Operating principles",
     rows: [
-      {
-        legend: "Source",
-        title: "Only fields the source returned.",
-        detail: "If the railway source did not send a field, you see “not returned”, never a guess. No confirmation odds are invented. Every result names its source and retrieval time.",
-      },
-      {
-        legend: "Account",
-        title: "Free, and no account to check.",
-        detail: "A check needs only the number. Sign in only if you want a watchlist that follows you between devices. It stays optional.",
-      },
-      {
-        legend: "Privacy",
-        title: "PNRs and passenger names are never logged.",
-        detail: "Your PNR is used to make the request and is not written to our logs. Recent checks stay on your device, and you can clear them any time.",
-      },
+      { num: "01", prop: "Fields shown beyond the source response", val: "0", rem: "If the source did not send a field, the record says “not returned” — never a guess." },
+      { num: "02", prop: "Confirmation odds invented", val: "0", rem: "Prediction fields exist in the type layer and are never rendered." },
+      { num: "03", prop: "Account required to check", val: "None", rem: "Sign in only for a watchlist that follows you between devices. It stays optional." },
+      { num: "04", prop: "PNRs and names written to logs", val: "0", rem: "Recent checks stay on your device, and you can clear them any time." },
+    ],
+    note: "Strict real-only policy: if the source is silent, the product says so and stops. Nothing on this sheet is a marketing estimate.",
+  },
+  how: {
+    kicker: "02 · How it works",
+    title: "Three stops, nothing hidden",
+    stepLabel: (num: string, kicker: string) => `${num} · ${kicker}`,
+    steps: [
+      { num: "01", kicker: "Origin", title: "Enter the PNR", detail: "The 10-digit number printed top-left on your ticket, or in your booking SMS, punched in 3–3–4 as it appears there." },
+      { num: "02", kicker: "En route", title: "Run the request", detail: "One live request to the railway source at the moment you press Run. Nothing pre-computed, nothing filled in." },
+      { num: "03", kicker: "Terminus", title: "Read what came back", detail: "Status, coach and berth, train and journey. Every field carries its source and the time it was retrieved." },
     ],
   },
-  availability: {
-    title: "What is connected right now",
-    lead: "The live state of every data source behind this product. When one is not connected, the product says so instead of guessing.",
-    link: "Read the data policy",
+  record: {
+    kicker: "03 · The record you get",
+    title: "Every field, with its source on it",
+    bodyOne:
+      "A result is the reservation record as the source holds it: current status per passenger, coach and berth where allotted, the train and journey, and the retrieval time. Where the source did not send a field, the record says “not returned”. The specimen here is generated from the labelled development fixture — it is design material, not a real reservation.",
+    bodyTwo: "One booking often holds several passengers in different states — this specimen shows a party of three: one confirmed, one RAC, one still waitlisted.",
+    plateTitle: "Specimen record",
+    plateSheet: "Sheet 02",
+    leadTag: (label: string) => `${label} — lead passenger`,
+    trainLine: (number: string, name: string, route: string) => `${number} · ${name} · ${route}`,
+    journeyLine: (date: string, departs: string, quota: string) => `${date} · departs ${departs} IST · quota ${quota}`,
+    caption: "Specimen passengers",
   },
-  cta: {
-    title: "Got a ticket? Run a check.",
-    lead: "No sign-up. Only what the railway returned.",
+  sources: {
+    kicker: "04 · Connected right now",
+    title: "The state of every source",
+    lead: "When a data set is not connected, the product says so instead of guessing. This board is read from the real flags.",
+    policy: "Read the data policy",
+  },
+  roadmap: {
+    kicker: "05 · On the roadmap",
+    title: "Extensions under construction",
+    lead: "Each ships only when a verified source stands behind it — the same rule the check follows.",
+    planned: "Planned",
+    items: [
+      { num: "01", title: "Live train running status", note: "Where the train is right now, from a verified running-status feed." },
+      { num: "02", title: "Coach position", note: "Where your coach halts on the platform, so you stand at the right spot." },
+      { num: "03", title: "Seat availability", note: "Open berths by class and date, straight from inventory." },
+      { num: "04", title: "Platform locator", note: "The announced platform for your train at major stations." },
+      { num: "05", title: "Fare enquiry", note: "The published fare table for a route and class — no markups, no bundling." },
+      { num: "06", title: "Train schedule search", note: "Timetables by train number or station pair." },
+      { num: "07", title: "Chart preparation alerts", note: "A notification when the chart for a watched PNR is prepared." },
+    ],
+  },
+  features: {
+    kicker: "06 · More than a check",
+    open: (title: string) => `Open ${title} →`,
+    watchlist: {
+      title: "Watchlist",
+      detail: "Save a PNR and re-check it in one tap. It lives on your device; sign in only if you want it to follow you between devices — with merge and undo when it syncs.",
+    },
+    preBooking: {
+      title: "Pre-booking",
+      detail: "Plan a journey before you book. The form is ready today; it fills with live availability the day a timetable and inventory source is connected.",
+    },
+    accuracy: {
+      title: "Accuracy",
+      detail: "A public ledger of how results matched outcomes. It opens with zero records and earns every entry — nothing on it will ever be invented.",
+    },
+  },
+  photo: {
+    kicker: "07 · Where it gets used",
+    title: "Legible under stress",
+    bodyOne: "A crowded platform in harsh daylight, or a moving berth at night — one hand free, low attention. The interface is built to be read in one glance, with day and night faces that follow your device.",
+    bodyTwo: "Installable as an app, so the check stays one tap away for the days you keep re-checking the same ticket before the chart.",
+    platformNumber: "3",
+  },
+  faq: {
+    kicker: "08 · Questions",
+    title: "Asked before you ask",
+    items: [
+      { q: "Is this affiliated with IRCTC or Indian Railways?", a: "No. Track & Trace is an independent product. It requests your reservation record from a verified railway data source and shows exactly what came back." },
+      { q: "Do I need an account?", a: "No. A check needs only the 10-digit PNR. An account adds one thing: a watchlist that syncs between your devices. It stays optional." },
+      { q: "Is my PNR stored or logged?", a: "PNRs and passenger names are never written to our logs. Your PNR is used to make the request; recent checks stay on your device and you can clear them any time." },
+      { q: "Why does a field say “not returned”?", a: "Because the source did not send it. The product never fills a gap with a guess — it fails closed: no source, no claim." },
+      { q: "Does it predict my confirmation chances?", a: "No, and it never will here. Invented odds are the one thing this product exists to not show you. You get the record, its source, and its retrieval time." },
+      { q: "Where does the data come from?", a: "From a verified railway source, named on every result with the time of retrieval. Until one is connected, every check resolves to an explicit unavailable state — by design." },
+      { q: "When should I check?", a: "The reservation chart, prepared about four hours before departure, decides waitlisted and RAC tickets. Save the PNR to your watchlist and re-check as the chart approaches — in Indian Standard Time, everywhere." },
+    ],
+  },
+  closing: {
+    title: "Got a ticket? Run a check",
+    meta: "No sign-up",
+    lead: "Only what the railway returned — nothing filled in, nothing predicted.",
   },
 } as const satisfies MessageTree;
