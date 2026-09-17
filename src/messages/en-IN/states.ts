@@ -13,6 +13,17 @@ export const states = {
     badge: "Source not connected",
     policyLink: "Read the data policy",
   },
+  /** The request lifecycle drawn under an unavailable result, as the Pre-booking sheet draws it. */
+  lifecycle: {
+    legend: "PNR request lifecycle",
+    steps: { input: "Request entered", validate: "Request validated", source: "Railway source", result: "Result" },
+    details: {
+      input: (formatted: string) => `PNR ${formatted}`,
+      validate: "Ten digits",
+      source: "No verified source answered",
+      result: "Unavailable until a source answers",
+    },
+  },
   notFound: {
     title: "No record for this PNR",
     detail: "The source answered, but has no reservation under this number. Check the digits against your ticket.",
@@ -26,6 +37,8 @@ export const states = {
     title: "Something broke on our side",
     detail: "The page hit an error. Nothing about your reservation was changed.",
     reference: (digest: string) => `Reference ${digest}`,
+    plateTitle: "This page did not load",
+    plateDetail: "Retry to load it again. No result was shown in its place.",
   },
   empty: {
     watchlistTitle: "Nothing saved yet",
@@ -37,7 +50,15 @@ export const states = {
     pnrTitle: "That is not a PNR",
     pnrDetail: "A PNR is ten digits. Enter the number from your ticket.",
     home: "Home",
+    terminalTitle: "PNR check — live request",
+    terminalForm: "Form T&T-01",
   },
   offline: "Offline. Results cannot be fetched until the connection returns.",
+  offlinePage: {
+    title: "Offline",
+    lead: "Results cannot be fetched until the connection returns.",
+    plateTitle: "No connection",
+    plateDetail: "This device is not reaching the network, so no request was sent. Nothing cached is shown in place of a result.",
+  },
   loadingResult: "Requesting railway data",
 } as const satisfies MessageTree;

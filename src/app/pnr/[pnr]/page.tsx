@@ -16,7 +16,7 @@ export default async function PnrPage({ params }: { params: Promise<{ pnr: strin
   const { pnr } = await params;
   if (!pnrSchema.safeParse(pnr).success) notFound();
   return (
-    <section className="mx-auto w-full max-w-page px-4 py-8 sm:px-6">
+    <section className="page-frame page-body">
       <Suspense fallback={<PnrResultSkeleton />}>
         <PnrResultLoader pnr={pnr} />
       </Suspense>
