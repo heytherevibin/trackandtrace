@@ -1,6 +1,4 @@
-import type { Tone } from "@/types/ui";
 import { cn } from "@/utils/cn";
-import { Led } from "./led";
 
 export type TimelineStepState = "done" | "current" | "pending" | "failed";
 
@@ -11,30 +9,29 @@ export interface TimelineStep {
   readonly state: TimelineStepState;
 }
 
-const TONE: Record<TimelineStepState, { tone: Tone | "key"; lit: boolean }> = {
-  done: { tone: "go", lit: true },
-  current: { tone: "key", lit: true },
-  pending: { tone: "neutral", lit: false },
-  failed: { tone: "stop", lit: true },
+const RING: Record<TimelineStepState, string> = {
+  done: "border-accent bg-accent",
+  current: "border-accent bg-accent-wash",
+  pending: "border-line-strong bg-transparent",
+  failed: "border-ink-alert bg-transparent",
 };
 
-/** The step sequence: one lamp per stage, the lit one is where the request stopped. */
+/** The request lifecycle as a vertical line of stops; filled stops are done, the hollow steel ring is where it waits. */
 export function Timeline({ steps, label, className }: { readonly steps: readonly TimelineStep[]; readonly label: string; readonly className?: string }) {
   return (
-    <ol className={cn("grid grid-cols-2 gap-2 sm:grid-cols-4", className)} aria-label={label}>
-      {steps.map((step, index) => {
-        const { tone, lit } = TONE[step.state];
-        return (
-          <li key={step.id} className="rounded-md border border-line bg-surface-2 p-3" aria-current={step.state === "current" ? "step" : undefined} data-state={step.state}>
-            <div className="flex items-center gap-2">
-              <Led tone={tone} lit={lit} />
-              <span className="silk">{String(index + 1).padStart(2, "0")}</span>
-            </div>
-            <p className="mt-2 text-sm font-medium text-ink-1">{step.title}</p>
-            {step.detail ? <p className="mt-1 text-xs text-ink-2">{step.detail}</p> : null}
-          </li>
-        );
-      })}
+    <ol className={cn("flex flex-col", className)} aria-label={label}>
+      {steps.map((step, index) => (
+        <li key={step.id} className="flex gap-3.5" aria-current={step.state === "current" ? "step" : undefined} data-state={step.state}>
+          <span className="flex flex-col items-center" aria-hidden="true">
+            <span className={cn("mt-1 size-3 shrink-0 rounded-full border", RING[step.state])} />
+            {index < steps.length - 1 ? <span className="min-h-5 w-px flex-1 bg-line" /> : null}
+          </span>
+          <span className={cn("min-w-0", index < steps.length - 1 && "pb-4")}>
+            <span className="block font-display text-base font-semibold uppercase leading-snug tracking-head text-ink-1">{step.title}</span>
+            {step.detail ? <span className={cn("mt-0.5 block text-label", step.state === "failed" ? "text-ink-alert" : "text-ink-3")}>{step.detail}</span> : null}
+          </span>
+        </li>
+      ))}
     </ol>
   );
 }

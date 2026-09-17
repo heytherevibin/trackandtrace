@@ -7,7 +7,7 @@ import { messages } from "@/messages";
 import { cn } from "@/utils/cn";
 import { IconButton } from "./icon-button";
 
-// The bottom sheet: a tray that slides up from the panel edge and can be
+// The bottom sheet: a square tray that slides up from the edge and can be
 // swiped back down. Base UI's Drawer supplies the gesture and its physics.
 
 export const SheetRoot = Drawer.Root;
@@ -21,22 +21,22 @@ export function SheetContent({ title, description, children, className }: { read
       <Drawer.Viewport className="fixed inset-0 z-sheet flex items-end justify-center">
         <Drawer.Popup
           className={cn(
-            "panel flex max-h-[85dvh] w-full max-w-prose flex-col rounded-b-none border-b-0 bg-surface-3 pb-(--safe-bottom) shadow-3 outline-none",
+            "flex max-h-[85dvh] w-full max-w-prose flex-col border border-b-0 border-line bg-surface-3 pb-(--safe-bottom) shadow-3 outline-none",
             "transition-transform duration-(--duration-slow) ease-out-expo data-[starting-style]:translate-y-full data-[ending-style]:translate-y-full",
             className,
           )}
         >
           <div className="flex justify-center pt-2" aria-hidden="true">
-            <span className="h-1 w-12 rounded-full bg-line-strong" />
+            <span className="h-1 w-12 bg-line-strong" />
           </div>
-          <div className="flex items-start justify-between gap-4 px-4 py-3">
+          <div className="flex items-start justify-between gap-4 border-b border-line px-5 py-3">
             <div className="min-w-0">
-              <Drawer.Title className="text-xl">{title}</Drawer.Title>
+              <Drawer.Title className="text-xl tracking-head">{title}</Drawer.Title>
               {description ? <Drawer.Description className="mt-1 text-sm text-ink-2">{description}</Drawer.Description> : null}
             </div>
             <Drawer.Close render={<IconButton label={messages.common.close} icon={<DismissRegular className="size-5" aria-hidden="true" />} size="sm" />} />
           </div>
-          <Drawer.Content className="overflow-y-auto px-4 pb-4">{children}</Drawer.Content>
+          <Drawer.Content className="overflow-y-auto p-5">{children}</Drawer.Content>
         </Drawer.Popup>
       </Drawer.Viewport>
     </Drawer.Portal>

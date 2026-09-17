@@ -2,64 +2,73 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
 import { Wordmark } from "@/components/brand/wordmark";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
+import { buttonClassName } from "@/components/ui/button";
 import { messages } from "@/messages";
 import { cn } from "@/utils/cn";
-import { PRIMARY_NAV, isActive } from "./nav-config";
+import { LANDING_SECTIONS, MINIMAL_HEADER_ROUTES, PRIMARY_NAV, TERMINAL_ID, isActive } from "./nav-config";
 import { UserMenu } from "./user-menu";
 
-/** A floating instrument rail: detached from the edge, blurred plate, lit key for the active section. */
+const LINK = "caps whitespace-nowrap py-1 text-label no-underline";
+
+/** The masthead: a sticky hairline bar. The landing lists its sections; app pages mark where you are. */
 export function TopNav() {
   const pathname = usePathname();
-  const [scrolled, setScrolled] = useState(false);
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 4);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+  const onLanding = pathname === "/";
+  const minimal = MINIMAL_HEADER_ROUTES.includes(pathname);
 
   return (
-    <header className="fixed inset-x-0 top-0 z-nav" style={{ viewTransitionName: "site-header" }}>
-      <div className="mx-auto w-full max-w-page px-3 pt-3 sm:px-6">
-        <nav
-          aria-label={messages.shell.nav.primaryLabel}
-          className={cn(
-            "flex h-14 items-center justify-between gap-3 rounded-lg border border-line bg-surface-1/85 px-3 backdrop-blur-md transition-shadow duration-(--duration-base) sm:gap-4 sm:px-4",
-            scrolled ? "shadow-2 border-line-strong" : "shadow-1",
-          )}
-        >
-          <Link href="/" className="shrink-0 rounded-md" aria-label={messages.common.productName}>
-            <Wordmark compact hideNameOnMobile />
-          </Link>
-          <div className="hidden items-center gap-1 md:flex">
-            {PRIMARY_NAV.map(({ href, label, Icon }) => {
-              const active = isActive(pathname, href);
-              return (
-                <Link
-                  key={href}
-                  href={href}
-                  aria-current={active ? "page" : undefined}
-                  className={cn(
-                    "press inline-flex h-9 items-center gap-2 rounded-md px-3 font-label text-sm font-semibold uppercase tracking-wide transition-colors",
-                    active ? "bg-surface-sunken text-ink-1 shadow-key-pressed" : "text-ink-2 hover:bg-surface-2 hover:text-ink-1",
-                  )}
-                >
-                  <Icon className="size-4" aria-hidden="true" />
-                  {label}
-                  <span className={cn("led size-1.5", active && "led-key")} aria-hidden="true" />
-                </Link>
-              );
-            })}
-          </div>
-          <div className="flex items-center gap-2 sm:gap-3">
-            <ThemeToggle />
-            <span className="hidden h-6 w-px bg-line sm:block" aria-hidden="true" />
-            <UserMenu />
-          </div>
-        </nav>
+    <header className="sticky top-0 z-nav border-b border-line bg-surface-0" style={{ viewTransitionName: "site-header" }}>
+      <div className="page-frame flex min-h-16 flex-wrap items-center gap-x-5 gap-y-1">
+        <Link href="/" className="mr-2 shrink-0 py-3 text-ink-1 no-underline hover:text-ink-1">
+          <Wordmark />
+        </Link>
+        {!minimal ? (
+          <nav
+            aria-label={messages.shell.nav.primaryLabel}
+            className={cn("order-last hidden w-full flex-wrap items-center gap-x-4 gap-y-1 pb-2 md:flex", onLanding ? "xl:order-none xl:w-auto xl:pb-0" : "lg:order-none lg:w-auto lg:pb-0")}
+          >
+            {onLanding ? (
+              <>
+                {LANDING_SECTIONS.map((s) => (
+                  <a key={s.id} href={`#${s.id}`} className={cn(LINK, "text-accent-text hover:text-accent-soft-ink")}>
+                    {s.label}
+                  </a>
+                ))}
+                <span aria-hidden="true" className="h-4 w-px bg-line" />
+                {PRIMARY_NAV.slice(1).map(({ href, label }) => (
+                  <Link key={href} href={href} className={cn(LINK, "text-ink-3 hover:text-ink-1")}>
+                    {label}
+                  </Link>
+                ))}
+              </>
+            ) : (
+              PRIMARY_NAV.map(({ href, label }) => {
+                const active = isActive(pathname, href);
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    aria-current={active ? "page" : undefined}
+                    className={cn(LINK, "border-b-2", active ? "border-accent text-accent-text hover:text-accent-text" : "border-transparent text-ink-3 hover:text-ink-1")}
+                  >
+                    {label}
+                  </Link>
+                );
+              })
+            )}
+          </nav>
+        ) : null}
+        <div className="ml-auto flex items-center gap-3">
+          <ThemeToggle />
+          {!minimal ? <UserMenu /> : null}
+          {onLanding ? (
+            <a href={`#${TERMINAL_ID}`} className={buttonClassName({ variant: "primary", className: "hidden sm:inline-flex" })}>
+              {messages.shell.nav.cta}
+            </a>
+          ) : null}
+        </div>
       </div>
     </header>
   );

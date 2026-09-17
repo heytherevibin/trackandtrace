@@ -11,10 +11,18 @@ export const shell = {
     signOut: "Sign out",
     primaryLabel: "Primary",
     tabsLabel: "Sections",
+    cta: "Check a PNR",
+    sections: {
+      how: "How it works",
+      record: "The record",
+      sources: "Sources",
+      roadmap: "Roadmap",
+      faq: "FAQ",
+    },
   },
   theme: {
     label: "Theme",
-    system: "System",
+    system: "Auto",
     light: "Day",
     dark: "Night",
   },
@@ -29,6 +37,7 @@ export const shell = {
     connected: "Connected",
     notConnected: "Not connected",
     copyright: (year: number) => `© ${year} Track & Trace`,
+    statusLabel: "Service status",
   },
   install: {
     title: "Install Track & Trace",

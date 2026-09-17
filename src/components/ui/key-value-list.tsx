@@ -7,14 +7,14 @@ export interface KeyValueItem {
   readonly numeric?: boolean;
 }
 
-/** Silkscreen label, plain value. Shares the kv-grid rule with stacked tables. */
+/** Legend label, plain value, on hairline rows. Shares the kv-grid rule with stacked tables. */
 export function KeyValueList({ items, dense = false, className }: { readonly items: readonly KeyValueItem[]; readonly dense?: boolean; readonly className?: string }) {
   return (
-    <dl className={cn("kv-grid", dense ? "gap-y-1.5" : "gap-y-3", className)}>
-      {items.map((item) => (
+    <dl className={cn("kv-grid", className)}>
+      {items.map((item, i) => (
         <div key={item.label} className="contents">
-          <dt className="silk">{item.label}</dt>
-          <dd className={cn("min-w-0 text-ink-1", item.numeric && "font-data")}>{item.value}</dd>
+          <dt className={cn("legend-sm self-center", i > 0 && "border-t border-line", dense ? "py-1.5" : "py-2.5")}>{item.label}</dt>
+          <dd className={cn("min-w-0 text-body text-ink-1", i > 0 && "border-t border-line", dense ? "py-1.5" : "py-2.5", item.numeric && "tnum")}>{item.value}</dd>
         </div>
       ))}
     </dl>

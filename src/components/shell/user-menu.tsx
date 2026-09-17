@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Suspense } from "react";
-import { PersonRegular, SignOutRegular } from "@/components/icons";
+import { SignOutRegular } from "@/components/icons";
 import { messages } from "@/messages";
 import { useUser } from "@/components/session/session-provider";
 import { Avatar } from "@/components/ui/avatar";
@@ -12,7 +12,7 @@ import { MenuContent, MenuItem, MenuLinkItem, MenuRoot, MenuSeparator, MenuTrigg
 import { signOutEverywhere } from "@/services/auth-client";
 
 function Placeholder() {
-  return <span className="inline-block size-9 rounded-full border border-line bg-surface-2" aria-hidden="true" />;
+  return <span className="hidden h-9 w-16 border border-line sm:inline-block" aria-hidden="true" />;
 }
 
 function UserMenuInner() {
@@ -20,8 +20,7 @@ function UserMenuInner() {
   const user = useUser();
   if (!user) {
     return (
-      <Link href="/login" className={buttonClassName({ variant: "key", size: "sm" })} data-testid="sign-in">
-        <PersonRegular className="size-4" aria-hidden="true" />
+      <Link href="/login" className={buttonClassName({ variant: "secondary", className: "hidden sm:inline-flex" })} data-testid="sign-in">
         {messages.shell.nav.signIn}
       </Link>
     );
@@ -29,13 +28,13 @@ function UserMenuInner() {
   const name = user.name ?? user.email ?? messages.shell.nav.account;
   return (
     <MenuRoot>
-      <MenuTrigger className="press rounded-full" aria-label={messages.shell.nav.account} data-testid="account-menu">
+      <MenuTrigger className="press hidden border border-transparent hover:border-line sm:inline-flex" aria-label={messages.shell.nav.account} data-testid="account-menu">
         <Avatar name={name} src={user.avatarUrl} size="sm" />
       </MenuTrigger>
       <MenuContent>
         <div className="px-3 py-2">
           <p className="truncate text-sm font-medium text-ink-1">{name}</p>
-          {user.email && user.name ? <p className="truncate text-xs text-ink-2">{user.email}</p> : null}
+          {user.email && user.name ? <p className="truncate text-label text-ink-3">{user.email}</p> : null}
         </div>
         <MenuSeparator />
         <MenuLinkItem render={<Link href="/account" />}>{messages.shell.nav.account}</MenuLinkItem>

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { messages } from "@/messages";
-import { KeyValueList } from "./key-value-list";
+import { FactGrid } from "./fact-grid";
 import { StateBlock } from "./state-block";
 
 // The honesty grammar. Every unavailable result names what was received, where
@@ -26,8 +26,8 @@ export function UnavailableState({
   const m = messages.states.unavailable;
   return (
     <StateBlock tone="watch" title={title} detail={detail} actions={actions} role="status" live="polite" className={className}>
-      <KeyValueList
-        dense
+      <FactGrid
+        size="sm"
         items={[
           { label: m.responseLabel, value: response },
           { label: m.provenanceLabel, value: provenance },

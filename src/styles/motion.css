@@ -4,7 +4,7 @@
   }
 }
 
-/* Invalid entry: the row shakes, once, short */
+/* Invalid entry: the plate shakes, once, short */
 @keyframes shake-x {
   0%,
   100% {
@@ -24,36 +24,82 @@
   }
 }
 
+/* The clock's minute turns over like a split-flap */
+@keyframes flip-x {
+  0% {
+    transform: rotateX(90deg);
+    opacity: 0;
+  }
+  100% {
+    transform: rotateX(0);
+    opacity: 1;
+  }
+}
+
+/* The digit caret blinks on a hard step */
+@keyframes caret-blink {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  55%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* The running request: a bar sweeps the track */
+@keyframes sweep-x {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(340%);
+  }
+}
+
 /* Route transitions: React ViewTransition classes (wrapped in each page, never the layout) */
 ::view-transition {
   pointer-events: none;
 }
 ::view-transition-old(root),
 ::view-transition-new(root) {
-  animation-duration: 180ms;
+  animation-duration: 160ms;
   animation-timing-function: var(--ease-out-expo);
 }
-::view-transition-old(.nav-forward) {
-  animation: 120ms var(--ease-in) both vt-fade-out;
+
+@utility spin {
+  animation: spin 800ms linear infinite;
 }
-::view-transition-new(.nav-forward) {
-  animation: 180ms var(--ease-out-expo) both vt-fade-in;
-}
-::view-transition-old(.nav-back) {
-  animation: 120ms var(--ease-in) both vt-fade-out;
-}
-::view-transition-new(.nav-back) {
-  animation: 180ms var(--ease-out-expo) both vt-fade-in;
-}
-@keyframes vt-fade-out {
+@keyframes spin {
   to {
-    opacity: 0;
+    transform: rotate(360deg);
   }
 }
-@keyframes vt-fade-in {
-  from {
-    opacity: 0;
-  }
+
+@utility shake {
+  animation: shake-x 380ms var(--ease-out);
+}
+@utility flip {
+  display: inline-block;
+  animation: flip-x 500ms var(--ease-out);
+}
+@utility caret-blink {
+  animation: caret-blink 1.1s step-end infinite;
+}
+@utility sweep {
+  animation: sweep-x 1s linear infinite;
+}
+
+/* Reveal on view: visible by default; JS marks below-fold sections pending until they enter */
+[data-reveal] {
+  transition:
+    opacity 420ms var(--ease-out-expo),
+    transform 420ms var(--ease-out-expo);
+}
+[data-reveal][data-pending] {
+  opacity: 0;
+  transform: translateY(12px);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -71,29 +117,12 @@
     animation-duration: 0s !important;
     animation-delay: 0s !important;
   }
-  .skeleton::after {
+  .skeleton::after,
+  .sweep {
     animation: none;
   }
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
+  [data-reveal][data-pending] {
+    opacity: 1;
+    transform: none;
   }
-}
-@utility spin {
-  animation: spin 800ms linear infinite;
-}
-
-@utility shake {
-  animation: shake-x 380ms var(--ease-out);
-}
-
-/* Reveal on view: visible by default; JS marks below-fold sections pending until they enter */
-[data-reveal] {
-  transition: opacity var(--duration-reveal) var(--ease-out-expo), transform var(--duration-reveal) var(--ease-out-expo);
-}
-[data-reveal][data-pending] {
-  opacity: 0;
-  transform: translateY(12px);
 }

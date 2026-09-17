@@ -96,7 +96,7 @@ export function AccountView({ user, savedCount }: { readonly user: SessionUser |
         </Panel>
         <Panel legend={m.preferences.legend} legendId="preferences-legend">
           <p className="silk">{m.preferences.theme}</p>
-          <ThemeToggle showLabels className="mt-2" />
+          <ThemeToggle size="md" className="mt-2" />
         </Panel>
       </div>
       <Panel legend={m.data.legend} legendId="data-legend">

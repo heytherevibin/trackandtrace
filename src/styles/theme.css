@@ -1,150 +1,99 @@
-/* Track & Trace — world tokens for the Rhythm Machine Step Row.
-   Night face = TR-808 charcoal panel. Day face = TR-909 cream panel.
-   Literal colours only (the contract test computes contrast from them). */
+/* Track & Trace — world tokens for Industry, the wireframe system.
+   Day face = light technical ground. Night face = steel-blue ground.
+   One accent: steel. Literal colours only (the contract test computes contrast from them). */
 
 :root,
 [data-theme="light"] {
   color-scheme: light;
 
-  /* Panel surfaces: 0 panel ground · 1 raised section · 2 popover · 3 dialog/sheet
-     sunken = readout windows and wells · inverse = the night panel used as a plate */
-  --surface-0: #e7e5df;
-  --surface-1: #efede7;
-  --surface-2: #f6f5f1;
-  --surface-3: #fbfaf7;
-  --surface-sunken: #d9d6ce;
-  --surface-inverse: #1a1a1c;
+  /* Grounds: 0 page · 1 wells and inputs · 2 menus and popovers · 3 dialogs and sheets */
+  --surface-0: #f2f2f3;
+  --surface-1: #e9e9ea;
+  --surface-2: #f5f5f8;
+  --surface-3: #f5f5f8;
 
-  /* Silkscreen ink */
-  --ink-1: #1c1c1e;
-  --ink-2: #4a4a4e;
-  --ink-3: #5f5f64;
-  --ink-inverse: #f2f2f2;
+  /* Ink: 1 text · 2 body copy at 78% · 3 legends and meta at 70% · alert is the deep steel step */
+  --ink-1: #1d1f20;
+  --ink-2: #4c4d4e;
+  --ink-3: #5d5e5f;
+  --ink-inverse: #f2f2f3;
+  --ink-alert: #2c455d;
 
-  /* The one accent: the 909's orange, spent on the primary action only */
-  --accent: #c4531a;
-  --accent-hover: #a8460f;
-  --accent-ink: #ffffff;
-  --accent-soft: #f5decf;
+  /* Steel. accent draws lines, carets, and lamps; accent-text is the readable step;
+     accent-strong is the one solid object on the board, the primary button. */
+  --accent: #5980a6;
+  --accent-text: #416180;
+  --accent-strong: #416180;
+  --accent-strong-hover: #2c455d;
+  --accent-strong-active: #1d2d3d;
+  --accent-ink: #f2f2f3;
+  --accent-soft: #e6f0fa;
+  --accent-soft-ink: #2c455d;
+  --accent-wash: rgba(89, 128, 166, 0.08);
+  --accent-busy: #94bce3;
 
-  /* Panel seams and highlights */
-  --line: #c9c6be;
-  --line-strong: #a8a49b;
-  --line-highlight: rgba(255, 255, 255, 0.7);
+  /* Hairlines and registration marks */
+  --line: rgba(29, 31, 32, 0.16);
+  --line-strong: rgba(29, 31, 32, 0.45);
+  --mark: rgba(29, 31, 32, 0.55);
 
-  /* Signal LEDs (railway aspects). fg = text and icon, bg = tint field, line = tint edge */
-  --go-fg: #176f36;
-  --go-bg: #ddefe1;
-  --go-line: #9fd1ac;
-  --watch-fg: #8a5300;
-  --watch-bg: #f6e7c6;
-  --watch-line: #e1bf74;
-  --stop-fg: #b02a22;
-  --stop-bg: #f6dbd8;
-  --stop-line: #e39c96;
-  --neutral-fg: #4a4a4e;
-  --neutral-bg: #dad7cf;
-  --neutral-line: #b9b5ac;
-
-  /* Step keys: charcoal caps with a colour band on the day face */
-  --key-red: #ff3b30;
-  --key-orange: #ff9a00;
-  --key-yellow: #ffe100;
-  --key-white: #f2f2f2;
-  --key-cap: #2b2b2e;
-  --key-cap-ink: #f2f2f2;
-  --key-window: #111113;
-  --key-led: #ff3b30;
-  --key-led-dim: #3a1c1a;
-
-  /* Segment readouts stay dark on both faces, as on the hardware */
-  --readout-bg: #141416;
-  --readout-fg: #ff3b30;
-  --readout-ghost: rgba(255, 59, 48, 0.14);
-
-  --focus-ring: #c4531a;
-  --backdrop: rgba(28, 28, 30, 0.45);
-  --skeleton-base: #dad7cf;
-  --skeleton-sheen: rgba(255, 255, 255, 0.6);
-  --selection-bg: #1c1c1e;
-  --selection-fg: #ffe100;
-  --scrollbar-thumb: #a8a49b;
+  --focus-ring: #5980a6;
+  --backdrop: rgba(43, 43, 45, 0.5);
+  --skeleton-base: #e2e2e4;
+  --skeleton-sheen: rgba(255, 255, 255, 0.55);
+  --selection-bg: rgba(89, 128, 166, 0.3);
+  --selection-fg: #1d1f20;
+  --scrollbar-thumb: rgba(29, 31, 32, 0.3);
   --scrollbar-track: transparent;
 
-  /* Elevation: offset + blur, never a halo */
-  --elevation-1: 0 1px 2px rgba(20, 20, 22, 0.08), 0 1px 3px rgba(20, 20, 22, 0.05);
-  --elevation-2: 0 4px 12px -2px rgba(20, 20, 22, 0.12), 0 2px 4px -1px rgba(20, 20, 22, 0.06);
-  --elevation-3: 0 24px 48px -12px rgba(20, 20, 22, 0.24), 0 8px 16px -6px rgba(20, 20, 22, 0.1);
-  --key-shadow: 0 1px 2px rgba(20, 20, 22, 0.1);
-  --key-shadow-pressed: inset 0 1px 2px rgba(20, 20, 22, 0.12);
+  /* Elevation: soft ink-tinted shadows on the light ground */
+  --elevation-1: 0 1px 2px rgba(43, 43, 45, 0.14);
+  --elevation-2: 0 3px 10px rgba(43, 43, 45, 0.16);
+  --elevation-3: 0 12px 32px rgba(43, 43, 45, 0.22);
 }
 
 [data-theme="dark"] {
   color-scheme: dark;
 
-  --surface-0: #1a1a1c;
-  --surface-1: #232326;
-  --surface-2: #2b2b2f;
-  --surface-3: #303035;
-  --surface-sunken: #121214;
-  --surface-inverse: #f2f2f2;
+  --surface-0: #1d2d3d;
+  --surface-1: #2c455d;
+  --surface-2: #243a50;
+  --surface-3: #243a50;
 
-  --ink-1: #f2f2f2;
-  --ink-2: #bdbdbd;
-  --ink-3: #9a9a9f;
-  --ink-inverse: #1a1a1c;
+  --ink-1: #f5f5f8;
+  --ink-2: #c6c9cf;
+  --ink-3: #b4b9c0;
+  --ink-inverse: #1d2d3d;
+  --ink-alert: #d6ebff;
 
-  --accent: #d8322a;
-  --accent-hover: #c42d26;
-  --accent-ink: #ffffff;
-  --accent-soft: #3a1f1e;
+  --accent: #5980a6;
+  --accent-text: #b5d9fd;
+  --accent-strong: #94bce3;
+  --accent-strong-hover: #b5d9fd;
+  --accent-strong-active: #d6ebff;
+  --accent-ink: #1d2d3d;
+  --accent-soft: #2c455d;
+  --accent-soft-ink: #d6ebff;
+  --accent-wash: rgba(148, 188, 227, 0.1);
+  --accent-busy: #94bce3;
 
-  --line: #3a3a3f;
-  --line-strong: #55555b;
-  --line-highlight: rgba(255, 255, 255, 0.06);
+  --line: rgba(245, 245, 248, 0.24);
+  --line-strong: rgba(245, 245, 248, 0.45);
+  --mark: rgba(245, 245, 248, 0.55);
 
-  --go-fg: #57d96e;
-  --go-bg: #14301c;
-  --go-line: #1f5a2e;
-  --watch-fg: #ffc53d;
-  --watch-bg: #33260a;
-  --watch-line: #5c4612;
-  --stop-fg: #ff6b61;
-  --stop-bg: #3a1715;
-  --stop-line: #6b2a26;
-  --neutral-fg: #bdbdbd;
-  --neutral-bg: #2b2b2f;
-  --neutral-line: #44444a;
-
-  /* Night face: the caps carry the colour themselves; the neutral cap is the white key */
-  --key-red: #ff3b30;
-  --key-orange: #ff9a00;
-  --key-yellow: #ffe100;
-  --key-white: #f2f2f2;
-  --key-cap: #f2f2f2;
-  --key-cap-ink: #111113;
-  --key-window: #141416;
-  --key-led: #ff3b30;
-  --key-led-dim: #3a1c1a;
-
-  --readout-bg: #0e0e10;
-  --readout-fg: #ff3b30;
-  --readout-ghost: rgba(255, 59, 48, 0.12);
-
-  --focus-ring: #ffe100;
+  --focus-ring: #749dc4;
   --backdrop: rgba(0, 0, 0, 0.6);
-  --skeleton-base: #2b2b2f;
+  --skeleton-base: #2c455d;
   --skeleton-sheen: rgba(255, 255, 255, 0.06);
-  --selection-bg: #ffe100;
-  --selection-fg: #111113;
-  --scrollbar-thumb: #55555b;
+  --selection-bg: rgba(148, 188, 227, 0.35);
+  --selection-fg: #f5f5f8;
+  --scrollbar-thumb: rgba(245, 245, 248, 0.3);
   --scrollbar-track: transparent;
 
-  --elevation-1: inset 0 1px 0 var(--line-highlight), 0 1px 2px rgba(0, 0, 0, 0.6);
-  --elevation-2: inset 0 1px 0 var(--line-highlight), 0 8px 20px -8px rgba(0, 0, 0, 0.7);
-  --elevation-3: inset 0 1px 0 var(--line-highlight), 0 28px 60px -16px rgba(0, 0, 0, 0.8);
-  --key-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --key-shadow-pressed: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+  /* A hairline edge plus ambient darkness on the dark ground */
+  --elevation-1: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --elevation-2: 0 3px 10px rgba(0, 0, 0, 0.5);
+  --elevation-3: 0 12px 32px rgba(0, 0, 0, 0.6);
 }
 
 /* Surfaces rendered outside the app tree (global-error, not-found) still get the face */

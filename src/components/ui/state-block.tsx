@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 import type { Tone } from "@/types/ui";
 import { cn } from "@/utils/cn";
-import { Led } from "./led";
+import { Corners } from "./corners";
 
-/** Shared anatomy for empty, unavailable, and error states: lamp, title, detail, actions. */
+/** Shared anatomy for empty, unavailable, and error states: a plate with a capital title, detail, evidence, actions. */
 export function StateBlock({
   tone = "neutral",
   title,
@@ -12,8 +12,10 @@ export function StateBlock({
   children,
   role,
   live,
+  headingLevel = 2,
   className,
 }: {
+  /** Kept for call-site compatibility; the mono world marks state with words, not colour. */
   readonly tone?: Tone;
   readonly title: string;
   readonly detail?: ReactNode;
@@ -21,18 +23,16 @@ export function StateBlock({
   readonly children?: ReactNode;
   readonly role?: "status" | "alert";
   readonly live?: "polite" | "assertive";
+  readonly headingLevel?: 1 | 2 | 3;
   readonly className?: string;
 }) {
+  const Heading = headingLevel === 1 ? "h1" : headingLevel === 3 ? "h3" : "h2";
   return (
-    <section className={cn("panel p-6 sm:p-8", className)} role={role} aria-live={live}>
-      <div className="flex items-start gap-3">
-        <Led tone={tone} lit size="lg" className="mt-1.5" />
-        <div className="min-w-0">
-          <h2 className="text-xl">{title}</h2>
-          {detail ? <p className="mt-2 text-ink-2">{detail}</p> : null}
-        </div>
-      </div>
-      {children ? <div className="seam mt-6 pt-6">{children}</div> : null}
+    <section className={cn("blueprint p-6 sm:p-8", className)} role={role} aria-live={live} data-tone={tone}>
+      <Corners />
+      <Heading className="text-3xl tracking-head">{title}</Heading>
+      {detail ? <p className="mt-2.5 max-w-prose text-body text-ink-2">{detail}</p> : null}
+      {children ? <div className="seam mt-5 pt-4">{children}</div> : null}
       {actions ? <div className="mt-6 flex flex-wrap gap-3">{actions}</div> : null}
     </section>
   );

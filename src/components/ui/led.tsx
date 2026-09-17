@@ -1,15 +1,16 @@
 import type { Tone } from "@/types/ui";
 import { cn } from "@/utils/cn";
 
-const LIT: Record<Tone | "key", string> = {
-  go: "led-go",
-  watch: "led-watch",
-  stop: "led-stop",
-  neutral: "bg-ink-2",
-  key: "led-key",
+const LIT: Record<Tone | "key" | "busy", string> = {
+  go: "bg-accent",
+  watch: "bg-accent",
+  key: "bg-accent",
+  busy: "bg-accent-busy",
+  stop: "bg-ink-alert",
+  neutral: "bg-ink-3",
 };
 
-/** A panel lamp. Decorative unless given a label; text next to it carries the meaning. */
+/** A lamp: a hollow ring when off, a steel fill when on. Decorative unless labelled; adjacent text carries the meaning. */
 export function Led({
   tone = "neutral",
   lit = false,
@@ -17,7 +18,7 @@ export function Led({
   label,
   className,
 }: {
-  readonly tone?: Tone | "key";
+  readonly tone?: Tone | "key" | "busy";
   readonly lit?: boolean;
   readonly size?: "sm" | "md" | "lg";
   readonly label?: string;
@@ -25,10 +26,17 @@ export function Led({
 }) {
   return (
     <span
-      className={cn("led shrink-0", size === "sm" && "size-1.5", size === "lg" && "size-3", lit && LIT[tone], className)}
+      className={cn(
+        "inline-block shrink-0 rounded-full border border-line-strong transition-colors",
+        size === "sm" ? "size-1.5" : size === "lg" ? "size-3" : "size-2",
+        lit ? LIT[tone] : "bg-transparent",
+        className,
+      )}
       role={label ? "img" : undefined}
       aria-label={label}
       aria-hidden={label ? undefined : true}
     />
   );
 }
+
+export const Lamp = Led;

@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense } from "react";
-import { Led } from "@/components/ui/led";
 import { useUser } from "@/components/session/session-provider";
 import { messages } from "@/messages";
 import { cn } from "@/utils/cn";
@@ -16,12 +15,15 @@ function Tab({ item, pathname }: { readonly item: NavItem; readonly pathname: st
     <Link
       href={item.href}
       aria-current={active ? "page" : undefined}
-      className={cn("press flex min-h-11 flex-1 flex-col items-center justify-center gap-1 rounded-md py-1.5 transition-colors", active ? "text-ink-1" : "text-ink-2")}
+      className={cn(
+        "press relative flex min-h-14 flex-1 flex-col items-center justify-center gap-1 no-underline",
+        active ? "text-accent-text hover:text-accent-text" : "text-ink-3 hover:text-ink-1",
+      )}
       data-testid={`tab-${item.href === "/" ? "check" : item.href.slice(1)}`}
     >
-      <Led tone="key" lit={active} size="sm" />
+      <span aria-hidden="true" className={cn("absolute inset-x-5 top-0 h-0.5", active ? "bg-accent" : "bg-transparent")} />
       <Icon className="size-5" aria-hidden="true" />
-      <span className="font-label text-xs font-semibold uppercase tracking-wide">{item.label}</span>
+      <span className="caps text-2xs">{item.label}</span>
     </Link>
   );
 }
@@ -31,16 +33,16 @@ function AccountTab({ pathname }: { readonly pathname: string }) {
   return <Tab item={user ? TAB_ACCOUNT : TAB_SIGN_IN} pathname={pathname} />;
 }
 
-/** Phone navigation: three keys along the bottom edge, the active one lit. */
+/** Phone navigation: three cells along the bottom edge behind a hairline; the current one carries a steel rule. */
 export function BottomTabBar() {
   const pathname = usePathname();
   return (
     <nav
       aria-label={messages.shell.nav.tabsLabel}
-      className="fixed inset-x-0 bottom-0 z-nav border-t border-line bg-surface-1 pb-(--safe-bottom) md:hidden"
+      className="fixed inset-x-0 bottom-0 z-nav border-t border-line bg-surface-0 pb-(--safe-bottom) md:hidden"
       style={{ viewTransitionName: "site-tabs" }}
     >
-      <div className="flex items-stretch gap-1 px-2 pt-1">
+      <div className="flex items-stretch divide-x divide-line">
         <Tab item={TAB_CHECK} pathname={pathname} />
         <Tab item={TAB_WATCHLIST} pathname={pathname} />
         <Suspense fallback={<Tab item={TAB_SIGN_IN} pathname={pathname} />}>

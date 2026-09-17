@@ -1,98 +1,176 @@
-/* Press feedback: mouse and touch only; keyboard activation never animates */
+/* Interactive feedback is a tint, never a transform: a wireframe does not squash. */
 @utility press {
-  transition: transform var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out);
-  &:active:not(:focus-visible):not(:disabled) {
-    transform: scale(0.97);
-  }
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
 }
 
-/* Data: tabular numerals in the mono face (PNR digits, times, coach and berth, counts) */
+/* The page sheet: 1200px wide, gutters that breathe with the viewport */
+@utility page-frame {
+  width: 100%;
+  max-width: var(--container-page);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+/* App page body: breathing room under the masthead, a long run-out above the footer */
+@utility page-body {
+  padding-top: clamp(2rem, 5vw, 3.5rem);
+  padding-bottom: 5rem;
+}
+/* Landing sections: 48px above, 60px below */
+@utility section-pad {
+  padding-top: 3rem;
+  padding-bottom: 3.75rem;
+}
+@utility gutter {
+  padding-inline: var(--gutter);
+}
+
+/* Figures: condensed, tabular (PNR digits, times, coach and berth, counts) */
 @utility font-data {
-  font-family: var(--font-mono);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+@utility tnum {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
 }
 
-/* Silkscreen legend: the panel's label voice. Short labels only, never body copy. */
-@utility silk {
-  font-family: var(--font-label);
+/* Condensed capitals at any size: headings, figures, plate titles */
+@utility caps {
+  font-family: var(--font-display);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* Legends: the label voice. 13px plate titles and kickers, 12px field labels, 11px table heads and meta. */
+@utility legend {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+@utility legend-md {
+  font-family: var(--font-display);
   font-weight: 600;
   font-size: 0.75rem;
   line-height: 1rem;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--ink-2);
+  color: var(--ink-3);
+}
+@utility legend-sm {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.6875rem;
+  line-height: 1rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+/* Deprecated alias for legend-md; kept so unmigrated markup still reads as a legend. */
+@utility silk {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
 }
 
-/* Panel section: a raised plate on the instrument face */
-@utility panel {
-  background: var(--surface-1);
+/* Kicker: "02 · How it works", in the readable steel step */
+@utility kicker {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-text);
+}
+
+/* Large condensed headings hang slightly left so the cap stems align with body copy */
+@utility optical-hang {
+  margin-left: -0.052em;
+}
+
+/* Blueprint object: square, hairline, transparent. Pair with <Corners /> for the registration marks. */
+@utility blueprint {
+  position: relative;
   border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--elevation-1);
+}
+/* Deprecated alias for blueprint */
+@utility panel {
+  position: relative;
+  border: 1px solid var(--line);
 }
 
-/* Panel seam between sections */
 @utility seam {
   border-top: 1px solid var(--line);
 }
-
-/* Readout window: dark glass with lit segments */
-@utility readout {
-  background: var(--readout-bg);
-  color: var(--readout-fg);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--line-strong);
-  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.6);
-  font-variant-numeric: tabular-nums;
+/* The ticket-stub perforation between entry and stub */
+@utility perforation {
+  border-top: 1px dashed var(--line);
 }
 
-/* Physical key cap */
-@utility key-cap {
-  border-radius: var(--radius-md);
-  box-shadow: var(--key-shadow);
-  transition: transform var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out);
-  &:active:not(:focus-visible):not(:disabled) {
-    transform: translateY(1px) scale(0.99);
-    box-shadow: var(--key-shadow-pressed);
+/* Input well (Industry .input): tinted ground, hairline, accent on focus */
+@utility well {
+  background: var(--surface-1);
+  border: 1px solid var(--line);
+  color: var(--ink-1);
+  caret-color: var(--accent);
+  transition: border-color var(--duration-fast) var(--ease-out);
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      border-color: var(--line-strong);
+    }
+  }
+  &:focus-visible {
+    border-color: var(--accent);
+    outline-offset: 0;
   }
 }
 
-/* LED: a small lamp; lit variants add a modest bloom sized to the lamp */
-@utility led {
-  display: inline-block;
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 9999px;
-  background: var(--key-led-dim);
-  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.5);
-  transition: background-color var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out);
+/* Twin rails with sleepers: the route line drawn between stops */
+@utility rail {
+  background:
+    linear-gradient(var(--line), var(--line)) left 4px / 100% 1px no-repeat,
+    linear-gradient(var(--line), var(--line)) left 7px / 100% 1px no-repeat,
+    repeating-linear-gradient(90deg, var(--line) 0 1px, transparent 1px 18px) left 0 / 100% 12px no-repeat;
 }
-@utility led-go {
-  background: var(--go-fg);
-  box-shadow: 0 0 4px 1px color-mix(in srgb, var(--go-fg) 60%, transparent);
-}
-@utility led-watch {
-  background: var(--watch-fg);
-  box-shadow: 0 0 4px 1px color-mix(in srgb, var(--watch-fg) 60%, transparent);
-}
-@utility led-stop {
-  background: var(--stop-fg);
-  box-shadow: 0 0 4px 1px color-mix(in srgb, var(--stop-fg) 60%, transparent);
-}
-@utility led-key {
-  background: var(--key-led);
-  box-shadow: 0 0 4px 1px color-mix(in srgb, var(--key-led) 60%, transparent);
+
+/* Photographs print in the steel duotone */
+@utility duotone {
+  position: relative;
+  overflow: hidden;
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: var(--accent);
+    mix-blend-mode: color;
+  }
 }
 
 /* Base UI popups: origin-aware, transform and opacity only */
 @utility popup-motion {
   transform-origin: var(--transform-origin);
-  transition: transform var(--duration-base) var(--ease-out), opacity var(--duration-base) var(--ease-out);
+  transition:
+    transform var(--duration-base) var(--ease-out),
+    opacity var(--duration-base) var(--ease-out);
   &[data-starting-style],
   &[data-ending-style] {
     opacity: 0;
-    transform: scale(0.96);
+    transform: scale(0.98);
   }
   &[data-ending-style] {
     transition-duration: var(--duration-fast);
@@ -100,12 +178,11 @@
   }
 }
 
-/* Skeleton: transform-only sheen */
+/* Skeleton: flat blocks with a transform-only sheen */
 @utility skeleton {
   position: relative;
   overflow: hidden;
   background: var(--skeleton-base);
-  border-radius: var(--radius-sm);
   &::after {
     content: "";
     position: absolute;
@@ -124,6 +201,12 @@
   align-items: baseline;
 }
 
+/* Fact cells: a grid of legend-over-figure cells that wraps by available width */
+@utility fact-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+}
+
 /* Responsive table: below md, rows stack into labelled key-value pairs */
 @utility table-stack {
   @media (max-width: 47.99rem) {
@@ -140,20 +223,24 @@
       grid-template-columns: minmax(6rem, 35%) 1fr;
       column-gap: calc(var(--spacing) * 4);
       row-gap: calc(var(--spacing) * 1);
-      padding-block: calc(var(--spacing) * 3);
+      padding: calc(var(--spacing) * 3) calc(var(--spacing) * 5);
       border-top: 1px solid var(--line);
+    }
+    & tbody tr:first-child {
+      border-top: 0;
     }
     & td {
       display: contents;
     }
     & td::before {
       content: attr(data-label);
-      font-family: var(--font-label);
+      font-family: var(--font-display);
       font-weight: 600;
-      font-size: 0.75rem;
-      letter-spacing: 0.04em;
+      font-size: 0.6875rem;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
-      color: var(--ink-2);
+      color: var(--ink-3);
+      align-self: center;
     }
   }
 }
@@ -175,18 +262,4 @@
 }
 @utility z-skip {
   z-index: var(--z-skip);
-}
-
-/* Twin rails with sleepers — the page's railway line, drawn from tokens */
-@utility track-h {
-  background:
-    linear-gradient(var(--line-strong), var(--line-strong)) left top / 100% 2px no-repeat,
-    linear-gradient(var(--line-strong), var(--line-strong)) left bottom / 100% 2px no-repeat,
-    repeating-linear-gradient(90deg, var(--line) 0 2px, transparent 2px 14px);
-}
-@utility track-v {
-  background:
-    linear-gradient(var(--line-strong), var(--line-strong)) left top / 2px 100% no-repeat,
-    linear-gradient(var(--line-strong), var(--line-strong)) right top / 2px 100% no-repeat,
-    repeating-linear-gradient(180deg, var(--line) 0 2px, transparent 2px 14px);
 }
