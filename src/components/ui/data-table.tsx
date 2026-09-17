@@ -25,6 +25,7 @@ export interface DataTableProps<Row> {
 export function DataTable<Row>({ columns, rows, rowKey, caption, showCaption = false, emptyState, dense = false, className }: DataTableProps<Row>) {
   if (rows.length === 0 && emptyState) return <>{emptyState}</>;
   const cell = dense ? "px-3.5 py-2" : "px-5 py-3";
+  // Every row, the last included, carries its hairline, as the sheets draw it.
   return (
     <div className={cn("overflow-x-auto", className)} role="region" aria-label={caption} tabIndex={0}>
       <table className="table-stack w-full border-collapse text-left text-body">
@@ -32,7 +33,7 @@ export function DataTable<Row>({ columns, rows, rowKey, caption, showCaption = f
         <thead>
           <tr>
             {columns.map((c) => (
-              <th key={c.key} scope="col" className={cn("legend-md border-b border-line", dense ? "px-3.5 py-2" : "px-5 py-2.5", c.align === "end" && "text-right")}>
+              <th key={c.key} scope="col" className={cn("legend-md border-b border-line", dense ? "px-3.5 py-2" : "px-5 py-2.5", c.align === "end" ? "text-right" : "text-left")}>
                 {c.header}
               </th>
             ))}
@@ -40,9 +41,9 @@ export function DataTable<Row>({ columns, rows, rowKey, caption, showCaption = f
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={rowKey(row)} className="border-t border-line first:border-t-0 hover:bg-ink-1/4">
+            <tr key={rowKey(row)}>
               {columns.map((c) => (
-                <td key={c.key} data-label={c.header} className={cn(cell, "align-middle text-ink-1", c.numeric && "tnum", c.align === "end" && "text-right")}>
+                <td key={c.key} data-label={c.header} className={cn(cell, "border-b border-line align-middle text-ink-1", c.numeric && "tnum", c.align === "end" && "text-right")}>
                   {c.cell(row)}
                 </td>
               ))}

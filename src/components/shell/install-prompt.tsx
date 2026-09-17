@@ -14,7 +14,7 @@ export function InstallPrompt() {
   if (!visible) return null;
   const m = messages.shell.install;
   return (
-    <aside className="fixed inset-x-0 bottom-(--tabbar-height) z-nav px-3 pb-3 md:bottom-4 md:left-auto md:right-4 md:w-auto md:px-0" aria-label={m.title} data-testid="install-prompt">
+    <aside className="fixed inset-x-0 bottom-0 z-nav px-3 pb-[calc(var(--safe-bottom)+12px)] md:bottom-4 md:left-auto md:right-4 md:w-auto md:px-0 md:pb-0" aria-label={m.title} data-testid="install-prompt">
       <div className="blueprint mx-auto flex w-full max-w-prose items-center gap-3 bg-surface-2 p-3 shadow-2 md:w-96">
         <Corners />
         <Mark size={32} />

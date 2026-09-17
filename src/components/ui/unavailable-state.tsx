@@ -28,6 +28,7 @@ export function UnavailableState({
     <StateBlock tone="watch" title={title} detail={detail} actions={actions} role="status" live="polite" className={className}>
       <FactGrid
         size="sm"
+        className="grid-cols-[repeat(auto-fit,minmax(150px,1fr))]"
         items={[
           { label: m.responseLabel, value: response },
           { label: m.provenanceLabel, value: provenance },

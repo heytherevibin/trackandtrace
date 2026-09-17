@@ -28,7 +28,7 @@ export function Select({ value, onValueChange, options, placeholder, name, disab
     <BaseSelect.Root value={value} onValueChange={(next) => onValueChange(next)} items={items} name={name} disabled={disabled}>
       <BaseSelect.Trigger
         id={id}
-        className={cn("well flex h-10 w-full items-center justify-between gap-2 px-3 text-base data-[popup-open]:border-accent disabled:cursor-not-allowed disabled:opacity-45", className)}
+        className={cn("well flex h-10 w-full items-center justify-between gap-2 px-2.5 text-sm data-[popup-open]:border-accent disabled:cursor-not-allowed disabled:opacity-45", className)}
       >
         <BaseSelect.Value placeholder={placeholder} className="truncate data-[placeholder]:text-ink-3" />
         <BaseSelect.Icon className="shrink-0 text-ink-3">

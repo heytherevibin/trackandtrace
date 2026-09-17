@@ -17,8 +17,8 @@ const OPTIONS: readonly { value: ThemeChoice; label: string }[] = [
   { value: "dark", label: messages.shell.theme.dark },
 ];
 
-/** Auto · Day · Night as three hairline cells. No choice is pressed until the stored one is known. */
-export function ThemeToggle({ className, size = "sm" }: { readonly className?: string; readonly size?: "sm" | "md" }) {
+/** Auto · Day · Night, as the masthead draws it: three hairline cells, 11px capitals, the chosen one tinted steel. */
+export function ThemeToggle({ className }: { readonly className?: string }) {
   const { theme, setTheme } = useTheme();
   const mounted = useSyncExternalStore(subscribeNever, isClient, isServer);
 
@@ -37,9 +37,8 @@ export function ThemeToggle({ className, size = "sm" }: { readonly className?: s
           key={value}
           value={value}
           className={cn(
-            "press inline-flex items-center justify-center font-display font-semibold uppercase tracking-caps text-ink-3",
+            "cursor-pointer bg-transparent px-2.5 py-[5px] font-display text-2xs font-semibold uppercase leading-normal tracking-caps text-ink-1/70",
             "not-first:border-l not-first:border-line hover:bg-accent/12 data-[pressed]:bg-accent/16 data-[pressed]:text-accent-text",
-            size === "md" ? "h-9 px-3 text-label" : "h-8 px-2.5 text-2xs sm:h-7",
           )}
         >
           {label}

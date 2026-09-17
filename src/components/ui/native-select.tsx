@@ -16,7 +16,7 @@ export function NativeSelect({
 }: Omit<SelectHTMLAttributes<HTMLSelectElement>, "size"> & { readonly options: readonly NativeSelectOption[]; readonly size?: "md" | "lg" }) {
   return (
     <span className="relative flex items-center">
-      <select className={cn("well w-full appearance-none pl-3 pr-10 text-base", size === "lg" ? "h-11" : "h-10", className)} {...rest}>
+      <select className={cn("well w-full appearance-none pl-2.5 pr-10", size === "lg" ? "h-11" : "h-10", className)} {...rest}>
         {options.map((o) => (
           <option key={o.value} value={o.value}>
             {o.label}

@@ -121,7 +121,7 @@
   border-top: 1px dashed var(--line);
 }
 
-/* Input well (Industry .input): tinted ground, hairline, accent on focus */
+/* Input well (Industry .input): min-height 36px, 6px 10px, tinted ground, hairline, accent on focus */
 @utility well {
   background: var(--surface-1);
   border: 1px solid var(--line);

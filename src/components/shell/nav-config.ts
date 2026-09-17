@@ -1,4 +1,4 @@
-import { BookmarkRegular, CalendarClockRegular, GaugeRegular, PersonRegular, TicketDiagonalRegular } from "@/components/icons";
+import { BookmarkRegular, CalendarClockRegular, GaugeRegular, TicketDiagonalRegular } from "@/components/icons";
 import { messages } from "@/messages";
 
 export interface NavItem {
@@ -14,10 +14,6 @@ export const PRIMARY_NAV: readonly NavItem[] = [
   { href: "/accuracy", label: messages.shell.nav.accuracy, Icon: GaugeRegular },
 ];
 
-export const TAB_CHECK: NavItem = PRIMARY_NAV[0]!;
-export const TAB_WATCHLIST: NavItem = PRIMARY_NAV[1]!;
-export const TAB_ACCOUNT: NavItem = { href: "/account", label: messages.shell.nav.account, Icon: PersonRegular };
-export const TAB_SIGN_IN: NavItem = { href: "/login", label: messages.shell.nav.signIn, Icon: PersonRegular };
 
 /** In-page anchors on the landing sheet. The landing sections must carry these ids. */
 export const LANDING_SECTIONS = [

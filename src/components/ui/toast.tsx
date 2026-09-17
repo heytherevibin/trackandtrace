@@ -12,8 +12,8 @@ export function ToastHost() {
     <Toaster
       position="bottom-center"
       theme={resolvedTheme ?? "system"}
-      offset="calc(var(--tabbar-height) + 12px)"
-      mobileOffset="calc(var(--tabbar-height) + 12px)"
+      offset="calc(var(--safe-bottom) + 16px)"
+      mobileOffset="calc(var(--safe-bottom) + 12px)"
       gap={8}
       toastOptions={{
         unstyled: true,

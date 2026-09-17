@@ -6,7 +6,7 @@ export interface Fact {
   readonly value: ReactNode;
 }
 
-const VALUE = { sm: "text-base", md: "text-lg", lg: "text-2xl" } as const;
+const VALUE = { sm: "text-base", md: "text-lead", lg: "text-2xl" } as const;
 
 /**
  * Legend over figure, in cells that wrap by width. `framed` draws the terminal's
@@ -24,7 +24,7 @@ export function FactGrid({
   readonly className?: string;
 }) {
   return (
-    <dl className={cn("fact-grid", framed ? "overflow-hidden border border-line" : "gap-3", className)}>
+    <dl className={cn("fact-grid", framed ? "grid-cols-[repeat(auto-fit,minmax(110px,1fr))] overflow-hidden border border-line" : "gap-3", className)}>
       {items.map((item) => (
         <div key={item.label} className={cn("min-w-0", framed && "-mt-px border-t border-line px-3.5 py-2.5")}>
           <dt className="legend-sm">{item.label}</dt>

@@ -1,6 +1,8 @@
 # DESIGN.md — Track & Trace
 
-World: **Industry**, the wireframe system. Adopted 2026-09-17 from the Claude Design project
+World: **Industry**, the wireframe system. **Fidelity rule: every surface matches the Claude Design
+reference exactly** — structure, copy, sizes, spacing, colours, and states are transcribed from the
+B sheets' inline styles, not reinterpreted. Adopted 2026-09-17 from the Claude Design project
 "App landing page redesign" (`Landing Redesign B.dc.html` plus the Watchlist, Pre-booking,
 Accuracy, and Sign in B pages). It replaces the Rhythm Machine Step Row.
 
@@ -23,7 +25,7 @@ Accuracy, and Sign in B pages). It replaces the Rhythm Machine Step Row.
 | `ink-alert` | #2c455d | #d6ebff | validation and error text (the deep steel step; mono world) |
 | `accent` | #5980a6 | #5980a6 | lines, carets, lamps, route stops, focus on inputs. Never text. |
 | `accent-text` | #416180 | #b5d9fd | readable steel: links, kickers, field labels, active nav |
-| `accent-strong` (+hover/active) / `accent-ink` | #416180 / #f2f2f3 | #94bce3 / #1d2d3d | the primary button |
+| `accent-strong` (+hover/active) / `accent-ink` | #5980a6 (#597ea3, #416180) / ground | #5980a6 / ground | the primary button (design-locked 3:1 pairing) |
 | `accent-soft` / `accent-soft-ink` | tint / deep | deep / tint | the filled tag |
 | `accent-wash`, `accent-busy` | 8% steel, #94bce3 | | digit cell fill, running lamp |
 | `line`, `line-strong`, `mark` | ink 16% / 45% / 55% | paper 24% / 45% / 55% | hairlines, hover edges, registration marks |
@@ -69,8 +71,7 @@ Tracking: `tracking-caps` .08em (legends), `brand` .06em (wordmark, digits), `he
 
 ## Shell
 
-- **Masthead** (`TopNav`): sticky, `surface-0`, hairline bottom. Wordmark (mark + "TRACK & TRACE" 18px `tracking-brand`). On `/` the nav lists the landing anchors (`#how #record #sources #roadmap #faq`, steel) then Watchlist / Pre-booking / Accuracy (ink-3), and a primary "Check a PNR" → `#terminal`. On app pages: Check / Watchlist / Pre-booking / Accuracy with a 2px steel underline on the current page. Right: Auto · Day · Night cells, then Sign in (secondary) or the account menu. `/login` shows brand and theme only. Below md the nav hides; the bottom tab bar navigates.
-- **Bottom tab bar** (phones): three hairline cells, current one carries a steel top rule.
+- **Masthead** (`TopNav`): sticky, `surface-0`, hairline bottom, wraps on narrow screens exactly as drawn (no phone tab bar). Wordmark (mark + "TRACK & TRACE" 18px `tracking-brand`). On `/` the nav lists the landing anchors (`#how #record #sources #roadmap #faq`, steel), a hairline divider, then Watchlist / Pre-booking / Accuracy / Sign in (text 70%); right: Auto · Day · Night, primary "Check a PNR" → `#terminal`. On app pages: Check / Watchlist / Pre-booking / Accuracy with a 2px steel underline on the current page; right: Auto · Day · Night, secondary "Sign in" (or the account menu). `/login` is not sticky and shows brand and theme only.
 - **Footer**: `/` gets the enterprise footer (brand + disclaimer, Product, Company, Status lamps read from real flags, © and IST clock). App pages get one line: disclaimer · © and the IST clock.
 
 ## Page anatomy

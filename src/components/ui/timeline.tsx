@@ -12,7 +12,7 @@ export interface TimelineStep {
 const RING: Record<TimelineStepState, string> = {
   done: "border-accent bg-accent",
   current: "border-accent bg-accent-wash",
-  pending: "border-line-strong bg-transparent",
+  pending: "border-line bg-transparent",
   failed: "border-ink-alert bg-transparent",
 };
 
@@ -26,8 +26,8 @@ export function Timeline({ steps, label, className }: { readonly steps: readonly
             <span className={cn("mt-1 size-3 shrink-0 rounded-full border", RING[step.state])} />
             {index < steps.length - 1 ? <span className="min-h-5 w-px flex-1 bg-line" /> : null}
           </span>
-          <span className={cn("min-w-0", index < steps.length - 1 && "pb-4")}>
-            <span className="block font-display text-base font-semibold uppercase leading-snug tracking-head text-ink-1">{step.title}</span>
+          <span className="min-w-0 pb-[18px]">
+            <span className="block font-display text-base font-semibold uppercase tracking-head text-ink-1">{step.title}</span>
             {step.detail ? <span className={cn("mt-0.5 block text-label", step.state === "failed" ? "text-ink-alert" : "text-ink-3")}>{step.detail}</span> : null}
           </span>
         </li>

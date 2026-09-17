@@ -28,12 +28,12 @@ export function StateBlock({
 }) {
   const Heading = headingLevel === 1 ? "h1" : headingLevel === 3 ? "h3" : "h2";
   return (
-    <section className={cn("blueprint p-6 sm:p-8", className)} role={role} aria-live={live} data-tone={tone}>
+    <section className={cn("blueprint p-6", className)} role={role} aria-live={live} data-tone={tone}>
       <Corners />
       <Heading className="text-3xl tracking-head">{title}</Heading>
-      {detail ? <p className="mt-2.5 max-w-prose text-body text-ink-2">{detail}</p> : null}
-      {children ? <div className="seam mt-5 pt-4">{children}</div> : null}
-      {actions ? <div className="mt-6 flex flex-wrap gap-3">{actions}</div> : null}
+      {detail ? <p className="mt-2.5 max-w-[64ch] text-body text-ink-2">{detail}</p> : null}
+      {children ? <div className="seam mt-[18px] pt-3.5">{children}</div> : null}
+      {actions ? <div className="mt-5 flex flex-wrap gap-3">{actions}</div> : null}
     </section>
   );
 }

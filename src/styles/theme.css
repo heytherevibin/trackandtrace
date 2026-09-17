@@ -19,15 +19,16 @@
   --ink-inverse: #f2f2f3;
   --ink-alert: #2c455d;
 
-  /* Steel. accent draws lines, carets, and lamps; accent-text is the readable step;
-     accent-strong is the one solid object on the board, the primary button. */
+  /* Steel, exactly as the Industry sheet sets it. accent draws lines, carets, lamps, the
+     outline tag, the ghost button, and fills the primary button (the one solid object);
+     accent-text (ramp 700) is the readable step for links, kickers, and labels. */
   --accent: #5980a6;
   --accent-text: #416180;
-  --accent-strong: #416180;
-  --accent-strong-hover: #2c455d;
-  --accent-strong-active: #1d2d3d;
+  --accent-strong: #5980a6;
+  --accent-strong-hover: #597ea3;
+  --accent-strong-active: #416180;
   --accent-ink: #f2f2f3;
-  --accent-soft: #e6f0fa;
+  --accent-soft: #eef6ff;
   --accent-soft-ink: #2c455d;
   --accent-wash: rgba(89, 128, 166, 0.08);
   --accent-busy: #94bce3;
@@ -68,24 +69,24 @@
 
   --accent: #5980a6;
   --accent-text: #b5d9fd;
-  --accent-strong: #94bce3;
-  --accent-strong-hover: #b5d9fd;
-  --accent-strong-active: #d6ebff;
+  --accent-strong: #5980a6;
+  --accent-strong-hover: #597ea3;
+  --accent-strong-active: #b5d9fd;
   --accent-ink: #1d2d3d;
   --accent-soft: #2c455d;
   --accent-soft-ink: #d6ebff;
-  --accent-wash: rgba(148, 188, 227, 0.1);
+  --accent-wash: rgba(89, 128, 166, 0.08);
   --accent-busy: #94bce3;
 
   --line: rgba(245, 245, 248, 0.24);
   --line-strong: rgba(245, 245, 248, 0.45);
   --mark: rgba(245, 245, 248, 0.55);
 
-  --focus-ring: #749dc4;
+  --focus-ring: #5980a6;
   --backdrop: rgba(0, 0, 0, 0.6);
   --skeleton-base: #2c455d;
   --skeleton-sheen: rgba(255, 255, 255, 0.06);
-  --selection-bg: rgba(148, 188, 227, 0.35);
+  --selection-bg: rgba(89, 128, 166, 0.3);
   --selection-fg: #f5f5f8;
   --scrollbar-thumb: rgba(245, 245, 248, 0.3);
   --scrollbar-track: transparent;

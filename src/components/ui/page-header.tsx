@@ -30,10 +30,10 @@ export function PageHeader({
         </Link>
       ) : null}
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="min-w-0 max-w-prose">
+        <div className="min-w-0 max-w-[60ch]">
           {kicker ? <p className="kicker mb-3">{kicker}</p> : null}
           <h1 className="optical-hang text-page tracking-display">{title}</h1>
-          {lead ? <p className="mt-4 text-base text-ink-2">{lead}</p> : null}
+          {lead ? <p className="mt-3.5 text-base text-ink-2">{lead}</p> : null}
           {meta ? <div className="legend mt-3 flex flex-wrap gap-x-4 gap-y-1">{meta}</div> : null}
         </div>
         {actions ? <div className="flex shrink-0 flex-wrap items-center gap-3">{actions}</div> : null}

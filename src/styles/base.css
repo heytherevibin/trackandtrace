@@ -50,11 +50,18 @@
     font: inherit;
     color: inherit;
   }
-  /* 16px or Safari zooms on focus */
+  /* 16px on phones or Safari zooms on focus; the sheet's 14px wells from sm up */
   input,
   select,
   textarea {
     font-size: 1rem;
+  }
+  @media (min-width: 40rem) {
+    input,
+    select,
+    textarea {
+      font-size: 0.875rem;
+    }
   }
 
   ::selection {
