@@ -1,55 +1,78 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowSyncRegular, DeleteRegular } from "@/components/icons";
-import { IconButton } from "@/components/ui/icon-button";
-import { StatusPill } from "@/components/ui/status-pill";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { messages } from "@/messages";
 import type { WatchlistEntry } from "@/types/domain";
-import { formatDateTime, formatRelative } from "@/utils/datetime";
+import { formatDateTime } from "@/utils/datetime";
 import { formatPnr } from "@/utils/pnr";
+import { statusDescription, statusLabel } from "@/utils/status-tone";
+import { checkedAgo, lastCheck, trendLabel } from "./watchlist-format";
 
-export function lastCheck(entry: WatchlistEntry) {
-  return entry.checks[entry.checks.length - 1] ?? null;
+// One saved PNR, as the Watchlist sheet draws a row: cells 12×20 on a hairline.
+
+const CELL = "border-b border-line px-5 py-3";
+const META = "text-xs leading-normal text-ink-1/65";
+/** The sheet's .btn sets line-height 1.2 (a 32.4px button). */
+export const BUTTON_LEADING = "leading-[1.2]";
+
+export interface WatchlistRowProps {
+  readonly entry: WatchlistEntry;
+  readonly busy: boolean;
+  readonly onRecheck: (pnr: string) => void;
+  readonly onRemove: (pnr: string) => void;
 }
 
-export function PnrCell({ entry }: { readonly entry: WatchlistEntry }) {
-  return (
-    <Link href={`/pnr/${entry.pnr}`} className="font-data font-medium text-ink-1 underline-offset-4 hover:underline">
-      {formatPnr(entry.pnr)}
-    </Link>
-  );
-}
-
-export function StatusCell({ entry }: { readonly entry: WatchlistEntry }) {
-  const last = lastCheck(entry);
-  if (!last) return <span className="text-ink-3">{messages.watchlist.noChecks}</span>;
-  const positions = entry.checks.map((c) => c.position).filter((p): p is number => typeof p === "number");
-  return (
-    <span className="flex flex-wrap items-center gap-2">
-      <StatusPill status={last.status} position={last.position} size="sm" />
-      {positions.length > 1 ? <span className="font-data text-xs text-ink-3">{positions.slice(-4).join(" → ")}</span> : null}
-    </span>
-  );
-}
-
-export function CheckedCell({ entry }: { readonly entry: WatchlistEntry }) {
-  const last = lastCheck(entry);
-  if (!last) return <span className="text-ink-3">—</span>;
-  return (
-    <span className="flex flex-col">
-      <span title={formatDateTime(last.at)}>{formatRelative(last.at)}</span>
-      <span className="text-xs text-ink-3">{messages.watchlist.checksCount(entry.checks.length)}</span>
-    </span>
-  );
-}
-
-export function ActionsCell({ entry, busy, onRecheck, onRemove }: { readonly entry: WatchlistEntry; readonly busy: boolean; readonly onRecheck: (pnr: string) => void; readonly onRemove: (pnr: string) => void }) {
+export function WatchlistRow({ entry, busy, onRecheck, onRemove }: WatchlistRowProps) {
   const m = messages.watchlist;
+  const last = lastCheck(entry);
+  const trend = trendLabel(entry.checks);
+  const pnr = formatPnr(entry.pnr);
+
   return (
-    <span className="flex items-center gap-1">
-      <IconButton label={`${m.recheck} ${formatPnr(entry.pnr)}`} icon={<ArrowSyncRegular className="size-5" aria-hidden="true" />} variant="secondary" size="sm" loading={busy} onClick={() => onRecheck(entry.pnr)} data-testid="watchlist-recheck" />
-      <IconButton label={`${m.remove} ${formatPnr(entry.pnr)}`} icon={<DeleteRegular className="size-5" aria-hidden="true" />} variant="ghost" size="sm" onClick={() => onRemove(entry.pnr)} data-testid="watchlist-remove" />
-    </span>
+    <tr>
+      <td className={`${CELL} font-data text-base leading-normal tracking-wide`}>
+        <Link href={`/pnr/${entry.pnr}`} className="text-ink-1 no-underline hover:text-ink-1 hover:underline">
+          {pnr}
+        </Link>
+      </td>
+      <td className={`${CELL} tnum text-ink-1/74`}>{entry.label}</td>
+      <td className={CELL}>
+        {last ? (
+          <span className="inline-flex flex-wrap items-center gap-2">
+            <Badge variant="accent" title={statusDescription(last.status)} data-status={last.status} className="border-0 leading-normal">
+              {statusLabel(last.status, last.position)}
+            </Badge>
+            <span className="sr-only">{statusDescription(last.status)}</span>
+            {trend ? <span className={`${META} tnum`}>{trend}</span> : null}
+          </span>
+        ) : (
+          <span className={META}>{m.noChecks}</span>
+        )}
+      </td>
+      <td className={CELL}>
+        {last ? (
+          <span className="flex flex-col">
+            <time dateTime={last.at} title={formatDateTime(last.at)} className="tnum" suppressHydrationWarning>
+              {checkedAgo(last.at)}
+            </time>
+            <span className={META}>{m.checksCount(entry.checks.length)}</span>
+          </span>
+        ) : (
+          <span className={META}>{m.checksCount(0)}</span>
+        )}
+      </td>
+      <td className={`${CELL} whitespace-nowrap text-right`}>
+        <Button variant="secondary" className={`mr-2 ${BUTTON_LEADING}`} aria-busy={busy || undefined} onClick={() => onRecheck(entry.pnr)} data-testid="watchlist-recheck">
+          {busy ? m.checking : m.recheck}
+          <span className="sr-only"> {pnr}</span>
+        </Button>
+        <Button variant="ghost" className={BUTTON_LEADING} onClick={() => onRemove(entry.pnr)} data-testid="watchlist-remove">
+          {m.remove}
+          <span className="sr-only"> {pnr}</span>
+        </Button>
+      </td>
+    </tr>
   );
 }

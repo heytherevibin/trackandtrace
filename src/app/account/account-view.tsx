@@ -3,19 +3,53 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { ArrowDownloadRegular, DeleteRegular, SignOutRegular } from "@/components/icons";
-import { PRIMARY_NAV } from "@/components/shell/nav-config";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { Avatar } from "@/components/ui/avatar";
 import { Button, buttonClassName } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/empty-state";
-import { PageHeader } from "@/components/ui/page-header";
-import { Panel } from "@/components/ui/panel";
+import { Corners } from "@/components/ui/corners";
+import { Plate } from "@/components/ui/plate";
 import { notify } from "@/components/ui/toast";
 import { messages } from "@/messages";
 import { signOutEverywhere } from "@/services/auth-client";
 import type { SessionUser } from "@/types/session";
 import { DeleteAccountDialog } from "./delete-account-dialog";
+
+// Account is not drawn on its own sheet. It is built from the B sheets' grammar:
+// the app title block, the empty plate (Watchlist), and title-block plates (10×20 cells).
+
+/** The sheet's .btn line-height (a 32.4px button). */
+const LEADING = "leading-[1.2]";
+const DETAIL = "text-body text-ink-1/78";
+
+function TitleBlock({ title }: { readonly title: string }) {
+  return (
+    <div className="max-w-[60ch]">
+      <h1 className="optical-hang text-page tracking-display">{title}</h1>
+    </div>
+  );
+}
+
+function SignedOut() {
+  const m = messages.account;
+  return (
+    <section className="page-frame page-body">
+      <TitleBlock title={m.title} />
+      <div className="blueprint mt-8 p-[clamp(28px,4vw,48px)]">
+        <Corners />
+        <h2 className="text-3xl leading-[1.12] tracking-head">{m.signedOut.title}</h2>
+        <p className={`mt-3 max-w-[52ch] ${DETAIL}`}>{m.signedOut.detail}</p>
+        <div className="mt-5 flex flex-wrap gap-3">
+          <Link href="/login" className={buttonClassName({ variant: "primary", className: LEADING })}>
+            {m.signedOut.signIn}
+          </Link>
+          <Link href="/watchlist" className={buttonClassName({ variant: "secondary", className: LEADING })}>
+            {m.signedOut.openLocal}
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 export function AccountView({ user, savedCount }: { readonly user: SessionUser | null; readonly savedCount: number }) {
   const m = messages.account;
@@ -23,7 +57,10 @@ export function AccountView({ user, savedCount }: { readonly user: SessionUser |
   const [exporting, setExporting] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
+  if (!user) return <SignedOut />;
+
   const exportJson = async () => {
+    if (exporting) return;
     setExporting(true);
     try {
       const res = await fetch("/api/account/export", { cache: "no-store" });
@@ -42,94 +79,57 @@ export function AccountView({ user, savedCount }: { readonly user: SessionUser |
     }
   };
 
-  if (!user) {
-    return (
-      <section className="mx-auto w-full max-w-page px-4 py-8 sm:px-6">
-        <PageHeader title={m.title} />
-        <EmptyState
-          className="mt-8"
-          title={m.signedOut.title}
-          detail={m.signedOut.detail}
-          actions={
-            <>
-              <Link href="/login" className={buttonClassName({ variant: "primary" })}>
-                {m.signedOut.signIn}
-              </Link>
-              <Link href="/watchlist" className={buttonClassName({ variant: "secondary" })}>
-                {m.signedOut.openLocal}
-              </Link>
-            </>
-          }
-        />
-      </section>
-    );
-  }
+  const signOut = () =>
+    void signOutEverywhere().then(() => {
+      router.push("/");
+      router.refresh();
+    });
 
   const name = user.name ?? user.email ?? m.title;
   return (
-    <section className="mx-auto flex w-full max-w-page flex-col gap-6 px-4 py-8 sm:px-6">
-      <PageHeader title={m.title} />
-      <Panel legend={m.profile.legend} legendId="profile-legend">
+    <section className="page-frame page-body">
+      <TitleBlock title={m.title} />
+
+      <Plate className="mt-8" title={m.profile.legend} titleId="account-profile" headingLevel={2} cells="tight">
         <div className="flex flex-wrap items-center gap-4">
-          <Avatar name={name} src={user.avatarUrl} size="lg" />
+          <Avatar name={name} src={user.avatarUrl} size="md" />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-lg font-medium">{name}</p>
-            {user.email && user.name ? <p className="truncate text-sm text-ink-2">{user.email}</p> : null}
+            <p className="truncate text-body font-medium">{name}</p>
+            {user.email && user.name ? <p className="truncate text-sm text-ink-1/74">{user.email}</p> : null}
           </div>
-          <Button variant="secondary" size="sm" leadingIcon={<SignOutRegular className="size-4" aria-hidden="true" />} onClick={() =>
-              void signOutEverywhere().then(() => {
-                router.push("/");
-                router.refresh();
-              })
-            }
-          >
+          <Button variant="secondary" className={LEADING} onClick={signOut}>
             {m.profile.signOut}
           </Button>
         </div>
-      </Panel>
-      <div className="grid gap-6 md:grid-cols-2">
-        <Panel legend={m.watchlist.legend} legendId="watchlist-legend">
-          <p className="text-ink-2">{m.watchlist.saved(savedCount)}</p>
-          <Link href="/watchlist" className={buttonClassName({ variant: "secondary", size: "sm", className: "mt-4" })}>
+      </Plate>
+
+      <div className="mt-8 grid grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))] gap-8">
+        <Plate title={m.watchlist.legend} titleId="account-watchlist" headingLevel={2} cells="tight" meta={[m.watchlist.count(savedCount)]}>
+          <p className={DETAIL}>{m.watchlist.saved(savedCount)}</p>
+          <Link href="/watchlist" className={buttonClassName({ variant: "secondary", className: `mt-4 ${LEADING}` })}>
             {m.watchlist.open}
           </Link>
-        </Panel>
-        <Panel legend={m.preferences.legend} legendId="preferences-legend">
-          <p className="silk">{m.preferences.theme}</p>
-          <ThemeToggle className="mt-2" />
-        </Panel>
+        </Plate>
+        <Plate title={m.preferences.legend} titleId="account-preferences" headingLevel={2} cells="tight">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span className="font-display text-label font-semibold uppercase leading-normal tracking-caps text-accent-text">{m.preferences.theme}</span>
+            <ThemeToggle />
+          </div>
+        </Plate>
       </div>
-      <Panel legend={m.data.legend} legendId="data-legend">
-        <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" loading={exporting} leadingIcon={<ArrowDownloadRegular className="size-4" aria-hidden="true" />} onClick={() => void exportJson()}>
+
+      <Plate className="mt-8" title={m.data.legend} titleId="account-data" headingLevel={2} cells="tight">
+        <p className="max-w-[64ch] text-sm text-ink-1/74">{m.data.detail}</p>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <Button variant="secondary" className={LEADING} aria-busy={exporting || undefined} onClick={() => void exportJson()}>
             {exporting ? m.data.exporting : m.data.export}
           </Button>
-          <Button variant="danger" leadingIcon={<DeleteRegular className="size-4" aria-hidden="true" />} onClick={() => setDeleteOpen(true)}>
+          <Button variant="ghost" className={LEADING} onClick={() => setDeleteOpen(true)}>
             {m.data.delete}
           </Button>
         </div>
-      </Panel>
-      <Panel legend={m.more.legend} legendId="more-legend" className="md:hidden">
-        <ul className="flex flex-col gap-2 text-sm">
-          {PRIMARY_NAV.slice(2).map(({ href, label }) => (
-            <li key={href}>
-              <Link href={href} className="text-ink-2 hover:text-ink-1">
-                {label}
-              </Link>
-            </li>
-          ))}
-          <li>
-            <Link href="/privacy" className="text-ink-2 hover:text-ink-1">
-              {messages.shell.footer.privacy}
-            </Link>
-          </li>
-          <li>
-            <Link href="/tos" className="text-ink-2 hover:text-ink-1">
-              {messages.shell.footer.terms}
-            </Link>
-          </li>
-        </ul>
-      </Panel>
+      </Plate>
+
       <DeleteAccountDialog open={deleteOpen} onOpenChange={setDeleteOpen} />
     </section>
   );

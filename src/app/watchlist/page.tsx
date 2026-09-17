@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { messages } from "@/messages";
+import { env, fixtureAllowed } from "@/services/env";
 import { currentUserFrom } from "@/services/session";
 import { createServerSupabase } from "@/services/supabase/server";
 import { listEntries } from "@/services/watchlist-repo";
@@ -21,5 +22,5 @@ export default async function WatchlistPage() {
       loadError = true;
     }
   }
-  return <WatchlistView signedIn={user !== null} initialEntries={initial} loadError={loadError} />;
+  return <WatchlistView signedIn={user !== null} initialEntries={initial} loadError={loadError} sampleData={fixtureAllowed(env())} />;
 }
