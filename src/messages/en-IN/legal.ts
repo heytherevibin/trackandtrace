@@ -1,7 +1,7 @@
 import type { MessageTree } from "../types";
 
 export const legal = {
-  updatedLabel: "Last updated",
+  updatedLine: (date: string) => `Last updated: ${date}`,
   updated: "17 September 2026",
   onThisPage: "On this page",
   privacy: {
