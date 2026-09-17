@@ -25,18 +25,15 @@ export function hintIdFor(inputId: string): string {
   return `${inputId}-hint`;
 }
 
-/** The face of the input: decorative cells; a click anywhere focuses the real input. */
+/** The face of the input: decorative cells; a click anywhere focuses the real input. No outline around the
+ *  row: the caret cell (steel edge, blinking caret) shows where typing lands. */
 export function PnrCells({ digits, status, onActivate, className }: { readonly digits: string; readonly status: FieldStatus; readonly onActivate: () => void; readonly className?: string }) {
   const caret = caretIndex(digits, status);
   return (
     <div
       aria-hidden="true"
       onClick={onActivate}
-      className={cn(
-        "flex cursor-text items-end",
-        "peer-focus-visible:outline-2 peer-focus-visible:outline-offset-4 peer-focus-visible:outline-focus peer-focus-visible:outline-solid",
-        className,
-      )}
+      className={cn("flex cursor-text items-end", className)}
     >
       {GROUPS.map((group, gi) => (
         <div key={group.label} className={cn("flex min-w-0 flex-col", group.flex, gi > 0 && "ml-3.5")}>

@@ -9,7 +9,7 @@ import { fontVars } from "./fonts";
 /** Renders its own document: no providers or shell, so it draws the sign-in masthead (brand only) over the error sheet. */
 export default function GlobalError({ error, retry }: { error: Error & { digest?: string }; retry: () => void }) {
   return (
-    <html lang="en" data-theme="light" className={fontVars} suppressHydrationWarning>
+    <html lang="en" data-theme="light" className={fontVars} data-scroll-behavior="smooth" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
       </head>

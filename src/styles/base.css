@@ -3,9 +3,17 @@
     scrollbar-width: thin;
     scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
     -webkit-text-size-adjust: 100%;
-    scroll-padding-top: calc(var(--header-height) + 1rem);
     background: var(--surface-0);
   }
+
+  /* Anchor targets stop below the sticky masthead. This lives on the targets, not as scroll-padding on
+     <html>: with padding, focusing any control inside the masthead (every mouse press on a link) made
+     the browser smooth-scroll to "reveal" it, which read as a jitter on press and a lurch on navigation. */
+  [id] {
+    scroll-margin-top: calc(var(--header-height) + 1rem);
+  }
+  /* In-page anchors glide. <html data-scroll-behavior="smooth"> lets Next switch this off during a
+     route change, so a page switch lands at the top instead of animating the scroll (Next 16). */
   @media (prefers-reduced-motion: no-preference) {
     html {
       scroll-behavior: smooth;

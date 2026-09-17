@@ -39,7 +39,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   // Un-awaited on purpose: the shell streams and loading boundaries still show.
   const userPromise = currentUser();
   return (
-    <html lang="en" className={fontVars} suppressHydrationWarning>
+    <html lang="en" className={fontVars} data-scroll-behavior="smooth" suppressHydrationWarning>
       <body className="bg-surface-0 text-ink-1">
         {/*
 DIRECTION CONTRACT — Industry (Claude Design "Landing Redesign B")

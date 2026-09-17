@@ -27,6 +27,18 @@ const MODES: readonly Mode[] = [
 
 const EASE_OUT_EXPO = [0.16, 1, 0.3, 1] as const;
 
+/**
+ * Changes the theme with every colour landing at once, like next-themes' disableTransitionOnChange,
+ * but without switching transitions off wholesale: the press animation keeps easing (motion.css reads
+ * data-theme-switching and leaves only transform transitions running for two frames).
+ */
+function switchTheme(setTheme: (next: ThemeChoice) => void, next: ThemeChoice): void {
+  const root = document.documentElement;
+  root.dataset.themeSwitching = "";
+  setTheme(next);
+  requestAnimationFrame(() => requestAnimationFrame(() => delete root.dataset.themeSwitching));
+}
+
 function modeAfter(value: ThemeChoice): Mode {
   const index = MODES.findIndex((mode) => mode.value === value);
   return MODES[(index + 1) % MODES.length]!;
@@ -49,13 +61,13 @@ export function ThemeToggle({ className }: { readonly className?: string }) {
   return (
     <button
       type="button"
-      onClick={() => setTheme(next.value)}
+      onClick={() => switchTheme(setTheme, next.value)}
       aria-label={mounted ? label : messages.shell.theme.label}
       title={mounted ? label : undefined}
       className={cn(MASTHEAD_CONTROL, "press cursor-pointer border-line bg-transparent text-accent-text hover:border-line-strong hover:bg-accent/12 active:bg-accent/20", className)}
     >
       <span aria-hidden="true" className="grid size-5 place-items-center">
-        <AnimatePresence mode="popLayout" initial={false}>
+        <AnimatePresence initial={false}>
           {mounted ? (
             <m.span
               key={current.value}
@@ -70,10 +82,12 @@ export function ThemeToggle({ className }: { readonly className?: string }) {
           ) : null}
         </AnimatePresence>
       </span>
-      {/* The longest label reserves the width, so the button never changes size between modes. */}
+      {/* The longest label reserves the width, so the button never changes size between modes. Entering and
+          leaving pieces overlap in one grid cell; no popLayout, which lifted the leaving piece out of flow
+          and flashed it far outside the button on its last frame. */}
       <span aria-hidden="true" className="grid overflow-hidden">
         <span className="invisible col-start-1 row-start-1">{messages.shell.theme.system}</span>
-        <AnimatePresence mode="popLayout" initial={false}>
+        <AnimatePresence initial={false}>
           {mounted ? (
             <m.span
               key={current.value}

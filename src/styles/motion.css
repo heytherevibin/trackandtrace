@@ -74,6 +74,13 @@
   transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
 }
 
+/* During a theme switch every colour lands at once; only the press keeps easing (see ThemeToggle). */
+html[data-theme-switching] *,
+html[data-theme-switching] *::before,
+html[data-theme-switching] *::after {
+  transition-property: transform !important;
+}
+
 /* Route transitions: React ViewTransition classes (wrapped in each page, never the layout) */
 ::view-transition {
   pointer-events: none;

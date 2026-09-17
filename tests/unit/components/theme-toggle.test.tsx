@@ -23,6 +23,22 @@ describe("ThemeToggle", () => {
     expect(button.querySelector("svg")).not.toBeNull();
   });
 
+  it("marks the document as switching for two frames so colours land at once while the press still eases", () => {
+    state.theme = "system";
+    const frames: FrameRequestCallback[] = [];
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((cb) => {
+      frames.push(cb);
+      return frames.length;
+    });
+    render(<ThemeToggle />);
+    fireEvent.click(screen.getByRole("button", { name: /^Theme:/ }));
+    expect(document.documentElement).toHaveAttribute("data-theme-switching");
+    frames.shift()?.(0);
+    expect(document.documentElement).toHaveAttribute("data-theme-switching");
+    frames.shift()?.(0);
+    expect(document.documentElement).not.toHaveAttribute("data-theme-switching");
+  });
+
   it.each([
     ["system", "light"],
     ["light", "dark"],
