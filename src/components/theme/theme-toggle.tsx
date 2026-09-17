@@ -34,8 +34,8 @@ function modeAfter(value: ThemeChoice): Mode {
 
 /**
  * One theme button. It shows only the active mode, icon beside its capital label, and a click
- * moves to the next (Auto → Day → Night). The press compresses the button; the old icon turns
- * out as the new one turns in, and the label slides up. Reduced motion (MotionConfig "user")
+ * moves to the next (System → Day → Night). The press is the app-wide one (motion.css); the old
+ * icon turns out as the new one turns in, and the label slides up. Reduced motion (MotionConfig "user")
  * drops the movement and keeps the change. Until the stored choice is known it holds its size
  * without claiming a mode.
  */
@@ -47,13 +47,11 @@ export function ThemeToggle({ className }: { readonly className?: string }) {
   const label = messages.shell.theme.cycle(current.label, next.label);
 
   return (
-    <m.button
+    <button
       type="button"
       onClick={() => setTheme(next.value)}
       aria-label={mounted ? label : messages.shell.theme.label}
       title={mounted ? label : undefined}
-      whileTap={{ scale: 0.9 }}
-      transition={{ type: "spring", stiffness: 600, damping: 28 }}
       className={cn(MASTHEAD_CONTROL, "press cursor-pointer border-line bg-transparent text-accent-text hover:border-line-strong hover:bg-accent/12 active:bg-accent/20", className)}
     >
       <span aria-hidden="true" className="grid size-5 place-items-center">
@@ -90,6 +88,6 @@ export function ThemeToggle({ className }: { readonly className?: string }) {
           ) : null}
         </AnimatePresence>
       </span>
-    </m.button>
+    </button>
   );
 }

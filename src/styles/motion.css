@@ -58,6 +58,22 @@
   }
 }
 
+/* Press: every button in the app, and every link dressed as one (.press), settles inward while held
+   and eases back on release. Transform only, so nothing around it moves; in fast, out a touch slower.
+   Unlayered on purpose: it outranks any utility transition, so every button behaves the same.
+   Keyboard activation never animates, and disabled controls never move. */
+:where(button, [role="button"], .press) {
+  transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+  transition-duration: 200ms;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  backface-visibility: hidden;
+}
+:where(button, [role="button"], .press):active:not(:focus-visible):not(:disabled):not([aria-disabled="true"]) {
+  transform: scale(0.96);
+  transition-duration: 90ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+}
+
 /* Route transitions: React ViewTransition classes (wrapped in each page, never the layout) */
 ::view-transition {
   pointer-events: none;
@@ -109,5 +125,8 @@
   .skeleton::after,
   .sweep {
     animation: none;
+  }
+  :where(button, [role="button"], .press):active {
+    transform: none;
   }
 }

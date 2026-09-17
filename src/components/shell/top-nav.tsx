@@ -10,8 +10,8 @@ import { MASTHEAD_CONTROL, MINIMAL_HEADER_ROUTES, PRIMARY_NAV, TERMINAL_ID, isAc
 import { UserMenu } from "./user-menu";
 
 // Each item is its own hairline box, the same control box as the theme and sign-in buttons. The current
-// page is tinted steel; a press settles the box inward.
-const ITEM = cn(MASTHEAD_CONTROL, "press no-underline transition-transform duration-(--duration-fast) active:scale-95");
+// page is tinted steel; .press gives it the app-wide press (motion.css).
+const ITEM = cn(MASTHEAD_CONTROL, "press no-underline");
 
 /**
  * The masthead, the same on every page: brand; the nav (Check a PNR, Watchlist, Pre-booking,

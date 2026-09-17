@@ -96,8 +96,12 @@ landing's specimen record is generated from the labelled development fixture and
 
 ## Motion
 
-Tint, never transform, on hover and press. The only movements: the invalid shake, the clock's
-flip, the digit caret, the running sweep, popup fades. All collapse under reduced motion.
+Hover is a tint. Press is the one app-wide movement: every button, button-styled link, and masthead
+box (`button`, `[role=button]`, `.press`) settles to 96% while held (90ms in) and eases back on
+release (200ms, no overshoot). It is a transform only, so layout never moves; keyboard activation and
+disabled controls never animate (rule in `src/styles/motion.css`, guarded by `tests/e2e/press.spec.ts`).
+The other movements: the theme button's turning icon and sliding label, the invalid shake, the
+clock's flip, the digit caret, the running sweep, popup fades. All collapse under reduced motion.
 
 ## Accessibility
 
