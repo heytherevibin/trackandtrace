@@ -102,11 +102,9 @@ const LEGACY_VOCABULARY = /\brounded-(sm|md|lg|xl|2xl)\b|\b(bg|text|border|divid
 // Surfaces still awaiting their Industry rewrite. Shrinks to empty when the redesign lands.
 const LEGACY_ALLOWLIST = new Set<string>([
   "src/app/account/account-view.tsx",
-  "src/app/accuracy/page.tsx",
   "src/app/login/login-form.tsx",
   "src/app/not-found.tsx",
   "src/app/pnr/[pnr]/not-found.tsx",
-  "src/app/pre-booking/pre-booking-form.tsx",
   "src/app/watchlist/loading.tsx",
   "src/app/watchlist/watchlist-view.tsx",
   "src/components/landing/availability.tsx",
@@ -115,7 +113,6 @@ const LEGACY_ALLOWLIST = new Set<string>([
   "src/components/landing/hero.tsx",
   "src/components/landing/how-it-works.tsx",
   "src/components/landing/track-divider.tsx",
-  "src/components/legal/legal-document.tsx",
   "src/components/pnr/journey-details.tsx",
   "src/components/pnr/passenger-table.tsx",
   "src/components/pnr/pnr-field.tsx",

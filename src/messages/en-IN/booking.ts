@@ -1,8 +1,11 @@
 import type { MessageTree } from "../types";
 
+// Copy transcribed from the Claude Design sheet "Pre-booking B".
+
 export const booking = {
   title: "Availability before booking",
   lead: "Pick class, quota, and date. Live availability appears here only when a timetable and inventory source is connected.",
+  form: { title: "Availability request", sheet: "Form T&T-02" },
   train: { label: "Train", notConnected: "Train search: not connected" },
   cls: "Class",
   quota: "Quota",
@@ -25,11 +28,24 @@ export const booking = {
     LD: "LD · Ladies",
     TQ: "TQ · Tatkal",
   },
-  requested: (cls: string, quota: string, date: string) => `Requested: ${cls} · ${quota} · ${date}`,
-  unavailableTitle: "No availability returned",
-  unavailableDetail: "No timetable or inventory source is connected. Nothing was estimated.",
   pastDate: "Pick today or a later date.",
+  result: {
+    title: "No availability returned",
+    detail: "No timetable or inventory source is connected. Nothing was estimated.",
+    requested: (cls: string, quota: string, date: string) => `Requested: ${cls} · ${quota} · ${date}.`,
+    responseLabel: "Response",
+    responseValue: "Not received",
+    provenanceLabel: "Provenance",
+    provenanceValue: "None",
+    fallbackLabel: "Fallback",
+    fallbackValue: "Not used",
+  },
   lifecycle: "Availability request lifecycle",
   steps: { input: "Request entered", validate: "Request validated", source: "Inventory source", result: "Result" },
-  stepStates: { pending: "Awaiting a connected source", unavailable: "Unavailable until connected" },
+  stepStates: {
+    waiting: "Waiting for a request",
+    done: "Done",
+    pending: "Awaiting a connected source",
+    unavailable: "Unavailable until connected",
+  },
 } as const satisfies MessageTree;

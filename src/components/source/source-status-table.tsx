@@ -33,11 +33,11 @@ function rows(): readonly Row[] {
 export function SourceStatusTable({ variant = "board" }: { readonly variant?: "board" | "ledger" }) {
   const m = messages.source.table;
   const board = variant === "board";
-  const th = cn("border-b border-line text-left font-display font-semibold uppercase tracking-caps text-ink-3", board ? "px-6 py-3 text-label" : "px-5 py-3 text-xs");
+  const th = cn("border-b border-line text-left font-display font-semibold uppercase tracking-caps text-ink-3", board ? "px-6 py-3 text-label" : "px-5 py-3 text-xs leading-normal");
   const td = cn("border-b border-line", board ? "px-6 py-3" : "px-5 py-[11px]");
   return (
     <div className="overflow-x-auto" role="region" aria-label={m.caption} tabIndex={0}>
-      <table className="w-full min-w-[560px] border-collapse text-body">
+      <table className={cn("w-full min-w-[560px] border-collapse text-body", !board && "leading-normal")}>
         <caption className="sr-only">{m.caption}</caption>
         <thead>
           <tr>
