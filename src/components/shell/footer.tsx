@@ -92,7 +92,7 @@ function CompactFooter() {
   const year = new Date().getFullYear();
   return (
     <div className="page-frame flex flex-wrap items-center justify-between gap-2 py-4">
-      <p className="m-0 text-label text-ink-1/70">
+      <p className="m-0 text-label leading-normal text-ink-1/70">
         {messages.common.notAffiliated}
         {"  ·  "}
         {messages.shell.footer.copyright(year)}
