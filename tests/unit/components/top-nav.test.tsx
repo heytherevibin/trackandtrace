@@ -31,9 +31,30 @@ describe("TopNav", () => {
     expect(signIn).toHaveClass("uppercase");
   });
 
-  it("keeps the one theme button in the masthead", () => {
+  it("draws every nav item as its own box, the current one tinted steel", () => {
+    nav.pathname = "/pre-booking";
     render(<TopNav />);
-    expect(screen.getAllByRole("button", { name: /^Theme:/ })).toHaveLength(1);
+    const links = within(screen.getByRole("navigation", { name: "Primary" })).getAllByRole("link");
+    expect(links).toHaveLength(4);
+    for (const link of links) expect(link).toHaveClass("border", "h-9", "text-label");
+    const current = within(screen.getByRole("navigation", { name: "Primary" })).getByRole("link", { name: "Pre-booking" });
+    expect(current).toHaveAttribute("aria-current", "page");
+    expect(current).toHaveClass("border-accent");
+  });
+
+  it("marks Watchlist with the eye icon", async () => {
+    const { PRIMARY_NAV } = await import("@/components/shell/nav-config");
+    const { EyeFilled } = await import("@/components/icons");
+    expect(PRIMARY_NAV.find((item) => item.href === "/watchlist")?.Icon).toBe(EyeFilled);
+  });
+
+  it("keeps the one theme button in the masthead, the same height and type as the nav boxes", () => {
+    nav.pathname = "/watchlist";
+    render(<TopNav />);
+    const theme = screen.getAllByRole("button", { name: /^Theme:/ });
+    expect(theme).toHaveLength(1);
+    expect(theme[0]).toHaveClass("h-9", "text-label");
+    expect(screen.getByTestId("sign-in")).toHaveClass("h-9", "text-label");
   });
 
   it("marks the current app page and sets Sign in in capitals with its icon", () => {

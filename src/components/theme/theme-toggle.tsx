@@ -4,6 +4,7 @@ import { AnimatePresence, m } from "motion/react";
 import { useSyncExternalStore } from "react";
 import { DarkThemeFilled, WeatherMoonFilled, WeatherSunnyFilled } from "@/components/icons";
 import { messages } from "@/messages";
+import { MASTHEAD_CONTROL } from "@/components/shell/nav-config";
 import { cn } from "@/utils/cn";
 import { useTheme, type ThemeChoice } from "./use-theme";
 
@@ -53,13 +54,9 @@ export function ThemeToggle({ className }: { readonly className?: string }) {
       title={mounted ? label : undefined}
       whileTap={{ scale: 0.9 }}
       transition={{ type: "spring", stiffness: 600, damping: 28 }}
-      className={cn(
-        "press inline-flex h-8 shrink-0 cursor-pointer items-center gap-2 border border-line bg-transparent px-3 font-display text-2xs font-semibold uppercase leading-[normal] tracking-caps text-accent-text",
-        "hover:border-line-strong hover:bg-accent/12 active:bg-accent/20",
-        className,
-      )}
+      className={cn(MASTHEAD_CONTROL, "press cursor-pointer border-line bg-transparent text-accent-text hover:border-line-strong hover:bg-accent/12 active:bg-accent/20", className)}
     >
-      <span aria-hidden="true" className="grid size-4 place-items-center">
+      <span aria-hidden="true" className="grid size-5 place-items-center">
         <AnimatePresence mode="popLayout" initial={false}>
           {mounted ? (
             <m.span
@@ -70,7 +67,7 @@ export function ThemeToggle({ className }: { readonly className?: string }) {
               exit={{ rotate: 120, scale: 0.3, opacity: 0 }}
               transition={{ duration: 0.32, ease: EASE_OUT_EXPO }}
             >
-              <current.Icon className="size-4" />
+              <current.Icon className="size-5" />
             </m.span>
           ) : null}
         </AnimatePresence>

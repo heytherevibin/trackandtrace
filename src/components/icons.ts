@@ -38,6 +38,7 @@ export {
   DarkThemeFilled,
   DatabaseFilled,
   DocumentTableFilled,
+  EyeFilled,
   FlowchartFilled,
   GaugeFilled,
   PersonFilled,

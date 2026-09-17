@@ -10,9 +10,11 @@ import { Avatar } from "@/components/ui/avatar";
 import { buttonClassName } from "@/components/ui/button";
 import { MenuContent, MenuItem, MenuLinkItem, MenuRoot, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
 import { signOutEverywhere } from "@/services/auth-client";
+import { cn } from "@/utils/cn";
+import { MASTHEAD_CONTROL } from "./nav-config";
 
 function Placeholder() {
-  return <span className="inline-block h-[32.4px] w-[96px] border border-line" aria-hidden="true" />;
+  return <span className="inline-block h-9 w-[104px] border border-line" aria-hidden="true" />;
 }
 
 function UserMenuInner() {
@@ -20,7 +22,7 @@ function UserMenuInner() {
   const user = useUser();
   if (!user) {
     return (
-      <Link href="/login" className={buttonClassName({ variant: "secondary", className: "gap-2 text-label uppercase tracking-caps" })} data-testid="sign-in">
+      <Link href="/login" className={cn(buttonClassName({ variant: "secondary" }), MASTHEAD_CONTROL, "py-0")} data-testid="sign-in">
         <PersonFilled className="size-5 shrink-0" aria-hidden="true" />
         {messages.shell.nav.signIn}
       </Link>
@@ -29,7 +31,7 @@ function UserMenuInner() {
   const name = user.name ?? user.email ?? messages.shell.nav.account;
   return (
     <MenuRoot>
-      <MenuTrigger className="press inline-flex border border-transparent hover:border-line" aria-label={messages.shell.nav.account} data-testid="account-menu">
+      <MenuTrigger className="press inline-flex size-9 items-center justify-center border border-line hover:border-line-strong" aria-label={messages.shell.nav.account} data-testid="account-menu">
         <Avatar name={name} src={user.avatarUrl} size="sm" />
       </MenuTrigger>
       <MenuContent>

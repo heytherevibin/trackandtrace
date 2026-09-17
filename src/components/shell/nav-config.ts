@@ -1,8 +1,8 @@
 import {
-  BookmarkFilled,
   CalendarClockFilled,
   DatabaseFilled,
   DocumentTableFilled,
+  EyeFilled,
   FlowchartFilled,
   GaugeFilled,
   PersonFilled,
@@ -13,6 +13,8 @@ import {
 import { messages } from "@/messages";
 
 /** Navigation icons are Fluent Filled, drawn at 20px (their native grid). */
+/** Every masthead control (nav boxes, theme button, sign in) shares this box: 36px, hairline, 13px capitals. */
+export const MASTHEAD_CONTROL = "inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap border px-3 font-display text-label font-semibold uppercase leading-none tracking-caps";
 export type NavIcon = typeof TicketDiagonalFilled;
 
 export interface NavItem {
@@ -23,7 +25,7 @@ export interface NavItem {
 
 export const PRIMARY_NAV: readonly NavItem[] = [
   { href: "/", label: messages.shell.nav.check, Icon: TicketDiagonalFilled },
-  { href: "/watchlist", label: messages.shell.nav.watchlist, Icon: BookmarkFilled },
+  { href: "/watchlist", label: messages.shell.nav.watchlist, Icon: EyeFilled },
   { href: "/pre-booking", label: messages.shell.nav.preBooking, Icon: CalendarClockFilled },
   { href: "/accuracy", label: messages.shell.nav.accuracy, Icon: GaugeFilled },
 ];
