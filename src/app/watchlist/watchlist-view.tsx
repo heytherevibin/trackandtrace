@@ -2,98 +2,139 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { Button, buttonClassName } from "@/components/ui/button";
-import { DataTable } from "@/components/ui/data-table";
-import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
-import { PageHeader } from "@/components/ui/page-header";
-import { notify } from "@/components/ui/toast";
 import { messages } from "@/messages";
 import { fetchPnr } from "@/services/pnr-source";
 import { mergePromptStore, planMerge } from "@/services/stores/watchlist-merge";
 import { useWatchlist, watchlistStore } from "@/services/stores/watchlist-store";
 import { deleteWatchlist, mergeWatchlist, saveWatchlist } from "@/services/watchlist-api";
 import type { HistoryPoint, WatchlistEntry } from "@/types/domain";
+import { formatPnr } from "@/utils/pnr";
 import { statusLabel } from "@/utils/status-tone";
 import { MergePrompt } from "./merge-prompt";
-import { ActionsCell, CheckedCell, PnrCell, StatusCell, lastCheck } from "./watchlist-row";
+import { lastCheck, restoreAt } from "./watchlist-format";
+import { EmptyPlate, SavedPlate, SyncNote, UndoButton } from "./watchlist-plates";
+import { CountSkeleton, SavedPlateSkeleton } from "./watchlist-skeleton";
 
 export interface WatchlistViewProps {
   readonly signedIn: boolean;
   readonly initialEntries: readonly WatchlistEntry[];
   readonly loadError: boolean;
+  /** True only while the labelled development fixture serves results. */
+  readonly sampleData: boolean;
 }
 
-/** Dual-mode watchlist: device entries when signed out, account entries when signed in. */
-export function WatchlistView({ signedIn, initialEntries, loadError }: WatchlistViewProps) {
+const subscribeNever = () => () => undefined;
+const onClient = () => true;
+const onServer = () => false;
+
+/** Puts a removed device entry back through the store, every saved check included. */
+function restoreLocal(entry: WatchlistEntry): void {
+  const [first, ...rest] = entry.checks;
+  watchlistStore.upsert(entry.pnr, entry.label, first);
+  for (const point of rest) watchlistStore.appendCheck(entry.pnr, point);
+}
+
+/** The Watchlist sheet. Device entries when signed out, account entries when signed in. */
+export function WatchlistView({ signedIn, initialEntries, loadError, sampleData }: WatchlistViewProps) {
   const m = messages.watchlist;
   const router = useRouter();
   const local = useWatchlist();
+  // Device entries exist only in the browser: until hydration, draw the plate in outline, not as empty.
+  const hydrated = useSyncExternalStore(subscribeNever, onClient, onServer);
   const [server, setServer] = useState<readonly WatchlistEntry[]>(initialEntries);
-  const [busy, setBusy] = useState<string | null>(null);
+  const [busy, setBusy] = useState<ReadonlySet<string>>(() => new Set());
+  const [removed, setRemoved] = useState<WatchlistEntry | null>(null);
+  const [announcement, setAnnouncement] = useState("");
   const [mergeDismissed, setMergeDismissed] = useState(false);
   const [mergeEligible] = useState(() => mergePromptStore.shouldPrompt());
-  const [announcement, setAnnouncement] = useState("");
-  const entries = signedIn ? server : local.entries;
+
+  const entries: readonly WatchlistEntry[] = signedIn ? server : local.entries;
+  const ready = signedIn || hydrated;
   const mergePlan = signedIn ? planMerge(local.entries, server) : null;
   const mergeCount = mergePlan ? mergePlan.create.length + mergePlan.update.length : 0;
   const mergeOpen = signedIn && mergeEligible && !mergeDismissed && mergeCount > 0;
 
+  const setPnrBusy = (pnr: string, on: boolean) =>
+    setBusy((current) => new Set(on ? [...current, pnr] : [...current].filter((p) => p !== pnr)));
+
   const recheck = async (pnr: string) => {
+    if (busy.has(pnr)) return;
     const before = entries.find((e) => e.pnr === pnr);
     const previous = before ? lastCheck(before) : null;
-    setBusy(pnr);
+    const shown = formatPnr(pnr);
+    setPnrBusy(pnr, true);
     const out = await fetchPnr(pnr, { fresh: true });
-    setBusy(null);
     if (!out.outcome.ok) {
-      notify.error(m.recheckFailed, out.outcome.message);
+      setPnrBusy(pnr, false);
+      setAnnouncement(m.announce.failed(shown, out.outcome.message));
       return;
     }
     const result = out.outcome.result;
     const point: HistoryPoint = { at: result.checkedAt, status: result.lead.status, position: result.lead.position };
-    const nowLabel = statusLabel(point.status, point.position);
-    const message = previous && (previous.status !== point.status || previous.position !== point.position) ? m.recheckUpdated(statusLabel(previous.status, previous.position), nowLabel) : m.recheckSame(nowLabel);
+    const source = messages.result.sources[result.snapshot.source];
+    const current = statusLabel(point.status, point.position);
+    const changed = previous !== null && (previous.status !== point.status || previous.position !== point.position);
+    const text = changed ? m.announce.changed(shown, statusLabel(previous.status, previous.position), current, source) : m.announce.same(shown, current, source);
     if (signedIn && before) {
       const saved = await saveWatchlist({ pnr, label: before.label, checks: [...before.checks, point].slice(-40) });
+      setPnrBusy(pnr, false);
       if (!saved.ok) {
-        notify.error(m.recheckFailed, saved.error.message);
+        setAnnouncement(m.announce.notSaved(shown));
         return;
       }
       setServer((list) => list.map((e) => (e.pnr === pnr ? saved.data : e)));
     } else {
-      watchlistStore.appendCheck(pnr, point);
+      if (!signedIn) watchlistStore.appendCheck(pnr, point);
+      setPnrBusy(pnr, false);
     }
-    setAnnouncement(`${pnr}: ${message}`);
-    notify.success(message);
+    setAnnouncement(text);
   };
 
   const remove = async (pnr: string) => {
-    const removed = entries.find((e) => e.pnr === pnr);
-    if (!removed) return;
+    const index = entries.findIndex((e) => e.pnr === pnr);
+    const gone = entries[index];
+    if (!gone) return;
+    const shown = formatPnr(pnr);
     if (signedIn) {
       setServer((list) => list.filter((e) => e.pnr !== pnr));
       const out = await deleteWatchlist(pnr);
       if (!out.ok) {
-        setServer((list) => [removed, ...list]);
-        notify.error(m.removeFailed, out.error.message);
+        setServer((list) => restoreAt(list, index, gone));
+        setAnnouncement(m.announce.removeFailed(shown));
         return;
       }
-      notify.undoable(m.removed(pnr), () => {
-        void saveWatchlist({ pnr: removed.pnr, label: removed.label, checks: removed.checks }).then((back) => {
-          if (back.ok) {
-            setServer((list) => [back.data, ...list.filter((e) => e.pnr !== pnr)]);
-            notify.success(m.restored);
-          }
-        });
-      });
     } else {
       local.remove(pnr);
-      notify.undoable(m.removed(pnr), () => {
-        watchlistStore.upsert(removed.pnr, removed.label, removed.checks[removed.checks.length - 1]);
-        notify.success(m.restored);
-      });
     }
+    setRemoved(gone);
+    setAnnouncement(m.announce.removed(shown));
+  };
+
+  const undo = async () => {
+    const entry = removed;
+    if (!entry) return;
+    setRemoved(null);
+    if (signedIn) {
+      const back = await saveWatchlist({ pnr: entry.pnr, label: entry.label, checks: entry.checks });
+      if (!back.ok) {
+        setRemoved(entry);
+        setAnnouncement(m.announce.restoreFailed);
+        return;
+      }
+      setServer((list) => [back.data, ...list.filter((e) => e.pnr !== entry.pnr)]);
+    } else {
+      restoreLocal(entry);
+    }
+    setAnnouncement(m.announce.restored);
+  };
+
+  const clearAll = () => {
+    local.clear();
+    setRemoved(null);
+    setAnnouncement(m.announce.cleared);
   };
 
   const move = async () => {
@@ -101,70 +142,72 @@ export function WatchlistView({ signedIn, initialEntries, loadError }: Watchlist
     const payload = [...mergePlan.create, ...mergePlan.update].map((e) => ({ pnr: e.pnr, label: e.label, checks: e.checks }));
     const out = await mergeWatchlist(payload);
     if (!out.ok) {
-      notify.error(m.merge.failed, out.error.message);
+      setAnnouncement(m.merge.failed);
       return;
     }
     setServer(out.data);
     local.clear();
     setMergeDismissed(true);
-    notify.success(m.merge.moved(payload.length));
+    setAnnouncement(m.merge.moved(payload.length));
   };
 
-  const columns = [
-    { key: "pnr", header: m.columns.pnr, cell: (e: WatchlistEntry) => <PnrCell entry={e} /> },
-    { key: "journey", header: m.columns.journey, cell: (e: WatchlistEntry) => <span className="text-ink-2">{e.label}</span> },
-    { key: "status", header: m.columns.status, cell: (e: WatchlistEntry) => <StatusCell entry={e} /> },
-    { key: "checked", header: m.columns.checked, cell: (e: WatchlistEntry) => <CheckedCell entry={e} /> },
-    { key: "actions", header: m.columns.actions, cell: (e: WatchlistEntry) => <ActionsCell entry={e} busy={busy === e.pnr} onRecheck={(p) => void recheck(p)} onRemove={(p) => void remove(p)} />, align: "end" as const },
-  ];
+  const undoButton = removed ? <UndoButton onUndo={() => void undo()} /> : null;
+  const showClear = !signedIn && entries.length > 0;
 
   return (
-    <section className="mx-auto flex w-full max-w-page flex-col gap-6 px-4 py-8 sm:px-6">
-      <span className="sr-only" role="status" aria-live="polite">
+    <section className="page-frame page-body">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="max-w-[56ch]">
+          <h1 className="optical-hang text-page tracking-display">{m.title}</h1>
+          <p className="mt-3.5 text-base text-ink-1/78">{signedIn ? m.signedLead : m.anonLead}</p>
+          {loadError ? null : ready ? (
+            <p className="mt-3 font-display text-label font-semibold uppercase leading-normal tracking-caps text-ink-1/70">{m.count(entries.length)}</p>
+          ) : (
+            <CountSkeleton />
+          )}
+        </div>
+        {signedIn ? null : (
+          <Link href="/login" className={buttonClassName({ variant: "secondary" })}>
+            {m.syncAction}
+          </Link>
+        )}
+      </div>
+
+      <p aria-live="polite" className="mt-4 min-h-5 text-sm text-accent-text">
         {announcement}
-      </span>
-      <PageHeader
-        title={m.title}
-        lead={signedIn ? m.signedLead : m.anonLead}
-        meta={<span>{m.count(entries.length)}</span>}
-        actions={
-          signedIn ? null : (
-            <Link href="/login" className={buttonClassName({ variant: "key", size: "sm" })}>
-              {messages.shell.nav.signIn}
-            </Link>
-          )
-        }
-      />
+      </p>
+
       {loadError ? (
-        <ErrorState title={m.loadError} onRetry={() => router.refresh()} />
-      ) : (
-        <div className="panel overflow-hidden">
-          <DataTable
-            caption={m.title}
-            rows={entries}
-            rowKey={(e) => e.pnr}
-            columns={columns}
-            emptyState={
-              <EmptyState
-                title={messages.states.empty.watchlistTitle}
-                detail={messages.states.empty.watchlistDetail}
-                actions={
-                  <Link href="/" className={buttonClassName({ variant: "primary" })}>
-                    {m.empty.action}
-                  </Link>
-                }
-              />
-            }
+        <ErrorState className="mt-4" title={m.loadError} detail={m.loadErrorDetail} onRetry={() => router.refresh()} />
+      ) : !ready ? (
+        <SavedPlateSkeleton />
+      ) : entries.length > 0 ? (
+        <>
+          <SavedPlate
+            title={signedIn ? m.plate.account : m.plate.device}
+            sampleData={sampleData}
+            entries={entries}
+            busy={busy}
+            onRecheck={(pnr) => void recheck(pnr)}
+            onRemove={(pnr) => void remove(pnr)}
           />
-        </div>
+          {showClear || undoButton ? (
+            <div className="mt-4 flex gap-3">
+              {showClear ? (
+                <Button variant="ghost" onClick={clearAll}>
+                  {m.clearLocal}
+                </Button>
+              ) : null}
+              {undoButton}
+            </div>
+          ) : null}
+        </>
+      ) : (
+        <EmptyPlate undo={undoButton} />
       )}
-      {!signedIn && local.entries.length > 0 ? (
-        <div>
-          <Button variant="ghost" size="sm" onClick={local.clear}>
-            {m.clearLocal}
-          </Button>
-        </div>
-      ) : null}
+
+      <SyncNote signedIn={signedIn} />
+
       {mergePlan ? (
         <MergePrompt
           count={mergeCount}
