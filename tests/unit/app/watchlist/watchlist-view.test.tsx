@@ -183,6 +183,8 @@ describe("WatchlistView — your account", () => {
   it("renders the load error plate with a retry", () => {
     view({ signedIn: true, loadError: true });
     expect(screen.getByRole("alert")).toHaveTextContent("Your watchlist could not be loaded.");
+    expect(screen.getByRole("alert")).toHaveTextContent("The account service did not answer. Nothing on your account was changed.");
+    expect(screen.queryByText("0 saved")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
     expect(refresh).toHaveBeenCalled();
   });

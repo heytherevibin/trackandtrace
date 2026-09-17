@@ -6,7 +6,7 @@ import { Button, buttonClassName } from "@/components/ui/button";
 import { Corners } from "@/components/ui/corners";
 import { messages } from "@/messages";
 import type { WatchlistEntry } from "@/types/domain";
-import { BUTTON_LEADING, WatchlistRow } from "./watchlist-row";
+import { WatchlistRow } from "./watchlist-row";
 
 // The Watchlist sheet's objects: the saved-PNR plate, the empty plate, and the account sync note.
 
@@ -77,7 +77,7 @@ export function SavedPlate({
 
 export function UndoButton({ onUndo }: { readonly onUndo: () => void }) {
   return (
-    <Button variant="ghost" className={BUTTON_LEADING} onClick={onUndo}>
+    <Button variant="ghost" onClick={onUndo}>
       {messages.watchlist.undo}
     </Button>
   );
@@ -91,7 +91,7 @@ export function EmptyPlate({ undo }: { readonly undo: ReactNode }) {
       <h2 className="text-3xl leading-[1.12] tracking-head">{m.title}</h2>
       <p className="mt-3 max-w-[52ch] text-body text-ink-1/78">{m.detail}</p>
       <div className="mt-5 flex flex-wrap gap-3">
-        <Link href="/#terminal" className={buttonClassName({ variant: "primary", className: BUTTON_LEADING })}>
+        <Link href="/#terminal" className={buttonClassName({ variant: "primary" })}>
           {m.action}
         </Link>
         {undo}

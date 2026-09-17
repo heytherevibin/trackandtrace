@@ -16,8 +16,8 @@ type Phase = "idle" | "sending" | "sent";
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const EMAIL_ID = "email";
 const ERROR_ID = "email-error";
-/** .btn line-height 1.2; .btn-block adds width and a 6.8px top margin; the sheet sets 44px. */
-const BLOCK = "mt-[6.8px] h-11 leading-[1.2]";
+/** .btn-block adds full width and a 6.8px top margin; the sheet sets 44px. */
+const BLOCK = "mt-[6.8px] h-11";
 const STATE_TITLE = "text-3xl leading-[1.12] tracking-head";
 const STATE_DETAIL = "text-body leading-[23px] text-ink-1/78";
 
@@ -75,10 +75,10 @@ export function LoginForm({ configured, error }: { readonly configured: boolean;
               <h2 className={STATE_TITLE}>{m.sent.title}</h2>
               <p className={STATE_DETAIL}>{m.sent.detail(email)}</p>
               <div className="mt-1.5 flex flex-wrap gap-2.5">
-                <Button variant="secondary" className="leading-[1.2]" onClick={() => void send()}>
+                <Button variant="secondary" onClick={() => void send()}>
                   {m.sent.resend}
                 </Button>
-                <Button variant="ghost" className="leading-[1.2]" onClick={() => setPhase("idle")}>
+                <Button variant="ghost" onClick={() => setPhase("idle")}>
                   {m.sent.change}
                 </Button>
               </div>

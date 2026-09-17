@@ -17,8 +17,6 @@ import { DeleteAccountDialog } from "./delete-account-dialog";
 // Account is not drawn on its own sheet. It is built from the B sheets' grammar:
 // the app title block, the empty plate (Watchlist), and title-block plates (10×20 cells).
 
-/** The sheet's .btn line-height (a 32.4px button). */
-const LEADING = "leading-[1.2]";
 const DETAIL = "text-body text-ink-1/78";
 
 function TitleBlock({ title }: { readonly title: string }) {
@@ -39,10 +37,10 @@ function SignedOut() {
         <h2 className="text-3xl leading-[1.12] tracking-head">{m.signedOut.title}</h2>
         <p className={`mt-3 max-w-[52ch] ${DETAIL}`}>{m.signedOut.detail}</p>
         <div className="mt-5 flex flex-wrap gap-3">
-          <Link href="/login" className={buttonClassName({ variant: "primary", className: LEADING })}>
+          <Link href="/login" className={buttonClassName({ variant: "primary" })}>
             {m.signedOut.signIn}
           </Link>
-          <Link href="/watchlist" className={buttonClassName({ variant: "secondary", className: LEADING })}>
+          <Link href="/watchlist" className={buttonClassName({ variant: "secondary" })}>
             {m.signedOut.openLocal}
           </Link>
         </div>
@@ -97,7 +95,7 @@ export function AccountView({ user, savedCount }: { readonly user: SessionUser |
             <p className="truncate text-body font-medium">{name}</p>
             {user.email && user.name ? <p className="truncate text-sm text-ink-1/74">{user.email}</p> : null}
           </div>
-          <Button variant="secondary" className={LEADING} onClick={signOut}>
+          <Button variant="secondary" onClick={signOut}>
             {m.profile.signOut}
           </Button>
         </div>
@@ -106,7 +104,7 @@ export function AccountView({ user, savedCount }: { readonly user: SessionUser |
       <div className="mt-8 grid grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))] gap-8">
         <Plate title={m.watchlist.legend} titleId="account-watchlist" headingLevel={2} cells="tight" meta={[m.watchlist.count(savedCount)]}>
           <p className={DETAIL}>{m.watchlist.saved(savedCount)}</p>
-          <Link href="/watchlist" className={buttonClassName({ variant: "secondary", className: `mt-4 ${LEADING}` })}>
+          <Link href="/watchlist" className={buttonClassName({ variant: "secondary", className: "mt-4" })}>
             {m.watchlist.open}
           </Link>
         </Plate>
@@ -121,10 +119,10 @@ export function AccountView({ user, savedCount }: { readonly user: SessionUser |
       <Plate className="mt-8" title={m.data.legend} titleId="account-data" headingLevel={2} cells="tight">
         <p className="max-w-[64ch] text-sm text-ink-1/74">{m.data.detail}</p>
         <div className="mt-4 flex flex-wrap gap-3">
-          <Button variant="secondary" className={LEADING} aria-busy={exporting || undefined} onClick={() => void exportJson()}>
+          <Button variant="secondary" aria-busy={exporting || undefined} onClick={() => void exportJson()}>
             {exporting ? m.data.exporting : m.data.export}
           </Button>
-          <Button variant="ghost" className={LEADING} onClick={() => setDeleteOpen(true)}>
+          <Button variant="ghost" onClick={() => setDeleteOpen(true)}>
             {m.data.delete}
           </Button>
         </div>

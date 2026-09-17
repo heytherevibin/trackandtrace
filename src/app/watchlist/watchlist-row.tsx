@@ -14,8 +14,6 @@ import { checkedAgo, lastCheck, trendLabel } from "./watchlist-format";
 
 const CELL = "border-b border-line px-5 py-3";
 const META = "text-xs leading-normal text-ink-1/65";
-/** The sheet's .btn sets line-height 1.2 (a 32.4px button). */
-export const BUTTON_LEADING = "leading-[1.2]";
 
 export interface WatchlistRowProps {
   readonly entry: WatchlistEntry;
@@ -64,11 +62,11 @@ export function WatchlistRow({ entry, busy, onRecheck, onRemove }: WatchlistRowP
         )}
       </td>
       <td className={`${CELL} whitespace-nowrap text-right`}>
-        <Button variant="secondary" className={`mr-2 ${BUTTON_LEADING}`} aria-busy={busy || undefined} onClick={() => onRecheck(entry.pnr)} data-testid="watchlist-recheck">
+        <Button variant="secondary" className="mr-2" aria-busy={busy || undefined} onClick={() => onRecheck(entry.pnr)} data-testid="watchlist-recheck">
           {busy ? m.checking : m.recheck}
           <span className="sr-only"> {pnr}</span>
         </Button>
-        <Button variant="ghost" className={BUTTON_LEADING} onClick={() => onRemove(entry.pnr)} data-testid="watchlist-remove">
+        <Button variant="ghost" onClick={() => onRemove(entry.pnr)} data-testid="watchlist-remove">
           {m.remove}
           <span className="sr-only"> {pnr}</span>
         </Button>

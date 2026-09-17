@@ -39,6 +39,7 @@ export const watchlist = {
     cleared: "Cleared all on this device",
   },
   loadError: "Your watchlist could not be loaded.",
+  loadErrorDetail: "The account service did not answer. Nothing on your account was changed.",
   empty: {
     title: "Nothing saved yet",
     detail: "Run a check and save the PNR to follow it here.",

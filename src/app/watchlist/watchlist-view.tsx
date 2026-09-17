@@ -15,7 +15,6 @@ import { formatPnr } from "@/utils/pnr";
 import { statusLabel } from "@/utils/status-tone";
 import { MergePrompt } from "./merge-prompt";
 import { lastCheck, restoreAt } from "./watchlist-format";
-import { BUTTON_LEADING } from "./watchlist-row";
 import { EmptyPlate, SavedPlate, SyncNote, UndoButton } from "./watchlist-plates";
 import { CountSkeleton, SavedPlateSkeleton } from "./watchlist-skeleton";
 
@@ -161,10 +160,14 @@ export function WatchlistView({ signedIn, initialEntries, loadError, sampleData 
         <div className="max-w-[56ch]">
           <h1 className="optical-hang text-page tracking-display">{m.title}</h1>
           <p className="mt-3.5 text-base text-ink-1/78">{signedIn ? m.signedLead : m.anonLead}</p>
-          {ready ? <p className="mt-3 font-display text-label font-semibold uppercase leading-normal tracking-caps text-ink-1/70">{m.count(entries.length)}</p> : <CountSkeleton />}
+          {loadError ? null : ready ? (
+            <p className="mt-3 font-display text-label font-semibold uppercase leading-normal tracking-caps text-ink-1/70">{m.count(entries.length)}</p>
+          ) : (
+            <CountSkeleton />
+          )}
         </div>
         {signedIn ? null : (
-          <Link href="/login" className={buttonClassName({ variant: "secondary", className: BUTTON_LEADING })}>
+          <Link href="/login" className={buttonClassName({ variant: "secondary" })}>
             {m.syncAction}
           </Link>
         )}
@@ -175,7 +178,7 @@ export function WatchlistView({ signedIn, initialEntries, loadError, sampleData 
       </p>
 
       {loadError ? (
-        <ErrorState className="mt-4" title={m.loadError} onRetry={() => router.refresh()} />
+        <ErrorState className="mt-4" title={m.loadError} detail={m.loadErrorDetail} onRetry={() => router.refresh()} />
       ) : !ready ? (
         <SavedPlateSkeleton />
       ) : entries.length > 0 ? (
@@ -191,7 +194,7 @@ export function WatchlistView({ signedIn, initialEntries, loadError, sampleData 
           {showClear || undoButton ? (
             <div className="mt-4 flex gap-3">
               {showClear ? (
-                <Button variant="ghost" className={BUTTON_LEADING} onClick={clearAll}>
+                <Button variant="ghost" onClick={clearAll}>
                   {m.clearLocal}
                 </Button>
               ) : null}
