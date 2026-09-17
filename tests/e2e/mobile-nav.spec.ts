@@ -1,24 +1,43 @@
 import { expect, test } from "./fixtures";
 import { gotoReady } from "./helpers";
 
-test("bottom tabs navigate and meet the touch target floor", async ({ page, isMobile }) => {
+// The B sheets draw no phone tab bar: the masthead wraps onto a second row and keeps
+// every link. These specs hold that on a phone.
+
+const PRODUCT = ["Check", "Watchlist", "Pre-booking", "Accuracy"] as const;
+const SECTIONS = ["How it works", "The record", "Sources", "Roadmap", "FAQ"] as const;
+
+test("the wrapped masthead keeps the product links and marks the current page", async ({ page, isMobile }) => {
   test.skip(!isMobile, "phone-only surface");
-  await gotoReady(page, "/");
-  const tabs = page.getByRole("navigation", { name: "Sections" });
-  await expect(tabs).toBeVisible();
-  for (const name of ["Check", "Watchlist", "Sign in"]) {
-    const tab = tabs.getByRole("link", { name });
-    const box = await tab.boundingBox();
-    expect(box, name).not.toBeNull();
-    expect(box!.height, name).toBeGreaterThanOrEqual(44);
-  }
-  await tabs.getByRole("link", { name: "Watchlist" }).click();
-  await page.waitForURL("**/watchlist");
-  await expect(tabs.getByRole("link", { name: "Watchlist" })).toHaveAttribute("aria-current", "page");
+  await gotoReady(page, "/watchlist");
+  const nav = page.getByRole("navigation", { name: "Primary" });
+  await expect(nav).toBeVisible();
+  for (const name of PRODUCT) await expect(nav.getByRole("link", { name, exact: true })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Watchlist", exact: true })).toHaveAttribute("aria-current", "page");
+
+  await nav.getByRole("link", { name: "Pre-booking", exact: true }).click();
+  await page.waitForURL("**/pre-booking");
+  await expect(nav.getByRole("link", { name: "Pre-booking", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(nav.getByRole("link", { name: "Watchlist", exact: true })).not.toHaveAttribute("aria-current", "page");
+
+  await nav.getByRole("link", { name: "Accuracy", exact: true }).click();
+  await page.waitForURL("**/accuracy");
+  await expect(nav.getByRole("link", { name: "Accuracy", exact: true })).toHaveAttribute("aria-current", "page");
+
+  await nav.getByRole("link", { name: "Check", exact: true }).click();
+  await page.waitForURL((url) => url.pathname === "/");
 });
 
-test("the top rail hides section links on a phone", async ({ page, isMobile }) => {
+test("the landing masthead keeps its section anchors and the check on a phone", async ({ page, isMobile }) => {
   test.skip(!isMobile, "phone-only surface");
   await gotoReady(page, "/");
-  await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Accuracy" })).toBeHidden();
+  const nav = page.getByRole("navigation", { name: "Primary" });
+  for (const name of SECTIONS) await expect(nav.getByRole("link", { name, exact: true })).toBeVisible();
+
+  const check = page.getByRole("banner").getByRole("link", { name: "Check a PNR" });
+  await expect(check).toBeVisible();
+  await expect(check).toHaveAttribute("href", "#terminal");
+  await check.click();
+  await expect(page).toHaveURL(/#terminal$/);
+  await expect(page.locator("#terminal")).toBeInViewport();
 });

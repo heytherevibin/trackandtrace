@@ -26,4 +26,10 @@ test("capture review screenshots", async ({ page }, testInfo) => {
   await gotoReady(page, `/pnr/${PNR.cnf}`);
   await settle();
   await page.screenshot({ path: `.impeccable/review/${name}-result.png`, fullPage: true });
+
+  for (const route of ["/pre-booking", "/accuracy", "/privacy", "/tos"] as const) {
+    await gotoReady(page, route);
+    await settle();
+    await page.screenshot({ path: `.impeccable/review/${name}${route.replace("/", "-")}.png`, fullPage: true });
+  }
 });

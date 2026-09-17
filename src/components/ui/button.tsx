@@ -38,9 +38,11 @@ export interface ButtonStyleOptions {
 /** Shared classes so links can dress as buttons without nesting interactive elements. */
 export function buttonClassName({ variant = "secondary", size = "md", fullWidth = false, className }: ButtonStyleOptions = {}): string {
   return cn(
-    "press relative inline-flex cursor-pointer select-none items-center justify-center gap-1.5 whitespace-nowrap border font-display font-semibold leading-tight no-underline",
+    "press relative inline-flex cursor-pointer select-none items-center justify-center gap-1.5 whitespace-nowrap border font-display font-semibold no-underline",
     "disabled:cursor-not-allowed disabled:opacity-45 aria-disabled:cursor-not-allowed aria-disabled:opacity-45",
     SIZE[size],
+    // After the size: a font-size class resets line height, so the drawn 1.2 must come last.
+    "leading-[1.2]",
     VARIANT[variant],
     fullWidth && "w-full",
     className,
