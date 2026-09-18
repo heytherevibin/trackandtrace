@@ -2,64 +2,57 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
 import { Wordmark } from "@/components/brand/wordmark";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { messages } from "@/messages";
 import { cn } from "@/utils/cn";
-import { PRIMARY_NAV, isActive } from "./nav-config";
+import { MASTHEAD_CONTROL, MINIMAL_HEADER_ROUTES, NAV_ITEM_ACTIVE, NAV_ITEM_IDLE, PRIMARY_NAV, isActive, navTarget } from "./nav-config";
+import { NavMenu } from "./nav-menu";
 import { UserMenu } from "./user-menu";
 
-/** A floating instrument rail: detached from the edge, blurred plate, lit key for the active section. */
+// Each item is its own hairline box, the same control box as the theme and sign-in buttons. The current
+// page is tinted steel; .press gives it the app-wide press (motion.css).
+const ITEM = cn(MASTHEAD_CONTROL, "press no-underline");
+
+/**
+ * The masthead, the same on every page: one sticky hairline row. From lg: the wordmark; the nav (Check a
+ * PNR, Watchlist, Pre-booking, Accuracy), each its own hairline box with a Fluent Filled icon beside its
+ * capital label, the current page tinted steel; then the theme icon button (System → Day → Night) and SIGN
+ * IN (or the account menu) on the right. Below lg: the hamburger on the left of the logo mark (the name
+ * shows from lg), with the same theme button and sign in on the right; the hamburger opens the nav in a
+ * sheet from the left. On the landing, Check a PNR jumps to the check plate. The landing's section anchors
+ * live in the footer. /login shows the brand only.
+ */
 export function TopNav() {
   const pathname = usePathname();
-  const [scrolled, setScrolled] = useState(false);
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 4);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+  const minimal = MINIMAL_HEADER_ROUTES.includes(pathname);
 
   return (
-    <header className="fixed inset-x-0 top-0 z-nav" style={{ viewTransitionName: "site-header" }}>
-      <div className="mx-auto w-full max-w-page px-3 pt-3 sm:px-6">
-        <nav
-          aria-label={messages.shell.nav.primaryLabel}
-          className={cn(
-            "flex h-14 items-center justify-between gap-3 rounded-lg border border-line bg-surface-1/85 px-3 backdrop-blur-md transition-shadow duration-(--duration-base) sm:gap-4 sm:px-4",
-            scrolled ? "shadow-2 border-line-strong" : "shadow-1",
-          )}
-        >
-          <Link href="/" className="shrink-0 rounded-md" aria-label={messages.common.productName}>
-            <Wordmark compact hideNameOnMobile />
-          </Link>
-          <div className="hidden items-center gap-1 md:flex">
-            {PRIMARY_NAV.map(({ href, label, Icon }) => {
-              const active = isActive(pathname, href);
-              return (
-                <Link
-                  key={href}
-                  href={href}
-                  aria-current={active ? "page" : undefined}
-                  className={cn(
-                    "press inline-flex h-9 items-center gap-2 rounded-md px-3 font-label text-sm font-semibold uppercase tracking-wide transition-colors",
-                    active ? "bg-surface-sunken text-ink-1 shadow-key-pressed" : "text-ink-2 hover:bg-surface-2 hover:text-ink-1",
-                  )}
-                >
-                  <Icon className="size-4" aria-hidden="true" />
-                  {label}
-                  <span className={cn("led size-1.5", active && "led-key")} aria-hidden="true" />
-                </Link>
-              );
-            })}
-          </div>
-          <div className="flex items-center gap-2 sm:gap-3">
-            <ThemeToggle />
-            <span className="hidden h-6 w-px bg-line sm:block" aria-hidden="true" />
-            <UserMenu />
-          </div>
-        </nav>
+    <header className={cn("border-b border-line bg-surface-0", !minimal && "sticky top-0 z-nav")} style={{ viewTransitionName: "site-header" }}>
+      <div className="page-frame flex h-16 items-center gap-x-3 lg:gap-x-5">
+        {minimal ? null : <NavMenu pathname={pathname} className="lg:hidden" />}
+        <Link href="/" aria-label={messages.common.productName} className="mr-auto inline-flex h-16 items-center text-ink-1 no-underline hover:text-ink-1 lg:mr-2">
+          <Wordmark nameFrom={minimal ? undefined : "lg"} />
+        </Link>
+        {minimal ? null : (
+          <>
+            <nav aria-label={messages.shell.nav.primaryLabel} className="hidden flex-1 items-center gap-2 lg:flex">
+              {PRIMARY_NAV.map(({ href, label, Icon }) => {
+                const active = isActive(pathname, href);
+                return (
+                  <Link key={href} href={navTarget(pathname, href)} aria-current={active ? "page" : undefined} className={cn(ITEM, active ? NAV_ITEM_ACTIVE : NAV_ITEM_IDLE)}>
+                    <Icon className="size-5 shrink-0" aria-hidden="true" />
+                    <span>{href === "/" ? messages.shell.nav.cta : label}</span>
+                  </Link>
+                );
+              })}
+            </nav>
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              <UserMenu />
+            </div>
+          </>
+        )}
       </div>
     </header>
   );

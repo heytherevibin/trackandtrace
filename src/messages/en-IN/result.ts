@@ -2,8 +2,24 @@ import type { MessageTree } from "../types";
 
 export const result = {
   back: "Check another PNR",
+  pnr: (formatted: string) => `PNR ${formatted}`,
   title: (from: string, to: string) => `${from} to ${to}`,
-  trainLine: (number: string, name: string) => `${number} · ${name}`,
+  trainLine: (number: string, name?: string) => (name ? `${number} · ${name}` : number),
+  lead: (train: string, date: string, cls: string) => `${train} · ${date} · ${cls}`,
+  /** The status plate, transcribed from the landing terminal's result state. */
+  status: {
+    legend: "Current reservation status",
+    sheet: "Sheet 01",
+    provenance: (time: string, source: string) => `Retrieved ${time} IST from ${source} · every field as returned, none invented`,
+    cached: "served from the last minute's read",
+    notFoundTag: "Not found",
+    notFoundProvenance: (time: string, source: string) => `Retrieved ${time} IST from ${source}`,
+  },
+  chart: {
+    at: (time: string) => `${time} IST`,
+    in: (hours: number, minutes: number) => `in ${hours} h ${minutes} min`,
+    prepared: "prepared",
+  },
   band: {
     legend: "Current reservation status",
     retrieved: (time: string, source: string) => `Retrieved ${time} IST from ${source}`,
@@ -12,7 +28,8 @@ export const result = {
     chartIn: (hours: number, minutes: number) => `in ${hours} h ${minutes} min`,
     chartPrepared: "Chart prepared",
   },
-  sources: { live: "the railway source", fixture: "the development fixture" },
+  sources: { live: "the railway source", fixture: "the development fixture", rapidapi: "RapidAPI · IRCTC (third-party)" },
+  sourceNames: { live: "Railway source", fixture: "Development fixture", rapidapi: "RapidAPI · IRCTC (third-party)" },
   facts: {
     passengers: "Passengers",
     quota: "Quota",
@@ -20,9 +37,14 @@ export const result = {
     chart: "Chart",
     train: "Train",
     route: "Route",
+    routeStops: (fromCity: string | undefined, fromCode: string, toCity: string | undefined, toCode: string) =>
+      `${fromCity ? `${fromCity} (${fromCode})` : fromCode} → ${toCity ? `${toCity} (${toCode})` : toCode}`,
+    chartPrepared: "Prepared",
+    chartNotPrepared: "Not prepared",
     journey: "Journey",
     cls: "Class",
     distance: "Distance",
+    time: (time: string) => `${time} IST`,
     km: (n: string) => `${n} km`,
   },
   actions: {
@@ -41,12 +63,29 @@ export const result = {
     saveFailed: "Could not save this PNR.",
     storageUnavailable: "Saving on this device is unavailable.",
   },
-  passengers: { legend: "Passengers", passenger: "Passenger", nth: (i: number) => `Passenger ${i}`, booked: "Booked", current: "Current", allocation: "Coach · berth", notAllocated: "Not allocated" },
+  passengers: {
+    legend: "Passengers",
+    count: (n: number) => `${n} booked`,
+    passenger: "Passenger",
+    nth: (i: number) => `Passenger ${i}`,
+    booked: "Booked",
+    current: "Current",
+    allocation: "Coach · berth",
+    notAllocated: "Not allocated",
+    /** Status as the ticket prints it: CNF, RAC 4, WL 9. */
+    codes: { CNF: "CNF", RAC: "RAC", WL: "WL", CANCELLED: "CAN", NOT_FOUND: "Not returned" },
+  },
   journey: { legend: "Journey" },
   provenance: {
     legend: "How this result was assembled",
     note: "Only fields returned by the source are shown. Prediction fields are never displayed.",
     steps: { input: "Input received", validate: "Request validated", source: "Source answered", result: "Result presented" },
+    details: {
+      input: (formatted: string) => `PNR ${formatted}`,
+      validate: "Ten digits",
+      source: (name: string, latency: string) => `${name} · ${latency}`,
+      result: (time: string) => `Retrieved ${time} IST`,
+    },
     latency: (ms: number) => `${ms} ms`,
   },
   updated: (label: string, time: string) => `Updated: ${label}, retrieved ${time} IST`,

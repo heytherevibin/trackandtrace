@@ -3,6 +3,23 @@
     scrollbar-width: thin;
     scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
     -webkit-text-size-adjust: 100%;
+    background: var(--surface-0);
+  }
+
+  /* Anchor targets stop below the sticky masthead. This lives on the targets, not as scroll-padding on
+     <html>: with padding, focusing any control inside the masthead (every mouse press on a link) made
+     the browser smooth-scroll to "reveal" it, which read as a jitter on press and a lurch on navigation.
+     Controls are excluded for the same reason: a component library that gives a masthead button an id
+     (Base UI's drawer trigger) would otherwise make focusing it scroll the page by that margin. */
+  [id]:not(:is(a, button, input, select, textarea, summary, label, [role="button"], [tabindex])) {
+    scroll-margin-top: calc(var(--header-height) + 1rem);
+  }
+  /* In-page anchors glide. <html data-scroll-behavior="smooth"> lets Next switch this off during a
+     route change, so a page switch lands at the top instead of animating the scroll (Next 16). */
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
   }
 
   body {
@@ -12,29 +29,24 @@
     line-height: 1.5;
     color: var(--ink-1);
     background: var(--surface-0);
-    text-transform: none;
-    letter-spacing: 0;
+    text-wrap: pretty;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
 
+  /* Headings are condensed capitals: the sheet's voice. Sizes come from the page. */
   h1,
   h2,
-  h3 {
+  h3,
+  h4 {
     font-family: var(--font-display);
-    text-wrap: balance;
-    letter-spacing: -0.01em;
-  }
-  h1 {
-    font-weight: 700;
-  }
-  h2,
-  h3 {
     font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    text-wrap: pretty;
   }
   p {
     text-wrap: pretty;
-    max-width: 72ch;
   }
 
   table {
@@ -48,11 +60,18 @@
     font: inherit;
     color: inherit;
   }
-  /* 16px or Safari zooms on focus */
+  /* 16px on phones or Safari zooms on focus; the sheet's 14px wells from sm up */
   input,
   select,
   textarea {
     font-size: 1rem;
+  }
+  @media (min-width: 40rem) {
+    input,
+    select,
+    textarea {
+      font-size: 0.875rem;
+    }
   }
 
   ::selection {
@@ -60,10 +79,12 @@
     color: var(--selection-fg);
   }
 
+  :focus {
+    outline: none;
+  }
   :focus-visible {
     outline: 2px solid var(--focus-ring);
     outline-offset: 2px;
-    border-radius: var(--radius-sm);
   }
   input:focus-visible,
   select:focus-visible,
@@ -72,11 +93,71 @@
   }
 
   a {
+    color: var(--accent-text);
     text-underline-offset: 0.15em;
     text-decoration-thickness: 1px;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    a:hover {
+      color: var(--accent-soft-ink);
+    }
+  }
+
+  summary {
+    cursor: pointer;
   }
 
   #app-root {
     isolation: isolate;
+  }
+}
+
+/* Registration marks: the "+" at each corner of a blueprint object. Drawn outside the box. */
+@layer components {
+  .corner {
+    position: absolute;
+    width: 11px;
+    height: 11px;
+    color: var(--mark);
+    pointer-events: none;
+  }
+  .corner::before,
+  .corner::after {
+    content: "";
+    position: absolute;
+    background: currentColor;
+  }
+  .corner::before {
+    left: 5px;
+    top: 0;
+    width: 1px;
+    height: 100%;
+  }
+  .corner::after {
+    top: 5px;
+    left: 0;
+    width: 100%;
+    height: 1px;
+  }
+  .corner-tl {
+    top: -6px;
+    left: -6px;
+  }
+  .corner-tr {
+    top: -6px;
+    right: -6px;
+  }
+  .corner-bl {
+    bottom: -6px;
+    left: -6px;
+  }
+  .corner-br {
+    bottom: -6px;
+    right: -6px;
+  }
+
+  /* Summary markers are drawn by the FAQ row itself */
+  .faq-summary::-webkit-details-marker {
+    display: none;
   }
 }

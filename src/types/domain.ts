@@ -1,7 +1,11 @@
 // Shared domain model for verified railway responses.
 
-export type Quota = "GN" | "PQWL" | "RLWL" | "TQWL" | "LD" | "TQ";
-export type BookingClass = "1A" | "2A" | "3A" | "SL" | "CC" | "EC" | "2S";
+/** IRCTC quota and waitlist-quota codes a reservation record can carry. */
+export type Quota =
+  | "GN" | "TQ" | "PT" | "LD" | "SS" | "HP" | "DF" | "DP" | "FT" | "YU" | "PH" | "RS" | "CK" | "RC" | "OS"
+  | "PQWL" | "RLWL" | "TQWL" | "RSWL" | "RQWL" | "CKWL";
+/** IRCTC travel classes a reservation record can carry. */
+export type BookingClass = "1A" | "2A" | "3A" | "3E" | "SL" | "CC" | "EC" | "EA" | "EV" | "FC" | "2S" | "VS";
 
 export type TicketStatus = "CNF" | "RAC" | "WL" | "CANCELLED" | "NOT_FOUND";
 export type Confidence = "high" | "medium" | "low";
@@ -9,19 +13,21 @@ export type Recommendation = "Confirmed" | "Likely to confirm" | "Watch — impr
 
 export interface Station {
   code: string;
-  city: string;
-  state: string;
+  /** Station or city name, when the source sends one. */
+  city?: string;
+  state?: string;
 }
 
+// Optional fields are ones a source may not return; the UI says "Not returned" and never estimates them.
 export interface TrainProfile {
   number: string;
-  name: string;
+  name?: string;
   from: Station;
   to: Station;
-  depTime: string;
-  durationHours: number;
-  distanceKm: number;
-  runsOn: number;
+  depTime?: string;
+  durationHours?: number;
+  distanceKm?: number;
+  runsOn?: number;
 }
 
 export interface PassengerSeat {
@@ -65,7 +71,8 @@ export interface Prediction {
   factors: Factor[];
 }
 
-export type PnrSource = "live" | "fixture";
+/** live: a verified railway provider · rapidapi: the third-party RapidAPI "IRCTC" API · fixture: labelled sample data. */
+export type PnrSource = "live" | "fixture" | "rapidapi";
 
 export interface PnrSnapshot {
   pnr: string;
@@ -73,8 +80,10 @@ export interface PnrSnapshot {
   cls: BookingClass;
   journeyDate: string;
   journeyDateLabel: string;
-  chartTime: string;
-  chartAt: string;
+  chartTime?: string;
+  chartAt?: string;
+  /** Whether the reservation chart is prepared, as the source reports it. */
+  chartPrepared?: boolean;
   passengerCount: number;
   pax: PassengerSeat[];
   source: PnrSource;
@@ -91,7 +100,7 @@ export interface PnrResult {
     quota: Quota;
   };
   trend?: TrendDay[];
-  hoursToChart: number;
+  hoursToChart?: number;
   checkedAt: string;
 }
 

@@ -1,62 +1,48 @@
-import { Badge } from "@/components/ui/badge";
-import { KeyValueList } from "@/components/ui/key-value-list";
-import { StatusPill } from "@/components/ui/status-pill";
+import { FactGrid } from "@/components/ui/fact-grid";
+import { Plate } from "@/components/ui/plate";
 import { messages } from "@/messages";
 import type { PnrResult } from "@/types/domain";
-import type { Tone } from "@/types/ui";
-import { cn } from "@/utils/cn";
 import { formatTime } from "@/utils/datetime";
-import { statusDescription, statusLabel, toneForStatus } from "@/utils/status-tone";
+import { statusDescription, statusLabel } from "@/utils/status-tone";
 import { ChartCountdown } from "./chart-countdown";
+import { chartValue, timeValue } from "./record-values";
+import { ResultTagRow } from "./result-tag-row";
 
-const TINT: Record<Tone, string> = {
-  go: "bg-go-bg border-go-line",
-  watch: "bg-watch-bg border-watch-line",
-  stop: "bg-stop-bg border-stop-line",
-  neutral: "bg-neutral-bg border-neutral-line",
-};
-
-/** The readout cluster: the lamp, the status word, and the facts that decide the journey. */
-export function StatusBand({ result, cached }: { readonly result: PnrResult; readonly cached: boolean }) {
+/**
+ * The status plate: the landing terminal's result state on its own sheet. Tag row,
+ * 30px capital status, the plain description, the framed facts that decide the
+ * journey, and the provenance line.
+ */
+export function StatusBand({ result, cached, className }: { readonly result: PnrResult; readonly cached: boolean; readonly className?: string }) {
   const m = messages.result;
   const s = result.snapshot;
-  const tone = toneForStatus(result.lead.status);
-  const sourceName = s.source === "fixture" ? m.sources.fixture : m.sources.live;
+  const label = statusLabel(result.lead.status, result.lead.position);
+  const provenance = m.status.provenance(formatTime(result.checkedAt), m.sources[s.source]);
   return (
-    <section className={cn("panel overflow-hidden border", TINT[tone])} aria-labelledby="status-band-title">
-      <div className="grid gap-6 p-6 sm:p-8 lg:grid-cols-[1.2fr_1fr] lg:gap-8">
-        <div>
-          <h2 id="status-band-title" className="silk">
-            {m.band.legend}
-          </h2>
-          <div className="mt-3 flex flex-wrap items-center gap-3">
-            <StatusPill status={result.lead.status} position={result.lead.position} live />
-            {s.source === "fixture" ? (
-              <Badge tone="watch" variant="outline" title={messages.common.sampleDataHint}>
-                {messages.common.sampleData}
-              </Badge>
-            ) : null}
-          </div>
-          <p className="mt-4 font-display text-3xl font-bold leading-tight sm:text-4xl" data-testid="result-status">
-            {statusLabel(result.lead.status, result.lead.position)}
-          </p>
-          <p className="mt-3 max-w-prose text-ink-2">{statusDescription(result.lead.status)}</p>
-          <p className="silk mt-6 text-ink-3">
-            {m.band.retrieved(formatTime(result.checkedAt), sourceName)}
-            {cached ? ` · ${m.band.cached}` : ""}
-          </p>
-        </div>
-        <div className="seam pt-6 lg:border-l lg:border-t-0 lg:border-line lg:pl-8 lg:pt-0">
-          <KeyValueList
-            items={[
-              { label: m.facts.passengers, value: String(s.passengerCount), numeric: true },
-              { label: m.facts.quota, value: result.lead.quota, numeric: true },
-              { label: m.facts.departs, value: `${s.train.depTime} ${messages.common.ist}`, numeric: true },
-              { label: m.facts.chart, value: <ChartCountdown chartAt={s.chartAt} /> },
-            ]}
-          />
-        </div>
-      </div>
-    </section>
+    <Plate
+      title={m.status.legend}
+      titleId="status-title"
+      headingLevel={2}
+      meta={[m.status.sheet]}
+      cells="tight"
+      className={className}
+      bodyClassName="flex flex-col gap-3.5"
+    >
+      <ResultTagRow tag={label} source={s.source} pnr={s.pnr} status={result.lead.status} />
+      <p className="font-display text-4xl font-semibold uppercase tracking-display" data-testid="result-status">
+        {label}
+      </p>
+      <p className="text-sm text-ink-1/78">{statusDescription(result.lead.status)}</p>
+      <FactGrid
+        framed
+        items={[
+          { label: m.facts.passengers, value: String(s.passengerCount) },
+          { label: m.facts.quota, value: result.lead.quota },
+          { label: m.facts.departs, value: timeValue(s.train.depTime) },
+          { label: m.facts.chart, value: s.chartAt ? <ChartCountdown chartAt={s.chartAt} /> : chartValue(s) },
+        ]}
+      />
+      <p className="text-label text-ink-1/70">{cached ? `${provenance} · ${m.status.cached}` : provenance}</p>
+    </Plate>
   );
 }

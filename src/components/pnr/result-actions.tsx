@@ -1,9 +1,9 @@
 "use client";
 
-import { ArrowSyncRegular, BookmarkFilled, BookmarkRegular, ShareRegular } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { messages } from "@/messages";
 
+/** The title block's actions, as the sheets draw them: hairline Refresh and Share, then Save as the one solid object. */
 export function ResultActions({
   refreshing,
   onRefresh,
@@ -21,24 +21,16 @@ export function ResultActions({
 }) {
   const m = messages.result.actions;
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <Button variant="secondary" size="sm" onClick={onRefresh} loading={refreshing} leadingIcon={<ArrowSyncRegular className="size-4" aria-hidden="true" />} data-testid="refresh">
+    <>
+      <Button variant="secondary" onClick={onRefresh} loading={refreshing} data-testid="refresh">
         {m.refresh}
       </Button>
-      <Button variant="secondary" size="sm" onClick={onShare} leadingIcon={<ShareRegular className="size-4" aria-hidden="true" />} data-testid="share-result">
+      <Button variant="secondary" onClick={onShare} data-testid="share-result">
         {m.share}
       </Button>
-      <Button
-        variant={saved ? "secondary" : "key"}
-        size="sm"
-        onClick={onToggleSave}
-        loading={saving}
-        aria-pressed={saved}
-        leadingIcon={saved ? <BookmarkFilled className="size-4" aria-hidden="true" /> : <BookmarkRegular className="size-4" aria-hidden="true" />}
-        data-testid="save-watchlist"
-      >
+      <Button variant={saved ? "secondary" : "primary"} onClick={onToggleSave} loading={saving} aria-pressed={saved} data-testid="save-watchlist">
         {saved ? m.saved : m.save}
       </Button>
-    </div>
+    </>
   );
 }

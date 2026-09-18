@@ -14,6 +14,23 @@ export function isValidPnr(value: string): boolean {
   return PNR_PATTERN.test(value);
 }
 
+/** Ten digits standing alone, bare or grouped 3-3-4 with one consistent space or hyphen. */
+const WHOLE_PNR = /(?<!\d)(\d{3})([ -]?)(\d{3})\2(\d{4})(?!\d)/g;
+/** "PNR", "PNR:", "PNR No." or "PNR number" right before a candidate. */
+const PNR_LABEL = /pnr[^0-9a-z]*(?:no\.?|number)?[^0-9a-z]*$/i;
+
+/**
+ * The whole PNR inside pasted text, such as a booking SMS or a copied ticket line. A candidate
+ * labelled "PNR" wins over other ten-digit numbers (a helpline, say); otherwise the first one.
+ * Null when the text holds no standalone ten-digit number.
+ */
+export function pnrInText(text: string): string | null {
+  const candidates = [...text.matchAll(WHOLE_PNR)];
+  const labelled = candidates.find((match) => PNR_LABEL.test(text.slice(Math.max(0, match.index - 16), match.index)));
+  const match = labelled ?? candidates[0];
+  return match ? `${match[1]}${match[3]}${match[4]}` : null;
+}
+
 /** Display grouping used on tickets and SMS: 3-3-4. Partial input keeps only the groups it has. */
 export function formatPnr(value: string): string {
   const digits = normalizePnr(value);

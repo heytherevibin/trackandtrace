@@ -10,6 +10,7 @@ export function ErrorState({
   onRetry,
   retryLabel = messages.common.retry,
   actions,
+  headingLevel,
   className,
 }: {
   readonly title?: string;
@@ -18,6 +19,7 @@ export function ErrorState({
   readonly onRetry?: () => void;
   readonly retryLabel?: string;
   readonly actions?: ReactNode;
+  readonly headingLevel?: 1 | 2 | 3;
   readonly className?: string;
 }) {
   return (
@@ -26,19 +28,22 @@ export function ErrorState({
       title={title}
       detail={detail}
       role="alert"
+      headingLevel={headingLevel}
       className={className}
       actions={
-        <>
-          {onRetry ? (
-            <Button variant="primary" onClick={onRetry}>
-              {retryLabel}
-            </Button>
-          ) : null}
-          {actions}
-        </>
+        onRetry || actions ? (
+          <>
+            {onRetry ? (
+              <Button variant="primary" onClick={onRetry}>
+                {retryLabel}
+              </Button>
+            ) : null}
+            {actions}
+          </>
+        ) : undefined
       }
     >
-      {digest ? <p className="font-data text-xs text-ink-3">{messages.states.error.reference(digest)}</p> : null}
+      {digest ? <p className="legend-sm tnum">{messages.states.error.reference(digest)}</p> : null}
     </StateBlock>
   );
 }

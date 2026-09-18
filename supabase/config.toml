@@ -160,10 +160,14 @@ site_url = "http://localhost:3000"
 # external_url = ""
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
 additional_redirect_urls = [
-  "http://localhost:3000/auth/callback",
-  "http://127.0.0.1:3000/auth/callback",
-  "http://localhost:3100/auth/callback",
-  "http://127.0.0.1:3100/auth/callback",
+  "http://localhost:3000/**",
+  "http://127.0.0.1:3000/**",
+  "http://localhost:3100/**",
+  "http://127.0.0.1:3100/**",
+  "http://localhost:3200/**",
+  "http://127.0.0.1:3200/**",
+  "http://localhost:4210/**",
+  "http://127.0.0.1:4210/**",
 ]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
@@ -227,7 +231,9 @@ enable_signup = true
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
-enable_confirmations = false
+# Kept on: the email provider also accepts password sign-ups through the API, and an
+# unconfirmed one must never claim an address that its owner later signs in to by link.
+enable_confirmations = true
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
@@ -261,6 +267,11 @@ otp_expiry = 3600
 [auth.email.template.magic_link]
 subject = "Your Track & Trace sign-in link"
 content_path = "./supabase/templates/magic-link.html"
+
+# A first sign-in creates the account, so Auth sends this template instead of the magic link.
+[auth.email.template.confirmation]
+subject = "Your Track & Trace sign-in link"
+content_path = "./supabase/templates/confirmation.html"
 
 [auth.sms]
 # Allow/disallow new user signups via SMS to your project.
@@ -328,7 +339,9 @@ max_frequency = "5s"
 # `discord`, `facebook`, `github`, `gitlab`, `google`, `keycloak`, `linkedin_oidc`, `notion`, `twitch`,
 # `twitter`, `x`, `slack`, `spotify`, `workos`, `zoom`.
 [auth.external.google]
-enabled = true
+# Off until a Google Cloud OAuth client exists. To switch on: set the two env vars below,
+# enabled = true, `npm run db:config`, then AUTH_GOOGLE_ENABLED=1 so the app shows the button.
+enabled = false
 client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
 secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
 skip_nonce_check = false
@@ -428,3 +441,38 @@ enabled = true
 # formatted with uppercase keywords, indent 2, max width 180, trailing commas,
 # and column/key alignment. Set to "null" to emit raw, unformatted SQL.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":180,\"commaStyle\":\"trailing\"}"
+
+# ---------------------------------------------------------------------------
+# Hosted project "Track&Trace" (ap-south-1). `npm run db:config` pushes the base
+# config above with these overrides, so the hosted project keeps the values Supabase
+# sized for it instead of local development defaults. Preview first: `npm run db:config:diff`.
+# ---------------------------------------------------------------------------
+[remotes.production]
+project_id = "xnykpktqtimadelfjgqf"
+
+[remotes.production.db.pooler]
+default_pool_size = 15
+max_client_conn = 200
+
+[remotes.production.auth.email]
+max_frequency = "1m0s"
+otp_length = 8
+
+[remotes.production.auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
+[remotes.production.storage.analytics]
+enabled = true
+max_namespaces = 10
+
+# Free-tier projects on Supabase's built-in email sender cannot change email templates
+# (the Auth API answers 400). Hosted keeps Supabase's default templates until a custom
+# SMTP provider is configured; then delete these two blocks and push again.
+[remotes.production.auth.email.template.magic_link]
+subject = "Your sign-in link"
+content_path = ""
+
+[remotes.production.auth.email.template.confirmation]
+subject = "Confirm your email address"
+content_path = ""

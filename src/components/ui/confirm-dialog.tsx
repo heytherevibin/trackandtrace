@@ -4,9 +4,10 @@ import { AlertDialog } from "@base-ui/react/alert-dialog";
 import { useState, type ReactNode } from "react";
 import { messages } from "@/messages";
 import { Button } from "./button";
+import { Corners } from "./corners";
 
 // For destructive, irreversible actions. No outside-click dismiss; the confirm
-// key is the only way through, and it can be gated by an acknowledgement.
+// button is the only way through, and it can be gated by an acknowledgement.
 
 export function ConfirmDialog({
   open,
@@ -18,6 +19,7 @@ export function ConfirmDialog({
   onConfirm,
   loading = false,
   confirmDisabled = false,
+  tone = "danger",
   children,
 }: {
   readonly open: boolean;
@@ -29,6 +31,7 @@ export function ConfirmDialog({
   readonly onConfirm: () => void | Promise<void>;
   readonly loading?: boolean;
   readonly confirmDisabled?: boolean;
+  readonly tone?: "danger" | "primary";
   readonly children?: ReactNode;
 }) {
   const [busy, setBusy] = useState(false);
@@ -38,14 +41,15 @@ export function ConfirmDialog({
       <AlertDialog.Portal>
         <AlertDialog.Backdrop className="fixed inset-0 z-dialog bg-backdrop transition-opacity duration-(--duration-base) data-[starting-style]:opacity-0 data-[ending-style]:opacity-0" />
         <AlertDialog.Viewport className="fixed inset-0 z-dialog flex items-center justify-center p-4">
-          <AlertDialog.Popup className="panel w-full max-w-narrow bg-surface-3 p-6 shadow-3 outline-none transition-[transform,opacity] duration-(--duration-slow) ease-out data-[starting-style]:scale-96 data-[starting-style]:opacity-0 data-[ending-style]:scale-96 data-[ending-style]:opacity-0">
-            <AlertDialog.Title className="text-xl">{title}</AlertDialog.Title>
-            <AlertDialog.Description className="mt-2 text-sm text-ink-2">{description}</AlertDialog.Description>
+          <AlertDialog.Popup className="blueprint w-full max-w-narrow bg-surface-3 p-6 shadow-3 outline-none transition-[transform,opacity] duration-(--duration-slow) ease-out data-[starting-style]:scale-98 data-[starting-style]:opacity-0 data-[ending-style]:scale-98 data-[ending-style]:opacity-0">
+            <Corners />
+            <AlertDialog.Title className="text-3xl tracking-head">{title}</AlertDialog.Title>
+            <AlertDialog.Description className="mt-2.5 text-body text-ink-2">{description}</AlertDialog.Description>
             {children ? <div className="mt-4">{children}</div> : null}
             <div className="mt-6 flex flex-wrap justify-end gap-2">
               <AlertDialog.Close render={<Button variant="secondary">{cancelLabel}</Button>} />
               <Button
-                variant="danger"
+                variant={tone}
                 loading={pending}
                 disabled={confirmDisabled}
                 onClick={async () => {

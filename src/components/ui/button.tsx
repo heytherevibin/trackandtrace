@@ -3,24 +3,29 @@ import type { Size } from "@/types/ui";
 import { cn } from "@/utils/cn";
 import { Spinner } from "./spinner";
 
-// Buttons in the panel's vocabulary: silkscreen legends on flat plates, or a
-// physical key cap for the actions the machine is about (Run).
+// Industry .btn, as drawn: Barlow Condensed 600 14px/1.2, 6.8px × 12.24px, square,
+// hairline. The primary is the one solid object on the board. "run" and "key" are
+// aliases kept for older call sites.
 
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "key" | "run";
 
+const PRIMARY = "border-accent-strong bg-accent-strong text-accent-ink hover:bg-accent-strong-hover active:bg-accent-strong-active";
+const SECONDARY = "border-line bg-transparent text-ink-1 hover:bg-ink-1/7 active:bg-ink-1/14";
+
 const VARIANT: Record<ButtonVariant, string> = {
-  primary: "press bg-accent text-accent-ink border border-accent hover:bg-accent-hover hover:border-accent-hover",
-  secondary: "press bg-surface-2 text-ink-1 border border-line-strong hover:bg-surface-3",
-  ghost: "press bg-transparent text-ink-1 border border-transparent hover:bg-surface-2",
-  danger: "press bg-surface-2 text-stop border border-stop-line hover:bg-stop-bg",
-  key: "press bg-surface-2 text-ink-1 border border-line-strong shadow-key hover:bg-surface-3",
-  run: "press bg-accent text-accent-ink border border-accent shadow-key hover:bg-accent-hover",
+  primary: PRIMARY,
+  run: PRIMARY,
+  secondary: SECONDARY,
+  key: SECONDARY,
+  ghost: "border-transparent bg-transparent px-[3.4px] text-accent hover:bg-accent/10 active:bg-accent/18",
+  danger: "border-ink-alert bg-ink-alert text-ink-inverse hover:bg-ink-alert/90 active:bg-ink-alert/80",
 };
 
+// md is the sheet's natural button; sm and lg only set a height where a row needs one.
 const SIZE: Record<Size, string> = {
-  sm: "h-8 px-3 text-xs",
-  md: "h-10 px-4 text-sm",
-  lg: "h-12 px-6 text-base",
+  sm: "min-h-8 px-[10.2px] py-[5px] text-label",
+  md: "px-[12.24px] py-[6.8px] text-sm",
+  lg: "h-11 px-[12.24px] text-sm",
 };
 
 export interface ButtonStyleOptions {
@@ -33,10 +38,12 @@ export interface ButtonStyleOptions {
 /** Shared classes so links can dress as buttons without nesting interactive elements. */
 export function buttonClassName({ variant = "secondary", size = "md", fullWidth = false, className }: ButtonStyleOptions = {}): string {
   return cn(
-    "relative inline-flex select-none items-center justify-center gap-2 whitespace-nowrap rounded-md font-label font-semibold uppercase tracking-wide",
-    "disabled:cursor-not-allowed disabled:opacity-50",
-    VARIANT[variant],
+    "press relative inline-flex cursor-pointer select-none items-center justify-center gap-1.5 whitespace-nowrap border font-display font-semibold no-underline",
+    "disabled:cursor-not-allowed disabled:opacity-45 aria-disabled:cursor-not-allowed aria-disabled:opacity-45",
     SIZE[size],
+    // After the size: a font-size class resets line height, so the drawn 1.2 must come last.
+    "leading-[1.2]",
+    VARIANT[variant],
     fullWidth && "w-full",
     className,
   );
@@ -67,7 +74,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
           <Spinner size="sm" />
         </span>
       ) : null}
-      <span className={cn("inline-flex items-center gap-2", loading && "invisible")}>
+      <span className={cn("inline-flex items-center gap-1.5", loading && "invisible")}>
         {leadingIcon}
         {children}
         {trailingIcon}

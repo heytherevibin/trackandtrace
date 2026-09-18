@@ -21,6 +21,15 @@
         "3100"
       ],
       "port": 3100
+    },
+    {
+      "name": "start:rapidapi",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "PNR_SOURCE=rapidapi npx next start --port 3200"
+      ],
+      "port": 3200
     }
   ]
 }

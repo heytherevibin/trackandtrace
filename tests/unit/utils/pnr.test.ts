@@ -1,9 +1,27 @@
 import { describe, expect, it } from "vitest";
-import { PNR_INVALID_MESSAGE, formatPnr, isValidPnr, normalizePnr, pnrSchema } from "@/utils/pnr";
+import { PNR_INVALID_MESSAGE, formatPnr, isValidPnr, normalizePnr, pnrInText, pnrSchema } from "@/utils/pnr";
 
 describe("normalizePnr", () => {
   it("strips non-digits and caps at 10", () => {
     expect(normalizePnr(" 234-567 8901x9 ")).toBe("2345678901");
+  });
+});
+
+describe("pnrInText", () => {
+  it.each([
+    ["2345678900", "2345678900"],
+    ["  2345678900\n", "2345678900"],
+    ["234 567 8900", "2345678900"],
+    ["234-567-8900", "2345678900"],
+    ["PNR: 2345678900", "2345678900"],
+    ["PNR:2345678900,TRN:12951,DOJ:17-09-26,SCH DEP:17:00,3A,BCT-NDLS", "2345678900"],
+    ["Train 12951 departs 17:00. PNR No. 234-567-8900. Helpline 1234567890", "2345678900"],
+  ])("finds the whole PNR in %j", (text, pnr) => {
+    expect(pnrInText(text)).toBe(pnr);
+  });
+
+  it.each(["", "12951", "234567", "23456789012", "abc", "234 567 89"])("finds no whole PNR in %j", (text) => {
+    expect(pnrInText(text)).toBeNull();
   });
 });
 

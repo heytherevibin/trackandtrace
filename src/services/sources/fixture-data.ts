@@ -6,7 +6,10 @@ import type { BookingClass, TrainProfile } from "@/types/domain";
 const NDLS = { code: "NDLS", city: "New Delhi", state: "Delhi" } as const;
 const BCT = { code: "BCT", city: "Mumbai Central", state: "Maharashtra" } as const;
 
-export const FIXTURE_TRAINS: readonly TrainProfile[] = [
+/** A sample train always carries its full profile. */
+export type FixtureTrain = TrainProfile & { readonly name: string; readonly depTime: string };
+
+export const FIXTURE_TRAINS: readonly FixtureTrain[] = [
   { number: "12951", name: "Mumbai Rajdhani", from: BCT, to: NDLS, depTime: "17:00", durationHours: 15.5, distanceKm: 1384, runsOn: 127 },
   { number: "12301", name: "Howrah Rajdhani", from: { code: "HWH", city: "Howrah", state: "West Bengal" }, to: NDLS, depTime: "16:55", durationHours: 17.2, distanceKm: 1447, runsOn: 127 },
   { number: "12621", name: "Tamil Nadu Express", from: { code: "MAS", city: "Chennai Central", state: "Tamil Nadu" }, to: NDLS, depTime: "22:00", durationHours: 33, distanceKm: 2180, runsOn: 127 },

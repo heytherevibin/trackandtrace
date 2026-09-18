@@ -9,10 +9,10 @@ import type { HistoryPoint, PnrResult, WatchlistEntry } from "./domain";
 
 const PNR_PATTERN = /^\d{10}$/;
 
-export const quotaSchema = z.enum(["GN", "PQWL", "RLWL", "TQWL", "LD", "TQ"]);
-export const bookingClassSchema = z.enum(["1A", "2A", "3A", "SL", "CC", "EC", "2S"]);
+export const quotaSchema = z.enum(["GN", "TQ", "PT", "LD", "SS", "HP", "DF", "DP", "FT", "YU", "PH", "RS", "CK", "RC", "OS", "PQWL", "RLWL", "TQWL", "RSWL", "RQWL", "CKWL"]);
+export const bookingClassSchema = z.enum(["1A", "2A", "3A", "3E", "SL", "CC", "EC", "EA", "EV", "FC", "2S", "VS"]);
 export const ticketStatusSchema = z.enum(["CNF", "RAC", "WL", "CANCELLED", "NOT_FOUND"]);
-export const pnrSourceSchema = z.enum(["live", "fixture"]);
+export const pnrSourceSchema = z.enum(["live", "fixture", "rapidapi"]);
 export const confidenceSchema = z.enum(["high", "medium", "low"]);
 export const recommendationSchema = z.enum([
   "Confirmed",
@@ -24,19 +24,19 @@ export const recommendationSchema = z.enum([
 
 export const stationSchema = z.object({
   code: z.string().min(2).max(5),
-  city: z.string().min(1),
-  state: z.string(),
+  city: z.string().min(1).optional(),
+  state: z.string().optional(),
 });
 
 export const trainProfileSchema = z.object({
   number: z.string().regex(/^\d{5}$/),
-  name: z.string().min(1),
+  name: z.string().min(1).optional(),
   from: stationSchema,
   to: stationSchema,
-  depTime: z.string().regex(/^\d{2}:\d{2}$/),
-  durationHours: z.number().nonnegative(),
-  distanceKm: z.number().nonnegative(),
-  runsOn: z.number().int(),
+  depTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  durationHours: z.number().nonnegative().optional(),
+  distanceKm: z.number().nonnegative().optional(),
+  runsOn: z.number().int().optional(),
 });
 
 export const passengerSeatSchema = z.object({
@@ -86,8 +86,9 @@ export const pnrSnapshotSchema = z.object({
   cls: bookingClassSchema,
   journeyDate: z.iso.date(),
   journeyDateLabel: z.string(),
-  chartTime: z.string(),
-  chartAt: z.iso.datetime(),
+  chartTime: z.string().optional(),
+  chartAt: z.iso.datetime().optional(),
+  chartPrepared: z.boolean().optional(),
   passengerCount: z.number().int().positive(),
   pax: z.array(passengerSeatSchema).min(1),
   source: pnrSourceSchema,
@@ -106,7 +107,7 @@ export const pnrResultSchema = z.object({
   prediction: predictionSchema.optional(),
   lead: pnrLeadSchema,
   trend: z.array(trendDaySchema).optional(),
-  hoursToChart: z.number(),
+  hoursToChart: z.number().optional(),
   checkedAt: z.iso.datetime(),
 });
 

@@ -3,6 +3,7 @@ import { env, fixtureAllowed } from "@/services/env";
 import type { PnrDataSource } from "@/services/pnr-source";
 import { fixtureSource } from "./fixture";
 import { createLiveSource } from "./live";
+import { createRapidApiSource } from "./rapidapi";
 
 // Provider registry. The fixture is served only when explicitly requested and
 // never in production; the env schema refuses that combination at boot and this
@@ -28,6 +29,9 @@ export function resolvePnrSource(current: Env = env()): PnrDataSource {
       console.error("[source] PNR_SOURCE=fixture refused: production never serves sample data");
     }
     return refusedSource;
+  }
+  if (current.PNR_SOURCE === "rapidapi" && current.RAPIDAPI_KEY) {
+    return createRapidApiSource({ key: current.RAPIDAPI_KEY, host: current.RAPIDAPI_HOST, path: current.RAPIDAPI_PNR_PATH, timeoutMs: current.RAPIDAPI_TIMEOUT_MS });
   }
   return createLiveSource(current);
 }

@@ -39,12 +39,13 @@ Stack: Next.js 16 App Router, TypeScript strict, Tailwind CSS v4, Supabase (Auth
 - Name: Track & Trace (kept). The former tagline "Journey intelligence" implies inference the product forbids and is retired in favor of a factual descriptor.
 - Honesty is a brand commitment: sample data is always labeled; accuracy is never invented; unavailable states are explained, not hidden.
 - Quality bar: Stripe/Linear-level system discipline in app surfaces, Airbnb-level warmth on the landing page.
-- Light and dark themes, following the system, with a user toggle.
+- Light and dark themes (Day and Night), following the system, with an Auto · Day · Night toggle.
+- Visual system: Industry, the wireframe world from the Claude Design project "App landing page redesign" (Landing, Watchlist, Pre-booking, Accuracy, Sign in B sheets), matched exactly. Undrawn surfaces follow its grammar (see DESIGN.md).
 - Not affiliated with IRCTC or Indian Railways; stated on every surface footer.
 
 ## Evidence on Hand
 
-- No verified railway provider is connected; every live request resolves to an unavailable state.
+- No verified railway provider is connected. For now the product can read the third-party RapidAPI "IRCTC" API (IRCTCAPI, not affiliated with IRCTC); its results are tagged "Third-party" and name the provider. The official path under evaluation is CRIS Pravah.
 - No testimonials, customer names, usage metrics, ratings, or accuracy records exist. None may be fabricated.
 - No logo, icon, or social image assets exist; the mark is designed in this redesign.
 - The development fixture (deterministic sample records keyed by PNR digits) is design and test material only and must never be presented as real.
@@ -59,4 +60,4 @@ Stack: Next.js 16 App Router, TypeScript strict, Tailwind CSS v4, Supabase (Auth
 
 ## Accessibility & Inclusion
 
-WCAG AA: keyboard navigation, visible focus, semantic tables, status announcements through live regions, reduced-motion support, color never the sole status indicator, 44px touch targets, 16px inputs on mobile, and a string structure ready for Indian languages.
+WCAG AA, with one recorded exception: the design-locked steel pairing (primary button fill, outline tag, ghost button text; #5980a6 against the grounds at about 3.7:1 by day and 3.4:1 by night) is kept exactly as drawn by decision on 2026-09-17, and is the only exemption in the automated axe scans. Otherwise: keyboard navigation, visible focus, semantic tables, status announcements through live regions, reduced-motion support, color never the sole status indicator, controls at the sheets' drawn sizes (32px buttons, 44px on sign in), 16px inputs on phones, and a string structure ready for Indian languages.

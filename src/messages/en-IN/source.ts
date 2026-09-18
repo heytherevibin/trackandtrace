@@ -18,5 +18,6 @@ export const source = {
     notConnected: "Not connected",
     noRecords: "No verified records",
     sample: "Sample data (development)",
+    thirdParty: "Connected · RapidAPI (third-party)",
   },
 } as const satisfies MessageTree;

@@ -1,7 +1,7 @@
 import type { PnrDataSource } from "@/services/pnr-source";
-import type { BookingClass, PassengerSeat, PnrOutcome, Quota, TicketStatus, TrainProfile } from "@/types/domain";
+import type { BookingClass, PassengerSeat, PnrOutcome, Quota, TicketStatus } from "@/types/domain";
 import { PNR_INVALID_MESSAGE, isValidPnr } from "@/utils/pnr";
-import { FIXTURE_CLASSES, FIXTURE_TRAINS } from "./fixture-data";
+import { FIXTURE_CLASSES, FIXTURE_TRAINS, type FixtureTrain } from "./fixture-data";
 
 // ---------------------------------------------------------------------------
 // Deterministic, clearly labelled sample source for development and tests.
@@ -107,7 +107,7 @@ export function buildFixtureResult(pnr: string, now: Date = new Date()): PnrOutc
   const last = digitAt(pnr, 9);
   const prev = digitAt(pnr, 8);
   const trainIndex = digitAt(pnr, 6) % FIXTURE_TRAINS.length;
-  const train: TrainProfile = FIXTURE_TRAINS[trainIndex] ?? FIXTURE_TRAINS[0]!;
+  const train: FixtureTrain = FIXTURE_TRAINS[trainIndex] ?? FIXTURE_TRAINS[0]!;
   const cls = classFor(trainIndex, digitAt(pnr, 7));
   const mixed = last === 9;
   const lead: LeadShape = mixed ? { status: "CNF", quota: "GN", position: null, coach: "B1", berth: "12 LB" } : leadFor(last, prev);

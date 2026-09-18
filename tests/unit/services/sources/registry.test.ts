@@ -41,4 +41,15 @@ describe("resolvePnrSource", () => {
     if (out.ok) return;
     expect(out.message).toMatch(/not connected/i);
   });
+
+  it("selects the RapidAPI adapter when PNR_SOURCE=rapidapi, labelled third-party", async () => {
+    const current = envOf({ NODE_ENV: "production", PNR_SOURCE: "rapidapi", RAPIDAPI_KEY: "test-key-0123456789abcdef" });
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ status: false, message: "Flushed PNR" }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const out = await resolvePnrSource(current).check("4949608635");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String((fetchMock.mock.calls[0] as unknown as [string])[0])).toContain("irctc1.p.rapidapi.com");
+    expect(out).toMatchObject({ ok: false, code: "NOT_FOUND" });
+    vi.unstubAllGlobals();
+  });
 });

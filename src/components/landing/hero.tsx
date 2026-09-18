@@ -1,24 +1,31 @@
-import { PnrCheckForm } from "@/components/pnr/pnr-check-form";
-import { RecentChecks } from "@/components/pnr/recent-checks";
+import { PnrTerminal } from "@/components/pnr/pnr-terminal";
+import { SheetTag } from "@/components/pnr/pnr-terminal-tags";
 import { messages } from "@/messages";
 
-/** Split hero: the pitch on the left, the compact instrument card on the right. Nothing animates in. */
-export function Hero() {
+/** Hero, as drawn: the promise in hero capitals with four outline tags on the left, the live check plate on the right. */
+export function Hero({ sampleMode, thirdPartyMode = false }: { readonly sampleMode: boolean; readonly thirdPartyMode?: boolean }) {
   const m = messages.home.hero;
+  const tags = [m.tags.free, m.tags.noAccount, m.tags.notLogged, m.tags.failsClosed];
   return (
-    <section className="mx-auto w-full max-w-page px-4 pb-16 pt-12 sm:px-6 sm:pt-16" aria-labelledby="hero-title">
-      <div className="grid items-center gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(420px,520px)] lg:gap-16">
-        <div className="max-w-prose">
-          <h1 id="hero-title" className="text-3xl sm:text-4xl">
-            {m.title}
-          </h1>
-          <p className="mt-4 text-lg text-ink-2">{m.lead}</p>
-        </div>
-        <div className="panel p-4 sm:p-6" data-testid="hero-instrument">
-          <PnrCheckForm autoFocus compact />
+    <section
+      aria-labelledby="hero-title"
+      className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] items-start gap-x-[clamp(24px,4vw,64px)] gap-y-12 pb-[72px] pt-[clamp(48px,7vw,96px)]"
+    >
+      <div className="min-w-0">
+        <h1 id="hero-title" className="optical-hang text-hero tracking-display text-balance">
+          <span className="block">{m.lineOne}</span>
+          <span className="block">{m.lineTwo}</span>
+        </h1>
+        <p className="mt-[28px] max-w-[56ch] text-lead text-ink-1/82">{m.lead}</p>
+        <div className="mt-[28px] flex flex-wrap gap-2.5">
+          {tags.map((tag) => (
+            <SheetTag key={tag} variant="outline">
+              {tag}
+            </SheetTag>
+          ))}
         </div>
       </div>
-      <RecentChecks />
+      <PnrTerminal sampleMode={sampleMode} thirdPartyMode={thirdPartyMode} />
     </section>
   );
 }

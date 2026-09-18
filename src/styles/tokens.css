@@ -25,56 +25,74 @@
   --container-*: initial;
   --font-serif: initial;
 
-  /* Type scale: text steps ×1.125 rounded, display steps wider. 12px is the floor (captions and silkscreen only). */
+  /* Type scale, read off the Industry sheets: legends 11–13, body 14–17, headings 18–32, page and hero clamp. */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
   --text-xs: 0.75rem;
   --text-xs--line-height: 1rem;
+  --text-label: 0.8125rem;
+  --text-label--line-height: 1.25rem;
   --text-sm: 0.875rem;
-  --text-sm--line-height: 1.25rem;
+  --text-sm--line-height: 1.3125rem;
+  --text-body: 0.9375rem;
+  --text-body--line-height: 1.5rem;
   --text-base: 1rem;
-  --text-base--line-height: 1.5rem;
+  --text-base--line-height: 1.5625rem;
+  --text-lead: 1.0625rem;
+  --text-lead--line-height: 1.625rem;
   --text-lg: 1.125rem;
-  --text-lg--line-height: 1.625rem;
-  --text-xl: 1.375rem;
-  --text-xl--line-height: 1.75rem;
-  --text-xl--letter-spacing: -0.005em;
-  --text-2xl: 1.75rem;
-  --text-2xl--line-height: 2rem;
-  --text-2xl--letter-spacing: -0.01em;
-  --text-3xl: 2.25rem;
-  --text-3xl--line-height: 2.5rem;
-  --text-3xl--letter-spacing: -0.015em;
-  --text-4xl: clamp(2.75rem, 1.9rem + 3.2vw, 4.5rem);
-  --text-4xl--line-height: 1.02;
-  --text-4xl--letter-spacing: -0.02em;
+  --text-lg--line-height: 1.5rem;
+  --text-xl: 1.25rem;
+  --text-xl--line-height: 1.5rem;
+  --text-2xl: 1.375rem;
+  --text-2xl--line-height: 1.5rem;
+  --text-3xl: 1.5rem;
+  --text-3xl--line-height: 1.75rem;
+  --text-4xl: 1.875rem;
+  --text-4xl--line-height: 1.1;
+  --text-5xl: 2rem;
+  --text-5xl--line-height: 2.25rem;
+  --text-page: clamp(2.125rem, 4vw, 3.25rem);
+  --text-page--line-height: 1.06;
+  --text-hero: clamp(2.75rem, 5.4vw, 4.75rem);
+  --text-hero--line-height: 1.04;
+  --text-signin: clamp(2.125rem, 5vw, 3rem);
+  --text-signin--line-height: 1.06;
 
-  --tracking-tight: -0.015em;
   --tracking-normal: 0em;
-  --tracking-wide: 0.04em; /* silkscreen caps only */
+  --tracking-display: 0.01em; /* page and hero headings */
+  --tracking-head: 0.02em; /* section headings, figures */
+  --tracking-wide: 0.04em; /* PNR figures in tables */
+  --tracking-brand: 0.06em; /* the wordmark, clock */
+  --tracking-caps: 0.08em; /* every legend */
 
   --leading-none: 1;
-  --leading-tight: 1.15;
+  --leading-tight: 1.1;
   --leading-snug: 1.3;
   --leading-normal: 1.5;
-  --leading-relaxed: 1.65;
+  --leading-relaxed: 1.6;
+  --leading-stack: 1.15; /* wordmark with descriptor */
 
-  /* Radii: a squared instrument. sm chips and LED windows · md keys, buttons, inputs · lg panels, dialogs */
-  --radius-sm: 0.125rem;
-  --radius-md: 0.25rem;
-  --radius-lg: 0.5rem;
+  /* The wireframe world is square. Only lamps and route stops are round. */
+  --radius-none: 0;
   --radius-full: 9999px;
 
-  /* Easing: exponential out for enters, in for exits, in-out for two-way moves, linear for the chase light */
   --ease-out: cubic-bezier(0.25, 1, 0.5, 1);
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in: cubic-bezier(0.5, 0, 0.75, 0);
   --ease-in-out: cubic-bezier(0.76, 0, 0.24, 1);
   --ease-linear: linear;
-  --default-transition-duration: 150ms;
+  --default-transition-duration: 120ms;
   --default-transition-timing-function: var(--ease-out);
 
-  --container-page: 76rem; /* max-w-page */
+  --container-page: 75rem; /* max-w-page: 1200px sheet */
   --container-prose: 40rem; /* max-w-prose */
-  --container-narrow: 28rem; /* max-w-narrow */
+  --container-measure: 36rem; /* max-w-measure: lead paragraphs */
+  --container-narrow: 30rem; /* max-w-narrow: sign in */
+  --container-faq: 51.25rem; /* max-w-faq: 820px */
+
+  /* xs: 360px, the narrowest common Android width; below it the masthead keeps icons only where it must. */
+  --breakpoint-xs: 22.5rem;
 }
 
 @theme inline {
@@ -82,62 +100,41 @@
   --color-surface-1: var(--surface-1);
   --color-surface-2: var(--surface-2);
   --color-surface-3: var(--surface-3);
-  --color-surface-sunken: var(--surface-sunken);
-  --color-surface-inverse: var(--surface-inverse);
   --color-ink-1: var(--ink-1);
   --color-ink-2: var(--ink-2);
   --color-ink-3: var(--ink-3);
   --color-ink-inverse: var(--ink-inverse);
+  --color-ink-alert: var(--ink-alert);
   --color-accent: var(--accent);
-  --color-accent-hover: var(--accent-hover);
+  --color-accent-text: var(--accent-text);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-strong-hover: var(--accent-strong-hover);
+  --color-accent-strong-active: var(--accent-strong-active);
   --color-accent-ink: var(--accent-ink);
   --color-accent-soft: var(--accent-soft);
+  --color-accent-soft-ink: var(--accent-soft-ink);
+  --color-accent-wash: var(--accent-wash);
+  --color-accent-busy: var(--accent-busy);
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
-  --color-go: var(--go-fg);
-  --color-go-bg: var(--go-bg);
-  --color-go-line: var(--go-line);
-  --color-watch: var(--watch-fg);
-  --color-watch-bg: var(--watch-bg);
-  --color-watch-line: var(--watch-line);
-  --color-stop: var(--stop-fg);
-  --color-stop-bg: var(--stop-bg);
-  --color-stop-line: var(--stop-line);
-  --color-neutral: var(--neutral-fg);
-  --color-neutral-bg: var(--neutral-bg);
-  --color-neutral-line: var(--neutral-line);
-  --color-key-red: var(--key-red);
-  --color-key-orange: var(--key-orange);
-  --color-key-yellow: var(--key-yellow);
-  --color-key-white: var(--key-white);
-  --color-key-cap: var(--key-cap);
-  --color-key-cap-ink: var(--key-cap-ink);
-  --color-key-window: var(--key-window);
-  --color-key-led: var(--key-led);
-  --color-key-led-dim: var(--key-led-dim);
-  --color-readout-bg: var(--readout-bg);
-  --color-readout: var(--readout-fg);
+  --color-mark: var(--mark);
   --color-focus: var(--focus-ring);
   --color-backdrop: var(--backdrop);
   --shadow-1: var(--elevation-1);
   --shadow-2: var(--elevation-2);
   --shadow-3: var(--elevation-3);
-  --shadow-key: var(--key-shadow);
-  --shadow-key-pressed: var(--key-shadow-pressed);
 
-  /* next/font sets the face variables on <html>; roles are mapped here */
+  /* next/font sets the face variables on <html>; roles are mapped here.
+     Barlow Condensed is the heading, legend, and figure voice; Barlow carries body copy. */
   --font-sans: var(--font-face-body), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-face-display), var(--font-face-body), ui-sans-serif, system-ui, sans-serif;
-  --font-label: var(--font-face-label), var(--font-face-body), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-face-mono), ui-monospace, "SF Mono", Menlo, monospace;
+  --font-display: var(--font-face-heading), var(--font-face-body), ui-sans-serif, system-ui, sans-serif;
+  --font-label: var(--font-face-heading), var(--font-face-body), ui-sans-serif, system-ui, sans-serif;
 }
 
 :root {
-  --duration-fast: 120ms; /* press, LED lit, hover colour */
+  --duration-fast: 120ms; /* hover tint, pressed fill */
   --duration-base: 180ms; /* menus, tooltips, popovers */
   --duration-slow: 260ms; /* dialog, sheet */
-  --duration-reveal: 420ms; /* the one authored landing moment */
-  --chase-step: 110ms; /* chase light per key, clock-locked */
   --z-nav: 40;
   --z-sheet: 50;
   --z-dialog: 60;
@@ -145,6 +142,6 @@
   --z-toast: 80;
   --z-skip: 100;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
-  --nav-height: 4.75rem;
-  --tabbar-height: calc(3.75rem + var(--safe-bottom));
+  --header-height: 4rem;
+  --gutter: clamp(1.25rem, 5vw, 4.5rem);
 }

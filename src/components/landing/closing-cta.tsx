@@ -1,22 +1,12 @@
-import { RevealOnView } from "@/components/motion/reveal-on-view";
-import { PnrCheckForm } from "@/components/pnr/pnr-check-form";
+import { PnrClosingTerminal } from "@/components/pnr/pnr-terminal";
 import { messages } from "@/messages";
 
-export function ClosingCta() {
-  const m = messages.home.cta;
+/** The close: a second, compact check plate — "Got a ticket? Run a check · No sign-up". */
+export function ClosingCta({ sampleMode, thirdPartyMode = false }: { readonly sampleMode: boolean; readonly thirdPartyMode?: boolean }) {
+  const m = messages.home.closing;
   return (
-    <section className="mx-auto w-full max-w-page px-4 py-16 sm:px-6" aria-labelledby="cta-title">
-      <RevealOnView>
-        <div className="panel p-6 sm:p-8">
-          <h2 id="cta-title" className="text-2xl">
-            {m.title}
-          </h2>
-          <p className="mt-2 text-ink-2">{m.lead}</p>
-          <div className="mt-6">
-            <PnrCheckForm id="pnr-footer" compact />
-          </div>
-        </div>
-      </RevealOnView>
+    <section aria-label={m.title} className="pb-[84px] pt-12">
+      <PnrClosingTerminal sampleMode={sampleMode} thirdPartyMode={thirdPartyMode} title={m.title} meta={m.meta} lead={m.lead} />
     </section>
   );
 }

@@ -6,11 +6,11 @@ type Variant = "ghost" | "secondary" | "key";
 type Size = "sm" | "md" | "lg";
 
 const VARIANT: Record<Variant, string> = {
-  ghost: "press bg-transparent text-ink-1 border border-transparent hover:bg-surface-2",
-  secondary: "press bg-surface-2 text-ink-1 border border-line-strong hover:bg-surface-3",
-  key: "key-cap bg-key-cap text-key-cap-ink border border-line-strong",
+  ghost: "border-transparent text-accent-text hover:bg-accent/10 active:bg-accent/20",
+  secondary: "border-line text-ink-1 hover:bg-ink-1/7 active:bg-ink-1/14",
+  key: "border-line text-ink-1 hover:bg-ink-1/7 active:bg-ink-1/14",
 };
-const SIZE: Record<Size, string> = { sm: "size-9", md: "size-10", lg: "size-11" };
+const SIZE: Record<Size, string> = { sm: "size-8", md: "size-9", lg: "size-11" };
 
 export interface IconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> {
   /** Required: becomes the accessible name. */
@@ -33,7 +33,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
       title={label}
       disabled={disabled || loading}
       aria-busy={loading || undefined}
-      className={cn("inline-flex shrink-0 items-center justify-center rounded-md disabled:cursor-not-allowed disabled:opacity-50", VARIANT[variant], SIZE[size], className)}
+      className={cn("press inline-flex shrink-0 items-center justify-center border bg-transparent disabled:cursor-not-allowed disabled:opacity-45", VARIANT[variant], SIZE[size], className)}
       {...rest}
     >
       {loading ? <Spinner size="sm" /> : icon}

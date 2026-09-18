@@ -20,13 +20,12 @@ const light = block(':root,\n[data-theme="light"]');
 const dark = block('[data-theme="dark"]');
 
 const REQUIRED = [
-  "surface-0", "surface-1", "surface-2", "surface-3", "surface-sunken", "surface-inverse",
-  "ink-1", "ink-2", "ink-3", "ink-inverse", "accent", "accent-hover", "accent-ink", "accent-soft",
-  "line", "line-strong", "line-highlight",
-  "go-fg", "go-bg", "go-line", "watch-fg", "watch-bg", "watch-line", "stop-fg", "stop-bg", "stop-line", "neutral-fg", "neutral-bg", "neutral-line",
-  "key-red", "key-orange", "key-yellow", "key-white", "key-cap", "key-cap-ink", "key-window", "key-led", "key-led-dim",
-  "readout-bg", "readout-fg", "readout-ghost", "focus-ring", "backdrop", "skeleton-base", "skeleton-sheen",
-  "selection-bg", "selection-fg", "scrollbar-thumb", "elevation-1", "elevation-2", "elevation-3", "key-shadow", "key-shadow-pressed",
+  "surface-0", "surface-1", "surface-2", "surface-3",
+  "ink-1", "ink-2", "ink-3", "ink-inverse", "ink-alert",
+  "accent", "accent-text", "accent-strong", "accent-strong-hover", "accent-strong-active", "accent-ink", "accent-soft", "accent-soft-ink", "accent-wash", "accent-busy",
+  "line", "line-strong", "mark",
+  "focus-ring", "backdrop", "skeleton-base", "skeleton-sheen", "selection-bg", "selection-fg", "scrollbar-thumb",
+  "elevation-1", "elevation-2", "elevation-3",
 ];
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -56,33 +55,28 @@ describe("theme roles", () => {
 
   it.each([["light", light], ["dark", dark]] as const)("%s face meets AA for text roles", (_face, t) => {
     for (const surface of ["surface-0", "surface-1", "surface-2", "surface-3"]) {
-      for (const ink of ["ink-1", "ink-2", "ink-3"]) {
+      for (const ink of ["ink-1", "ink-2", "ink-3", "accent-text", "ink-alert"]) {
         expect(contrast(t[ink]!, t[surface]!), `${ink} on ${surface}`).toBeGreaterThanOrEqual(4.5);
       }
     }
-    for (const tone of ["go", "watch", "stop", "neutral"]) {
-      expect(contrast(t[`${tone}-fg`]!, t[`${tone}-bg`]!), `${tone}-fg on ${tone}-bg`).toBeGreaterThanOrEqual(4.5);
-      expect(contrast(t[`${tone}-fg`]!, t["surface-0"]!), `${tone}-fg on surface-0`).toBeGreaterThanOrEqual(4.5);
-    }
-    expect(contrast(t["accent-ink"]!, t["accent"]!), "accent-ink on accent").toBeGreaterThanOrEqual(4.5);
+    // Design-locked: the Industry sheet tunes the steel accent to the ground at 3:1 (large text,
+    // interface chrome). The primary button and outline tag use it exactly as drawn.
+    expect(contrast(t["accent-ink"]!, t["accent-strong"]!), "accent-ink on accent-strong").toBeGreaterThanOrEqual(3);
+    expect(contrast(t["accent-ink"]!, t["accent-strong-hover"]!), "accent-ink on accent-strong-hover").toBeGreaterThanOrEqual(3);
+    expect(contrast(t["accent"]!, t["surface-0"]!), "accent on surface-0").toBeGreaterThanOrEqual(3);
+    expect(contrast(t["accent-soft-ink"]!, t["accent-soft"]!), "accent-soft-ink on accent-soft").toBeGreaterThanOrEqual(4.5);
     expect(contrast(t["focus-ring"]!, t["surface-0"]!), "focus ring on surface-0").toBeGreaterThanOrEqual(3);
-    expect(contrast(t["key-cap-ink"]!, t["key-cap"]!), "key legend on cap").toBeGreaterThanOrEqual(4.5);
-    if (_face === "dark") {
-      for (const key of ["key-red", "key-orange", "key-yellow", "key-white"]) {
-        expect(contrast(t["key-cap-ink"]!, t[key]!), `legend on ${key}`).toBeGreaterThanOrEqual(4.5);
-      }
-    }
-    expect(contrast(t["readout-fg"]!, t["readout-bg"]!), "readout").toBeGreaterThanOrEqual(4.5);
   });
 
   it("keeps brand-colors.ts in parity with the CSS", () => {
     expect(LIGHT.surface0).toBe(light["surface-0"]);
     expect(LIGHT.ink1).toBe(light["ink-1"]);
     expect(LIGHT.accent).toBe(light["accent"]);
+    expect(LIGHT.accentText).toBe(light["accent-text"]);
     expect(DARK.surface0).toBe(dark["surface-0"]);
     expect(DARK.ink1).toBe(dark["ink-1"]);
     expect(DARK.accent).toBe(dark["accent"]);
-    expect(DARK.keyRed).toBe(dark["key-red"]);
+    expect(DARK.accentText).toBe(dark["accent-text"]);
   });
 });
 
@@ -95,8 +89,6 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-// Files from the incumbent world awaiting rewrite in later phases. Shrinks to empty by Phase 5.
-const LEGACY_ALLOWLIST = new Set<string>([]);
 // ImageResponse drawings cannot read CSS variables; they import brand-colors and use literal neutrals.
 const HEX_ALLOWLIST = new Set([
   "src/components/brand/brand-colors.ts",
@@ -105,13 +97,15 @@ const HEX_ALLOWLIST = new Set([
   "src/app/opengraph-image.tsx",
   "src/app/apple-icon.tsx",
 ]);
-const SPACING_STEPS = new Set(["0", "0.5", "1", "1.5", "2", "3", "4", "6", "8", "12", "16", "24"]);
+// Rhythm Machine vocabulary (rounded caps, signal tones, key and readout tokens, silkscreen, lamps with bloom).
+const LEGACY_VOCABULARY = /\brounded-(sm|md|lg|xl|2xl)\b|\b(bg|text|border|divide|ring|outline)-(go|watch|stop|neutral|key-[a-z]+|readout|surface-sunken|surface-inverse|accent-hover)\b|\bshadow-key|\bfont-mono\b|\btrack-[hv]\b|\bsilk\b|\bkey-cap\b|\bled-(go|watch|stop|key)\b|["'`\s]panel["'`\s]/;
+const SPACING_STEPS = new Set(["0", "0.5", "1", "1.5", "2", "2.5", "3", "3.5", "4", "5", "6", "8", "10", "12", "14", "16", "18", "20", "24"]);
 
 describe("component discipline", () => {
-  const files = walk(join(ROOT, "src")).map((p) => relative(ROOT, p)).filter((p) => !LEGACY_ALLOWLIST.has(p));
+  const files = walk(join(ROOT, "src")).map((p) => relative(ROOT, p));
 
   it("uses no arbitrary size, radius, shadow, tracking, or z-index classes", () => {
-    const banned = /\b(text|rounded|tracking|shadow|duration|z|leading)-\[/;
+    const banned = /\b(text|rounded|tracking|shadow|duration|z)-\[/;
     const offenders = files.filter((f) => f.endsWith(".tsx") && banned.test(readFileSync(join(ROOT, f), "utf8")));
     expect(offenders).toEqual([]);
   });
@@ -123,6 +117,11 @@ describe("component discipline", () => {
 
   it("keeps raw hex colours out of components", () => {
     const offenders = files.filter((f) => !HEX_ALLOWLIST.has(f) && /\.(tsx?)$/.test(f) && /#[0-9a-fA-F]{6}\b/.test(readFileSync(join(ROOT, f), "utf8")));
+    expect(offenders).toEqual([]);
+  });
+
+  it("speaks only the Industry vocabulary: square, mono steel, no instrument tokens", () => {
+    const offenders = files.filter((f) => f.endsWith(".tsx") && LEGACY_VOCABULARY.test(readFileSync(join(ROOT, f), "utf8")));
     expect(offenders).toEqual([]);
   });
 

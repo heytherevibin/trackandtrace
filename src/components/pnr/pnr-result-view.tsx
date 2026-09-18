@@ -1,10 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ArrowLeftRegular } from "@/components/icons";
 import { useUser } from "@/components/session/session-provider";
-import { buttonClassName } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
 import { notify } from "@/components/ui/toast";
 import { messages } from "@/messages";
 import { fetchPnr } from "@/services/pnr-source";
@@ -37,7 +35,7 @@ function pointFor(result: PnrResult): HistoryPoint {
   return { at: result.checkedAt, status: result.lead.status, position: result.lead.position };
 }
 
-/** The result surface. Server-rendered from the loader; refresh, share, and save happen here. */
+/** The result sheet. Server-rendered from the loader; refresh, share, and save happen here. */
 export function PnrResultView({ pnr, initial }: { readonly pnr: string; readonly initial: PnrResultInitial }) {
   const m = messages.result;
   const user = useUser();
@@ -113,30 +111,23 @@ export function PnrResultView({ pnr, initial }: { readonly pnr: string; readonly
 
   const s = result.snapshot;
   return (
-    <article className="flex flex-col gap-6" data-testid="pnr-result">
+    <article className="flex flex-col" data-testid="pnr-result">
       <span className="sr-only" role="status" aria-live="polite">
         {announcement}
       </span>
-      <header className="flex flex-col gap-4">
-        <Link href="/" className={buttonClassName({ variant: "ghost", size: "sm", className: "w-fit -ml-3" })}>
-          <ArrowLeftRegular className="size-4" aria-hidden="true" />
-          {m.back}
-        </Link>
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div className="min-w-0">
-            <p className="silk">{`PNR ${formatPnr(pnr)}`}</p>
-            <h1 className="mt-2 text-3xl sm:text-4xl">{m.title(s.train.from.code, s.train.to.code)}</h1>
-            <p className="mt-2 text-lg text-ink-2">{`${m.trainLine(s.train.name, s.train.number)} · ${s.journeyDateLabel} · ${s.cls}`}</p>
-          </div>
-          <ResultActions refreshing={refreshing} onRefresh={() => void refresh()} onShare={() => void share()} saved={saved} saving={saving} onToggleSave={() => void toggleSave()} />
-        </div>
-      </header>
-      <StatusBand result={result} cached={cached} />
-      <div className="grid gap-6 lg:grid-cols-[1.25fr_0.75fr]">
+      <PageHeader
+        back={{ href: "/#terminal", label: m.back }}
+        title={m.title(s.train.from.code, s.train.to.code)}
+        lead={m.lead(m.trainLine(s.train.number, s.train.name), s.journeyDateLabel, s.cls)}
+        meta={<span className="tnum">{m.pnr(formatPnr(pnr))}</span>}
+        actions={<ResultActions refreshing={refreshing} onRefresh={() => void refresh()} onShare={() => void share()} saved={saved} saving={saving} onToggleSave={() => void toggleSave()} />}
+      />
+      <StatusBand className="mt-8" result={result} cached={cached} />
+      <div className="mt-[28px] grid items-start gap-[28px] lg:grid-cols-[1.25fr_.75fr]">
         <PassengerTable pax={s.pax} />
-        <JourneyDetails snapshot={s} />
+        <JourneyDetails snapshot={s} quota={result.lead.quota} />
       </div>
-      <ProvenancePanel source={s.source} checkedAt={result.checkedAt} latencyMs={latencyMs} />
+      <ProvenancePanel className="mt-[28px]" pnr={pnr} source={s.source} checkedAt={result.checkedAt} latencyMs={latencyMs} />
     </article>
   );
 }

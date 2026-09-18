@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { accountsConfigured, fixtureAllowed, parseEnv } from "@/services/env";
+import { accountsConfigured, fixtureAllowed, googleSignInEnabled, parseEnv, passkeysEnabled } from "@/services/env";
 
 const dev = { NODE_ENV: "development" } as const;
 
@@ -46,11 +46,47 @@ describe("derived flags", () => {
     const on = parseEnv({
       ...dev,
       NEXT_PUBLIC_SUPABASE_URL: "https://abc.supabase.co",
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: "sb_publishable_0123456789abcdefghij",
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_0123456789abcdefghij",
     });
     if (!off.ok || !on.ok) throw new Error("expected valid env");
     expect(accountsConfigured(off.env)).toBe(false);
     expect(accountsConfigured(on.env)).toBe(true);
+  });
+
+  it("reads Supabase's publishable and secret key names, not the legacy anon and service-role names", () => {
+    const legacy = parseEnv({ ...dev, NEXT_PUBLIC_SUPABASE_URL: "https://abc.supabase.co", NEXT_PUBLIC_SUPABASE_ANON_KEY: "sb_publishable_0123456789abcdefghij" });
+    expect(legacy.ok).toBe(false);
+    const current = parseEnv({ ...dev, SUPABASE_SECRET_KEY: "sb_secret_0123456789abcdefghijkl" });
+    if (!current.ok) throw new Error("expected valid env");
+    expect(current.env.SUPABASE_SECRET_KEY).toBe("sb_secret_0123456789abcdefghijkl");
+  });
+
+  it("googleSignInEnabled needs accounts configured and AUTH_GOOGLE_ENABLED=1", () => {
+    const accounts = { ...dev, NEXT_PUBLIC_SUPABASE_URL: "https://abc.supabase.co", NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_0123456789abcdefghij" };
+    const cases = [
+      [accounts, false],
+      [{ ...accounts, AUTH_GOOGLE_ENABLED: "1" }, true],
+      [{ ...dev, AUTH_GOOGLE_ENABLED: "1" }, false],
+    ] as const;
+    for (const [source, expected] of cases) {
+      const parsed = parseEnv(source);
+      if (!parsed.ok) throw new Error("expected valid env");
+      expect(googleSignInEnabled(parsed.env)).toBe(expected);
+    }
+  });
+
+  it("passkeysEnabled needs accounts configured and AUTH_PASSKEY_ENABLED=1", () => {
+    const accounts = { ...dev, NEXT_PUBLIC_SUPABASE_URL: "https://abc.supabase.co", NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_0123456789abcdefghij" };
+    const cases = [
+      [accounts, false],
+      [{ ...accounts, AUTH_PASSKEY_ENABLED: "1" }, true],
+      [{ ...dev, AUTH_PASSKEY_ENABLED: "1" }, false],
+    ] as const;
+    for (const [source, expected] of cases) {
+      const parsed = parseEnv(source);
+      if (!parsed.ok) throw new Error("expected valid env");
+      expect(passkeysEnabled(parsed.env)).toBe(expected);
+    }
   });
 
   it("fixtureAllowed is true only for fixture outside production", () => {
@@ -61,3 +97,34 @@ describe("derived flags", () => {
     expect(fixtureAllowed(live.env)).toBe(false);
   });
 });
+
+describe("RapidAPI source configuration", () => {
+  it("requires a key when PNR_SOURCE=rapidapi", () => {
+    const parsed = parseEnv({ NODE_ENV: "production", PNR_SOURCE: "rapidapi" });
+    expect(parsed.ok).toBe(false);
+    if (parsed.ok) return;
+    expect(parsed.issues.join(" ")).toMatch(/RAPIDAPI_KEY/);
+  });
+
+  it("defaults the host, path, and timeout to the IRCTC API", () => {
+    const parsed = parseEnv({ NODE_ENV: "production", PNR_SOURCE: "rapidapi", RAPIDAPI_KEY: "test-key-0123456789abcdef" });
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.env.RAPIDAPI_HOST).toBe("irctc1.p.rapidapi.com");
+    expect(parsed.env.RAPIDAPI_PNR_PATH).toBe("/api/v3/getPNRStatus");
+    expect(parsed.env.RAPIDAPI_TIMEOUT_MS).toBe(8000);
+  });
+
+  it("names the active source for provenance: fixture, rapidapi, or live", async () => {
+    const { activePnrSource } = await import("@/services/env");
+    const of = (source: Record<string, string>) => {
+      const parsed = parseEnv(source);
+      if (!parsed.ok) throw new Error(parsed.issues.join("; "));
+      return parsed.env;
+    };
+    expect(activePnrSource(of({ NODE_ENV: "development", PNR_SOURCE: "fixture" }))).toBe("fixture");
+    expect(activePnrSource(of({ NODE_ENV: "production", PNR_SOURCE: "rapidapi", RAPIDAPI_KEY: "test-key-0123456789abcdef" }))).toBe("rapidapi");
+    expect(activePnrSource(of({ NODE_ENV: "production" }))).toBe("live");
+  });
+});
+

@@ -21,28 +21,29 @@ export interface DataTableProps<Row> {
   readonly className?: string;
 }
 
-/** Semantic table. Scrolls sideways on wide screens; stacks into labelled rows below md. */
+/** Semantic table on hairline rules. Scrolls sideways on wide screens; stacks into labelled rows below md. */
 export function DataTable<Row>({ columns, rows, rowKey, caption, showCaption = false, emptyState, dense = false, className }: DataTableProps<Row>) {
   if (rows.length === 0 && emptyState) return <>{emptyState}</>;
-  const cell = dense ? "px-3 py-2" : "px-4 py-3";
+  const cell = dense ? "px-3.5 py-2" : "px-5 py-3";
+  // Every row, the last included, carries its hairline, as the sheets draw it.
   return (
     <div className={cn("overflow-x-auto", className)} role="region" aria-label={caption} tabIndex={0}>
-      <table className="table-stack w-full text-left text-sm">
-        <caption className={showCaption ? "silk py-2 text-left" : "sr-only"}>{caption}</caption>
+      <table className="table-stack w-full border-collapse text-left text-body">
+        <caption className={showCaption ? "legend px-5 py-2.5 text-left" : "sr-only"}>{caption}</caption>
         <thead>
-          <tr className="border-b border-line">
+          <tr>
             {columns.map((c) => (
-              <th key={c.key} scope="col" className={cn("silk", cell, c.align === "end" && "text-right")}>
+              <th key={c.key} scope="col" className={cn("legend-md border-b border-line", dense ? "px-3.5 py-2" : "px-5 py-2.5", c.align === "end" ? "text-right" : "text-left")}>
                 {c.header}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-line">
+        <tbody>
           {rows.map((row) => (
             <tr key={rowKey(row)}>
               {columns.map((c) => (
-                <td key={c.key} data-label={c.header} className={cn(cell, "align-top text-ink-1", c.numeric && "font-data", c.align === "end" && "text-right")}>
+                <td key={c.key} data-label={c.header} className={cn(cell, "border-b border-line align-middle text-ink-1", c.numeric && "tnum", c.align === "end" && "text-right")}>
                   {c.cell(row)}
                 </td>
               ))}
