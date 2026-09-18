@@ -1,13 +1,18 @@
 import type { Env } from "@/services/env";
-import { env, fixtureAllowed } from "@/services/env";
+import { activePnrSource, env, fallbackPnrSource, fixtureAllowed } from "@/services/env";
 import type { PnrDataSource } from "@/services/pnr-source";
+import type { ThirdPartySource } from "@/utils/source";
+import { createFallbackSource } from "./fallback";
 import { fixtureSource } from "./fixture";
 import { createLiveSource } from "./live";
+import { createRailkitSource } from "./railkit";
 import { createRapidApiSource } from "./rapidapi";
 
 // Provider registry. The fixture is served only when explicitly requested and
 // never in production; the env schema refuses that combination at boot and this
 // registry refuses it again at call time, so a bypassed guard still fails closed.
+// A third-party source may have a second third-party source behind it, asked only
+// while the first is unavailable.
 
 let refusalLogged = false;
 
@@ -30,10 +35,28 @@ export function resolvePnrSource(current: Env = env()): PnrDataSource {
     }
     return refusedSource;
   }
-  if (current.PNR_SOURCE === "rapidapi" && current.RAPIDAPI_KEY) {
-    return createRapidApiSource({ key: current.RAPIDAPI_KEY, host: current.RAPIDAPI_HOST, path: current.RAPIDAPI_PNR_PATH, timeoutMs: current.RAPIDAPI_TIMEOUT_MS });
+  const active = activePnrSource(current);
+  if (active === "railkit" || active === "rapidapi") {
+    const primary = thirdPartySource(active, current);
+    const fallback = fallbackPnrSource(current);
+    return primary && fallback ? withFallback(primary, thirdPartySource(fallback, current)) : (primary ?? createLiveSource(current));
   }
   return createLiveSource(current);
+}
+
+function withFallback(primary: PnrDataSource, fallback: PnrDataSource | null): PnrDataSource {
+  return fallback ? createFallbackSource(primary, fallback) : primary;
+}
+
+function thirdPartySource(source: ThirdPartySource, current: Env): PnrDataSource | null {
+  if (source === "railkit") {
+    return current.RAILKIT_API_KEY
+      ? createRailkitSource({ key: current.RAILKIT_API_KEY, baseUrl: current.RAILKIT_BASE_URL, timeoutMs: current.RAILKIT_TIMEOUT_MS })
+      : null;
+  }
+  return current.RAPIDAPI_KEY
+    ? createRapidApiSource({ key: current.RAPIDAPI_KEY, host: current.RAPIDAPI_HOST, path: current.RAPIDAPI_PNR_PATH, timeoutMs: current.RAPIDAPI_TIMEOUT_MS })
+    : null;
 }
 
 export function getPnrSource(): PnrDataSource {

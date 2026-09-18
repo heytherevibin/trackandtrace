@@ -1,9 +1,10 @@
 import { PnrTerminal } from "@/components/pnr/pnr-terminal";
+import type { ThirdPartySource } from "@/utils/source";
 import { SheetTag } from "@/components/pnr/pnr-terminal-tags";
 import { messages } from "@/messages";
 
 /** Hero, as drawn: the promise in hero capitals with four outline tags on the left, the live check plate on the right. */
-export function Hero({ sampleMode, thirdPartyMode = false }: { readonly sampleMode: boolean; readonly thirdPartyMode?: boolean }) {
+export function Hero({ sampleMode, thirdPartySource }: { readonly sampleMode: boolean; readonly thirdPartySource?: ThirdPartySource }) {
   const m = messages.home.hero;
   const tags = [m.tags.free, m.tags.noAccount, m.tags.notLogged, m.tags.failsClosed];
   return (
@@ -25,7 +26,7 @@ export function Hero({ sampleMode, thirdPartyMode = false }: { readonly sampleMo
           ))}
         </div>
       </div>
-      <PnrTerminal sampleMode={sampleMode} thirdPartyMode={thirdPartyMode} />
+      <PnrTerminal sampleMode={sampleMode} thirdPartySource={thirdPartySource} />
     </section>
   );
 }

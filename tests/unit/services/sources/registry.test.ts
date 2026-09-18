@@ -52,4 +52,55 @@ describe("resolvePnrSource", () => {
     expect(out).toMatchObject({ ok: false, code: "NOT_FOUND" });
     vi.unstubAllGlobals();
   });
+
+  it("selects the RailKit adapter when PNR_SOURCE=railkit, with its key in x-api-key", async () => {
+    const key = "railkit_0123456789abcdef0123456789abcdef";
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ success: false, error: "PNR not found" }), { status: 404 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const out = await resolvePnrSource(envOf({ NODE_ENV: "production", PNR_SOURCE: "railkit", RAILKIT_API_KEY: key })).check("5827194603");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("https://api.railkit.in/api/v1/pnr/5827194603");
+    expect(new Headers(init.headers).get("x-api-key")).toBe(key);
+    expect(out).toMatchObject({ ok: false, code: "NOT_FOUND" });
+    vi.unstubAllGlobals();
+  });
+
+  it("falls back to RapidAPI only while RailKit is unavailable", async () => {
+    const current = envOf({
+      NODE_ENV: "production",
+      PNR_SOURCE: "railkit",
+      RAILKIT_API_KEY: "railkit_0123456789abcdef0123456789abcdef",
+      PNR_FALLBACK: "rapidapi",
+      RAPIDAPI_KEY: "test-key-0123456789abcdef",
+    });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const hosts: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        hosts.push(new URL(url).host);
+        return url.includes("railkit")
+          ? new Response("<html>Bad gateway</html>", { status: 502 })
+          : new Response(JSON.stringify({ status: false, message: "Flushed PNR" }), { status: 200 });
+      }),
+    );
+    const out = await resolvePnrSource(current).check("5827194603");
+    expect(hosts).toEqual(["api.railkit.in", "irctc1.p.rapidapi.com"]);
+    expect(out).toMatchObject({ ok: false, code: "NOT_FOUND" });
+
+    hosts.length = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        hosts.push(new URL(url).host);
+        return new Response(JSON.stringify({ success: false, error: "No PNR data found or invalid PNR number" }), { status: 400 });
+      }),
+    );
+    const noRecord = await resolvePnrSource(current).check("5827194603");
+    expect(noRecord).toMatchObject({ ok: false, code: "NOT_FOUND" });
+    expect(hosts).toEqual(["api.railkit.in"]);
+    vi.unstubAllGlobals();
+    warn.mockRestore();
+  });
 });

@@ -68,7 +68,7 @@ export function TerminalRecord({ result, full, onReset }: { readonly result: Ter
       <div className="flex flex-wrap items-center gap-2.5">
         <SheetTag variant="accent">{result.statusShort}</SheetTag>
         {result.sample ? <SampleTag /> : null}
-        {result.thirdParty ? <ThirdPartyTag /> : null}
+        {result.thirdParty ? <ThirdPartyTag source={result.thirdParty} /> : null}
         <span className="ml-auto text-label leading-normal text-ink-1/70 tnum">{result.pnrLabel}</span>
       </div>
       <p className="m-0 font-display text-4xl font-semibold uppercase tracking-display">{result.statusBig}</p>
