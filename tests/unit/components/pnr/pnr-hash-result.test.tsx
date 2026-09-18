@@ -81,6 +81,6 @@ describe("PnrHashResult", () => {
     setHash("#2345678901");
     render(<PnrHashResult source="fixture" />);
     await screen.findByText("Record for 2345678901");
-    expect(document.title).toBe("PNR 234 567 8901 · Track & Trace");
+    expect(document.title).toBe("PNR 234 567 8901 · Trakline");
   });
 });

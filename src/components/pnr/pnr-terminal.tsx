@@ -120,7 +120,7 @@ function useCheckPlate(sampleMode: boolean, thirdPartySource: ThirdPartySource |
   };
 }
 
-/** The hero plate: "PNR check — live request · Form T&T-01", with the recent strip along its foot. */
+/** The hero plate: "PNR check — live request · Form TL-01", with the recent strip along its foot. */
 export function PnrTerminal({ sampleMode, thirdPartySource }: { readonly sampleMode: boolean; readonly thirdPartySource?: ThirdPartySource }) {
   const plate = useCheckPlate(sampleMode, thirdPartySource);
   const m = messages.check;

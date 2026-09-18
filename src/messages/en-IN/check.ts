@@ -1,6 +1,6 @@
 import type { MessageTree } from "../types";
 
-// The check plate ("PNR check — live request", Form T&T-01), transcribed from Landing Redesign B.
+// The check plate ("PNR check — live request", Form TL-01), transcribed from Landing Redesign B.
 
 const PARTY_WORDS: Readonly<Record<number, string>> = { 2: "two", 3: "three", 4: "four", 5: "five", 6: "six" };
 
@@ -28,7 +28,7 @@ export const check = {
   groups: { one: "1–3", two: "4–6", three: "7–10" },
   plate: {
     title: "PNR check — live request",
-    form: "Form T&T-01",
+    form: "Form TL-01",
   },
   result: {
     pnr: (formatted: string) => `PNR ${formatted}`,

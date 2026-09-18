@@ -15,7 +15,7 @@ export const home = {
     },
   },
   principles: {
-    title: "Track & Trace — operating principles",
+    title: "Trakline — operating principles",
     code: "TT-100",
     sheet: "Sheet 01 of 04",
     label: "Operating principles",
@@ -98,7 +98,7 @@ export const home = {
     kicker: "08 · Questions",
     title: "Asked before you ask",
     items: [
-      { q: "Is this affiliated with IRCTC or Indian Railways?", a: "No. Track & Trace is an independent product. It requests your reservation record from a verified railway data source and shows exactly what came back." },
+      { q: "Is this affiliated with IRCTC or Indian Railways?", a: "No. Trakline is an independent product. It requests your reservation record from a verified railway data source and shows exactly what came back." },
       { q: "Do I need an account?", a: "No. A check needs only the 10-digit PNR. An account adds one thing: a watchlist that syncs between your devices. It stays optional." },
       { q: "Is my PNR stored or logged?", a: "PNRs and passenger names are never written to our logs. Your PNR is used to make the request; recent checks stay on your device and you can clear them any time." },
       { q: "Why does a field say “not returned”?", a: "Because the source did not send it. The product never fills a gap with a guess — it fails closed: no source, no claim." },

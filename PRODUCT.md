@@ -36,7 +36,7 @@ Stack: Next.js 16 App Router, TypeScript strict, Tailwind CSS v4, Supabase (Auth
 
 ## Brand Commitments
 
-- Name: Track & Trace (kept). The former tagline "Journey intelligence" implies inference the product forbids and is retired in favor of a factual descriptor.
+- Name: Trakline (renamed from Track & Trace on 2026-09-18). The former tagline "Journey intelligence" implies inference the product forbids and is retired in favor of a factual descriptor.
 - Honesty is a brand commitment: sample data is always labeled; accuracy is never invented; unavailable states are explained, not hidden.
 - Quality bar: Stripe/Linear-level system discipline in app surfaces, Airbnb-level warmth on the landing page.
 - Light and dark themes (Day and Night), following the system, with an Auto · Day · Night toggle.

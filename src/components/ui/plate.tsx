@@ -4,7 +4,7 @@ import { Corners } from "./corners";
 
 // A plate: the Industry blueprint object. Square, hairline, transparent, with
 // registration marks. An optional header row of cells reads like a drawing's
-// title block: the title cell grows, meta cells ("Form T&T-01", "Sheet 02")
+// title block: the title cell grows, meta cells ("Form TL-01", "Sheet 02")
 // sit to its right behind hairlines. Plates do not nest.
 
 export type PlatePadding = "none" | "sm" | "md" | "lg";

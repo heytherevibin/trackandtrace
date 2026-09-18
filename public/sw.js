@@ -1,4 +1,4 @@
-/* Track & Trace service worker v2.
+/* Trakline service worker v2.
    Never caches /api/* or /auth/*: a stale reservation record presented as live
    would break the product's real-only policy. Navigations are network-first
    with an offline fallback; static assets are stale-while-revalidate. */

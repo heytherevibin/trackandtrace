@@ -35,7 +35,7 @@ describe("PnrTerminal", () => {
   it("draws the plate header, counter, ten cells, and the idle stub", () => {
     const { container } = render(<PnrTerminal sampleMode />);
     expect(screen.getByText("PNR check — live request")).toBeInTheDocument();
-    expect(screen.getByText("Form T&T-01")).toBeInTheDocument();
+    expect(screen.getByText("Form TL-01")).toBeInTheDocument();
     expect(screen.getByText("0 / 10")).toBeInTheDocument();
     expect(container.querySelectorAll("[data-cell]")).toHaveLength(10);
     expect(screen.getByText("Standing by")).toBeInTheDocument();

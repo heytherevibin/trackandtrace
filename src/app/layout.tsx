@@ -9,19 +9,19 @@ import { fontVars } from "./fonts";
 
 export const metadata: Metadata = {
   title: {
-    default: "Track & Trace — PNR status from the source",
-    template: "%s · Track & Trace",
+    default: "Trakline — PNR status from the source",
+    template: "%s · Trakline",
   },
   description:
     "Enter a 10-digit Indian Railways PNR and read exactly what the verified source returned, with its name and retrieval time. Free, no account needed.",
-  applicationName: "Track & Trace",
+  applicationName: "Trakline",
   manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, statusBarStyle: "default", title: "Track & Trace" },
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "Trakline" },
   openGraph: {
-    title: "Track & Trace — PNR status from the source",
+    title: "Trakline — PNR status from the source",
     description: "Only the fields the railway source returned, with provenance and retrieval time. Free, no account.",
     type: "website",
-    siteName: "Track & Trace",
+    siteName: "Trakline",
   },
 };
 

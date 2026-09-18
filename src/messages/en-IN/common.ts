@@ -1,7 +1,7 @@
 import type { MessageTree } from "../types";
 
 export const common = {
-  productName: "Track & Trace",
+  productName: "Trakline",
   descriptor: "PNR status from the source",
   notAffiliated: "Not affiliated with IRCTC or Indian Railways.",
   footerDisclaimer: "Not affiliated with IRCTC or Indian Railways. Only fields returned by a verified source are shown, each with provenance and retrieval time.",

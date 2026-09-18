@@ -15,7 +15,7 @@ test("the hamburger holds the product links and marks the current page", async (
   const hamburger = banner.getByRole("button", { name: "Open menu" });
   await expect(hamburger).toBeVisible();
   await expect(banner.getByRole("navigation", { name: "Primary" })).toBeHidden();
-  const brand = banner.getByRole("link", { name: "Track & Trace" });
+  const brand = banner.getByRole("link", { name: "Trakline" });
   const [menuBox, brandBox] = [await hamburger.boundingBox(), await brand.boundingBox()];
   expect(menuBox!.x).toBeLessThan(brandBox!.x);
 
