@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
-import { SourceStatusTable } from "@/components/source/source-status-table";
+import { ServiceList } from "@/components/status/service-list";
 import { Corners } from "@/components/ui/corners";
 import { messages } from "@/messages";
+import { serviceStatus } from "@/services/service-status";
 import { cn } from "@/utils/cn";
 
 export const metadata: Metadata = { title: messages.accuracy.title };
@@ -45,11 +46,11 @@ export default function AccuracyPage() {
         </dl>
       </div>
 
-      <section className="mt-[44px]" aria-labelledby="accuracy-connected">
-        <Kicker id="accuracy-connected">{m.connected.kicker}</Kicker>
+      <section className="mt-[44px]" aria-labelledby="accuracy-service">
+        <Kicker id="accuracy-service">{m.service.kicker}</Kicker>
         <div className="blueprint">
           <Corners />
-          <SourceStatusTable variant="ledger" />
+          <ServiceList status={serviceStatus()} />
         </div>
       </section>
 

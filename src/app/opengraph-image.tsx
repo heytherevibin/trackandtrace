@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 import { LIGHT } from "@/components/brand/brand-colors";
 
-export const alt = "Track & Trace — PNR status from the source";
+export const alt = "Trakline — PNR status from the source";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -24,7 +24,7 @@ export default function OpengraphImage() {
     (
       <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", justifyContent: "space-between", background: LIGHT.surface0, padding: 64, color: LIGHT.ink1 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          <div style={{ display: "flex", fontSize: 26, letterSpacing: 6, color: LIGHT.accentText }}>TRACK &amp; TRACE</div>
+          <div style={{ display: "flex", fontSize: 26, letterSpacing: 6, color: LIGHT.accentText }}>TRAKLINE</div>
           <div style={{ display: "flex", fontSize: 72, fontWeight: 700, lineHeight: 1.04, letterSpacing: 1, maxWidth: 980 }}>YOUR PNR, AS THE RAILWAY RECORDS IT.</div>
         </div>
         <div style={{ position: "relative", display: "flex", flexDirection: "column", border: `2px solid ${LIGHT.line}` }}>
@@ -34,7 +34,7 @@ export default function OpengraphImage() {
           <Corner top={false} left={false} />
           <div style={{ display: "flex", borderBottom: `2px solid ${LIGHT.line}`, fontSize: 22, letterSpacing: 3 }}>
             <div style={{ display: "flex", flex: 1, padding: "14px 24px" }}>PNR CHECK — LIVE REQUEST</div>
-            <div style={{ display: "flex", padding: "14px 24px", borderLeft: `2px solid ${LIGHT.line}`, color: LIGHT.ink3 }}>FORM T&amp;T-01</div>
+            <div style={{ display: "flex", padding: "14px 24px", borderLeft: `2px solid ${LIGHT.line}`, color: LIGHT.ink3 }}>FORM TL-01</div>
           </div>
           <div style={{ display: "flex", gap: 28, padding: 24 }}>
             {GROUPS.map((count, gi) => (

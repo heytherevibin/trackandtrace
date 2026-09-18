@@ -1,4 +1,5 @@
 import type { BookingClass, PassengerSeat, PnrResult, Quota, Station } from "@/types/domain";
+import { messages } from "@/messages";
 import { bookingClassSchema, quotaSchema } from "@/types/schemas";
 import {
   chartPreparedFrom,
@@ -27,11 +28,11 @@ import {
 
 export type RailkitParse = { readonly ok: true; readonly result: PnrResult } | Failure;
 
-const UNREADABLE = "RailKit returned a record this product cannot read. Nothing was shown in its place.";
+const OUT = messages.source.outcomes;
 const STATION_CODE = /^[A-Z]{2,5}$/;
 const WAITLIST_CODE = /^(GN|PQ|RL|TQ|RS|RQ|CK)?WL$/;
 
-function unavailable(message: string = UNREADABLE): Failure {
+function unavailable(message: string = OUT.unreadable): Failure {
   return { ok: false, code: "SOURCE_UNAVAILABLE", message };
 }
 
@@ -100,8 +101,8 @@ function passengerFrom(raw: unknown, fallbackIndex: number, quota: Quota): Passe
 function refusal(body: Json): Failure {
   const message = typeof body.error === "string" ? body.error : "";
   return isNoRecordMessage(message)
-    ? { ok: false, code: "NOT_FOUND", message: "RailKit has no reservation record for this PNR." }
-    : unavailable("RailKit could not answer for this PNR. Nothing was shown in its place.");
+    ? { ok: false, code: "NOT_FOUND", message: OUT.noRecord }
+    : unavailable(OUT.couldNotAnswer);
 }
 
 export function parseRailkitPnrResponse(body: unknown, pnr: string, now: Date): RailkitParse {

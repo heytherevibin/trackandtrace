@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseRailkitPnrResponse } from "@/services/sources/railkit-parse";
 import { parseClockTime } from "@/services/sources/irctc-record";
+import { toPublicResult } from "@/services/public-result";
 import { pnrApiOkSchema, pnrResultSchema } from "@/types/schemas";
 
 // Payload shape: RailKit's documented GET /api/v1/pnr/:pnr answer (README, v6). Confirm the live
@@ -104,9 +105,13 @@ describe("parseRailkitPnrResponse", () => {
   it("produces records the wire contract accepts, so the browser renders them", () => {
     const out = parseRailkitPnrResponse(documented(), PNR, NOW);
     if (!out.ok) throw new Error("expected a record");
-    expect(pnrResultSchema.safeParse(out.result).success).toBe(true);
-    const wire = { ok: true, source: "railkit", cached: false, latencyMs: 5, rate: { remaining: 19, limit: 20 }, data: out.result };
+    const shown = toPublicResult(out.result);
+    expect(shown.snapshot.source).toBe("live");
+    expect(pnrResultSchema.safeParse(shown).success).toBe(true);
+    const wire = { ok: true, source: "live", cached: false, latencyMs: 5, rate: { remaining: 19, limit: 20 }, data: shown };
     expect(pnrApiOkSchema.safeParse(wire).success).toBe(true);
+    // The wire contract refuses a provider name: a missed mapping fails closed in the browser.
+    expect(pnrApiOkSchema.safeParse({ ...wire, source: "railkit", data: out.result }).success).toBe(false);
   });
 
   it("never carries the fare, booking time or any prediction", () => {

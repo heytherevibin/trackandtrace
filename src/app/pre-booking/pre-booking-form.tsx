@@ -9,7 +9,7 @@ import { QUOTA_VALUES, type FormClass, type FormQuota } from "@/types/booking";
 import { PLATE_TITLE_STACK, plateCellClass } from "@/components/ui/plate";
 import { cn } from "@/utils/cn";
 
-// Transcribed from the Claude Design sheet "Pre-booking B": Form T&T-02, the honest
+// Transcribed from the Claude Design sheet "Pre-booking B": Form TL-02, the honest
 // result plate, and the request lifecycle. Real behaviour only: the IST minimum date,
 // the past-date guard, and an unavailable answer. No train list is invented.
 

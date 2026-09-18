@@ -5,7 +5,7 @@ import type { MessageTree } from "../types";
 export const booking = {
   title: "Availability before booking",
   lead: "Pick class, quota, and date. Live availability appears here only when a timetable and inventory source is connected.",
-  form: { title: "Availability request", sheet: "Form T&T-02" },
+  form: { title: "Availability request", sheet: "Form TL-02" },
   train: { label: "Train", notConnected: "Train search: not connected" },
   cls: "Class",
   quota: "Quota",

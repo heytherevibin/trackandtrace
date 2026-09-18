@@ -15,7 +15,7 @@ export const home = {
     },
   },
   principles: {
-    title: "Track & Trace — operating principles",
+    title: "Trakline — operating principles",
     code: "TT-100",
     sheet: "Sheet 01 of 04",
     label: "Operating principles",
@@ -50,10 +50,15 @@ export const home = {
     journeyLine: (date: string, departs: string, quota: string) => `${date} · departs ${departs} IST · quota ${quota}`,
     caption: "Specimen passengers",
   },
-  sources: {
-    kicker: "04 · Connected right now",
-    title: "The state of every source",
-    lead: "When a data set is not connected, the product says so instead of guessing. This board is read from the real flags.",
+  reliability: {
+    kicker: "04 · Reliability",
+    title: "Real records, checked live",
+    lead: "Trakline asks for your reservation at the moment you check and shows exactly what comes back.",
+    facts: [
+      { legend: "Live at check", title: "Asked the moment you press Run", detail: "Each check asks for the current record. A repeat within a minute is marked as the last minute's read." },
+      { legend: "Time-stamped", title: "Every result shows when it was retrieved", detail: "The retrieval time sits beside the status, in IST, so an old answer never passes for a new one." },
+      { legend: "Never estimated", title: "A missing field reads “Not returned”", detail: "Nothing is predicted, filled in or rounded up. Confirmation odds are never shown." },
+    ],
     policy: "Read the data policy",
   },
   roadmap: {
@@ -98,7 +103,7 @@ export const home = {
     kicker: "08 · Questions",
     title: "Asked before you ask",
     items: [
-      { q: "Is this affiliated with IRCTC or Indian Railways?", a: "No. Track & Trace is an independent product. It requests your reservation record from a verified railway data source and shows exactly what came back." },
+      { q: "Is this affiliated with IRCTC or Indian Railways?", a: "No. Trakline is an independent product. It requests your reservation record from a verified railway data source and shows exactly what came back." },
       { q: "Do I need an account?", a: "No. A check needs only the 10-digit PNR. An account adds one thing: a watchlist that syncs between your devices. It stays optional." },
       { q: "Is my PNR stored or logged?", a: "PNRs and passenger names are never written to our logs. Your PNR is used to make the request; recent checks stay on your device and you can clear them any time." },
       { q: "Why does a field say “not returned”?", a: "Because the source did not send it. The product never fills a gap with a guess — it fails closed: no source, no claim." },

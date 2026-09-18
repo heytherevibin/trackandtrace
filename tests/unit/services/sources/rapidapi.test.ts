@@ -57,16 +57,17 @@ describe("createRapidApiSource", () => {
   });
 
   it.each([
-    [401, "SOURCE_UNAVAILABLE", /key/i],
-    [403, "SOURCE_UNAVAILABLE", /key|subscri/i],
-    [429, "SOURCE_UNAVAILABLE", /quota/i],
-    [500, "SOURCE_UNAVAILABLE", /error/i],
-    [503, "SOURCE_UNAVAILABLE", /error/i],
+    [401, "SOURCE_UNAVAILABLE", /unavailable right now/i],
+    [403, "SOURCE_UNAVAILABLE", /unavailable right now/i],
+    [429, "SOURCE_UNAVAILABLE", /busy/i],
+    [500, "SOURCE_UNAVAILABLE", /returned an error/i],
+    [503, "SOURCE_UNAVAILABLE", /returned an error/i],
   ] as const)("maps HTTP %i to %s", async (status, code, message) => {
     const out = await sourceWith((async () => response(status, { message: "nope" }, { "retry-after": "30" })) as unknown as typeof fetch).check(PNR);
     expect(out).toMatchObject({ ok: false, code });
     if (out.ok) return;
     expect(out.message).toMatch(message);
+    expect(out.message).not.toMatch(/rapid|irctcapi|railkit|key|subscription|http/i);
     if (status === 429) expect(out.retryAfter).toBe(30);
   });
 

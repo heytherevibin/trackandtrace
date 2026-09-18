@@ -20,10 +20,10 @@ afterEach(() => {
 });
 
 describe("PreBookingForm", () => {
-  it("draws Form T&T-02 with an honest train box, the drawn options, and a disabled check", () => {
+  it("draws Form TL-02 with an honest train box, the drawn options, and a disabled check", () => {
     render(<PreBookingForm />);
     expect(screen.getByRole("heading", { level: 2, name: "Availability request" })).toBeInTheDocument();
-    expect(screen.getByText("Form T&T-02")).toBeInTheDocument();
+    expect(screen.getByText("Form TL-02")).toBeInTheDocument();
     expect(screen.getByText("Train search: not connected")).toHaveAttribute("role", "status");
 
     const cls = screen.getByLabelText("Class") as HTMLSelectElement;

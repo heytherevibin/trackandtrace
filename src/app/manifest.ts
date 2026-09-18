@@ -3,8 +3,8 @@ import { LIGHT } from "@/components/brand/brand-colors";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Track & Trace",
-    short_name: "Track & Trace",
+    name: "Trakline",
+    short_name: "Trakline",
     description: "Check an Indian Railways PNR and read exactly what the source returned.",
     start_url: "/",
     display: "standalone",

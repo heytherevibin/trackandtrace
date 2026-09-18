@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { HistoryPoint, PnrResult, WatchlistEntry } from "./domain";
+import type { HistoryPoint, PublicPnrResult, WatchlistEntry } from "./domain";
 
 // ---------------------------------------------------------------------------
 // Canonical wire contract. Every route handler, client fetch, stored record,
@@ -12,7 +12,8 @@ const PNR_PATTERN = /^\d{10}$/;
 export const quotaSchema = z.enum(["GN", "TQ", "PT", "LD", "SS", "HP", "DF", "DP", "FT", "YU", "PH", "RS", "CK", "RC", "OS", "PQWL", "RLWL", "TQWL", "RSWL", "RQWL", "CKWL"]);
 export const bookingClassSchema = z.enum(["1A", "2A", "3A", "3E", "SL", "CC", "EC", "EA", "EV", "FC", "2S", "VS"]);
 export const ticketStatusSchema = z.enum(["CNF", "RAC", "WL", "CANCELLED", "NOT_FOUND"]);
-export const pnrSourceSchema = z.enum(["live", "fixture", "rapidapi", "railkit"]);
+/** Sources as the browser sees them: labelled sample data, or Trakline. Provider names never cross the wire. */
+export const pnrSourceSchema = z.enum(["live", "fixture"]);
 export const confidenceSchema = z.enum(["high", "medium", "low"]);
 export const recommendationSchema = z.enum([
   "Confirmed",
@@ -162,7 +163,7 @@ export type WatchlistUpsert = z.infer<typeof watchlistUpsertSchema>;
 
 // Contract lock: the schemas must infer exactly the domain interfaces.
 type Equals<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
-const resultContract: Equals<z.infer<typeof pnrResultSchema>, PnrResult> = true;
+const resultContract: Equals<z.infer<typeof pnrResultSchema>, PublicPnrResult> = true;
 const historyContract: Equals<z.infer<typeof historyPointSchema>, HistoryPoint> = true;
 const entryContract: Equals<z.infer<typeof watchlistEntrySchema>, WatchlistEntry> = true;
 void resultContract;

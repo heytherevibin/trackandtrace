@@ -5,7 +5,7 @@ import { PreBookingForm } from "./pre-booking-form";
 export const metadata: Metadata = { title: messages.booking.title };
 
 /**
- * Pre-booking B: the 60ch title block, then Form T&T-02, the honest result, and the lifecycle.
+ * Pre-booking B: the 60ch title block, then Form TL-02, the honest result, and the lifecycle.
  * Headings wrap "pretty" as the sheet's do (base.css balances h1–h4, which breaks lines differently).
  */
 export default function PreBookingPage() {

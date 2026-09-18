@@ -1,10 +1,9 @@
 import { PnrTerminal } from "@/components/pnr/pnr-terminal";
-import type { ThirdPartySource } from "@/utils/source";
 import { SheetTag } from "@/components/pnr/pnr-terminal-tags";
 import { messages } from "@/messages";
 
 /** Hero, as drawn: the promise in hero capitals with four outline tags on the left, the live check plate on the right. */
-export function Hero({ sampleMode, thirdPartySource }: { readonly sampleMode: boolean; readonly thirdPartySource?: ThirdPartySource }) {
+export function Hero({ sampleMode, connected = false }: { readonly sampleMode: boolean; readonly connected?: boolean }) {
   const m = messages.home.hero;
   const tags = [m.tags.free, m.tags.noAccount, m.tags.notLogged, m.tags.failsClosed];
   return (
@@ -26,7 +25,7 @@ export function Hero({ sampleMode, thirdPartySource }: { readonly sampleMode: bo
           ))}
         </div>
       </div>
-      <PnrTerminal sampleMode={sampleMode} thirdPartySource={thirdPartySource} />
+      <PnrTerminal sampleMode={sampleMode} connected={connected} />
     </section>
   );
 }

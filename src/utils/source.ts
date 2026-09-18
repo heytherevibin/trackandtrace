@@ -1,11 +1,10 @@
-import type { PnrSource } from "@/types/domain";
+import type { PnrSource, PublicPnrSource } from "@/types/domain";
 
-// Which sources are third parties: real reservation records from a provider that is
-// not an official railway source, always labelled "Third-party" with the provider named.
-// Client-safe (no env access), so components and the env schema share one definition.
+// What a traveller is told about where a record came from: labelled sample data, or Trakline.
+// The provider behind a check stays on the server (src/services).
 
-export type ThirdPartySource = Extract<PnrSource, "rapidapi" | "railkit">;
+export type { PublicPnrSource };
 
-export function isThirdPartySource(source: PnrSource): source is ThirdPartySource {
-  return source === "rapidapi" || source === "railkit";
+export function publicSourceOf(source: PnrSource): PublicPnrSource {
+  return source === "fixture" ? "fixture" : "live";
 }

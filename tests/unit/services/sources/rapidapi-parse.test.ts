@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseIrctc1Response, parseJourneyDate, parseSeatStatus } from "@/services/sources/rapidapi-parse";
+import { toPublicResult } from "@/services/public-result";
 import { pnrApiOkSchema, pnrResultSchema } from "@/types/schemas";
 
 // Payload shapes: IRCTC1 v3 on RapidAPI answers in PascalCase (PassengerStatus, CurrentStatus, TrainNo);
@@ -106,8 +107,9 @@ describe("parseIrctc1Response", () => {
       const out = parseIrctc1Response(body, PNR, NOW);
       expect(out.ok).toBe(true);
       if (!out.ok) return;
-      expect(pnrResultSchema.safeParse(out.result).success).toBe(true);
-      const envelope = { ok: true, source: out.result.snapshot.source, cached: false, latencyMs: 2125, rate: { remaining: 19, limit: 20 }, data: out.result };
+      const shown = toPublicResult(out.result);
+      expect(pnrResultSchema.safeParse(shown).success).toBe(true);
+      const envelope = { ok: true, source: shown.snapshot.source, cached: false, latencyMs: 2125, rate: { remaining: 19, limit: 20 }, data: shown };
       expect(pnrApiOkSchema.safeParse(JSON.parse(JSON.stringify(envelope))).success).toBe(true);
     }
   });

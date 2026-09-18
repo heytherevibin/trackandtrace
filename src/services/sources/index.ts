@@ -1,7 +1,6 @@
 import type { Env } from "@/services/env";
-import { activePnrSource, env, fallbackPnrSource, fixtureAllowed } from "@/services/env";
+import { activePnrSource, env, fallbackPnrSource, fixtureAllowed, type ThirdPartySource } from "@/services/env";
 import type { PnrDataSource } from "@/services/pnr-source";
-import type { ThirdPartySource } from "@/utils/source";
 import { createFallbackSource } from "./fallback";
 import { fixtureSource } from "./fixture";
 import { createLiveSource } from "./live";

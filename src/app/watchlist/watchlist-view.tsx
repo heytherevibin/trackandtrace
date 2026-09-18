@@ -17,6 +17,7 @@ import { MergePrompt } from "./merge-prompt";
 import { lastCheck, restoreAt } from "./watchlist-format";
 import { EmptyPlate, SavedPlate, SyncNote, UndoButton } from "./watchlist-plates";
 import { CountSkeleton, SavedPlateSkeleton } from "./watchlist-skeleton";
+import { publicSourceOf } from "@/utils/source";
 
 export interface WatchlistViewProps {
   readonly signedIn: boolean;
@@ -74,7 +75,7 @@ export function WatchlistView({ signedIn, initialEntries, loadError, sampleData 
     }
     const result = out.outcome.result;
     const point: HistoryPoint = { at: result.checkedAt, status: result.lead.status, position: result.lead.position };
-    const source = messages.result.sources[result.snapshot.source];
+    const source = messages.result.sources[publicSourceOf(result.snapshot.source)];
     const current = statusLabel(point.status, point.position);
     const changed = previous !== null && (previous.status !== point.status || previous.position !== point.position);
     const text = changed ? m.announce.changed(shown, statusLabel(previous.status, previous.position), current, source) : m.announce.same(shown, current, source);

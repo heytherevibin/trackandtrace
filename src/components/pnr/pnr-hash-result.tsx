@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { messages } from "@/messages";
 import { fetchPnr } from "@/services/pnr-source";
-import type { PnrSource } from "@/types/domain";
+import type { PublicPnrSource } from "@/types/domain";
 import { formatPnr, pnrFromHash } from "@/utils/pnr";
 import { buttonClassName } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
@@ -53,7 +53,7 @@ function viewFor({ outcome, cached, latencyMs }: Awaited<ReturnType<typeof fetch
   return { kind: "unavailable", message: outcome.message };
 }
 
-export function PnrHashResult({ source }: { readonly source: PnrSource }) {
+export function PnrHashResult({ source }: { readonly source: PublicPnrSource }) {
   const hash = useSyncExternalStore(subscribe, readHash, noHashOnServer);
   const pnr = hash === null ? null : pnrFromHash(hash);
   const [attempt, setAttempt] = useState(0);

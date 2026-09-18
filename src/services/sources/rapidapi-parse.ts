@@ -1,4 +1,5 @@
 import type { BookingClass, PassengerSeat, PnrResult, Quota } from "@/types/domain";
+import { messages } from "@/messages";
 import { bookingClassSchema, quotaSchema } from "@/types/schemas";
 import {
   chartPreparedFrom,
@@ -30,9 +31,9 @@ export { parseJourneyDate, parseSeatStatus, type SeatParse } from "./irctc-recor
 
 export type Irctc1Parse = { readonly ok: true; readonly result: PnrResult } | Failure;
 
-const UNREADABLE = "The third-party provider returned a record this product cannot read. Nothing was shown in its place.";
+const OUT = messages.source.outcomes;
 
-function unavailable(message: string = UNREADABLE): Failure {
+function unavailable(message: string = OUT.unreadable): Failure {
   return { ok: false, code: "SOURCE_UNAVAILABLE", message };
 }
 
@@ -96,8 +97,8 @@ export function parseIrctc1Response(body: unknown, pnr: string, now: Date): Irct
   if (body.status === false) {
     const message = typeof body.message === "string" ? body.message : "";
     return isNoRecordMessage(message)
-      ? { ok: false, code: "NOT_FOUND", message: "The third-party provider has no reservation record for this PNR." }
-      : unavailable("The third-party provider could not answer for this PNR. Nothing was shown in its place.");
+      ? { ok: false, code: "NOT_FOUND", message: OUT.noRecord }
+      : unavailable(OUT.couldNotAnswer);
   }
 
   const nested = body.data;

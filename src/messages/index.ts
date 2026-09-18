@@ -6,6 +6,7 @@ import { check } from "./en-IN/check";
 import { legal } from "./en-IN/legal";
 import { home } from "./en-IN/home";
 import { result } from "./en-IN/result";
+import { service } from "./en-IN/service";
 import { source } from "./en-IN/source";
 import { common } from "./en-IN/common";
 import { shell } from "./en-IN/shell";
@@ -18,6 +19,6 @@ import { watchlist } from "./en-IN/watchlist";
 
 export const locale = "en-IN" as const;
 
-export const messages = { common, status, check, states, shell, home, source, result, watchlist, auth, account, booking, accuracy, legal } as const;
+export const messages = { common, status, check, states, shell, home, source, service, result, watchlist, auth, account, booking, accuracy, legal } as const;
 
 export type Messages = typeof messages;

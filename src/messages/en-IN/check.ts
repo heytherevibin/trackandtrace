@@ -1,6 +1,7 @@
 import type { MessageTree } from "../types";
+import { common } from "./common";
 
-// The check plate ("PNR check — live request", Form T&T-01), transcribed from Landing Redesign B.
+// The check plate ("PNR check — live request", Form TL-01), transcribed from Landing Redesign B.
 
 const PARTY_WORDS: Readonly<Record<number, string>> = { 2: "two", 3: "three", 4: "four", 5: "five", 6: "six" };
 
@@ -28,7 +29,7 @@ export const check = {
   groups: { one: "1–3", two: "4–6", three: "7–10" },
   plate: {
     title: "PNR check — live request",
-    form: "Form T&T-01",
+    form: "Form TL-01",
   },
   result: {
     pnr: (formatted: string) => `PNR ${formatted}`,
@@ -71,12 +72,12 @@ export const check = {
     },
     withPosition: (code: string, position: number) => `${code} ${position}`,
     recentLabel: (train: string, from: string, to: string, date: string) => `${train} · ${from}→${to} · ${date}`,
-    sources: { live: "the railway source", fixture: "the development fixture", rapidapi: "RapidAPI · IRCTC (third-party)", railkit: "RailKit (third-party)" },
+    sources: { live: common.productName, fixture: "the development fixture" },
     provenance: {
       retrieved: (time: string, source: string) => `Retrieved ${time} IST from ${source} · every field as returned, none invented`,
       retrievedOnly: (time: string, source: string) => `Retrieved ${time} IST from ${source}`,
       silent: (time: string) => `Attempted ${time} IST · no verified source answered`,
-      thirdPartySilent: (time: string, source: string) => `Attempted ${time} IST · ${source} did not answer`,
+      noAnswer: (time: string) => `Attempted ${time} IST · ${common.productName} did not answer`,
       heldBack: (time: string) => `Attempted ${time} IST · held back, nothing sent to the source`,
       refused: (time: string) => `Attempted ${time} IST · refused before the source`,
     },
@@ -89,7 +90,7 @@ export const check = {
       short: "Source silent",
       big: "Source not connected",
       long: "No verified railway source is connected right now, so this product makes no claim about this PNR. It fails closed: no source, no invented result.",
-      thirdPartyBig: "Source did not answer",
+      connectedBig: "No answer from the service",
     },
     limited: {
       short: "Held back",

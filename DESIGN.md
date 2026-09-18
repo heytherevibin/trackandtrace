@@ -1,4 +1,4 @@
-# DESIGN.md — Track & Trace
+# DESIGN.md — Trakline
 
 World: **Industry**, the wireframe system. **Fidelity rule: every surface matches the Claude Design
 reference exactly** — structure, copy, sizes, spacing, colours, and states are transcribed from the
@@ -11,7 +11,7 @@ Accuracy, and Sign in B pages). It replaces the Rhythm Machine Step Row.
 - **THESIS** — A PNR check is a drawing of a record. Every surface is a technical sheet: nothing is decorated, everything is labelled.
 - **OWN-WORLD** — A light technical ground by day, a steel-blue ground by night. Square hairline plates with `+` registration marks at the corners. Barlow Condensed capitals over Barlow body copy. One steel accent; the primary button is the one solid object on the board.
 - **STORY** — Punch ten digits into the ticket-stub plate (3-3-4), press Run, watch the sweep, read the record the source returned with its provenance and retrieval time. If the source is silent, the plate says so and stops.
-- **FIRST VIEWPORT** — The promise on the left in hero capitals with four outline tags; the live check plate ("PNR check — live request · Form T&T-01") on the right.
+- **FIRST VIEWPORT** — The promise on the left in hero capitals with four outline tags; the live check plate ("PNR check — live request · Form TL-01") on the right.
 - **FINISH** — All visible data is source-backed, labelled sample data, or explicitly unavailable.
 
 ## Tokens (`src/styles/theme.css`, mapped in `tokens.css`)
@@ -53,7 +53,7 @@ Tracking: `tracking-caps` .08em (legends), `brand` .06em (wordmark, digits), `he
 | Primitive | Grammar |
 | --- | --- |
 | `Corners` | The four registration marks. Every plate, figure, dialog, and state block wears them. |
-| `Plate` (+ `PlateHeader`) | `blueprint` object with an optional title-block header row: a title cell and meta cells behind hairlines ("Form T&T-02", "Sheet 01 of 04", "Sample data"). Padding none/sm/md/lg; cells tight/regular/wide. |
+| `Plate` (+ `PlateHeader`) | `blueprint` object with an optional title-block header row: a title cell and meta cells behind hairlines ("Form TL-02", "Sheet 01 of 04", "Sample data"). Padding none/sm/md/lg; cells tight/regular/wide. |
 | `SectionHeader` | Kicker "02 · How it works" → hairline rule → 32px condensed capital `h2` → optional lead and actions. |
 | `PageHeader` | Optional back link and kicker, `text-page` capital `h1`, 16px lead, legend meta line, actions right. |
 | `Button` | Square, hairline, condensed, sentence case. `primary` solid steel; `secondary` hairline; `ghost` steel text; `danger` solid deep steel. Sizes sm 32 · md 36 · lg 44. |
@@ -71,10 +71,11 @@ Tracking: `tracking-caps` .08em (legends), `brand` .06em (wordmark, digits), `he
 
 ## Shell
 
-- **Masthead** (`TopNav`), the same on every page: sticky, `surface-0`, hairline bottom. Wordmark (mark + "TRACK & TRACE" 18px `tracking-brand`); the nav CHECK A PNR · WATCHLIST · PRE-BOOKING · ACCURACY, each its own hairline box with a Fluent **Filled** icon at 20px beside its 13px capital label (Watchlist = eye), the current page tinted steel (on `/`, Check a PNR is current and jumps to `#terminal`); then, on the right, the theme icon button (one square 36px box showing the active mode's Filled icon; a click cycles System → Day → Night; the mode lives in its accessible name and tooltip) beside SIGN IN (capitals, person icon), or the account menu. Every masthead control shares one 36px box (13px capitals, 20px icons). From `lg` it is one row. Below `lg` it is still one row: a square hamburger box on the left of the logo mark (the name shows from `lg`), with the theme button and SIGN IN on the right; the hamburger opens the nav in a sheet that slides in from the left edge and swipes back to it, holding the same four boxes at 48px. Below `xs` (360px) SIGN IN keeps its icon and moves its label to assistive tech. `/login` is not sticky and shows the brand only.
+- **Masthead** (`TopNav`), the same on every page: sticky, `surface-0`, hairline bottom. Wordmark (mark + "TRAKLINE" 18px `tracking-brand`); the nav CHECK A PNR · WATCHLIST · PRE-BOOKING · ACCURACY, each its own hairline box with a Fluent **Filled** icon at 20px beside its 13px capital label (Watchlist = eye), the current page tinted steel (on `/`, Check a PNR is current and jumps to `#terminal`); then, on the right, the theme icon button (one square 36px box showing the active mode's Filled icon; a click cycles System → Day → Night; the mode lives in its accessible name and tooltip) beside SIGN IN (capitals, person icon), or the account menu. Every masthead control shares one 36px box (13px capitals, 20px icons). From `lg` it is one row. Below `lg` it is still one row: a square hamburger box on the left of the logo mark (the name shows from `lg`), with the theme button and SIGN IN on the right; the hamburger opens the nav in a sheet that slides in from the left edge and swipes back to it, holding the same four boxes at 48px. Below `xs` (360px) SIGN IN keeps its icon and moves its label to assistive tech. `/login` is not sticky and shows the brand only.
 
-- **Phone widths.** Nothing is clipped or scrolls sideways at 320px and up (`tests/e2e/responsive.spec.ts` holds this on every route). Data tables — the sources board and ledger, both passenger tables, the watchlist — fold into labelled records below `sm` (the watchlist below `lg`; it has five columns): the row's name across the top, then each cell drawing its column name above its value from `data-label` (CSS generated text with empty alt text, so a screen reader hears the column header once). A restyled table keeps explicit `role` attributes, since changing a table's display drops its semantics. Plate headers give the title its own row below `sm` and let the meta cells share the row beneath.
-- **Footer**: `/` gets the enterprise footer (brand + disclaimer; Sections — the landing's anchors How it works, The record, Sources, Roadmap, FAQ with Filled icons; Product; Company; Status lamps read from real flags; © and IST clock). App pages get one line: disclaimer · © and the IST clock.
+- **Phone widths.** Nothing is clipped or scrolls sideways at 320px and up (`tests/e2e/responsive.spec.ts` holds this on every route). Data tables — both passenger tables and the watchlist — fold into labelled records below `sm` (the watchlist below `lg`; it has five columns): the row's name across the top, then each cell drawing its column name above its value from `data-label` (CSS generated text with empty alt text, so a screen reader hears the column header once). A restyled table keeps explicit `role` attributes, since changing a table's display drops its semantics. Plate headers give the title its own row below `sm` and let the meta cells share the row beneath.
+- **Footer**: `/` gets the enterprise footer: brand + disclaimer; Sections (How it works, The record, Roadmap, FAQ), Product and Company as plain link columns in one grammar (`footer-styles.ts`); then one bar with ©, a single service-status line (lamp + "All systems operational" / "Some services are unavailable" / "Services are unavailable") and the IST clock. App pages get one line: disclaimer · © and the IST clock.
+- **Travellers see one service.** No page, message, tag or response names a data provider or shows how sources are wired: results read "Retrieved … from Trakline", failures speak in one neutral voice, and service status shows only what travellers use (PNR checks, accounts and watchlist sync). Landing section 04 is **Reliability** (three promise plates and a PNR-checks status line), and the accuracy page's section 01 is **Service** (a two-row status list). Both replaced the sources board and ledger on 2026-09-18, by the user's direction.
 
 ## Page anatomy
 

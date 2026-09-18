@@ -51,7 +51,7 @@ export const states = {
     pnrDetail: "A PNR is ten digits. Enter the number from your ticket.",
     home: "Home",
     terminalTitle: "PNR check — live request",
-    terminalForm: "Form T&T-01",
+    terminalForm: "Form TL-01",
   },
   offline: "Offline. Results cannot be fetched until the connection returns.",
   offlinePage: {

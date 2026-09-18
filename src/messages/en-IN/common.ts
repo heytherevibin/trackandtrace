@@ -1,10 +1,10 @@
 import type { MessageTree } from "../types";
 
 export const common = {
-  productName: "Track & Trace",
-  descriptor: "PNR status from the source",
+  productName: "Trakline",
+  descriptor: "PNR status, checked live",
   notAffiliated: "Not affiliated with IRCTC or Indian Railways.",
-  footerDisclaimer: "Not affiliated with IRCTC or Indian Railways. Only fields returned by a verified source are shown, each with provenance and retrieval time.",
+  footerDisclaimer: "An independent service, not affiliated with IRCTC or Indian Railways. Every result shows only what the reservation service returned, with the time it was retrieved.",
   ist: "IST",
   retry: "Retry",
   cancel: "Cancel",
@@ -14,11 +14,6 @@ export const common = {
   notReturned: "Not returned",
   sampleData: "Sample data",
   sampleDataHint: "Development fixture. Not a real reservation.",
-  thirdParty: "Third-party",
-  thirdPartyHints: {
-    rapidapi: "Read from the RapidAPI \"IRCTC\" API by IRCTCAPI, a third party not affiliated with IRCTC or Indian Railways.",
-    railkit: "Read from RailKit (railkit.in), a third party not affiliated with IRCTC or Indian Railways.",
-  },
   copy: "Copy",
   copied: "Copied",
   share: "Share",

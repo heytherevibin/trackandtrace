@@ -28,11 +28,14 @@ describe("AccuracyPage", () => {
     ]);
   });
 
-  it("numbers its sections and puts the connection ledger in the first", () => {
+  it("numbers its sections and puts the service status, with nothing internal, in the first", () => {
     render(<AccuracyPage />);
-    const connected = screen.getByRole("heading", { level: 2, name: "01 · What is connected right now" });
-    const section = connected.closest("section") as HTMLElement;
-    expect(within(section).getByRole("table", { name: "Data sources and their connection state" })).toBeInTheDocument();
+    const service = screen.getByRole("heading", { level: 2, name: "01 · Service" });
+    const section = service.closest("section") as HTMLElement;
+    const list = within(section).getByRole("list", { name: "Service status" });
+    expect(within(list).getByText("PNR checks")).toBeInTheDocument();
+    expect(within(list).getByText("Accounts and watchlist sync")).toBeInTheDocument();
+    expect(section.textContent).not.toMatch(/timetable|inventory|flags|railkit|rapid|fallback/i);
     expect(screen.getByRole("heading", { level: 2, name: "02 · What would have to exist first" })).toBeInTheDocument();
   });
 

@@ -69,16 +69,17 @@ describe("createRailkitSource", () => {
   });
 
   it.each([
-    [401, { success: false, error: "Invalid API key" }, /key/i],
-    [403, { success: false, error: "API key is inactive" }, /key|plan/i],
-    [500, { success: false, error: "Internal error" }, /HTTP 500/],
-    [502, "<html>Bad gateway</html>", /HTTP 502/],
+    [401, { success: false, error: "Invalid API key" }, /unavailable right now/i],
+    [403, { success: false, error: "API key is inactive" }, /unavailable right now/i],
+    [500, { success: false, error: "Internal error" }, /returned an error/i],
+    [502, "<html>Bad gateway</html>", /returned an error/i],
   ])("answers HTTP %i as unavailable, never as data", async (status, body, message) => {
     const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const out = await sourceWith(async () => response(status, body)).check(PNR);
     expect(out).toMatchObject({ ok: false, code: "SOURCE_UNAVAILABLE" });
     expect(!out.ok && out.message).toMatch(message);
+    expect(!out.ok && out.message).not.toMatch(/railkit|rapid|key|plan|http/i);
     error.mockRestore();
     warn.mockRestore();
   });
@@ -151,5 +152,23 @@ describe("createRailkitSource", () => {
     expect(printed).not.toContain(PNR);
     expect(printed).not.toContain(CONFIG.key);
     expect(printed).not.toContain("SAMPURN");
+  });
+
+  it("never names the provider in anything a traveller can see", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const answers = [
+      response(401, { success: false, error: "Invalid API key" }),
+      response(429, { success: false, error: "Usage limit exceeded" }),
+      response(400, { success: false, error: "No PNR data found or invalid PNR number" }),
+      response(400, { success: false, error: "Invalid date format. Use DD-MM-YYYY." }),
+      response(500, "<html>boom</html>"),
+      response(200, "not json"),
+      response(200, { success: true, data: { pnr: PNR } }),
+    ];
+    for (const answer of answers) {
+      const out = await sourceWith(async () => answer).check(PNR);
+      expect(!out.ok && out.message).not.toMatch(/railkit|rapid|irctcapi/i);
+    }
   });
 });

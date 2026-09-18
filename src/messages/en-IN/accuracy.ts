@@ -14,7 +14,7 @@ export const accuracy = {
       { label: "Figures estimated", value: "0" },
     ],
   },
-  connected: { kicker: "01 · What is connected right now" },
+  service: { kicker: "01 · Service" },
   evidence: {
     kicker: "02 · What would have to exist first",
     rows: [

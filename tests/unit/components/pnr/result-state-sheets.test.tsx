@@ -13,7 +13,7 @@ describe("CheckAgainSheet", () => {
     expect(screen.getByRole("heading", { level: 1, name: "That is not a PNR" })).toBeInTheDocument();
     const terminal = screen.getByText("PNR check — live request").closest(".blueprint");
     expect(terminal).not.toBeNull();
-    expect(within(terminal as HTMLElement).getByText("Form T&T-01")).toBeInTheDocument();
+    expect(within(terminal as HTMLElement).getByText("Form TL-01")).toBeInTheDocument();
     expect(within(terminal as HTMLElement).getByLabelText("PNR number")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("href", "/");
     expect(screen.getByRole("link", { name: "Watchlist" })).toHaveAttribute("href", "/watchlist");

@@ -18,7 +18,7 @@ test("the sheet carries the operating principles, every anchored section, and no
   for (const claim of ["Fields shown beyond the source response", "Confirmation odds invented", "Account required to check", "PNRs and names written to logs"]) {
     await expect(principles.getByText(claim)).toBeAttached();
   }
-  for (const id of ["how", "record", "sources", "roadmap", "faq", "terminal"]) {
+  for (const id of ["how", "record", "reliability", "roadmap", "faq", "terminal"]) {
     await expect(page.locator(`#${id}`)).toBeAttached();
   }
   await expect(page.getByText("Specimen record", { exact: true })).toBeAttached();

@@ -265,12 +265,12 @@ otp_expiry = 3600
 # content_path = "./supabase/templates/password_changed_notification.html"
 
 [auth.email.template.magic_link]
-subject = "Your Track & Trace sign-in link"
+subject = "Your Trakline sign-in link"
 content_path = "./supabase/templates/magic-link.html"
 
 # A first sign-in creates the account, so Auth sends this template instead of the magic link.
 [auth.email.template.confirmation]
-subject = "Your Track & Trace sign-in link"
+subject = "Your Trakline sign-in link"
 content_path = "./supabase/templates/confirmation.html"
 
 [auth.sms]
