@@ -27,10 +27,23 @@ const csp = [
   "form-action 'self'",
 ].join("; ");
 
+// The site has one address. www answers with a permanent redirect there, path and query kept.
+const CANONICAL_HOST = "trakline.in";
+
 const nextConfig: NextConfig = {
   typedRoutes: true,
   images: {
     remotePatterns: [{ protocol: "https", hostname: "*.googleusercontent.com" }],
+  },
+  async redirects() {
+    return [
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: `www.${CANONICAL_HOST}` }],
+        destination: `https://${CANONICAL_HOST}/:path*`,
+        permanent: true,
+      },
+    ];
   },
   async headers() {
     return [
