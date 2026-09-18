@@ -454,6 +454,24 @@ project_id = "xnykpktqtimadelfjgqf"
 default_pool_size = 15
 max_client_conn = 200
 
+[remotes.production.auth]
+# The deployed site. Links in emails and any redirect Auth cannot match fall back here.
+site_url = "https://trackandtraze.vercel.app"
+# Sign-in may return to production, to a Vercel preview of this team, or to local development
+# (which also signs in against the hosted project). This list replaces the base list above.
+additional_redirect_urls = [
+  "https://trackandtraze.vercel.app/**",
+  "https://*-track-and-traze.vercel.app/**",
+  "http://localhost:3000/**",
+  "http://127.0.0.1:3000/**",
+  "http://localhost:3100/**",
+  "http://127.0.0.1:3100/**",
+  "http://localhost:3200/**",
+  "http://127.0.0.1:3200/**",
+  "http://localhost:4210/**",
+  "http://127.0.0.1:4210/**",
+]
+
 [remotes.production.auth.email]
 max_frequency = "1m0s"
 otp_length = 8
