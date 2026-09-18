@@ -62,7 +62,7 @@ describe("createRateLimiter", () => {
     const { createRateLimiter, MemoryRateLimiter, UpstashRateLimiter } = await import("@/services/rate-limit");
     const { parseEnv } = await import("@/services/env");
     const memory = parseEnv({ NODE_ENV: "test", UPSTASH_REDIS_REST_URL: "https://x.upstash.io", UPSTASH_REDIS_REST_TOKEN: "t" });
-    const upstash = parseEnv({ NODE_ENV: "test", RATE_LIMIT_STRATEGY: "upstash", UPSTASH_REDIS_REST_URL: "https://x.upstash.io", UPSTASH_REDIS_REST_TOKEN: "t" });
+    const upstash = parseEnv({ NODE_ENV: "test", RATE_LIMIT_STRATEGY: "upstash", UPSTASH_REDIS_REST_URL: "https://x.upstash.io", UPSTASH_REDIS_REST_TOKEN: "t", DATA_KEY: Buffer.alloc(32, 7).toString("base64") });
     if (!memory.ok || !upstash.ok) throw new Error("expected valid env");
     expect(createRateLimiter(memory.env)).toBeInstanceOf(MemoryRateLimiter);
     expect(createRateLimiter(upstash.env)).toBeInstanceOf(UpstashRateLimiter);

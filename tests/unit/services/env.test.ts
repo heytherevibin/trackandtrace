@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { accountsConfigured, fixtureAllowed, googleSignInEnabled, parseEnv, passkeysEnabled } from "@/services/env";
+import { accountsConfigured, fixtureAllowed, googleSignInEnabled, parseEnv, passkeysEnabled, sharedStoreConfig } from "@/services/env";
 
 const dev = { NODE_ENV: "development" } as const;
 
 describe("parseEnv", () => {
-  it("defaults PNR_SOURCE to live and rate limiting to memory", () => {
+  it("defaults PNR_SOURCE to live and rate limiting to auto", () => {
     const parsed = parseEnv(dev);
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) return;
     expect(parsed.env.PNR_SOURCE).toBe("live");
-    expect(parsed.env.RATE_LIMIT_STRATEGY).toBe("memory");
+    expect(parsed.env.RATE_LIMIT_STRATEGY).toBe("auto");
     expect(parsed.env.LIVE_SOURCE_ENABLED).toBe(false);
   });
 
@@ -186,5 +186,65 @@ describe("RailKit source configuration", () => {
   it("accepts RailKit as the fallback behind RapidAPI", () => {
     const current = of({ NODE_ENV: "production", PNR_SOURCE: "rapidapi", RAPIDAPI_KEY: "test-key-0123456789abcdef", PNR_FALLBACK: "railkit", RAILKIT_API_KEY: KEY });
     expect(current.PNR_FALLBACK).toBe("railkit");
+  });
+});
+
+const DATA_KEY = Buffer.alloc(32, 7).toString("base64");
+const KV = { KV_REST_API_URL: "https://fake.upstash.io", KV_REST_API_TOKEN: "fake-token" } as const;
+
+describe("the shared store", () => {
+  it("is required on a production deployment", () => {
+    const parsed = parseEnv({ NODE_ENV: "production", VERCEL_ENV: "production" });
+    expect(parsed.ok).toBe(false);
+    if (parsed.ok) return;
+    expect(parsed.issues.join(" ")).toMatch(/DATA_KEY/);
+  });
+
+  it("is required on a preview too", () => {
+    expect(parseEnv({ NODE_ENV: "production", VERCEL_ENV: "preview", ...KV }).ok).toBe(false);
+  });
+
+  it("accepts the names Vercel's Upstash integration injects, and prefixes keys with the deployment", () => {
+    const parsed = parseEnv({ NODE_ENV: "production", VERCEL_ENV: "production", ...KV, DATA_KEY });
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(sharedStoreConfig(parsed.env)).toEqual({
+      credentials: { url: "https://fake.upstash.io", token: "fake-token" },
+      dataKey: DATA_KEY,
+      prefix: "tt:production",
+    });
+  });
+
+  it("prefers the UPSTASH_ names when both pairs are present", () => {
+    const parsed = parseEnv({ ...dev, ...KV, UPSTASH_REDIS_REST_URL: "https://direct.upstash.io", UPSTASH_REDIS_REST_TOKEN: "direct", DATA_KEY });
+    if (!parsed.ok) throw new Error(parsed.issues.join());
+    expect(sharedStoreConfig(parsed.env)?.credentials.url).toBe("https://direct.upstash.io");
+  });
+
+  it("refuses the memory strategy on a deployment", () => {
+    expect(parseEnv({ NODE_ENV: "production", VERCEL_ENV: "production", ...KV, DATA_KEY, RATE_LIMIT_STRATEGY: "memory" }).ok).toBe(false);
+  });
+
+  it("stays off, and optional, for a CI or local build", () => {
+    const parsed = parseEnv({ NODE_ENV: "production" });
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(sharedStoreConfig(parsed.env)).toBeNull();
+  });
+
+  it("stays off without DATA_KEY, even with credentials", () => {
+    const parsed = parseEnv({ ...dev, ...KV });
+    if (!parsed.ok) throw new Error(parsed.issues.join());
+    expect(sharedStoreConfig(parsed.env)).toBeNull();
+  });
+
+  it("insists on 32 bytes of base64 for DATA_KEY", () => {
+    expect(parseEnv({ ...dev, DATA_KEY: "too-short" }).ok).toBe(false);
+    expect(parseEnv({ ...dev, DATA_KEY: Buffer.alloc(16).toString("base64") }).ok).toBe(false);
+  });
+
+  it("makes the explicit upstash strategy demand DATA_KEY", () => {
+    expect(parseEnv({ ...dev, ...KV, RATE_LIMIT_STRATEGY: "upstash" }).ok).toBe(false);
+    expect(parseEnv({ ...dev, ...KV, RATE_LIMIT_STRATEGY: "upstash", DATA_KEY }).ok).toBe(true);
   });
 });
