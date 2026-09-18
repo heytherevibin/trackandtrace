@@ -1,11 +1,13 @@
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
-import tsconfigPaths from "vite-tsconfig-paths";
 
 // Two projects: pure logic under node, components under jsdom.
 // File extension decides the environment: *.test.ts → node, *.test.tsx → jsdom.
 export default defineConfig({
-  plugins: [tsconfigPaths(), react()],
+  plugins: [react()],
+  // The one path alias in tsconfig.json (`@/*` → `src/*`), resolved without a plugin.
+  resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
   test: {
     coverage: {
       provider: "v8",
