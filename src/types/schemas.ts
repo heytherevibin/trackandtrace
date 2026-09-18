@@ -12,7 +12,7 @@ const PNR_PATTERN = /^\d{10}$/;
 export const quotaSchema = z.enum(["GN", "TQ", "PT", "LD", "SS", "HP", "DF", "DP", "FT", "YU", "PH", "RS", "CK", "RC", "OS", "PQWL", "RLWL", "TQWL", "RSWL", "RQWL", "CKWL"]);
 export const bookingClassSchema = z.enum(["1A", "2A", "3A", "3E", "SL", "CC", "EC", "EA", "EV", "FC", "2S", "VS"]);
 export const ticketStatusSchema = z.enum(["CNF", "RAC", "WL", "CANCELLED", "NOT_FOUND"]);
-export const pnrSourceSchema = z.enum(["live", "fixture", "rapidapi"]);
+export const pnrSourceSchema = z.enum(["live", "fixture", "rapidapi", "railkit"]);
 export const confidenceSchema = z.enum(["high", "medium", "low"]);
 export const recommendationSchema = z.enum([
   "Confirmed",

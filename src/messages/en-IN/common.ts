@@ -15,7 +15,10 @@ export const common = {
   sampleData: "Sample data",
   sampleDataHint: "Development fixture. Not a real reservation.",
   thirdParty: "Third-party",
-  thirdPartyHint: "Read from the RapidAPI \"IRCTC\" API by IRCTCAPI, a third party not affiliated with IRCTC or Indian Railways.",
+  thirdPartyHints: {
+    rapidapi: "Read from the RapidAPI \"IRCTC\" API by IRCTCAPI, a third party not affiliated with IRCTC or Indian Railways.",
+    railkit: "Read from RailKit (railkit.in), a third party not affiliated with IRCTC or Indian Railways.",
+  },
   copy: "Copy",
   copied: "Copied",
   share: "Share",

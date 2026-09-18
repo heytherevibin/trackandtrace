@@ -71,8 +71,11 @@ export interface Prediction {
   factors: Factor[];
 }
 
-/** live: a verified railway provider · rapidapi: the third-party RapidAPI "IRCTC" API · fixture: labelled sample data. */
-export type PnrSource = "live" | "fixture" | "rapidapi";
+/**
+ * live: a verified railway provider · railkit: the third-party RailKit API (railkit.in) · rapidapi: the
+ * third-party RapidAPI "IRCTC" API · fixture: labelled sample data.
+ */
+export type PnrSource = "live" | "fixture" | "rapidapi" | "railkit";
 
 export interface PnrSnapshot {
   pnr: string;

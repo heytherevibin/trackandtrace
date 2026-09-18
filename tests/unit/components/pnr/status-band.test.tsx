@@ -47,6 +47,13 @@ describe("StatusBand", () => {
     expect(screen.getByText("Retrieved 12:00 IST from the railway source · every field as returned, none invented · served from the last minute's read")).toBeInTheDocument();
   });
 
+  it("names RailKit in the Third-party tag's note and the provenance for its results", () => {
+    const base = fixtureResult("2345678901");
+    render(<StatusBand result={{ ...base, snapshot: { ...base.snapshot, source: "railkit" as const } }} cached={false} />);
+    expect(screen.getByText("Third-party")).toHaveAttribute("title", expect.stringMatching(/RailKit.*not affiliated/i));
+    expect(screen.getByText(/from RailKit \(third-party\)/)).toBeInTheDocument();
+  });
+
   it("wears a Third-party tag for RapidAPI results, names the source, and never estimates a missing chart", () => {
     const base = fixtureResult("2345678901");
     const result = { ...base, snapshot: { ...base.snapshot, source: "rapidapi" as const, train: { number: "12658", from: { code: "SBC" }, to: { code: "MAS" } }, chartAt: undefined, chartTime: undefined, chartPrepared: false } };

@@ -1,5 +1,8 @@
 import { z } from "zod";
 import type { PnrSource } from "@/types/domain";
+import { isThirdPartySource } from "@/utils/source";
+
+export { isThirdPartySource };
 
 // ---------------------------------------------------------------------------
 // Typed environment. Parsed once through `env()`; application code never reads
@@ -13,17 +16,30 @@ const envSchema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
     /**
-     * live (default) asks the verified provider seam; rapidapi reads the third-party RapidAPI "IRCTC" API
-     * (IRCTCAPI, not affiliated with IRCTC) and labels every result so; fixture serves labelled sample data
-     * and is refused in production.
+     * live (default) asks the verified provider seam; railkit reads the third-party RailKit API (railkit.in)
+     * and rapidapi the third-party RapidAPI "IRCTC" API (IRCTCAPI), neither affiliated with IRCTC, and every
+     * result is labelled so; fixture serves labelled sample data and is refused in production.
      */
-    PNR_SOURCE: z.enum(["live", "fixture", "rapidapi"]).default("live"),
+    PNR_SOURCE: z.enum(["live", "fixture", "rapidapi", "railkit"]).default("live"),
+    /** A second third-party source that answers only while PNR_SOURCE is unavailable. */
+    PNR_FALLBACK: z.enum(["none", "rapidapi", "railkit"]).default("none"),
     LIVE_SOURCE_ENABLED: flag.default("0").transform((v) => v === "1"),
     /** Server only. Never expose with a NEXT_PUBLIC_ prefix. */
     RAPIDAPI_KEY: z.string().min(16).optional(),
     RAPIDAPI_HOST: z.string().regex(/^[a-z0-9.-]+\.p\.rapidapi\.com$/).default("irctc1.p.rapidapi.com"),
     RAPIDAPI_PNR_PATH: z.string().regex(/^\/[A-Za-z0-9/_-]+$/).default("/api/v3/getPNRStatus"),
     RAPIDAPI_TIMEOUT_MS: z.coerce.number().int().min(1000).max(30000).default(8000),
+    /** Server only. A RailKit dashboard key (railkit_…); never expose with a NEXT_PUBLIC_ prefix. */
+    RAILKIT_API_KEY: z
+      .string()
+      .regex(/^railkit_[A-Za-z0-9]{24,}$/, "RAILKIT_API_KEY must be a RailKit key (railkit_…) with no spaces.")
+      .optional(),
+    /** RailKit's REST origin: https, no path, no trailing slash. */
+    RAILKIT_BASE_URL: z
+      .string()
+      .regex(/^https:\/\/[a-z0-9.-]+(?::\d{2,5})?$/, "RAILKIT_BASE_URL must be an https origin such as https://api.railkit.in.")
+      .default("https://api.railkit.in"),
+    RAILKIT_TIMEOUT_MS: z.coerce.number().int().min(1000).max(30000).default(8000),
     RATE_LIMIT_STRATEGY: z.enum(["memory", "upstash"]).default("memory"),
     UPSTASH_REDIS_REST_URL: z.url().optional(),
     UPSTASH_REDIS_REST_TOKEN: z.string().min(1).optional(),
@@ -43,8 +59,14 @@ const envSchema = z
     E2E_NOW: z.iso.datetime().optional(),
   })
   .superRefine((v, ctx) => {
-    if (v.PNR_SOURCE === "rapidapi" && !v.RAPIDAPI_KEY) {
-      ctx.addIssue({ code: "custom", path: ["RAPIDAPI_KEY"], message: "RAPIDAPI_KEY is required when PNR_SOURCE=rapidapi." });
+    if ((v.PNR_SOURCE === "rapidapi" || v.PNR_FALLBACK === "rapidapi") && !v.RAPIDAPI_KEY) {
+      ctx.addIssue({ code: "custom", path: ["RAPIDAPI_KEY"], message: "RAPIDAPI_KEY is required when RapidAPI is the source or the fallback." });
+    }
+    if ((v.PNR_SOURCE === "railkit" || v.PNR_FALLBACK === "railkit") && !v.RAILKIT_API_KEY) {
+      ctx.addIssue({ code: "custom", path: ["RAILKIT_API_KEY"], message: "RAILKIT_API_KEY is required when RailKit is the source or the fallback." });
+    }
+    if (v.PNR_FALLBACK !== "none" && v.PNR_FALLBACK === v.PNR_SOURCE) {
+      ctx.addIssue({ code: "custom", path: ["PNR_FALLBACK"], message: "PNR_FALLBACK must name a different source than PNR_SOURCE." });
     }
     if (v.NODE_ENV === "production" && v.PNR_SOURCE === "fixture") {
       ctx.addIssue({ code: "custom", path: ["PNR_SOURCE"], message: "PNR_SOURCE=fixture is refused in production." });
@@ -130,15 +152,27 @@ export function fixtureAllowed(current: Env = env()): boolean {
 /** Which source answers PNR checks in this deployment, as results and provenance name it. */
 export function activePnrSource(current: Env = env()): PnrSource {
   if (fixtureAllowed(current)) return "fixture";
+  if (current.PNR_SOURCE === "railkit" && current.RAILKIT_API_KEY) return "railkit";
   if (current.PNR_SOURCE === "rapidapi" && current.RAPIDAPI_KEY) return "rapidapi";
   return "live";
 }
+
+/** The source that answers while the active one is unavailable, if one is configured. */
+export function fallbackPnrSource(current: Env = env()): Extract<PnrSource, "rapidapi" | "railkit"> | null {
+  const active = activePnrSource(current);
+  if (active === "fixture" || current.PNR_FALLBACK === "none" || current.PNR_FALLBACK === active) return null;
+  if (current.PNR_FALLBACK === "railkit" && current.RAILKIT_API_KEY) return "railkit";
+  if (current.PNR_FALLBACK === "rapidapi" && current.RAPIDAPI_KEY) return "rapidapi";
+  return null;
+}
+
+
 
 /** Feature flags read through one place. */
 export const flags = {
   /** A reservation source is connected: a verified provider, or the configured third-party API. */
   get liveSource(): boolean {
     const current = env();
-    return current.LIVE_SOURCE_ENABLED || activePnrSource(current) === "rapidapi";
+    return current.LIVE_SOURCE_ENABLED || isThirdPartySource(activePnrSource(current));
   },
 };

@@ -23,7 +23,8 @@
 ## Deploy
 
 - **Vercel**, from `main`. `vercel.json` pins Functions to `bom1` (Mumbai), the same AWS region as the Supabase project, and installs with `npm ci`.
-- Production refuses `PNR_SOURCE=fixture`. Set environment variables in the Vercel project, never in the repo.
+- Production refuses `PNR_SOURCE=fixture`. Set environment variables in the Vercel project, never in the repo; mark keys Sensitive (they then read back as `[SENSITIVE]` from `vercel env pull`, so verify behaviour on the live site instead).
+- PNR data: `PNR_SOURCE=railkit`, `RAILKIT_API_KEY`, and `PNR_FALLBACK=rapidapi` with `RAPIDAPI_KEY`. Watch the RailKit plan's renewal date: an expired plan quietly drops to 50 requests a month.
 
 ## Conventions
 

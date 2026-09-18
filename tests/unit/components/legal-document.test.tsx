@@ -10,7 +10,8 @@ describe("LegalDocument", () => {
     render(<LegalDocument title={privacy.title} lead={privacy.lead} sections={privacy.sections} />);
     expect(screen.getByRole("heading", { level: 1, name: "Privacy" })).toBeInTheDocument();
     expect(screen.getByText("What this product processes, where it keeps it, and how you remove it.")).toBeInTheDocument();
-    expect(screen.getByText("Last updated: 17 September 2026")).toBeInTheDocument();
+    expect(screen.getByText(messages.legal.updatedLine(messages.legal.updated))).toBeInTheDocument();
+    expect(messages.legal.updated).toMatch(/^\d{1,2} [A-Z][a-z]+ \d{4}$/);
   });
 
   it("indexes every section in a marked plate", () => {

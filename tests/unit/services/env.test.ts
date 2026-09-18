@@ -128,3 +128,63 @@ describe("RapidAPI source configuration", () => {
   });
 });
 
+
+describe("RailKit source configuration", () => {
+  const KEY = "railkit_0123456789abcdef0123456789abcdef";
+  const of = (source: Record<string, string>) => {
+    const parsed = parseEnv(source);
+    if (!parsed.ok) throw new Error(parsed.issues.join("; "));
+    return parsed.env;
+  };
+
+  it("requires a key when PNR_SOURCE=railkit", () => {
+    const parsed = parseEnv({ NODE_ENV: "production", PNR_SOURCE: "railkit" });
+    expect(parsed.ok).toBe(false);
+    if (parsed.ok) return;
+    expect(parsed.issues.join(" ")).toMatch(/RAILKIT_API_KEY/);
+  });
+
+  it("defaults the base URL and timeout, and names railkit as the active source", async () => {
+    const { activePnrSource } = await import("@/services/env");
+    const current = of({ NODE_ENV: "production", PNR_SOURCE: "railkit", RAILKIT_API_KEY: KEY });
+    expect(current.RAILKIT_BASE_URL).toBe("https://api.railkit.in");
+    expect(current.RAILKIT_TIMEOUT_MS).toBe(8000);
+    expect(current.PNR_FALLBACK).toBe("none");
+    expect(activePnrSource(current)).toBe("railkit");
+  });
+
+  it.each([
+    ["a key from another service", "sk_live_0123456789abcdef0123"],
+    ["a key with a stray space", `${KEY} `],
+    ["a key cut short", "railkit_0123"],
+  ])("refuses %s, so a bad paste fails loudly at boot", (_label, key) => {
+    const parsed = parseEnv({ NODE_ENV: "production", PNR_SOURCE: "railkit", RAILKIT_API_KEY: key });
+    expect(parsed.ok).toBe(false);
+    if (parsed.ok) return;
+    expect(parsed.issues.join(" ")).toMatch(/RAILKIT_API_KEY/);
+  });
+
+  it.each(["http://api.railkit.in", "https://api.railkit.in/", "https://api.railkit.in/api/v1", "ftp://api.railkit.in"])(
+    "refuses the base URL %s",
+    (url) => {
+      const parsed = parseEnv({ NODE_ENV: "production", PNR_SOURCE: "railkit", RAILKIT_API_KEY: KEY, RAILKIT_BASE_URL: url });
+      expect(parsed.ok).toBe(false);
+    },
+  );
+
+  it("accepts RapidAPI as the fallback only with its key, and never the primary as its own fallback", () => {
+    expect(parseEnv({ NODE_ENV: "production", PNR_SOURCE: "railkit", RAILKIT_API_KEY: KEY, PNR_FALLBACK: "rapidapi" }).ok).toBe(false);
+    expect(
+      parseEnv({ NODE_ENV: "production", PNR_SOURCE: "railkit", RAILKIT_API_KEY: KEY, PNR_FALLBACK: "rapidapi", RAPIDAPI_KEY: "test-key-0123456789abcdef" }).ok,
+    ).toBe(true);
+    const self = parseEnv({ NODE_ENV: "production", PNR_SOURCE: "railkit", RAILKIT_API_KEY: KEY, PNR_FALLBACK: "railkit" });
+    expect(self.ok).toBe(false);
+    if (self.ok) return;
+    expect(self.issues.join(" ")).toMatch(/PNR_FALLBACK/);
+  });
+
+  it("accepts RailKit as the fallback behind RapidAPI", () => {
+    const current = of({ NODE_ENV: "production", PNR_SOURCE: "rapidapi", RAPIDAPI_KEY: "test-key-0123456789abcdef", PNR_FALLBACK: "railkit", RAILKIT_API_KEY: KEY });
+    expect(current.PNR_FALLBACK).toBe("railkit");
+  });
+});

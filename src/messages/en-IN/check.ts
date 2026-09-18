@@ -71,7 +71,7 @@ export const check = {
     },
     withPosition: (code: string, position: number) => `${code} ${position}`,
     recentLabel: (train: string, from: string, to: string, date: string) => `${train} · ${from}→${to} · ${date}`,
-    sources: { live: "the railway source", fixture: "the development fixture", rapidapi: "RapidAPI · IRCTC (third-party)" },
+    sources: { live: "the railway source", fixture: "the development fixture", rapidapi: "RapidAPI · IRCTC (third-party)", railkit: "RailKit (third-party)" },
     provenance: {
       retrieved: (time: string, source: string) => `Retrieved ${time} IST from ${source} · every field as returned, none invented`,
       retrievedOnly: (time: string, source: string) => `Retrieved ${time} IST from ${source}`,

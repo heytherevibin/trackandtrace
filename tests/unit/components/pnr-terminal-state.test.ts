@@ -107,9 +107,9 @@ describe("result view", () => {
 
   it("labels a RapidAPI result third-party and names it in the provenance", () => {
     const base = okResult("2345678901");
-    const view = terminalResult({ ok: true, result: { ...base, snapshot: { ...base.snapshot, source: "rapidapi" } } }, { pnr: "2345678901", attemptedAt: NOW, sampleMode: false, thirdPartyMode: true });
+    const view = terminalResult({ ok: true, result: { ...base, snapshot: { ...base.snapshot, source: "rapidapi" } } }, { pnr: "2345678901", attemptedAt: NOW, sampleMode: false, thirdPartySource: "rapidapi" });
     expect(view.sample).toBe(false);
-    expect(view.thirdParty).toBe(true);
+    expect(view.thirdParty).toBe("rapidapi");
     expect(view.provenance).toBe("Retrieved 12:00 IST from RapidAPI · IRCTC (third-party) · every field as returned, none invented");
   });
 
@@ -127,15 +127,42 @@ describe("result view", () => {
   });
 
   it("names RapidAPI, not a missing connection, when the third-party source fails", () => {
-    const view = terminalResult({ ok: false, code: "SOURCE_UNAVAILABLE", message: "The third-party provider did not answer in time. Nothing was shown in its place." }, { pnr: "1234567890", attemptedAt: NOW, sampleMode: false, thirdPartyMode: true });
-    expect(view).toMatchObject({ kind: "unavailable", thirdParty: true, statusBig: "Source did not answer" });
+    const view = terminalResult({ ok: false, code: "SOURCE_UNAVAILABLE", message: "The third-party provider did not answer in time. Nothing was shown in its place." }, { pnr: "1234567890", attemptedAt: NOW, sampleMode: false, thirdPartySource: "rapidapi" });
+    expect(view).toMatchObject({ kind: "unavailable", thirdParty: "rapidapi", statusBig: "Source did not answer" });
     expect(view.statusLong).toBe("The third-party provider did not answer in time. Nothing was shown in its place.");
     expect(view.provenance).toBe("Attempted 12:00 IST · RapidAPI · IRCTC (third-party) did not answer");
   });
 
   it("labels a RapidAPI no-record answer by its source", () => {
-    const view = terminalResult({ ok: false, code: "NOT_FOUND", message: "none" }, { pnr: "4949608635", attemptedAt: NOW, sampleMode: false, thirdPartyMode: true });
-    expect(view).toMatchObject({ kind: "notfound", sample: false, thirdParty: true, provenance: "Retrieved 12:00 IST from RapidAPI · IRCTC (third-party)" });
+    const view = terminalResult({ ok: false, code: "NOT_FOUND", message: "none" }, { pnr: "4949608635", attemptedAt: NOW, sampleMode: false, thirdPartySource: "rapidapi" });
+    expect(view).toMatchObject({ kind: "notfound", sample: false, thirdParty: "rapidapi", provenance: "Retrieved 12:00 IST from RapidAPI · IRCTC (third-party)" });
+  });
+
+  it("labels a RailKit result third-party and names RailKit in the provenance", () => {
+    const base = okResult("2345678901");
+    const view = terminalResult({ ok: true, result: { ...base, snapshot: { ...base.snapshot, source: "railkit" } } }, { pnr: "2345678901", attemptedAt: NOW, sampleMode: false, thirdPartySource: "railkit" });
+    expect(view.thirdParty).toBe("railkit");
+    expect(view.provenance).toBe("Retrieved 12:00 IST from RailKit (third-party) · every field as returned, none invented");
+  });
+
+  it("names the source that answered when the fallback stands in for RailKit", () => {
+    const base = okResult("2345678901");
+    const view = terminalResult({ ok: true, result: { ...base, snapshot: { ...base.snapshot, source: "rapidapi" } } }, { pnr: "2345678901", attemptedAt: NOW, sampleMode: false, thirdPartySource: "railkit" });
+    expect(view.thirdParty).toBe("rapidapi");
+    expect(view.provenance).toBe("Retrieved 12:00 IST from RapidAPI · IRCTC (third-party) · every field as returned, none invented");
+  });
+
+  it("names RailKit when it fails to answer", () => {
+    const view = terminalResult({ ok: false, code: "SOURCE_UNAVAILABLE", message: "RailKit did not answer in time. Nothing was shown in its place." }, { pnr: "1234567890", attemptedAt: NOW, sampleMode: false, thirdPartySource: "railkit" });
+    expect(view).toMatchObject({ kind: "unavailable", thirdParty: "railkit", statusLong: "RailKit did not answer in time. Nothing was shown in its place." });
+    expect(view.provenance).toBe("Attempted 12:00 IST · RailKit (third-party) did not answer");
+  });
+
+  it("carries no third-party label for the railway source or the fixture", () => {
+    const base = okResult("2345678901");
+    expect(terminalResult({ ok: true, result: base }, { pnr: "2345678901", attemptedAt: NOW, sampleMode: true }).thirdParty).toBeNull();
+    const live = { ...base, snapshot: { ...base.snapshot, source: "live" as const } };
+    expect(terminalResult({ ok: true, result: live }, { pnr: "2345678901", attemptedAt: NOW, sampleMode: false }).thirdParty).toBeNull();
   });
 
   it("reads a missing record as not found, labelled by where it came from", () => {

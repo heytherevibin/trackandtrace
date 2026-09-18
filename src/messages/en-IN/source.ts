@@ -18,6 +18,15 @@ export const source = {
     notConnected: "Not connected",
     noRecords: "No verified records",
     sample: "Sample data (development)",
-    thirdParty: "Connected · RapidAPI (third-party)",
+    thirdParty: (source: string) => `Connected · ${source}`,
+    thirdPartyWithFallback: (source: string, fallback: string) => `Connected · ${source} · ${fallback} as fallback`,
+  },
+  providers: {
+    rapidapi: "RapidAPI (third-party)",
+    railkit: "RailKit (third-party)",
+  },
+  providerShort: {
+    rapidapi: "RapidAPI",
+    railkit: "RailKit",
   },
 } as const satisfies MessageTree;

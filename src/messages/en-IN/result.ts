@@ -28,8 +28,8 @@ export const result = {
     chartIn: (hours: number, minutes: number) => `in ${hours} h ${minutes} min`,
     chartPrepared: "Chart prepared",
   },
-  sources: { live: "the railway source", fixture: "the development fixture", rapidapi: "RapidAPI · IRCTC (third-party)" },
-  sourceNames: { live: "Railway source", fixture: "Development fixture", rapidapi: "RapidAPI · IRCTC (third-party)" },
+  sources: { live: "the railway source", fixture: "the development fixture", rapidapi: "RapidAPI · IRCTC (third-party)", railkit: "RailKit (third-party)" },
+  sourceNames: { live: "Railway source", fixture: "Development fixture", rapidapi: "RapidAPI · IRCTC (third-party)", railkit: "RailKit (third-party)" },
   facts: {
     passengers: "Passengers",
     quota: "Quota",

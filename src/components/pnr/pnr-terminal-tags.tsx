@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { messages } from "@/messages";
+import type { ThirdPartySource } from "@/utils/source";
 
 // Server-safe pieces shared by the check plates and the landing sheet.
 
@@ -12,10 +13,10 @@ export function SheetTag({ variant, title, children }: { readonly variant: "acce
   );
 }
 
-/** "Third-party": the RapidAPI source's label, with its hover note naming the provider. */
-export function ThirdPartyTag() {
+/** "Third-party": a third-party source's label, with its hover note naming the provider. */
+export function ThirdPartyTag({ source }: { readonly source: ThirdPartySource }) {
   return (
-    <SheetTag variant="outline" title={messages.common.thirdPartyHint}>
+    <SheetTag variant="outline" title={messages.common.thirdPartyHints[source]}>
       {messages.common.thirdParty}
     </SheetTag>
   );

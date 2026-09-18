@@ -1,7 +1,7 @@
 import { Led } from "@/components/ui/led";
 import { STACKED_ROLES as R, stackedTable } from "@/components/ui/stacked-table";
 import { messages } from "@/messages";
-import { accountsConfigured, activePnrSource, env, fixtureAllowed, flags } from "@/services/env";
+import { accountsConfigured, activePnrSource, env, fallbackPnrSource, fixtureAllowed, flags, isThirdPartySource, type Env } from "@/services/env";
 import { cn } from "@/utils/cn";
 
 interface Row {
@@ -12,18 +12,29 @@ interface Row {
   readonly connected: boolean;
 }
 
+/** The reservation row's state: sample data, the third-party source (and its fallback), or the railway seam. */
+export function reservationStateFor(current: Env): string {
+  const m = messages.source;
+  if (fixtureAllowed(current)) return m.states.sample;
+  const active = activePnrSource(current);
+  if (isThirdPartySource(active)) {
+    const fallback = fallbackPnrSource(current);
+    return fallback ? m.states.thirdPartyWithFallback(m.providers[active], m.providerShort[fallback]) : m.states.thirdParty(m.providers[active]);
+  }
+  return current.LIVE_SOURCE_ENABLED ? m.states.connected : m.states.notConnected;
+}
+
 function rows(): readonly Row[] {
   const m = messages.source;
   const current = env();
   const live = flags.liveSource;
-  const sample = fixtureAllowed(current);
   const accounts = accountsConfigured(current);
   return [
     {
       id: "reservation",
       name: m.rows.reservation.name,
       use: m.rows.reservation.use,
-      state: sample ? m.states.sample : activePnrSource(current) === "rapidapi" ? m.states.thirdParty : live ? m.states.connected : m.states.notConnected,
+      state: reservationStateFor(current),
       connected: live,
     },
     { id: "inventory", name: m.rows.inventory.name, use: m.rows.inventory.use, state: m.states.notConnected, connected: false },

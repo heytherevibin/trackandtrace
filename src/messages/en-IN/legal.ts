@@ -2,16 +2,16 @@ import type { MessageTree } from "../types";
 
 export const legal = {
   updatedLine: (date: string) => `Last updated: ${date}`,
-  updated: "17 September 2026",
+  updated: "18 September 2026",
   onThisPage: "On this page",
   privacy: {
     title: "Privacy",
     lead: "What this product processes, where it keeps it, and how you remove it.",
     sections: [
-      { id: "processing", title: "What we process", body: "A PNR is used only to make the request to the railway data source. It is not written to our logs, and passenger names returned by the source are never stored." },
+      { id: "processing", title: "What we process", body: "A PNR is used only to request its reservation record from the data source. It is not written to our logs, and passenger names are never read or stored." },
       { id: "device", title: "Recent checks and the device watchlist", body: "Recent checks and a device watchlist live in your browser's storage on this device only. You can clear them any time from the home page or the watchlist." },
       { id: "account", title: "Account data", body: "If you sign in, your email, display name, avatar, and the PNRs you save are stored with your account in Supabase, a hosted database service. Access is limited to your own records." },
-      { id: "third-parties", title: "Third parties", body: "The railway data source receives the PNR you check. Supabase hosts account data. There are no advertising or analytics trackers." },
+      { id: "third-parties", title: "Third parties", body: "PNR checks are answered by RailKit (railkit.in), a third-party provider not affiliated with IRCTC or Indian Railways; if it cannot answer, the RapidAPI \"IRCTC\" API by IRCTCAPI answers instead. The provider that answers receives the PNR you check and records its requests under its own privacy policy. Supabase hosts account data. There are no advertising or analytics trackers." },
       { id: "controls", title: "Your controls", body: "Export your account data as JSON, or delete your account and every record on it, from the Account page." },
     ],
   },
