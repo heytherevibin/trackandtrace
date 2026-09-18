@@ -484,14 +484,3 @@ verify_enabled = true
 [remotes.production.storage.analytics]
 enabled = true
 max_namespaces = 10
-
-# Free-tier projects on Supabase's built-in email sender cannot change email templates
-# (the Auth API answers 400). Hosted keeps Supabase's default templates until a custom
-# SMTP provider is configured; then delete these two blocks and push again.
-[remotes.production.auth.email.template.magic_link]
-subject = "Your sign-in link"
-content_path = ""
-
-[remotes.production.auth.email.template.confirmation]
-subject = "Confirm your email address"
-content_path = ""
