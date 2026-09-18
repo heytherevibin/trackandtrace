@@ -18,8 +18,14 @@ const envSchema = z
     UPSTASH_REDIS_REST_URL: z.url().optional(),
     UPSTASH_REDIS_REST_TOKEN: z.string().min(1).optional(),
     NEXT_PUBLIC_SUPABASE_URL: z.url().optional(),
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: keyLike.optional(),
-    SUPABASE_SERVICE_ROLE_KEY: keyLike.optional(),
+    /** Supabase publishable key (sb_publishable_…): safe in the browser, RLS applies. */
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: keyLike.optional(),
+    /** Supabase secret key (sb_secret_…). Server only, used solely to delete an account. */
+    SUPABASE_SECRET_KEY: keyLike.optional(),
+    /** Shows "Continue with Google" once the provider is enabled in the Supabase project. */
+    AUTH_GOOGLE_ENABLED: flag.default("0").transform((v) => v === "1"),
+    /** Offers passkeys once they are enabled in the Supabase project. */
+    AUTH_PASSKEY_ENABLED: flag.default("0").transform((v) => v === "1"),
     NEXT_PUBLIC_APP_URL: z.url().optional(),
     /** Set by the Playwright web server; unlocks test-only affordances. */
     E2E: flag.default("0").transform((v) => v === "1"),
@@ -33,8 +39,8 @@ const envSchema = z
     if (v.RATE_LIMIT_STRATEGY === "upstash" && !(v.UPSTASH_REDIS_REST_URL && v.UPSTASH_REDIS_REST_TOKEN)) {
       ctx.addIssue({ code: "custom", path: ["RATE_LIMIT_STRATEGY"], message: "The upstash strategy needs both URL and token." });
     }
-    if (Boolean(v.NEXT_PUBLIC_SUPABASE_URL) !== Boolean(v.NEXT_PUBLIC_SUPABASE_ANON_KEY)) {
-      ctx.addIssue({ code: "custom", path: ["NEXT_PUBLIC_SUPABASE_ANON_KEY"], message: "Set both Supabase URL and anon key, or neither." });
+    if (Boolean(v.NEXT_PUBLIC_SUPABASE_URL) !== Boolean(v.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY)) {
+      ctx.addIssue({ code: "custom", path: ["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"], message: "Set both Supabase URL and publishable key, or neither." });
     }
   });
 
@@ -90,7 +96,17 @@ export function resetEnvCache(): void {
 }
 
 export function accountsConfigured(current: Env = env()): boolean {
-  return Boolean(current.NEXT_PUBLIC_SUPABASE_URL && current.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  return Boolean(current.NEXT_PUBLIC_SUPABASE_URL && current.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
+}
+
+/** Google sign-in is offered only when accounts exist and the provider was switched on deliberately. */
+export function googleSignInEnabled(current: Env = env()): boolean {
+  return accountsConfigured(current) && current.AUTH_GOOGLE_ENABLED;
+}
+
+/** Passkeys are offered only when accounts exist and the project has them switched on. */
+export function passkeysEnabled(current: Env = env()): boolean {
+  return accountsConfigured(current) && current.AUTH_PASSKEY_ENABLED;
 }
 
 /** The fixture may serve only outside production, and only when explicitly requested. */

@@ -10,7 +10,7 @@ export type Db = SupabaseClient<Database>;
 export async function createServerSupabase(): Promise<Db | null> {
   if (!isSupabaseConfigured()) return null;
   const cookieStore = await cookies();
-  return createServerClient<Database>(supabasePublicEnv.url, supabasePublicEnv.anonKey, {
+  return createServerClient<Database>(supabasePublicEnv.url, supabasePublicEnv.publishableKey, {
     cookies: {
       getAll: () => cookieStore.getAll(),
       setAll: (list) => {

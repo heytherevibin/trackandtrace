@@ -20,7 +20,9 @@ test("accuracy, privacy, terms, login, and account render their states", async (
   await gotoReady(page, "/tos");
   await expect(page.getByText("Not affiliated with IRCTC or Indian Railways.").first()).toBeVisible();
   await gotoReady(page, "/login");
-  await expect(page.getByRole("heading", { name: "Sign-in is not connected" })).toBeVisible();
+  // A server Playwright starts has no Supabase (see playwright.config.ts); a reused dev
+  // server may be connected. Either honest state passes; login-form.test.tsx pins both.
+  await expect(page.getByRole("heading", { name: "Sign-in is not connected" }).or(page.getByLabel("Email"))).toBeVisible();
   await gotoReady(page, "/account");
   await expect(page.getByRole("heading", { name: "Nothing to sync yet" })).toBeVisible();
   await expectAxeClean(page);

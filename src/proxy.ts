@@ -10,7 +10,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   if (!isSupabaseConfigured()) return NextResponse.next({ request });
 
   let response = NextResponse.next({ request });
-  const supabase = createServerClient<Database>(supabasePublicEnv.url, supabasePublicEnv.anonKey, {
+  const supabase = createServerClient<Database>(supabasePublicEnv.url, supabasePublicEnv.publishableKey, {
     cookies: {
       getAll: () => request.cookies.getAll(),
       setAll: (list) => {

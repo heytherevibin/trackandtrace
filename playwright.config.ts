@@ -33,6 +33,10 @@ export default defineConfig({
     timeout: 120_000,
     env: {
       PNR_SOURCE: "fixture",
+      // Empty values win over .env.local (Next never overrides a set variable), so a
+      // server Playwright starts stays signed-out and offline from the hosted project.
+      NEXT_PUBLIC_SUPABASE_URL: "",
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "",
       E2E: "1",
       E2E_NOW: process.env.E2E_NOW ?? "2026-09-17T06:30:00.000Z",
     },

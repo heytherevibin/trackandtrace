@@ -10,7 +10,7 @@ if [ "${WITH_SUPABASE:-1}" = "1" ] && command -v docker >/dev/null 2>&1; then
   npx supabase@2.117.0 start
   npx supabase@2.117.0 db reset
   echo "Local Supabase keys (merge into .env.local):"
-  npx supabase@2.117.0 status -o env | sed -n 's/^API_URL=\(.*\)$/NEXT_PUBLIC_SUPABASE_URL=\1/p; s/^ANON_KEY=\(.*\)$/NEXT_PUBLIC_SUPABASE_ANON_KEY=\1/p; s/^SERVICE_ROLE_KEY=\(.*\)$/SUPABASE_SERVICE_ROLE_KEY=\1/p'
+  npx supabase@2.117.0 status -o env | sed -n 's/^API_URL=\(.*\)$/NEXT_PUBLIC_SUPABASE_URL=\1/p; s/^ANON_KEY=\(.*\)$/NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=\1/p; s/^SERVICE_ROLE_KEY=\(.*\)$/SUPABASE_SECRET_KEY=\1/p'
   npm run db:types
 fi
 
