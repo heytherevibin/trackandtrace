@@ -456,11 +456,12 @@ max_client_conn = 200
 
 [remotes.production.auth]
 # The deployed site. Links in emails and any redirect Auth cannot match fall back here.
-site_url = "https://trackandtraze.vercel.app"
+site_url = "https://trakline.in"
 # Sign-in may return to production, to a Vercel preview of this team, or to local development
 # (which also signs in against the hosted project). This list replaces the base list above.
 additional_redirect_urls = [
-  "https://trackandtraze.vercel.app/**",
+  "https://trakline.in/**",
+  "https://www.trakline.in/**",
   "https://*-track-and-traze.vercel.app/**",
   "http://localhost:3000/**",
   "http://127.0.0.1:3000/**",
