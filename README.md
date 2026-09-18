@@ -2,7 +2,7 @@
 
 Check an Indian Railways PNR and read exactly what the source returned — every field labelled with its provenance and retrieval time. Free, no account needed. Not affiliated with IRCTC or Indian Railways.
 
-**Data policy (the product's spine):** strict real-only. If a verified railway source did not return a field, the interface says "not returned" — it never guesses, never invents confirmation odds, and fails closed when the source is silent. PNRs and passenger names are never written to logs.
+**Data policy (the product's spine):** strict real-only. If a verified railway source did not return a field, the interface says "not returned" — it never guesses, never invents confirmation odds, and fails closed when the source is silent. PNRs never appear in our web addresses or server logs (checks send them in a POST body; result links are `/pnr#<pnr>`), and passenger names are never read or stored.
 
 ## Stack
 

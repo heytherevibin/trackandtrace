@@ -18,7 +18,7 @@ Supabase
   auth.users + public.watchlist_entries (supabase/migrations/*) — RLS: owner-only
 ```
 
-The result page renders server-first: `pnr/[pnr]/page.tsx` validates, then a Suspense-wrapped server loader calls `queryPnr` directly (no HTTP hop). Refresh and re-check go through `GET /api/pnr/[pnr]?fresh=1` from the client.
+PNRs never travel in an address, because request paths and query strings are recorded in platform request logs. The result page is `/pnr#<pnr>`: a static shell whose client body (`PnrHashResult`) reads the PNR from the hash and asks `POST /api/pnr` with `{ pnr, fresh? }` in the body. Links are built only by `pnrHref()`. The pre-hydration form posts to `/check` (303 to the hash form), old `/pnr/<pnr>` links answer 308, and `tests/unit/privacy/no-pnr-in-urls.test.ts` fails the build if code puts a PNR in a path or query string again.
 
 ## Real-only enforcement points
 
@@ -43,7 +43,7 @@ The result page renders server-first: `pnr/[pnr]/page.tsx` validates, then a Sus
 | Supabase unconfigured | Accounts surface says so; watchlist stays device-local; APIs 503 |
 | Session expired | 401 → UI returns to local mode |
 | Storage unavailable / corrupt | Stores degrade to empty; invalid records dropped on parse |
-| Invalid `/pnr/xyz` | Real 404 before any await |
+| Invalid or missing PNR after `/pnr#` | The check-again sheet; nothing is requested |
 
 ## State
 
