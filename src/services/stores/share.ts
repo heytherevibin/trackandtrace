@@ -9,7 +9,8 @@ export function buildShareUrl(origin: string, pnr: string): string {
 
 export function buildShareText(result: PnrResult): string {
   const s = result.snapshot;
-  return `PNR ${formatPnr(s.pnr)} · ${s.train.number} ${s.train.name} · ${statusLabel(result.lead.status, result.lead.position)} · ${messages.common.productName}`;
+  const train = s.train.name ? `${s.train.number} ${s.train.name}` : s.train.number;
+  return `PNR ${formatPnr(s.pnr)} · ${train} · ${statusLabel(result.lead.status, result.lead.position)} · ${messages.common.productName}`;
 }
 
 export type ShareOutcome = "shared" | "copied" | "failed";

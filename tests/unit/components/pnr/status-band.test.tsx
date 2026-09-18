@@ -46,4 +46,17 @@ describe("StatusBand", () => {
     render(<StatusBand result={asLive(fixtureResult("2345678901"))} cached />);
     expect(screen.getByText("Retrieved 12:00 IST from the railway source · every field as returned, none invented · served from the last minute's read")).toBeInTheDocument();
   });
+
+  it("wears a Third-party tag for RapidAPI results, names the source, and never estimates a missing chart", () => {
+    const base = fixtureResult("2345678901");
+    const result = { ...base, snapshot: { ...base.snapshot, source: "rapidapi" as const, train: { number: "12658", from: { code: "SBC" }, to: { code: "MAS" } }, chartAt: undefined, chartTime: undefined, chartPrepared: false } };
+    render(<StatusBand result={result} cached={false} />);
+    expect(screen.getByText("Third-party")).toHaveAttribute("title", expect.stringMatching(/not affiliated/i));
+    expect(screen.queryByText("Sample data")).toBeNull();
+    expect(screen.getByText(/from RapidAPI · IRCTC \(third-party\)/)).toBeInTheDocument();
+    const value = (label: string) => screen.getByText(label, { selector: "dt" }).nextElementSibling;
+    expect(value("Departs")).toHaveTextContent("Not returned");
+    expect(value("Chart")).toHaveTextContent("Not prepared");
+  });
 });
+

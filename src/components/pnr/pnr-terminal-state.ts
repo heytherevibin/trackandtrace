@@ -4,6 +4,7 @@ import type { PassengerSeat, PnrOutcome, PnrResult, TicketStatus } from "@/types
 import { formatTime } from "@/utils/datetime";
 import { formatPnr } from "@/utils/pnr";
 import { statusDescription, statusLabel } from "@/utils/status-tone";
+import { chartValue, sourceTagFor, timeValue } from "./record-values";
 
 // The check plate's behaviour as pure functions: the drawn `formVals` states and
 // the `buildResult` view, fed by the real outcome instead of a local port.
@@ -75,6 +76,8 @@ export interface TerminalResult {
   readonly statusBig: string;
   readonly statusLong: string;
   readonly sample: boolean;
+  /** The result came from the third-party RapidAPI source (or that source failed to answer). */
+  readonly thirdParty: boolean;
   readonly provenance: string;
   readonly facts: readonly TerminalFact[];
   readonly pax: readonly PaxRow[];
@@ -118,9 +121,9 @@ export function factsFor(result: PnrResult): readonly TerminalFact[] {
     { label: f.route, value: v.route(train.from.code, train.to.code) },
     { label: f.journey, value: snapshot.journeyDateLabel },
     { label: f.classQuota, value: v.pair(snapshot.cls, lead.quota) },
-    { label: f.departs, value: v.departs(train.depTime) },
+    { label: f.departs, value: timeValue(train.depTime, v.departs) },
     ...(lead.coach && lead.berth ? [{ label: f.coachBerth, value: v.pair(lead.coach, lead.berth) }] : []),
-    { label: f.chart, value: v.chart(snapshot.chartTime) },
+    { label: f.chart, value: chartValue(snapshot, v.chart) },
   ];
 }
 
@@ -134,17 +137,20 @@ interface ResultContext {
   readonly attemptedAt: Date;
   /** Server-computed: the labelled fixture is the source serving this deployment. */
   readonly sampleMode: boolean;
+  /** Server-computed: the third-party RapidAPI source is serving this deployment. */
+  readonly thirdPartyMode?: boolean;
 }
 
-export function terminalResult(outcome: PnrOutcome, { pnr, attemptedAt, sampleMode }: ResultContext): TerminalResult {
+export function terminalResult(outcome: PnrOutcome, { pnr, attemptedAt, sampleMode, thirdPartyMode = false }: ResultContext): TerminalResult {
   const r = messages.check.result;
   const attempted = formatTime(attemptedAt);
   const checkedAt = attemptedAt.toISOString();
-  const base = { pnr, pnrLabel: r.pnr(formatPnr(pnr)), facts: [], pax: [] } as const;
+  const base = { pnr, pnrLabel: r.pnr(formatPnr(pnr)), facts: [], pax: [], thirdParty: false } as const;
+  const activeSource = sampleMode ? r.sources.fixture : thirdPartyMode ? r.sources.rapidapi : r.sources.live;
 
   if (outcome.ok) {
     const { result } = outcome;
-    const fixture = result.snapshot.source === "fixture";
+    const tag = sourceTagFor(result.snapshot.source);
     const label = statusLabel(result.lead.status, result.lead.position);
     return {
       ...base,
@@ -152,8 +158,9 @@ export function terminalResult(outcome: PnrOutcome, { pnr, attemptedAt, sampleMo
       statusShort: label,
       statusBig: statusBigFor(result),
       statusLong: statusDescription(result.lead.status),
-      sample: fixture,
-      provenance: r.provenance.retrieved(formatTime(result.checkedAt), fixture ? r.sources.fixture : r.sources.live),
+      sample: tag === "sample",
+      thirdParty: tag === "thirdParty",
+      provenance: r.provenance.retrieved(formatTime(result.checkedAt), r.sources[result.snapshot.source]),
       facts: factsFor(result),
       pax: result.snapshot.pax.length > 1 ? paxRows(result.snapshot.pax) : [],
       recent: { pnr, label: recentLabelFor(result), status: result.lead.status, position: result.lead.position, checkedAt: result.checkedAt },
@@ -169,7 +176,8 @@ export function terminalResult(outcome: PnrOutcome, { pnr, attemptedAt, sampleMo
         statusBig: r.notFound.big,
         statusLong: r.notFound.long,
         sample: sampleMode,
-        provenance: r.provenance.retrievedOnly(attempted, sampleMode ? r.sources.fixture : r.sources.live),
+        thirdParty: thirdPartyMode,
+        provenance: r.provenance.retrievedOnly(attempted, activeSource),
         recent: { pnr, status: "NOT_FOUND", position: null, checkedAt },
       };
     case "RATE_LIMITED":
@@ -199,10 +207,12 @@ export function terminalResult(outcome: PnrOutcome, { pnr, attemptedAt, sampleMo
         ...base,
         kind: "unavailable",
         statusShort: r.unavailable.short,
-        statusBig: r.unavailable.big,
-        statusLong: r.unavailable.long,
+        statusBig: thirdPartyMode ? r.unavailable.thirdPartyBig : r.unavailable.big,
+        // The adapter's messages are written for readers: which failure, and that nothing was shown in its place.
+        statusLong: thirdPartyMode ? outcome.message : r.unavailable.long,
         sample: false,
-        provenance: r.provenance.silent(attempted),
+        thirdParty: thirdPartyMode,
+        provenance: thirdPartyMode ? r.provenance.thirdPartySilent(attempted, r.sources.rapidapi) : r.provenance.silent(attempted),
         recent: { pnr, label: r.unavailable.short, checkedAt },
       };
   }

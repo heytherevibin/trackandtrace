@@ -26,4 +26,17 @@ describe("JourneyDetails", () => {
     expect(grid).toHaveClass("grid-cols-2");
     expect(grid?.children.length).toBe(8);
   });
+
+  it("says Not returned for journey facts the source did not send", () => {
+    const base = fixtureResult("2345678901");
+    const snapshot = { ...base.snapshot, source: "rapidapi" as const, train: { number: "12658", from: { code: "SBC", city: "KSR Bengaluru" }, to: { code: "MAS" } }, chartAt: undefined, chartTime: undefined };
+    render(<JourneyDetails snapshot={snapshot} quota="GN" />);
+    const value = (label: string) => screen.getByText(label, { selector: "dt" }).nextElementSibling;
+    expect(value("Train")).toHaveTextContent(/^12658$/);
+    expect(value("Route")).toHaveTextContent("KSR Bengaluru (SBC) → MAS");
+    expect(value("Distance")).toHaveTextContent("Not returned");
+    expect(value("Departs")).toHaveTextContent("Not returned");
+    expect(value("Chart")).toHaveTextContent("Not returned");
+  });
 });
+

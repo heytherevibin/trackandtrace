@@ -50,6 +50,8 @@ export const check = {
       pair: (a: string, b: string) => `${a} · ${b}`,
       departs: (time: string) => `${time} IST`,
       chart: (time: string) => `~${time} IST`,
+      chartPrepared: "Prepared",
+      chartNotPrepared: "Not prepared",
     },
     passengers: {
       caption: "Passengers on this booking",
@@ -69,11 +71,12 @@ export const check = {
     },
     withPosition: (code: string, position: number) => `${code} ${position}`,
     recentLabel: (train: string, from: string, to: string, date: string) => `${train} · ${from}→${to} · ${date}`,
-    sources: { live: "the railway source", fixture: "the development fixture" },
+    sources: { live: "the railway source", fixture: "the development fixture", rapidapi: "RapidAPI · IRCTC (third-party)" },
     provenance: {
       retrieved: (time: string, source: string) => `Retrieved ${time} IST from ${source} · every field as returned, none invented`,
       retrievedOnly: (time: string, source: string) => `Retrieved ${time} IST from ${source}`,
       silent: (time: string) => `Attempted ${time} IST · no verified source answered`,
+      thirdPartySilent: (time: string, source: string) => `Attempted ${time} IST · ${source} did not answer`,
       heldBack: (time: string) => `Attempted ${time} IST · held back, nothing sent to the source`,
       refused: (time: string) => `Attempted ${time} IST · refused before the source`,
     },
@@ -86,6 +89,7 @@ export const check = {
       short: "Source silent",
       big: "Source not connected",
       long: "No verified railway source is connected right now, so this product makes no claim about this PNR. It fails closed: no source, no invented result.",
+      thirdPartyBig: "Source did not answer",
     },
     limited: {
       short: "Held back",

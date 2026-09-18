@@ -27,8 +27,8 @@ export function buildSpecimen(now: Date): Specimen | null {
   const r = messages.check.result;
   return {
     leadTag: m.leadTag(statusLabel(lead.status, lead.position)),
-    trainLine: m.trainLine(snapshot.train.number, snapshot.train.name, r.values.route(snapshot.train.from.code, snapshot.train.to.code)),
-    journeyLine: m.journeyLine(snapshot.journeyDateLabel, snapshot.train.depTime, lead.quota),
+    trainLine: m.trainLine(snapshot.train.number, snapshot.train.name ?? "", r.values.route(snapshot.train.from.code, snapshot.train.to.code)),
+    journeyLine: m.journeyLine(snapshot.journeyDateLabel, snapshot.train.depTime ?? "", lead.quota),
     pax: paxRows(snapshot.pax),
     provenance: r.provenance.retrieved(formatTime(checkedAt), r.sources.fixture),
   };

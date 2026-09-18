@@ -35,7 +35,7 @@ async function request(pnr: string): Promise<PnrOutcome> {
   }
 }
 
-function useCheckPlate(sampleMode: boolean) {
+function useCheckPlate(sampleMode: boolean, thirdPartyMode: boolean) {
   const [digits, setDigits] = useState("");
   const [attempted, setAttempted] = useState(false);
   const [phase, setPhase] = useState<Phase>("entry");
@@ -78,7 +78,7 @@ function useCheckPlate(sampleMode: boolean) {
     setAnnouncement("");
     const [outcome] = await Promise.all([request(pnr), wait(MIN_RUNNING_MS)]);
     if (runId.current !== id) return;
-    const view = terminalResult(outcome, { pnr, attemptedAt, sampleMode });
+    const view = terminalResult(outcome, { pnr, attemptedAt, sampleMode, thirdPartyMode });
     recentStore.push(view.recent);
     setResult(view);
     setPhase("done");
@@ -120,8 +120,8 @@ function useCheckPlate(sampleMode: boolean) {
 }
 
 /** The hero plate: "PNR check — live request · Form T&T-01", with the recent strip along its foot. */
-export function PnrTerminal({ sampleMode }: { readonly sampleMode: boolean }) {
-  const plate = useCheckPlate(sampleMode);
+export function PnrTerminal({ sampleMode, thirdPartyMode = false }: { readonly sampleMode: boolean; readonly thirdPartyMode?: boolean }) {
+  const plate = useCheckPlate(sampleMode, thirdPartyMode);
   const m = messages.check;
   return (
     <Plate
@@ -165,8 +165,20 @@ export function PnrTerminal({ sampleMode }: { readonly sampleMode: boolean }) {
 }
 
 /** The closing plate: a second, compact check with the lead line above the cells and the hint beside Run. */
-export function PnrClosingTerminal({ sampleMode, title, meta, lead }: { readonly sampleMode: boolean; readonly title: string; readonly meta: string; readonly lead: string }) {
-  const plate = useCheckPlate(sampleMode);
+export function PnrClosingTerminal({
+  sampleMode,
+  thirdPartyMode = false,
+  title,
+  meta,
+  lead,
+}: {
+  readonly sampleMode: boolean;
+  readonly thirdPartyMode?: boolean;
+  readonly title: string;
+  readonly meta: string;
+  readonly lead: string;
+}) {
+  const plate = useCheckPlate(sampleMode, thirdPartyMode);
   const running = plate.phase === "running";
   return (
     <Plate as="div" title={title} meta={[meta]} cells="wide" padding="lg" className={cn(plate.shaking && "shake")} onAnimationEnd={plate.onAnimationEnd}>

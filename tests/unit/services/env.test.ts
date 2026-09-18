@@ -97,3 +97,34 @@ describe("derived flags", () => {
     expect(fixtureAllowed(live.env)).toBe(false);
   });
 });
+
+describe("RapidAPI source configuration", () => {
+  it("requires a key when PNR_SOURCE=rapidapi", () => {
+    const parsed = parseEnv({ NODE_ENV: "production", PNR_SOURCE: "rapidapi" });
+    expect(parsed.ok).toBe(false);
+    if (parsed.ok) return;
+    expect(parsed.issues.join(" ")).toMatch(/RAPIDAPI_KEY/);
+  });
+
+  it("defaults the host, path, and timeout to the IRCTC API", () => {
+    const parsed = parseEnv({ NODE_ENV: "production", PNR_SOURCE: "rapidapi", RAPIDAPI_KEY: "test-key-0123456789abcdef" });
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.env.RAPIDAPI_HOST).toBe("irctc1.p.rapidapi.com");
+    expect(parsed.env.RAPIDAPI_PNR_PATH).toBe("/api/v3/getPNRStatus");
+    expect(parsed.env.RAPIDAPI_TIMEOUT_MS).toBe(8000);
+  });
+
+  it("names the active source for provenance: fixture, rapidapi, or live", async () => {
+    const { activePnrSource } = await import("@/services/env");
+    const of = (source: Record<string, string>) => {
+      const parsed = parseEnv(source);
+      if (!parsed.ok) throw new Error(parsed.issues.join("; "));
+      return parsed.env;
+    };
+    expect(activePnrSource(of({ NODE_ENV: "development", PNR_SOURCE: "fixture" }))).toBe("fixture");
+    expect(activePnrSource(of({ NODE_ENV: "production", PNR_SOURCE: "rapidapi", RAPIDAPI_KEY: "test-key-0123456789abcdef" }))).toBe("rapidapi");
+    expect(activePnrSource(of({ NODE_ENV: "production" }))).toBe("live");
+  });
+});
+

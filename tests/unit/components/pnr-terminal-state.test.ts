@@ -105,6 +105,39 @@ describe("result view", () => {
     expect(view.provenance).toBe("Retrieved 12:00 IST from the railway source · every field as returned, none invented");
   });
 
+  it("labels a RapidAPI result third-party and names it in the provenance", () => {
+    const base = okResult("2345678901");
+    const view = terminalResult({ ok: true, result: { ...base, snapshot: { ...base.snapshot, source: "rapidapi" } } }, { pnr: "2345678901", attemptedAt: NOW, sampleMode: false, thirdPartyMode: true });
+    expect(view.sample).toBe(false);
+    expect(view.thirdParty).toBe(true);
+    expect(view.provenance).toBe("Retrieved 12:00 IST from RapidAPI · IRCTC (third-party) · every field as returned, none invented");
+  });
+
+  it("says Not returned for a departure or chart the source did not send, and the chart state when it did", () => {
+    const base = okResult("2345678901");
+    const bare: PnrResult = {
+      ...base,
+      snapshot: { ...base.snapshot, source: "rapidapi", train: { number: "12658", from: { code: "SBC" }, to: { code: "MAS" } }, chartTime: undefined, chartAt: undefined },
+    };
+    const facts = Object.fromEntries(factsFor(bare).map((f) => [f.label, f.value]));
+    expect(facts["Departs"]).toBe("Not returned");
+    expect(facts["Chart"]).toBe("Not returned");
+    const prepared = Object.fromEntries(factsFor({ ...bare, snapshot: { ...bare.snapshot, chartPrepared: true } }).map((f) => [f.label, f.value]));
+    expect(prepared["Chart"]).toBe("Prepared");
+  });
+
+  it("names RapidAPI, not a missing connection, when the third-party source fails", () => {
+    const view = terminalResult({ ok: false, code: "SOURCE_UNAVAILABLE", message: "The third-party provider did not answer in time. Nothing was shown in its place." }, { pnr: "1234567890", attemptedAt: NOW, sampleMode: false, thirdPartyMode: true });
+    expect(view).toMatchObject({ kind: "unavailable", thirdParty: true, statusBig: "Source did not answer" });
+    expect(view.statusLong).toBe("The third-party provider did not answer in time. Nothing was shown in its place.");
+    expect(view.provenance).toBe("Attempted 12:00 IST · RapidAPI · IRCTC (third-party) did not answer");
+  });
+
+  it("labels a RapidAPI no-record answer by its source", () => {
+    const view = terminalResult({ ok: false, code: "NOT_FOUND", message: "none" }, { pnr: "4949608635", attemptedAt: NOW, sampleMode: false, thirdPartyMode: true });
+    expect(view).toMatchObject({ kind: "notfound", sample: false, thirdParty: true, provenance: "Retrieved 12:00 IST from RapidAPI · IRCTC (third-party)" });
+  });
+
   it("reads a missing record as not found, labelled by where it came from", () => {
     const outcome: PnrOutcome = { ok: false, code: "NOT_FOUND", message: "none" };
     const view = terminalResult(outcome, { pnr: "2345678900", attemptedAt: NOW, sampleMode: true });

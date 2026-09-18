@@ -11,7 +11,7 @@ import { Roadmap } from "@/components/landing/roadmap";
 import { SourcesBoard } from "@/components/landing/sources-board";
 import { buildSpecimen } from "@/components/landing/specimen-data";
 import { SpecimenRecord } from "@/components/landing/specimen-record";
-import { env, fixtureAllowed } from "@/services/env";
+import { activePnrSource, env } from "@/services/env";
 import { fixtureClock } from "@/services/sources/fixture";
 
 export const metadata: Metadata = {
@@ -23,11 +23,13 @@ export const metadata: Metadata = {
 export default async function HomePage() {
   // Per request: the sources board and sample mode read the live flags, and the specimen's retrieval time is real.
   await connection();
-  const sampleMode = fixtureAllowed(env());
+  const source = activePnrSource(env());
+  const sampleMode = source === "fixture";
+  const thirdPartyMode = source === "rapidapi";
   const specimen = buildSpecimen(fixtureClock());
   return (
     <div id="top" className="page-frame">
-      <Hero sampleMode={sampleMode} />
+      <Hero sampleMode={sampleMode} thirdPartyMode={thirdPartyMode} />
       <PrinciplesSheet />
       <HowItWorks />
       <SpecimenRecord specimen={specimen} />
@@ -36,7 +38,7 @@ export default async function HomePage() {
       <Features />
       <PhotoSplit />
       <Faq />
-      <ClosingCta sampleMode={sampleMode} />
+      <ClosingCta sampleMode={sampleMode} thirdPartyMode={thirdPartyMode} />
     </div>
   );
 }

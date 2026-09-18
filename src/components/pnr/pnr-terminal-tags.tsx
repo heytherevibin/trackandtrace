@@ -12,6 +12,15 @@ export function SheetTag({ variant, title, children }: { readonly variant: "acce
   );
 }
 
+/** "Third-party": the RapidAPI source's label, with its hover note naming the provider. */
+export function ThirdPartyTag() {
+  return (
+    <SheetTag variant="outline" title={messages.common.thirdPartyHint}>
+      {messages.common.thirdParty}
+    </SheetTag>
+  );
+}
+
 /** "Sample data": the fixture label, with its hover note. */
 export function SampleTag() {
   return (

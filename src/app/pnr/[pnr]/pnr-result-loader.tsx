@@ -9,7 +9,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { StateBlock } from "@/components/ui/state-block";
 import { UnavailableState } from "@/components/ui/unavailable-state";
 import { messages } from "@/messages";
-import { fixtureAllowed } from "@/services/env";
+import { activePnrSource } from "@/services/env";
 import { queryPnr } from "@/services/pnr-query";
 import { clientIp } from "@/services/rate-limit";
 import { formatPnr } from "@/utils/pnr";
@@ -34,7 +34,7 @@ export async function PnrResultLoader({ pnr }: { readonly pnr: string }) {
     return (
       <>
         {header}
-        <SourceNotFound className="mt-8" pnr={pnr} sample={fixtureAllowed()} retrievedAt={new Date()} />
+        <SourceNotFound className="mt-8" pnr={pnr} source={activePnrSource()} retrievedAt={new Date()} />
       </>
     );
   }

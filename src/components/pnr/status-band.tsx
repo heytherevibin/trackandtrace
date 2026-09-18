@@ -5,6 +5,7 @@ import type { PnrResult } from "@/types/domain";
 import { formatTime } from "@/utils/datetime";
 import { statusDescription, statusLabel } from "@/utils/status-tone";
 import { ChartCountdown } from "./chart-countdown";
+import { chartValue, timeValue } from "./record-values";
 import { ResultTagRow } from "./result-tag-row";
 
 /**
@@ -27,7 +28,7 @@ export function StatusBand({ result, cached, className }: { readonly result: Pnr
       className={className}
       bodyClassName="flex flex-col gap-3.5"
     >
-      <ResultTagRow tag={label} sample={s.source === "fixture"} pnr={s.pnr} status={result.lead.status} />
+      <ResultTagRow tag={label} source={s.source} pnr={s.pnr} status={result.lead.status} />
       <p className="font-display text-4xl font-semibold uppercase tracking-display" data-testid="result-status">
         {label}
       </p>
@@ -37,8 +38,8 @@ export function StatusBand({ result, cached, className }: { readonly result: Pnr
         items={[
           { label: m.facts.passengers, value: String(s.passengerCount) },
           { label: m.facts.quota, value: result.lead.quota },
-          { label: m.facts.departs, value: m.facts.time(s.train.depTime) },
-          { label: m.facts.chart, value: <ChartCountdown chartAt={s.chartAt} /> },
+          { label: m.facts.departs, value: timeValue(s.train.depTime) },
+          { label: m.facts.chart, value: s.chartAt ? <ChartCountdown chartAt={s.chartAt} /> : chartValue(s) },
         ]}
       />
       <p className="text-label text-ink-1/70">{cached ? `${provenance} · ${m.status.cached}` : provenance}</p>

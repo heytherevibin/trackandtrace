@@ -2,7 +2,7 @@ import { FactGrid } from "@/components/ui/fact-grid";
 import { Plate } from "@/components/ui/plate";
 import { messages } from "@/messages";
 import type { PnrSnapshot, Quota } from "@/types/domain";
-import { formatCount } from "@/utils/datetime";
+import { chartValue, distanceValue, timeValue } from "./record-values";
 
 /**
  * The journey record as the terminal frames its facts: legend over figure in hairline
@@ -22,9 +22,9 @@ export function JourneyDetails({ snapshot, quota, className }: { readonly snapsh
           { label: m.facts.journey, value: snapshot.journeyDateLabel },
           { label: m.facts.cls, value: snapshot.cls },
           { label: m.facts.quota, value: quota },
-          { label: m.facts.distance, value: m.facts.km(formatCount(t.distanceKm)) },
-          { label: m.facts.departs, value: m.facts.time(t.depTime) },
-          { label: m.facts.chart, value: m.facts.time(snapshot.chartTime) },
+          { label: m.facts.distance, value: distanceValue(t.distanceKm) },
+          { label: m.facts.departs, value: timeValue(t.depTime) },
+          { label: m.facts.chart, value: chartValue(snapshot) },
         ]}
       />
     </Plate>

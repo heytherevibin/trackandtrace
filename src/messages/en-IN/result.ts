@@ -4,7 +4,7 @@ export const result = {
   back: "Check another PNR",
   pnr: (formatted: string) => `PNR ${formatted}`,
   title: (from: string, to: string) => `${from} to ${to}`,
-  trainLine: (number: string, name: string) => `${number} · ${name}`,
+  trainLine: (number: string, name?: string) => (name ? `${number} · ${name}` : number),
   lead: (train: string, date: string, cls: string) => `${train} · ${date} · ${cls}`,
   /** The status plate, transcribed from the landing terminal's result state. */
   status: {
@@ -28,8 +28,8 @@ export const result = {
     chartIn: (hours: number, minutes: number) => `in ${hours} h ${minutes} min`,
     chartPrepared: "Chart prepared",
   },
-  sources: { live: "the railway source", fixture: "the development fixture" },
-  sourceNames: { live: "Railway source", fixture: "Development fixture" },
+  sources: { live: "the railway source", fixture: "the development fixture", rapidapi: "RapidAPI · IRCTC (third-party)" },
+  sourceNames: { live: "Railway source", fixture: "Development fixture", rapidapi: "RapidAPI · IRCTC (third-party)" },
   facts: {
     passengers: "Passengers",
     quota: "Quota",
@@ -37,7 +37,10 @@ export const result = {
     chart: "Chart",
     train: "Train",
     route: "Route",
-    routeStops: (fromCity: string, fromCode: string, toCity: string, toCode: string) => `${fromCity} (${fromCode}) → ${toCity} (${toCode})`,
+    routeStops: (fromCity: string | undefined, fromCode: string, toCity: string | undefined, toCode: string) =>
+      `${fromCity ? `${fromCity} (${fromCode})` : fromCode} → ${toCity ? `${toCity} (${toCode})` : toCode}`,
+    chartPrepared: "Prepared",
+    chartNotPrepared: "Not prepared",
     journey: "Journey",
     cls: "Class",
     distance: "Distance",

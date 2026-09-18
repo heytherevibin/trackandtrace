@@ -68,8 +68,8 @@ describe("buildFixtureResult", () => {
     const dayDiff = (Date.parse(`${r.snapshot.journeyDate}T00:00:00Z`) - Date.parse(`${istToday}T00:00:00Z`)) / 86_400_000;
     expect(dayDiff).toBeGreaterThanOrEqual(1);
     expect(dayDiff).toBeLessThanOrEqual(6);
-    const departure = Date.parse(`${r.snapshot.journeyDate}T${r.snapshot.train.depTime}:00+05:30`);
-    expect(Date.parse(r.snapshot.chartAt)).toBe(departure - 4 * 60 * 60 * 1000);
+    const departure = Date.parse(`${r.snapshot.journeyDate}T${r.snapshot.train.depTime ?? ""}:00+05:30`);
+    expect(Date.parse(r.snapshot.chartAt ?? "")).toBe(departure - 4 * 60 * 60 * 1000);
     expect(r.hoursToChart).toBeCloseTo((departure - 4 * 3_600_000 - NOW.getTime()) / 3_600_000, 1);
   });
 
