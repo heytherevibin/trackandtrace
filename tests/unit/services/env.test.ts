@@ -225,6 +225,17 @@ describe("the shared store", () => {
     expect(parseEnv({ NODE_ENV: "production", VERCEL_ENV: "production", ...KV, DATA_KEY, RATE_LIMIT_STRATEGY: "memory" }).ok).toBe(false);
   });
 
+  it("names exactly what a deployment is missing", () => {
+    const issues = (source: Record<string, string>) => {
+      const parsed = parseEnv({ NODE_ENV: "production", VERCEL_ENV: "preview", ...source });
+      return parsed.ok ? "" : parsed.issues.join(" ");
+    };
+    expect(issues({ ...KV })).toMatch(/missing DATA_KEY/);
+    expect(issues({ ...KV })).not.toMatch(/URL and token/);
+    expect(issues({ DATA_KEY })).toMatch(/missing the Upstash URL and token/);
+    expect(issues({ ...KV, DATA_KEY, RATE_LIMIT_STRATEGY: "memory" })).toMatch(/RATE_LIMIT_STRATEGY=memory/);
+  });
+
   it("stays off, and optional, for a CI or local build", () => {
     const parsed = parseEnv({ NODE_ENV: "production" });
     expect(parsed.ok).toBe(true);

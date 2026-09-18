@@ -86,16 +86,17 @@ const envSchema = z
     if (v.NODE_ENV === "production" && v.PNR_SOURCE === "fixture") {
       ctx.addIssue({ code: "custom", path: ["PNR_SOURCE"], message: "PNR_SOURCE=fixture is refused in production." });
     }
-    const store = Boolean(upstashCredentials(v) && v.DATA_KEY);
-    if (v.RATE_LIMIT_STRATEGY === "upstash" && !store) {
-      ctx.addIssue({ code: "custom", path: ["RATE_LIMIT_STRATEGY"], message: "The upstash strategy needs the Upstash URL and token, and DATA_KEY." });
+    const storeGaps = [
+      ...(upstashCredentials(v) ? [] : ["missing the Upstash URL and token (KV_REST_API_* or UPSTASH_REDIS_REST_*)"]),
+      ...(v.DATA_KEY ? [] : ["missing DATA_KEY"]),
+    ];
+    if (v.RATE_LIMIT_STRATEGY === "upstash" && storeGaps.length > 0) {
+      ctx.addIssue({ code: "custom", path: ["RATE_LIMIT_STRATEGY"], message: `The upstash strategy needs the shared store: ${storeGaps.join("; ")}.` });
     }
-    if ((v.VERCEL_ENV === "production" || v.VERCEL_ENV === "preview") && (!store || v.RATE_LIMIT_STRATEGY === "memory")) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["DATA_KEY"],
-        message: "Deployments need the shared store: KV_REST_API_URL and KV_REST_API_TOKEN (or UPSTASH_REDIS_REST_*), and DATA_KEY.",
-      });
+    const deployed = v.VERCEL_ENV === "production" || v.VERCEL_ENV === "preview";
+    const deployGaps = [...storeGaps, ...(v.RATE_LIMIT_STRATEGY === "memory" ? ["RATE_LIMIT_STRATEGY=memory is not allowed (remove it)"] : [])];
+    if (deployed && deployGaps.length > 0) {
+      ctx.addIssue({ code: "custom", path: ["DATA_KEY"], message: `Deployments need the shared store: ${deployGaps.join("; ")}.` });
     }
     if (Boolean(v.NEXT_PUBLIC_SUPABASE_URL) !== Boolean(v.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY)) {
       ctx.addIssue({ code: "custom", path: ["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"], message: "Set both Supabase URL and publishable key, or neither." });
