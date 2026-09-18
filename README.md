@@ -30,7 +30,7 @@ Production refuses `PNR_SOURCE=fixture` at boot. With `PNR_SOURCE=live` and no p
 
 ### Real data through RailKit (third-party, primary)
 
-`PNR_SOURCE=railkit` reads **RailKit** (railkit.in) over its REST API (`GET https://api.railkit.in/api/v1/pnr/:pnr`, key in the `x-api-key` header). It is a third party, not affiliated with IRCTC or Indian Railways, and not an official source, so every result wears a **Third-party** tag and its provenance names RailKit. The published `railkit` npm SDK ships only obfuscated code, so it is deliberately not used: the adapter calls the documented endpoint itself, with its own timeout and fail-closed parsing. The fare and booking time are never read.
+`PNR_SOURCE=railkit` reads **RailKit** (railkit.in) over its REST API (`GET https://api.railkit.in/api/v1/pnr/:pnr`, key in the `x-api-key` header). It is a third party, not affiliated with IRCTC or Indian Railways, and not an official source, so travellers never see its name: results read as Trakline, and the privacy page mentions an unnamed third-party data provider. The published `railkit` npm SDK ships only obfuscated code, so it is deliberately not used: the adapter calls the documented endpoint itself, with its own timeout and fail-closed parsing. The fare and booking time are never read.
 
 1. Buy a paid RailKit plan (commercial use needs one) and put the dashboard key in `.env.local`: `RAILKIT_API_KEY=railkit_…` (server only; never commit or paste it anywhere).
 2. Confirm the response shape with your own PNR: `npm run source:probe:railkit -- <PNR>`. It prints field names, types and RailKit's error text only, never record values.
@@ -40,7 +40,7 @@ RailKit's terms allow display inside your own app and short caching for performa
 
 ### Real data through RapidAPI (third-party, fallback)
 
-`PNR_SOURCE=rapidapi` reads the RapidAPI **"IRCTC" API by IRCTCAPI** (`irctc1.p.rapidapi.com`, `GET /api/v3/getPNRStatus`). It is a third party, not affiliated with IRCTC or Indian Railways, and not a verified source, so every result wears a **Third-party** tag and its provenance names RapidAPI. Its predictions and passenger names are never read; fields it does not send read "Not returned".
+`PNR_SOURCE=rapidapi` reads the RapidAPI **"IRCTC" API by IRCTCAPI** (`irctc1.p.rapidapi.com`, `GET /api/v3/getPNRStatus`). It is a third party, not affiliated with IRCTC or Indian Railways, and not a verified source, so travellers never see its name: results read as Trakline. Its predictions and passenger names are never read; fields it does not send read "Not returned".
 
 1. Subscribe to the API on RapidAPI and put your key in `.env.local`: `RAPIDAPI_KEY=…` (server only; never commit it).
 2. Confirm the response shape with your own PNR: `npm run source:probe -- <PNR>`. It prints field names and types only, never values.
