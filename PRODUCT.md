@@ -45,7 +45,7 @@ Stack: Next.js 16 App Router, TypeScript strict, Tailwind CSS v4, Supabase (Auth
 
 ## Evidence on Hand
 
-- No verified railway provider is connected. For now the product can read the third-party RapidAPI "IRCTC" API (IRCTCAPI, not affiliated with IRCTC); its results are tagged "Third-party" and name the provider. The official path under evaluation is CRIS Pravah.
+- No verified railway provider is connected. PNR checks are answered by RailKit (railkit.in), a third party not affiliated with IRCTC, with the RapidAPI "IRCTC" API (IRCTCAPI) as a fallback while RailKit is unavailable; results are tagged "Third-party" and name the provider that answered. The official path under evaluation is CRIS Pravah.
 - No testimonials, customer names, usage metrics, ratings, or accuracy records exist. None may be fabricated.
 - No logo, icon, or social image assets exist; the mark is designed in this redesign.
 - The development fixture (deterministic sample records keyed by PNR digits) is design and test material only and must never be presented as real.

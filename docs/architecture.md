@@ -10,7 +10,7 @@ Browser
 Next.js server
   route handlers (src/app/api/*)           — thin: guard → validate → repository/query → jsonOk/jsonError
   pnr-query (src/services/pnr-query.ts)    — the one PNR path: validate → rate limit → cache → source
-  sources (src/services/sources/*)         — registry: live seam (unavailable until a provider lands) | rapidapi (third-party, labelled) | fixture (dev only)
+  sources (src/services/sources/*)         — registry: live seam (unavailable until a provider lands) | railkit | rapidapi (third-party, labelled; optional fallback between them) | fixture (dev only)
   watchlist-repo (src/services/watchlist-repo.ts) — supabase-js over RLS-guarded tables
   session (src/services/session.ts)        — verified JWT claims → SessionUser DTO
   proxy (src/proxy.ts)                     — Supabase session refresh on page requests
@@ -24,8 +24,10 @@ The result page renders server-first: `pnr/[pnr]/page.tsx` validates, then a Sus
 
 1. `src/services/env.ts` — `PNR_SOURCE=fixture` refuses to boot in production.
 2. `src/services/sources/index.ts` — the registry refuses the fixture again at call time.
-3. `snapshot.source` — `"live" | "rapidapi" | "fixture"`; every fixture result renders a visible "Sample data" badge and every RapidAPI result a "Third-party" badge, with the provider named in its provenance.
+3. `snapshot.source` — `"live" | "railkit" | "rapidapi" | "fixture"`; every fixture result renders a visible "Sample data" badge and every third-party result (RailKit, RapidAPI) a "Third-party" badge, with the provider that answered named in its note and provenance.
 3a. `src/services/sources/rapidapi-parse.ts` — the RapidAPI adapter validates every rendered field, never reads the provider's predictions or passenger names, leaves unsent fields unset ("Not returned"), and fails closed on anything unreadable. `RAPIDAPI_KEY` is server-only and required by the env schema when `PNR_SOURCE=rapidapi`.
+3b. `src/services/sources/railkit.ts` + `railkit-parse.ts` — RailKit over REST (never its obfuscated SDK), with the same rules; the fare and booking time are never read. `RAILKIT_API_KEY` must look like a RailKit key or production refuses to boot. Both adapters share `irctc-record.ts` for IRCTC seat notation and dates.
+3c. `src/services/sources/fallback.ts` — `PNR_FALLBACK` asks a second third-party source only when the first is unavailable, never on "no record"; each answer keeps its own source label, and when both fail the primary's explanation is kept.
 4. `public/sw.js` — never caches `/api/*` or `/auth/*`; a stale record can never be served as live.
 5. `src/services/log.ts` — every log line is redacted; ten-digit runs never reach the console.
 6. Prediction fields exist in the type layer but no component renders them.
