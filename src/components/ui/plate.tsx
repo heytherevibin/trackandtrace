@@ -15,6 +15,14 @@ const PAD: Record<PlatePadding, string> = { none: "", sm: "p-4", md: "p-5", lg: 
 const MIN_CH = { 12: "min-w-[12ch]", 14: "min-w-[14ch]", 16: "min-w-[16ch]" } as const;
 const CELL: Record<PlateCells, string> = { tight: "px-5 py-2.5", regular: "px-5 py-3", wide: "px-6 py-3" };
 
+/** Below sm a title that has cells beside it takes the header's whole first row, never squeezed by them. */
+export const PLATE_TITLE_STACK = "max-sm:basis-full";
+
+/** A meta or action cell: behind a hairline beside the title; below sm, sharing the row under it. */
+export function plateCellClass(index: number): string {
+  return cn("max-sm:flex-1 max-sm:border-t max-sm:border-line", index === 0 && "max-sm:border-l-0");
+}
+
 export interface PlateProps extends Omit<HTMLAttributes<HTMLElement>, "title"> {
   readonly as?: "section" | "div" | "article" | "aside" | "figure";
   /** Title cell text. Rendered as a heading when headingLevel is set, else as a legend span. */
@@ -46,15 +54,15 @@ export function PlateHeader({
   const Heading = headingLevel === 2 ? "h2" : headingLevel === 3 ? "h3" : "span";
   return (
     <div className="flex flex-wrap items-stretch border-b border-line">
-      <Heading id={titleId} className={cn("legend flex-1 leading-6 text-ink-1", MIN_CH[titleMinCh], CELL[cells])}>
+      <Heading id={titleId} className={cn("legend flex-1 leading-6 text-ink-1", MIN_CH[titleMinCh], CELL[cells], (meta.length > 0 || actions) && PLATE_TITLE_STACK)}>
         {title}
       </Heading>
       {meta.map((cell, i) => (
-        <span key={i} className={cn("legend whitespace-nowrap border-l border-line leading-6", CELL[cells])}>
+        <span key={i} className={cn("legend whitespace-nowrap border-l border-line leading-6", CELL[cells], plateCellClass(i))}>
           {cell}
         </span>
       ))}
-      {actions ? <span className="flex items-center gap-2 border-l border-line px-3 py-1.5">{actions}</span> : null}
+      {actions ? <span className={cn("flex items-center gap-2 border-l border-line px-3 py-1.5", plateCellClass(meta.length))}>{actions}</span> : null}
     </div>
   );
 }

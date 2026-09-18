@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Corners } from "@/components/ui/corners";
 import { NativeSelect } from "@/components/ui/native-select";
 import { messages } from "@/messages";
-import { QUOTA_VALUES } from "@/types/booking";
-import type { BookingClass, Quota } from "@/types/domain";
+import { QUOTA_VALUES, type FormClass, type FormQuota } from "@/types/booking";
+import { PLATE_TITLE_STACK, plateCellClass } from "@/components/ui/plate";
 import { cn } from "@/utils/cn";
 
 // Transcribed from the Claude Design sheet "Pre-booking B": Form T&T-02, the honest
@@ -14,10 +14,10 @@ import { cn } from "@/utils/cn";
 // the past-date guard, and an unavailable answer. No train list is invented.
 
 /** The class options in the order the sheet draws them. */
-const DRAWN_CLASSES: readonly BookingClass[] = ["1A", "2A", "3A", "SL", "CC", "EC", "2S"];
+const DRAWN_CLASSES: readonly FormClass[] = ["1A", "2A", "3A", "SL", "CC", "EC", "2S"];
 
-const isClass = (value: string): value is BookingClass => DRAWN_CLASSES.some((c) => c === value);
-const isQuota = (value: string): value is Quota => QUOTA_VALUES.some((q) => q === value);
+const isClass = (value: string): value is FormClass => DRAWN_CLASSES.some((c) => c === value);
+const isQuota = (value: string): value is FormQuota => QUOTA_VALUES.some((q) => q === value);
 
 /** Today in IST as YYYY-MM-DD. */
 function todayIst(): string {
@@ -28,8 +28,8 @@ const subscribeNever = () => () => undefined;
 const noDateOnServer = () => "";
 
 interface AvailabilityRequest {
-  readonly cls: BookingClass;
-  readonly quota: Quota;
+  readonly cls: FormClass;
+  readonly quota: FormQuota;
   readonly date: string;
 }
 
@@ -45,8 +45,8 @@ const FACT_VALUE = "font-display text-base font-semibold leading-normal tracking
 export function PreBookingForm() {
   const m = messages.booking;
   const ids = useId();
-  const [cls, setCls] = useState<BookingClass>("3A");
-  const [quota, setQuota] = useState<Quota>("GN");
+  const [cls, setCls] = useState<FormClass>("3A");
+  const [quota, setQuota] = useState<FormQuota>("GN");
   const [date, setDate] = useState("");
   const [submitted, setSubmitted] = useState<AvailabilityRequest | null>(null);
   const minDate = useSyncExternalStore(subscribeNever, todayIst, noDateOnServer);
@@ -77,10 +77,10 @@ export function PreBookingForm() {
       <form onSubmit={submit} noValidate className="blueprint mt-8" aria-labelledby={`${ids}-form`}>
         <Corners />
         <div className="flex flex-wrap items-stretch border-b border-line">
-          <h2 id={`${ids}-form`} className={`${CELL} min-w-[14ch] flex-1 px-5 py-2.5`}>
+          <h2 id={`${ids}-form`} className={`${CELL} min-w-[14ch] flex-1 px-5 py-2.5 ${PLATE_TITLE_STACK}`}>
             {m.form.title}
           </h2>
-          <span className={`${CELL} whitespace-nowrap border-l border-line px-5 py-2.5 text-ink-1/70`}>{m.form.sheet}</span>
+          <span className={cn(CELL, "whitespace-nowrap border-l border-line px-5 py-2.5 text-ink-1/70", plateCellClass(0))}>{m.form.sheet}</span>
         </div>
         <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,180px),1fr))] items-end gap-4 p-5">
           <div className={FIELD}>

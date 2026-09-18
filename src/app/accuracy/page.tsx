@@ -58,7 +58,7 @@ export default function AccuracyPage() {
         <dl className="blueprint">
           <Corners />
           {m.evidence.rows.map((row, index) => (
-            <div key={row.legend} className={cn("grid grid-cols-[minmax(120px,180px)_1fr] gap-x-6 px-5 py-[18px]", index > 0 && "border-t border-line")}>
+            <div key={row.legend} className={cn("grid grid-cols-1 gap-x-6 gap-y-2 px-5 py-[18px] sm:grid-cols-[minmax(120px,180px)_1fr]", index > 0 && "border-t border-line")}>
               <dt className="font-display text-label font-semibold uppercase leading-normal tracking-caps text-accent-text">{row.legend}</dt>
               <dd className="min-w-0">
                 <span className="block font-display text-xl font-semibold uppercase leading-normal tracking-head">{row.title}</span>

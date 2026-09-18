@@ -4,6 +4,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { Button, buttonClassName } from "@/components/ui/button";
 import { Corners } from "@/components/ui/corners";
+import { PLATE_TITLE_STACK, plateCellClass } from "@/components/ui/plate";
+import { STACKED_ROLES as R, stackedTable } from "@/components/ui/stacked-table";
 import { messages } from "@/messages";
 import type { WatchlistEntry } from "@/types/domain";
 import { WatchlistRow } from "./watchlist-row";
@@ -13,6 +15,7 @@ import { WatchlistRow } from "./watchlist-row";
 const HEAD_CELL = "px-5 py-2.5 font-display text-label font-semibold uppercase leading-6 tracking-caps";
 const TH = "border-b border-line px-5 py-2.5 font-display text-xs font-semibold uppercase leading-normal tracking-caps text-ink-1/70";
 const TITLE_ID = "watchlist-plate-title";
+const S = stackedTable("lg");
 
 export function SavedPlate({
   title,
@@ -34,37 +37,37 @@ export function SavedPlate({
     <div className="blueprint mt-4">
       <Corners />
       <div className="flex flex-wrap items-stretch border-b border-line">
-        <span id={TITLE_ID} className={`${HEAD_CELL} min-w-[14ch] flex-1`}>
+        <span id={TITLE_ID} className={`${HEAD_CELL} min-w-[14ch] flex-1 ${sampleData ? PLATE_TITLE_STACK : ""}`}>
           {title}
         </span>
         {sampleData ? (
-          <span title={messages.common.sampleDataHint} className={`${HEAD_CELL} whitespace-nowrap border-l border-line text-ink-1/70`}>
+          <span title={messages.common.sampleDataHint} className={`${HEAD_CELL} whitespace-nowrap border-l border-line text-ink-1/70 ${plateCellClass(0)}`}>
             {messages.common.sampleData}
           </span>
         ) : null}
       </div>
       <div className="overflow-x-auto">
-        <table aria-labelledby={TITLE_ID} className="w-full min-w-[720px] border-collapse text-body leading-normal">
-          <thead>
-            <tr>
-              <th scope="col" className={`${TH} text-left`}>
+        <table role={R.table} aria-labelledby={TITLE_ID} className={`w-full border-collapse text-body leading-normal lg:min-w-[720px] ${S.table}`}>
+          <thead role={R.rowgroup} className={S.head}>
+            <tr role={R.row}>
+              <th role={R.columnheader} scope="col" className={`${TH} text-left`}>
                 {c.pnr}
               </th>
-              <th scope="col" className={`${TH} text-left`}>
+              <th role={R.columnheader} scope="col" className={`${TH} text-left`}>
                 {c.journey}
               </th>
-              <th scope="col" className={`${TH} text-left`}>
+              <th role={R.columnheader} scope="col" className={`${TH} text-left`}>
                 {c.status}
               </th>
-              <th scope="col" className={`${TH} text-left`}>
+              <th role={R.columnheader} scope="col" className={`${TH} text-left`}>
                 {c.checked}
               </th>
-              <th scope="col" className={`${TH} text-right`}>
+              <th role={R.columnheader} scope="col" className={`${TH} text-right`}>
                 {c.actions}
               </th>
             </tr>
           </thead>
-          <tbody>
+          <tbody role={R.rowgroup} className={S.body}>
             {entries.map((entry) => (
               <WatchlistRow key={entry.pnr} entry={entry} busy={busy.has(entry.pnr)} onRecheck={onRecheck} onRemove={onRemove} />
             ))}
