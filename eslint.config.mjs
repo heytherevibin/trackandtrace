@@ -14,6 +14,10 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Agent worktrees are separate checkouts with their own lint runs.
     ".claude/**",
+    // Generated reports: `npm run test:coverage` and Playwright write these.
+    "coverage/**",
+    "playwright-report/**",
+    "test-results/**",
   ]),
 ]);
 
