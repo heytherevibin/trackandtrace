@@ -459,10 +459,12 @@ max_client_conn = 200
 site_url = "https://trakline.in"
 # Sign-in may return to production, to a Vercel preview of this team, or to local development
 # (which also signs in against the hosted project). This list replaces the base list above.
+# Previews match only <project>-<9-character id>-<team>, so no other team's address can match
+# (a bare * would accept a team slug that merely ends in "-trakline").
 additional_redirect_urls = [
   "https://trakline.in/**",
   "https://www.trakline.in/**",
-  "https://*-track-and-traze.vercel.app/**",
+  "https://trakline-?????????-trakline.vercel.app/**",
   "http://localhost:3000/**",
   "http://127.0.0.1:3000/**",
   "http://localhost:3100/**",

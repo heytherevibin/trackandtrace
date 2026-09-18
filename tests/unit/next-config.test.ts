@@ -27,7 +27,7 @@ describe("next.config redirects", () => {
   });
 
   it("leaves the apex, previews and local servers alone", async () => {
-    for (const url of ["https://trakline.in/pnr", "https://trakline-git-main-track-and-traze.vercel.app/", "http://localhost:3000/"]) {
+    for (const url of ["https://trakline.in/pnr", "https://trakline-bdq1lxt5p-trakline.vercel.app/", "http://localhost:3000/"]) {
       expect(getRedirectUrl(await request(url))).toBeNull();
     }
   });
