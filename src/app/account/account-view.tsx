@@ -13,6 +13,7 @@ import { messages } from "@/messages";
 import { signOutEverywhere } from "@/services/auth-client";
 import type { SessionUser } from "@/types/session";
 import { DeleteAccountDialog } from "./delete-account-dialog";
+import { PasskeysPlate } from "./passkeys-plate";
 
 // Account is not drawn on its own sheet. It is built from the B sheets' grammar:
 // the app title block, the empty plate (Watchlist), and title-block plates (10×20 cells).
@@ -49,7 +50,7 @@ function SignedOut() {
   );
 }
 
-export function AccountView({ user, savedCount }: { readonly user: SessionUser | null; readonly savedCount: number }) {
+export function AccountView({ user, savedCount, passkeys = false }: { readonly user: SessionUser | null; readonly savedCount: number; readonly passkeys?: boolean }) {
   const m = messages.account;
   const router = useRouter();
   const [exporting, setExporting] = useState(false);
@@ -115,6 +116,8 @@ export function AccountView({ user, savedCount }: { readonly user: SessionUser |
           </div>
         </Plate>
       </div>
+
+      {passkeys ? <PasskeysPlate /> : null}
 
       <Plate className="mt-8" title={m.data.legend} titleId="account-data" headingLevel={2} cells="tight">
         <p className="max-w-[64ch] text-sm text-ink-1/74">{m.data.detail}</p>

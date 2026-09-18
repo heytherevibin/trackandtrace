@@ -1,17 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { useState, useSyncExternalStore, type FormEvent } from "react";
 import { Mark } from "@/components/brand/mark";
 import { Button } from "@/components/ui/button";
 import { Corners } from "@/components/ui/corners";
 import { messages } from "@/messages";
-import { sendMagicLink, signInWithGoogle } from "@/services/auth-client";
+import { passkeysUsable, sendMagicLink, signInWithGoogle, signInWithPasskey } from "@/services/auth-client";
 
 // The Sign in B sheet: mark, title, lead, one plate that holds the idle, sent, or
 // not-connected state, then the no-account note.
 
 type Phase = "idle" | "sending" | "sent";
+
+const subscribeNever = () => () => undefined;
+const noPasskeysOnServer = () => false;
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const EMAIL_ID = "email";
@@ -21,10 +25,23 @@ const BLOCK = "mt-[6.8px] h-11";
 const STATE_TITLE = "text-3xl leading-[1.12] tracking-head";
 const STATE_DETAIL = "text-body leading-[23px] text-ink-1/78";
 
-export function LoginForm({ configured, error }: { readonly configured: boolean; readonly error: string | null }) {
+interface LoginFormProps {
+  readonly configured: boolean;
+  /** Google is offered only once the provider is switched on for this deployment. */
+  readonly google: boolean;
+  /** Passkeys are offered once the project has them, and only where the browser can do the ceremony. */
+  readonly passkey: boolean;
+  readonly error: string | null;
+}
+
+export function LoginForm({ configured, google, passkey, error }: LoginFormProps) {
   const m = messages.auth;
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [phase, setPhase] = useState<Phase>("idle");
+  const [passkeyWaiting, setPasskeyWaiting] = useState(false);
+  // Read on the client only: the server cannot know what the reader's device can do.
+  const passkeyReady = useSyncExternalStore(subscribeNever, passkeysUsable, noPasskeysOnServer) && passkey;
   const [message, setMessage] = useState<string | null>(error === "link" ? m.errors.link : null);
   const invalid = message === m.errors.invalidEmail;
 
@@ -50,7 +67,23 @@ export function LoginForm({ configured, error }: { readonly configured: boolean;
     void send();
   };
 
-  const google = async () => {
+  const continueWithPasskey = async () => {
+    if (passkeyWaiting) return;
+    setMessage(null);
+    setPasskeyWaiting(true);
+    const result = await signInWithPasskey();
+    setPasskeyWaiting(false);
+    if (result.ok) {
+      // The browser client wrote the session cookie; the server renders the account from it.
+      router.push("/account");
+      router.refresh();
+      return;
+    }
+    // A dismissed device prompt carries no message: the reader already knows they closed it.
+    if (result.message) setMessage(result.message);
+  };
+
+  const continueWithGoogle = async () => {
     setMessage(null);
     const result = await signInWithGoogle();
     if (!result.ok) setMessage(result.message);
@@ -60,7 +93,7 @@ export function LoginForm({ configured, error }: { readonly configured: boolean;
     <section className="mx-auto w-full max-w-[520px] px-6 pb-20 pt-[clamp(40px,7vw,80px)]">
       <Mark size={40} />
       <h1 className="optical-hang mt-6 text-signin tracking-display">{m.title}</h1>
-      <p className="mt-3 text-base text-ink-1/78">{m.lead}</p>
+      <p className="mt-3 text-base text-ink-1/78">{google ? m.lead : passkeyReady ? m.leadPasskey : m.leadEmailOnly}</p>
 
       <div className="blueprint mt-8">
         <Corners />
@@ -114,9 +147,16 @@ export function LoginForm({ configured, error }: { readonly configured: boolean;
               <Button type="submit" variant="primary" fullWidth className={BLOCK} aria-busy={phase === "sending" || undefined}>
                 {phase === "sending" ? m.sending : m.sendLink}
               </Button>
-              <Button variant="secondary" fullWidth className={BLOCK} onClick={() => void google()}>
-                {m.google}
-              </Button>
+              {passkeyReady ? (
+                <Button variant="secondary" fullWidth className={BLOCK} aria-busy={passkeyWaiting || undefined} onClick={() => void continueWithPasskey()}>
+                  {passkeyWaiting ? m.passkeyWaiting : m.passkey}
+                </Button>
+              ) : null}
+              {google ? (
+                <Button variant="secondary" fullWidth className={BLOCK} onClick={() => void continueWithGoogle()}>
+                  {m.google}
+                </Button>
+              ) : null}
             </form>
           )}
         </div>
