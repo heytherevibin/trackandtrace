@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 // Vercel's Node version, and actions pinned to a commit.
 
 const DIR = join(process.cwd(), ".github/workflows");
-const FILES = ["ci.yml"] as const;
+const FILES = ["ci.yml", "audit.yml"] as const;
 
 function read(name: string): string {
   const path = join(DIR, name);
@@ -60,5 +60,18 @@ describe("ci.yml", () => {
   it("runs the browser suite and keeps its report only when it fails", () => {
     expect(ci).toContain("npx playwright test");
     expect(ci).toMatch(/if: failure\(\)\n\s+uses: actions\/upload-artifact@/);
+  });
+});
+
+describe("audit.yml", () => {
+  const audit = read("audit.yml");
+
+  it("audits production dependencies and fails on high or critical advisories", () => {
+    expect(audit).toContain("npm audit --omit=dev --audit-level=high");
+  });
+
+  it("runs weekly and when the dependency files change, never on unrelated work", () => {
+    expect(audit).toMatch(/schedule:\n\s+- cron: /);
+    expect(audit).toMatch(/paths: \[package\.json, package-lock\.json\]/);
   });
 });
