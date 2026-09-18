@@ -8,16 +8,20 @@ Every response carries `Cache-Control: no-store`. Errors share one envelope:
 
 Codes: `INVALID_INPUT` 400 · `NOT_FOUND` 404 · `UNAUTHENTICATED` 401 · `RATE_LIMITED` 429 (+ `Retry-After` header) · `SOURCE_UNAVAILABLE` 503 · `INTERNAL` 500.
 
-## GET /api/pnr/[pnr]?fresh=1
+## POST /api/pnr
 
-Rate limit 20/min/IP. `fresh=1` bypasses the 60-second read cache. Success:
+Body `{ "pnr": "2345678901", "fresh": true }` (`fresh` optional; unknown fields are refused). The PNR travels in the body because request paths and query strings are recorded in platform request logs and bodies are not. Rate limit 20/min/IP. `fresh: true` bypasses the 60-second read cache. Success:
 
 ```json
-{ "ok": true, "source": "live|fixture", "cached": false, "latencyMs": 12,
+{ "ok": true, "source": "live|railkit|rapidapi|fixture", "cached": false, "latencyMs": 12,
   "rate": { "remaining": 19, "limit": 20 }, "data": { /* PnrResult */ } }
 ```
 
 `data` validates against `pnrResultSchema` (src/types/schemas.ts) — snapshot (train, class, journey, chart, passengers), lead status, `checkedAt`.
+
+## Result links
+
+The result page is `/pnr#<pnr>`: the PNR after "#" is never sent to a server. `POST /check` (form field `pnr`, the pre-hydration form) answers 303 to `/pnr#<pnr>`; old `/pnr/<pnr>` links answer 308 to the same.
 
 ## Watchlist (session required; 60 writes/min/user)
 

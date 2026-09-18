@@ -7,7 +7,7 @@ import { STACKED_ROLES as R, stackedTable } from "@/components/ui/stacked-table"
 import { messages } from "@/messages";
 import type { WatchlistEntry } from "@/types/domain";
 import { formatDateTime } from "@/utils/datetime";
-import { formatPnr } from "@/utils/pnr";
+import { formatPnr, pnrHref } from "@/utils/pnr";
 import { statusDescription, statusLabel } from "@/utils/status-tone";
 import { checkedAgo, lastCheck, trendLabel } from "./watchlist-format";
 
@@ -36,7 +36,7 @@ export function WatchlistRow({ entry, busy, onRecheck, onRemove }: WatchlistRowP
   return (
     <tr role={R.row} className={`${S.row} max-lg:grid-cols-2`}>
       <td role={R.cell} className={`${CELL} ${S.wide} font-data text-base leading-normal tracking-wide`}>
-        <Link href={`/pnr/${entry.pnr}`} className="text-ink-1 no-underline hover:text-ink-1 hover:underline">
+        <Link href={pnrHref(entry.pnr)} className="text-ink-1 no-underline hover:text-ink-1 hover:underline">
           {pnr}
         </Link>
       </td>

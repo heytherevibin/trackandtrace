@@ -1,10 +1,10 @@
 import { messages } from "@/messages";
 import type { PnrResult } from "@/types/domain";
-import { formatPnr } from "@/utils/pnr";
+import { formatPnr, pnrHref } from "@/utils/pnr";
 import { statusLabel } from "@/utils/status-tone";
 
 export function buildShareUrl(origin: string, pnr: string): string {
-  return `${origin}/pnr/${pnr}`;
+  return `${origin}${pnrHref(pnr)}`;
 }
 
 export function buildShareText(result: PnrResult): string {

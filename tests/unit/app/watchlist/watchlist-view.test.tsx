@@ -52,7 +52,7 @@ describe("WatchlistView — this device", () => {
     expect(screen.getByText("3 saved")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Sign in to sync" })).toHaveAttribute("href", "/login");
     expect(screen.getByRole("table", { name: "Saved PNRs — this device" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "234 567 8909" })).toHaveAttribute("href", "/pnr/2345678909");
+    expect(screen.getByRole("link", { name: "234 567 8909" })).toHaveAttribute("href", "/pnr#2345678909");
     expect(screen.getAllByRole("columnheader").map((th) => th.textContent)).toEqual(["PNR", "Journey", "Last status", "Checked", "Actions"]);
     expect(screen.getByText("Account sync")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Clear all on this device" })).toBeInTheDocument();

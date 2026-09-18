@@ -21,11 +21,11 @@ export async function enterPnr(page: Page, pnr: string): Promise<void> {
 }
 
 /**
- * Runs a check and ends on the full record at /pnr/<pnr>. On the landing plate the record renders
+ * Runs a check and ends on the full record at /pnr#<pnr>. On the landing plate the record renders
  * in place first, so this follows its "Open full record" link; the navigate-mode form goes straight there.
  */
 export async function runCheck(page: Page, pnr: string): Promise<void> {
-  const target = `**/pnr/${pnr}`;
+  const target = new RegExp(`/pnr#${pnr}$`);
   await enterPnr(page, pnr);
   await page.getByRole("button", { name: "Run", exact: true }).first().click();
   const open = page.getByRole("link", { name: "Open full record" }).first();

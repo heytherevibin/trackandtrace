@@ -6,7 +6,7 @@ import { PNR, gotoReady } from "./helpers";
 // container that hides part of its content (a clipped nav strip, a table wider than its plate).
 
 const WIDTHS = [320, 360, 390, 768] as const;
-const ROUTES = ["/", "/watchlist", "/pre-booking", "/accuracy", "/login", "/account", `/pnr/${PNR.mixed}`, `/pnr/${PNR.notFound}`, "/pnr/abc", "/check", "/privacy", "/tos", "/offline", "/nowhere"] as const;
+const ROUTES = ["/", "/watchlist", "/pre-booking", "/accuracy", "/login", "/account", `/pnr#${PNR.mixed}`, `/pnr#${PNR.notFound}`, "/pnr/abc", "/check", "/privacy", "/tos", "/offline", "/nowhere"] as const;
 
 const SAVED = [
   {

@@ -25,7 +25,7 @@ test("check, save, remove, and undo a PNR", async ({ page, isMobile }) => {
 });
 
 test("the result page passes an axe scan", async ({ page }) => {
-  await gotoReady(page, `/pnr/${PNR.cnf}`);
+  await gotoReady(page, `/pnr#${PNR.cnf}`);
   await expect(page.getByTestId("result-status")).toBeVisible();
   await expectAxeClean(page);
 });

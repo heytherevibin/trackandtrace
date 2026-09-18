@@ -2,6 +2,8 @@ import type { MessageTree } from "../types";
 
 export const result = {
   back: "Check another PNR",
+  pageTitle: "PNR result",
+  needsScript: "This record loads in your browser. Turn on JavaScript to see it.",
   pnr: (formatted: string) => `PNR ${formatted}`,
   title: (from: string, to: string) => `${from} to ${to}`,
   trainLine: (number: string, name?: string) => (name ? `${number} · ${name}` : number),

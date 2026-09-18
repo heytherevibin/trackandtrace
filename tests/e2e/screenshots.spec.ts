@@ -23,7 +23,7 @@ test("capture review screenshots", async ({ page }, testInfo) => {
   await gotoReady(page, "/");
   await settle();
   await page.screenshot({ path: `.impeccable/review/${name}.png`, fullPage: true });
-  await gotoReady(page, `/pnr/${PNR.cnf}`);
+  await gotoReady(page, `/pnr#${PNR.cnf}`);
   await settle();
   await page.screenshot({ path: `.impeccable/review/${name}-result.png`, fullPage: true });
 
