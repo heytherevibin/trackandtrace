@@ -1,24 +1,18 @@
 import Link from "next/link";
 import { Mark } from "@/components/brand/mark";
-import { Led } from "@/components/ui/led";
 import { messages } from "@/messages";
-import { accountsConfigured, flags } from "@/services/env";
+import { ServicePill } from "@/components/status/service-pill";
+import { serviceStatus } from "@/services/service-status";
 import { FooterSections } from "./footer-sections";
+import { COLUMN_HEAD, COLUMN_LINK, COLUMN_LIST } from "./footer-styles";
 import { FooterSwitch } from "./footer-switch";
 import { IstClock } from "./ist-clock";
 import { PRIMARY_NAV } from "./nav-config";
 
-const COLUMN_HEAD = "m-0 font-display text-label font-semibold uppercase tracking-caps text-accent-text";
-const COLUMN_LIST = "mt-3.5 flex list-none flex-col gap-2.5 p-0 text-sm";
-const COLUMN_LINK = "text-ink-1/78 no-underline hover:text-ink-1/78";
-
-/** The landing's enterprise footer, as drawn: brand and disclaimer, Product, Company, Status lamps, then the clock bar. */
+/** The landing's footer: brand and disclaimer, Sections, Product, Company; then one bar with the copyright, service status and clock. */
 function FullFooter() {
   const m = messages.shell.footer;
-  const rows = [
-    { label: m.sourceRow, on: flags.liveSource },
-    { label: m.accountsRow, on: accountsConfigured() },
-  ];
+  const status = serviceStatus();
   const year = new Date().getFullYear();
   return (
     <>
@@ -69,23 +63,14 @@ function FullFooter() {
             </li>
           </ul>
         </div>
-        <div className="flex-[1.2_1_220px]">
-          <p className={COLUMN_HEAD}>{m.status}</p>
-          <ul className={COLUMN_LIST} aria-label={m.statusLabel}>
-            {rows.map((row) => (
-              <li key={row.label} className="flex items-center gap-2.5">
-                <Led lit={row.on} size="sm" />
-                <span className="text-ink-1/78">{row.label}</span>
-                <span className="ml-auto font-display text-2xs font-semibold uppercase tracking-caps text-ink-1/70">{row.on ? m.connected : m.notConnected}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
       </div>
       <div className="border-t border-line">
         <div className="page-frame flex flex-wrap items-center justify-between gap-x-6 gap-y-3 py-4">
           <p className="m-0 font-display text-xs font-semibold uppercase tracking-caps text-ink-1/70">{m.copyright(year)}</p>
-          <IstClock />
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+            <ServicePill status={status} />
+            <IstClock />
+          </div>
         </div>
       </div>
     </>

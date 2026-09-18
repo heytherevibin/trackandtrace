@@ -1,6 +1,5 @@
 import { messages } from "@/messages";
 import type { PnrSnapshot, PnrSource } from "@/types/domain";
-import { isThirdPartySource } from "@/utils/source";
 
 // How a record's optional facts read. A fact the source did not send says "Not returned";
 // nothing here estimates a value the source did not provide.
@@ -25,9 +24,7 @@ export function distanceValue(km: number | undefined): string {
   return km === undefined ? NOT_RETURNED : messages.result.facts.km(new Intl.NumberFormat("en-IN").format(km));
 }
 
-/** Which tag a result wears beside its status: the fixture's Sample data, or the third-party source's label. */
-export function sourceTagFor(source: PnrSource): "sample" | "thirdParty" | null {
-  if (source === "fixture") return "sample";
-  if (isThirdPartySource(source)) return "thirdParty";
-  return null;
+/** The tag a result wears beside its status: only the fixture's Sample data. Real records carry none. */
+export function sourceTagFor(source: PnrSource): "sample" | null {
+  return source === "fixture" ? "sample" : null;
 }

@@ -4,6 +4,7 @@ import { messages } from "@/messages";
 import type { PnrSource } from "@/types/domain";
 import { formatTime } from "@/utils/datetime";
 import { formatPnr } from "@/utils/pnr";
+import { publicSourceOf } from "@/utils/source";
 
 /** The request lifecycle as the Pre-booking sheet draws it, every stop done, closed by the data-policy note. */
 export function ProvenancePanel({
@@ -28,7 +29,7 @@ export function ProvenancePanel({
         steps={[
           { id: "input", title: m.steps.input, detail: m.details.input(formatPnr(pnr)), state: "done" },
           { id: "validate", title: m.steps.validate, detail: m.details.validate, state: "done" },
-          { id: "source", title: m.steps.source, detail: m.details.source(messages.result.sourceNames[source], m.latency(latencyMs)), state: "done" },
+          { id: "source", title: m.steps.source, detail: m.details.source(messages.result.sourceNames[publicSourceOf(source)], m.latency(latencyMs)), state: "done" },
           { id: "result", title: m.steps.result, detail: m.details.result(formatTime(checkedAt)), state: "done" },
         ]}
       />

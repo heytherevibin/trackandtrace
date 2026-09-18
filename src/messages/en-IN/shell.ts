@@ -18,7 +18,6 @@ export const shell = {
     sections: {
       how: "How it works",
       record: "The record",
-      sources: "Sources",
       roadmap: "Roadmap",
       faq: "FAQ",
     },
@@ -33,15 +32,9 @@ export const shell = {
   footer: {
     product: "Product",
     company: "Company",
-    status: "Status",
     privacy: "Privacy",
     terms: "Terms",
-    sourceRow: "Reservation source",
-    accountsRow: "Account storage",
-    connected: "Connected",
-    notConnected: "Not connected",
     copyright: (year: number) => `© ${year} Trakline`,
-    statusLabel: "Service status",
     sections: "Sections",
   },
   install: {

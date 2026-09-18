@@ -7,6 +7,7 @@ import { statusDescription, statusLabel } from "@/utils/status-tone";
 import { ChartCountdown } from "./chart-countdown";
 import { chartValue, timeValue } from "./record-values";
 import { ResultTagRow } from "./result-tag-row";
+import { publicSourceOf } from "@/utils/source";
 
 /**
  * The status plate: the landing terminal's result state on its own sheet. Tag row,
@@ -17,7 +18,7 @@ export function StatusBand({ result, cached, className }: { readonly result: Pnr
   const m = messages.result;
   const s = result.snapshot;
   const label = statusLabel(result.lead.status, result.lead.position);
-  const provenance = m.status.provenance(formatTime(result.checkedAt), m.sources[s.source]);
+  const provenance = m.status.provenance(formatTime(result.checkedAt), m.sources[publicSourceOf(s.source)]);
   return (
     <Plate
       title={m.status.legend}

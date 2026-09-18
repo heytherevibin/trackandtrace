@@ -6,7 +6,7 @@ import { gotoReady, navigateFromMasthead, openMasthead } from "./helpers";
 // hamburger. The landing's section anchors live in the footer.
 
 const PRODUCT = ["Check a PNR", "Watchlist", "Pre-booking", "Accuracy"] as const;
-const SECTIONS = ["How it works", "The record", "Sources", "Roadmap", "FAQ"] as const;
+const SECTIONS = ["How it works", "The record", "Roadmap", "FAQ"] as const;
 
 test("the hamburger holds the product links and marks the current page", async ({ page, isMobile }) => {
   test.skip(!isMobile, "phone-only surface");

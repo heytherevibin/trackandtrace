@@ -16,7 +16,7 @@ Accept a 10-digit PNR, request the current reservation record from a verified ra
 
 ## Positioning
 
-Only fields returned by a verified source are shown, each with provenance and retrieval time; no fabricated confirmation odds, trends, or route rankings. Checking is free and needs no account. PNRs never appear in our web addresses or server logs (checks send them in the request body; result links keep them after "#"), and passenger names are never read or stored. A neighboring product that predicts confirmation cannot truthfully make the first claim.
+Only fields returned by the reservation service are shown, each with its retrieval time, under the one name travellers see (Trakline; the data provider behind it is never named to them); no fabricated confirmation odds, trends, or route rankings. Checking is free and needs no account. PNRs never appear in our web addresses or server logs (checks send them in the request body; result links keep them after "#"), and passenger names are never read or stored. A neighboring product that predicts confirmation cannot truthfully make the first claim.
 
 ## Operating Context
 

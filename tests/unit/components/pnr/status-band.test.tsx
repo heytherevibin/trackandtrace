@@ -44,23 +44,16 @@ describe("StatusBand", () => {
     expect(screen.getByText("Retrieved 12:00 IST from the development fixture · every field as returned, none invented")).toBeInTheDocument();
     unmount();
     render(<StatusBand result={asLive(fixtureResult("2345678901"))} cached />);
-    expect(screen.getByText("Retrieved 12:00 IST from the railway source · every field as returned, none invented · served from the last minute's read")).toBeInTheDocument();
+    expect(screen.getByText("Retrieved 12:00 IST from Trakline · every field as returned, none invented · served from the last minute's read")).toBeInTheDocument();
   });
 
-  it("names RailKit in the Third-party tag's note and the provenance for its results", () => {
+  it("wears no provider tag, names Trakline, and never estimates a missing chart", () => {
     const base = fixtureResult("2345678901");
-    render(<StatusBand result={{ ...base, snapshot: { ...base.snapshot, source: "railkit" as const } }} cached={false} />);
-    expect(screen.getByText("Third-party")).toHaveAttribute("title", expect.stringMatching(/RailKit.*not affiliated/i));
-    expect(screen.getByText(/from RailKit \(third-party\)/)).toBeInTheDocument();
-  });
-
-  it("wears a Third-party tag for RapidAPI results, names the source, and never estimates a missing chart", () => {
-    const base = fixtureResult("2345678901");
-    const result = { ...base, snapshot: { ...base.snapshot, source: "rapidapi" as const, train: { number: "12658", from: { code: "SBC" }, to: { code: "MAS" } }, chartAt: undefined, chartTime: undefined, chartPrepared: false } };
+    const result = { ...base, snapshot: { ...base.snapshot, source: "live" as const, train: { number: "12658", from: { code: "SBC" }, to: { code: "MAS" } }, chartAt: undefined, chartTime: undefined, chartPrepared: false } };
     render(<StatusBand result={result} cached={false} />);
-    expect(screen.getByText("Third-party")).toHaveAttribute("title", expect.stringMatching(/not affiliated/i));
+    expect(screen.queryByText("Third-party")).toBeNull();
     expect(screen.queryByText("Sample data")).toBeNull();
-    expect(screen.getByText(/from RapidAPI · IRCTC \(third-party\)/)).toBeInTheDocument();
+    expect(screen.getByText(/from Trakline/)).toBeInTheDocument();
     const value = (label: string) => screen.getByText(label, { selector: "dt" }).nextElementSibling;
     expect(value("Departs")).toHaveTextContent("Not returned");
     expect(value("Chart")).toHaveTextContent("Not prepared");

@@ -9,7 +9,6 @@ import { fetchPnr } from "@/services/pnr-source";
 import { recentStore } from "@/services/stores/recent-store";
 import type { PnrOutcome } from "@/types/domain";
 import { cn } from "@/utils/cn";
-import type { ThirdPartySource } from "@/utils/source";
 import { formatPnr } from "@/utils/pnr";
 import { PnrActions, PnrCells, PnrEntry, PnrField, PnrHint, PnrInput, PnrStub, useShake } from "./pnr-field";
 import { TerminalRecord } from "./pnr-terminal-result";
@@ -36,7 +35,7 @@ async function request(pnr: string): Promise<PnrOutcome> {
   }
 }
 
-function useCheckPlate(sampleMode: boolean, thirdPartySource: ThirdPartySource | undefined) {
+function useCheckPlate(sampleMode: boolean, connected: boolean) {
   const [digits, setDigits] = useState("");
   const [attempted, setAttempted] = useState(false);
   const [phase, setPhase] = useState<Phase>("entry");
@@ -79,7 +78,7 @@ function useCheckPlate(sampleMode: boolean, thirdPartySource: ThirdPartySource |
     setAnnouncement("");
     const [outcome] = await Promise.all([request(pnr), wait(MIN_RUNNING_MS)]);
     if (runId.current !== id) return;
-    const view = terminalResult(outcome, { pnr, attemptedAt, sampleMode, thirdPartySource });
+    const view = terminalResult(outcome, { pnr, attemptedAt, sampleMode, connected });
     recentStore.push(view.recent);
     setResult(view);
     setPhase("done");
@@ -121,8 +120,8 @@ function useCheckPlate(sampleMode: boolean, thirdPartySource: ThirdPartySource |
 }
 
 /** The hero plate: "PNR check — live request · Form TL-01", with the recent strip along its foot. */
-export function PnrTerminal({ sampleMode, thirdPartySource }: { readonly sampleMode: boolean; readonly thirdPartySource?: ThirdPartySource }) {
-  const plate = useCheckPlate(sampleMode, thirdPartySource);
+export function PnrTerminal({ sampleMode, connected = false }: { readonly sampleMode: boolean; readonly connected?: boolean }) {
+  const plate = useCheckPlate(sampleMode, connected);
   const m = messages.check;
   return (
     <Plate
@@ -168,18 +167,18 @@ export function PnrTerminal({ sampleMode, thirdPartySource }: { readonly sampleM
 /** The closing plate: a second, compact check with the lead line above the cells and the hint beside Run. */
 export function PnrClosingTerminal({
   sampleMode,
-  thirdPartySource,
+  connected = false,
   title,
   meta,
   lead,
 }: {
   readonly sampleMode: boolean;
-  readonly thirdPartySource?: ThirdPartySource;
+  readonly connected?: boolean;
   readonly title: string;
   readonly meta: string;
   readonly lead: string;
 }) {
-  const plate = useCheckPlate(sampleMode, thirdPartySource);
+  const plate = useCheckPlate(sampleMode, connected);
   const running = plate.phase === "running";
   return (
     <Plate as="div" title={title} meta={[meta]} cells="wide" padding="lg" className={cn(plate.shaking && "shake")} onAnimationEnd={plate.onAnimationEnd}>

@@ -3,6 +3,7 @@ import { log } from "@/services/log";
 import type { PnrOutcome } from "@/types/domain";
 import { PNR_INVALID_MESSAGE, isValidPnr } from "@/utils/pnr";
 import { parseIrctc1Response } from "./rapidapi-parse";
+import { messages } from "@/messages";
 
 // ---------------------------------------------------------------------------
 // The RapidAPI "IRCTC" API (IRCTCAPI, irctc1.p.rapidapi.com) as a PNR source.
@@ -25,6 +26,9 @@ export interface RapidApiDeps {
   readonly fetch?: typeof fetch;
   readonly now?: () => Date;
 }
+
+/** Travellers read one neutral voice; the provider, key, plan and HTTP status stay in the server log. */
+const OUT = messages.source.outcomes;
 
 function unavailable(message: string, retryAfter?: number): PnrOutcome {
   return retryAfter === undefined ? { ok: false, code: "SOURCE_UNAVAILABLE", message } : { ok: false, code: "SOURCE_UNAVAILABLE", message, retryAfter };
@@ -60,23 +64,23 @@ export function createRapidApiSource(config: RapidApiConfig, deps: RapidApiDeps 
       } catch (error) {
         if (isTimeout(error)) {
           log.warn("[source:rapidapi] timed out", { timeoutMs: config.timeoutMs });
-          return unavailable("The third-party provider did not answer in time. Nothing was shown in its place.");
+          return unavailable(OUT.timeout);
         }
         log.warn("[source:rapidapi] request failed", { kind: error instanceof Error ? error.name : typeof error });
-        return unavailable("The third-party provider could not be reached. Nothing was shown in its place.");
+        return unavailable(OUT.unreachable);
       }
 
       if (response.status === 401 || response.status === 403) {
         log.error("[source:rapidapi] credentials refused", { status: response.status });
-        return unavailable("The third-party provider refused this deployment's API key or subscription.");
+        return unavailable(OUT.refused);
       }
       if (response.status === 429) {
         log.warn("[source:rapidapi] quota exhausted", { status: response.status });
-        return unavailable("The third-party provider's request quota is used up for now. Try again later.", retryAfterSeconds(response.headers.get("retry-after")));
+        return unavailable(OUT.busy, retryAfterSeconds(response.headers.get("retry-after")));
       }
       if (!response.ok) {
         log.warn("[source:rapidapi] provider error", { status: response.status });
-        return unavailable(`The third-party provider returned an error (HTTP ${response.status}). Nothing was shown in its place.`);
+        return unavailable(OUT.error);
       }
 
       let body: unknown;
@@ -84,7 +88,7 @@ export function createRapidApiSource(config: RapidApiConfig, deps: RapidApiDeps 
         body = await response.json();
       } catch {
         log.warn("[source:rapidapi] unreadable body", { status: response.status });
-        return unavailable("The third-party provider returned an unreadable response. Nothing was shown in its place.");
+        return unavailable(OUT.unreadable);
       }
 
       const parsed = parseIrctc1Response(body, pnr, now());

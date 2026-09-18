@@ -4,6 +4,7 @@ import { isRecord } from "./irctc-record";
 import type { PnrOutcome } from "@/types/domain";
 import { PNR_INVALID_MESSAGE, isValidPnr } from "@/utils/pnr";
 import { parseRailkitPnrResponse } from "./railkit-parse";
+import { messages } from "@/messages";
 
 // ---------------------------------------------------------------------------
 // RailKit (railkit.in) as a PNR source, over its REST API. A third party, not
@@ -28,6 +29,9 @@ export interface RailkitDeps {
   readonly fetch?: typeof fetch;
   readonly now?: () => Date;
 }
+
+/** Travellers read one neutral voice; the provider, key, plan and HTTP status stay in the server log. */
+const OUT = messages.source.outcomes;
 
 function unavailable(message: string, retryAfter?: number): PnrOutcome {
   return retryAfter === undefined ? { ok: false, code: "SOURCE_UNAVAILABLE", message } : { ok: false, code: "SOURCE_UNAVAILABLE", message, retryAfter };
@@ -75,19 +79,19 @@ export function createRailkitSource(config: RailkitConfig, deps: RailkitDeps = {
       } catch (error) {
         if (isTimeout(error)) {
           log.warn("[source:railkit] timed out", { timeoutMs: config.timeoutMs });
-          return unavailable("RailKit did not answer in time. Nothing was shown in its place.");
+          return unavailable(OUT.timeout);
         }
         log.warn("[source:railkit] request failed", { kind: error instanceof Error ? error.name : typeof error });
-        return unavailable("RailKit could not be reached. Nothing was shown in its place.");
+        return unavailable(OUT.unreachable);
       }
 
       if (response.status === 401 || response.status === 403) {
         log.error("[source:railkit] key or plan refused", { status: response.status });
-        return unavailable("RailKit refused this deployment's API key or plan. Nothing was shown in its place.");
+        return unavailable(OUT.refused);
       }
       if (response.status === 429) {
         log.warn("[source:railkit] quota or rate limit reached", { status: response.status });
-        return unavailable("RailKit's request limit is used up for now. Try again later.", retryAfterSeconds(response.headers));
+        return unavailable(OUT.busy, retryAfterSeconds(response.headers));
       }
 
       const body = await jsonOrNull(response);
@@ -100,11 +104,11 @@ export function createRailkitSource(config: RailkitConfig, deps: RailkitDeps = {
       }
       if (!response.ok) {
         log.warn("[source:railkit] provider error", { status: response.status });
-        return unavailable(`RailKit returned an error (HTTP ${response.status}). Nothing was shown in its place.`);
+        return unavailable(OUT.error);
       }
       if (body === null) {
         log.warn("[source:railkit] unreadable body", { status: response.status });
-        return unavailable("RailKit returned an unreadable response. Nothing was shown in its place.");
+        return unavailable(OUT.unreadable);
       }
 
       const parsed = parseRailkitPnrResponse(body, pnr, now());

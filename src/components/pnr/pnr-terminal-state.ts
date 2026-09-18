@@ -1,11 +1,11 @@
 import { messages } from "@/messages";
-import { isThirdPartySource, type ThirdPartySource } from "@/utils/source";
 import type { RecentCheck } from "@/services/stores/recent-store";
 import type { PassengerSeat, PnrOutcome, PnrResult, TicketStatus } from "@/types/domain";
 import { formatTime } from "@/utils/datetime";
 import { formatPnr } from "@/utils/pnr";
 import { statusDescription, statusLabel } from "@/utils/status-tone";
 import { chartValue, sourceTagFor, timeValue } from "./record-values";
+import { publicSourceOf } from "@/utils/source";
 
 // The check plate's behaviour as pure functions: the drawn `formVals` states and
 // the `buildResult` view, fed by the real outcome instead of a local port.
@@ -77,8 +77,6 @@ export interface TerminalResult {
   readonly statusBig: string;
   readonly statusLong: string;
   readonly sample: boolean;
-  /** The third-party source that answered (or failed to answer); null for the railway source and the fixture. */
-  readonly thirdParty: ThirdPartySource | null;
   readonly provenance: string;
   readonly facts: readonly TerminalFact[];
   readonly pax: readonly PaxRow[];
@@ -138,16 +136,16 @@ interface ResultContext {
   readonly attemptedAt: Date;
   /** Server-computed: the labelled fixture is the source serving this deployment. */
   readonly sampleMode: boolean;
-  /** Server-computed: the third-party source serving this deployment, if one is. */
-  readonly thirdPartySource?: ThirdPartySource;
+  /** Server-computed: a reservation source is connected (its failures are answers, not a missing connection). */
+  readonly connected?: boolean;
 }
 
-export function terminalResult(outcome: PnrOutcome, { pnr, attemptedAt, sampleMode, thirdPartySource }: ResultContext): TerminalResult {
+export function terminalResult(outcome: PnrOutcome, { pnr, attemptedAt, sampleMode, connected = false }: ResultContext): TerminalResult {
   const r = messages.check.result;
   const attempted = formatTime(attemptedAt);
   const checkedAt = attemptedAt.toISOString();
-  const base = { pnr, pnrLabel: r.pnr(formatPnr(pnr)), facts: [], pax: [], thirdParty: null } as const;
-  const activeSource = sampleMode ? r.sources.fixture : thirdPartySource ? r.sources[thirdPartySource] : r.sources.live;
+  const base = { pnr, pnrLabel: r.pnr(formatPnr(pnr)), facts: [], pax: [] } as const;
+  const activeSource = sampleMode ? r.sources.fixture : r.sources.live;
 
   if (outcome.ok) {
     const { result } = outcome;
@@ -160,8 +158,7 @@ export function terminalResult(outcome: PnrOutcome, { pnr, attemptedAt, sampleMo
       statusBig: statusBigFor(result),
       statusLong: statusDescription(result.lead.status),
       sample: tag === "sample",
-      thirdParty: tag === "thirdParty" && isThirdPartySource(result.snapshot.source) ? result.snapshot.source : null,
-      provenance: r.provenance.retrieved(formatTime(result.checkedAt), r.sources[result.snapshot.source]),
+      provenance: r.provenance.retrieved(formatTime(result.checkedAt), r.sources[publicSourceOf(result.snapshot.source)]),
       facts: factsFor(result),
       pax: result.snapshot.pax.length > 1 ? paxRows(result.snapshot.pax) : [],
       recent: { pnr, label: recentLabelFor(result), status: result.lead.status, position: result.lead.position, checkedAt: result.checkedAt },
@@ -177,7 +174,6 @@ export function terminalResult(outcome: PnrOutcome, { pnr, attemptedAt, sampleMo
         statusBig: r.notFound.big,
         statusLong: r.notFound.long,
         sample: sampleMode,
-        thirdParty: thirdPartySource ?? null,
         provenance: r.provenance.retrievedOnly(attempted, activeSource),
         recent: { pnr, status: "NOT_FOUND", position: null, checkedAt },
       };
@@ -208,12 +204,11 @@ export function terminalResult(outcome: PnrOutcome, { pnr, attemptedAt, sampleMo
         ...base,
         kind: "unavailable",
         statusShort: r.unavailable.short,
-        statusBig: thirdPartySource ? r.unavailable.thirdPartyBig : r.unavailable.big,
+        statusBig: connected ? r.unavailable.connectedBig : r.unavailable.big,
         // The adapter's messages are written for readers: which failure, and that nothing was shown in its place.
-        statusLong: thirdPartySource ? outcome.message : r.unavailable.long,
+        statusLong: connected ? outcome.message : r.unavailable.long,
         sample: false,
-        thirdParty: thirdPartySource ?? null,
-        provenance: thirdPartySource ? r.provenance.thirdPartySilent(attempted, r.sources[thirdPartySource]) : r.provenance.silent(attempted),
+        provenance: connected ? r.provenance.noAnswer(attempted) : r.provenance.silent(attempted),
         recent: { pnr, label: r.unavailable.short, checkedAt },
       };
   }

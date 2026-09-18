@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { messages } from "@/messages";
 import type { PaxRow, TerminalFact, TerminalResult } from "./pnr-terminal-state";
-import { SampleTag, SheetTag, ThirdPartyTag } from "./pnr-terminal-tags";
+import { SampleTag, SheetTag } from "./pnr-terminal-tags";
 import { pnrHref } from "@/utils/pnr";
 
 // The record rendered in place on the check plate, as drawn: status tag, sample
@@ -69,7 +69,6 @@ export function TerminalRecord({ result, full, onReset }: { readonly result: Ter
       <div className="flex flex-wrap items-center gap-2.5">
         <SheetTag variant="accent">{result.statusShort}</SheetTag>
         {result.sample ? <SampleTag /> : null}
-        {result.thirdParty ? <ThirdPartyTag source={result.thirdParty} /> : null}
         <span className="ml-auto text-label leading-normal text-ink-1/70 tnum">{result.pnrLabel}</span>
       </div>
       <p className="m-0 font-display text-4xl font-semibold uppercase tracking-display">{result.statusBig}</p>

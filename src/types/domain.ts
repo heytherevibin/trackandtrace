@@ -107,6 +107,18 @@ export interface PnrResult {
   checkedAt: string;
 }
 
+/** Sources as travellers see them: labelled sample data, or Trakline. Provider names stay on the server. */
+export type PublicPnrSource = "live" | "fixture";
+
+/** A record as it crosses the wire: the same fields, with the public source only. */
+export interface PublicPnrSnapshot extends Omit<PnrSnapshot, "source"> {
+  source: PublicPnrSource;
+}
+
+export interface PublicPnrResult extends Omit<PnrResult, "snapshot"> {
+  snapshot: PublicPnrSnapshot;
+}
+
 export type SourceErrorCode = "INVALID" | "NOT_FOUND" | "SOURCE_UNAVAILABLE" | "RATE_LIMITED";
 
 export type PnrOutcome =

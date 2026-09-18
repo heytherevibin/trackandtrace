@@ -2,13 +2,11 @@ import { Badge } from "@/components/ui/badge";
 import { messages } from "@/messages";
 import type { PnrSource } from "@/types/domain";
 import { formatPnr } from "@/utils/pnr";
-import { isThirdPartySource } from "@/utils/source";
 import { sourceTagFor } from "./record-values";
 
 /**
  * The terminal result's first line, as drawn: the filled status tag, the outline source tag
- * ("Sample data" for the fixture, "Third-party" for RailKit or RapidAPI, its note naming the provider), and
- * the PNR at the right in 13px figures.
+ * ("Sample data" for the fixture only), and the PNR at the right in 13px figures.
  */
 export function ResultTagRow({ tag, source, pnr, status }: { readonly tag: string; readonly source: PnrSource; readonly pnr: string; readonly status?: string }) {
   const sourceTag = sourceTagFor(source);
@@ -20,11 +18,6 @@ export function ResultTagRow({ tag, source, pnr, status }: { readonly tag: strin
       {sourceTag === "sample" ? (
         <Badge variant="outline" title={messages.common.sampleDataHint}>
           {messages.common.sampleData}
-        </Badge>
-      ) : null}
-      {sourceTag === "thirdParty" && isThirdPartySource(source) ? (
-        <Badge variant="outline" title={messages.common.thirdPartyHints[source]}>
-          {messages.common.thirdParty}
         </Badge>
       ) : null}
       <span className="tnum ml-auto text-label text-ink-1/70">{messages.result.pnr(formatPnr(pnr))}</span>

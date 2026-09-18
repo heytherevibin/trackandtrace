@@ -50,16 +50,16 @@ describe("PnrHashResult", () => {
   it("labels a no-record answer with the deployment's source", async () => {
     fetchPnr.mockResolvedValue(answer({ ok: false, code: "NOT_FOUND", message: "none" }));
     setHash("#5827194603");
-    render(<PnrHashResult source="railkit" />);
+    render(<PnrHashResult source="live" />);
     expect(await screen.findByRole("heading", { level: 2, name: "No record for this PNR" })).toBeInTheDocument();
-    expect(screen.getByText(/from RailKit \(third-party\)/)).toBeInTheDocument();
+    expect(screen.getByText(/from Trakline/)).toBeInTheDocument();
   });
 
   it("explains an unavailable source and retries with a fresh read", async () => {
-    fetchPnr.mockResolvedValue(answer({ ok: false, code: "SOURCE_UNAVAILABLE", message: "RailKit did not answer in time. Nothing was shown in its place." }));
+    fetchPnr.mockResolvedValue(answer({ ok: false, code: "SOURCE_UNAVAILABLE", message: "The reservation service did not answer in time. Nothing was shown in its place." }));
     setHash("#2345678901");
-    render(<PnrHashResult source="railkit" />);
-    expect(await screen.findByText("RailKit did not answer in time. Nothing was shown in its place.")).toBeInTheDocument();
+    render(<PnrHashResult source="live" />);
+    expect(await screen.findByText("The reservation service did not answer in time. Nothing was shown in its place.")).toBeInTheDocument();
     act(() => screen.getByTestId("retry").click());
     await waitFor(() => expect(fetchPnr).toHaveBeenLastCalledWith("2345678901", { fresh: true }));
   });

@@ -1,13 +1,8 @@
 import {
   CalendarClockFilled,
-  DatabaseFilled,
-  DocumentTableFilled,
   EyeFilled,
-  FlowchartFilled,
   GaugeFilled,
   PersonFilled,
-  QuestionCircleFilled,
-  RoadFilled,
   TicketDiagonalFilled,
 } from "@/components/icons";
 import { messages } from "@/messages";
@@ -41,12 +36,11 @@ export const ACCOUNT_ITEM: NavItem = { href: "/account", label: messages.shell.n
 export const SIGN_IN_ITEM: NavItem = { href: "/login", label: messages.shell.nav.signIn, Icon: PersonFilled };
 
 /** In-page anchors on the landing sheet. The landing sections must carry these ids. */
-export const LANDING_SECTIONS: readonly { readonly id: string; readonly label: string; readonly Icon: NavIcon }[] = [
-  { id: "how", label: messages.shell.nav.sections.how, Icon: FlowchartFilled },
-  { id: "record", label: messages.shell.nav.sections.record, Icon: DocumentTableFilled },
-  { id: "sources", label: messages.shell.nav.sections.sources, Icon: DatabaseFilled },
-  { id: "roadmap", label: messages.shell.nav.sections.roadmap, Icon: RoadFilled },
-  { id: "faq", label: messages.shell.nav.sections.faq, Icon: QuestionCircleFilled },
+export const LANDING_SECTIONS: readonly { readonly id: string; readonly label: string }[] = [
+  { id: "how", label: messages.shell.nav.sections.how },
+  { id: "record", label: messages.shell.nav.sections.record },
+  { id: "roadmap", label: messages.shell.nav.sections.roadmap },
+  { id: "faq", label: messages.shell.nav.sections.faq },
 ];
 
 /** The id of the landing's check plate, the target of every "Check a PNR" link. */

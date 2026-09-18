@@ -98,19 +98,18 @@ describe("result view", () => {
     expect(view.recent).toMatchObject({ pnr: "2345678909", status: "CNF", position: null, label: "12627 · SBC→NDLS · Sat, 19 Sept" });
   });
 
-  it("names the railway source for a live result", () => {
+  it("names Trakline for a real result", () => {
     const live = okResult("2345678901");
     const view = terminalResult({ ok: true, result: { ...live, snapshot: { ...live.snapshot, source: "live" } } }, { pnr: "2345678901", attemptedAt: NOW, sampleMode: false });
     expect(view.sample).toBe(false);
-    expect(view.provenance).toBe("Retrieved 12:00 IST from the railway source · every field as returned, none invented");
+    expect(view.provenance).toBe("Retrieved 12:00 IST from Trakline · every field as returned, none invented");
   });
 
-  it("labels a RapidAPI result third-party and names it in the provenance", () => {
+  it("names Trakline even for a record a provider produced, and carries no provider field", () => {
     const base = okResult("2345678901");
-    const view = terminalResult({ ok: true, result: { ...base, snapshot: { ...base.snapshot, source: "rapidapi" } } }, { pnr: "2345678901", attemptedAt: NOW, sampleMode: false, thirdPartySource: "rapidapi" });
-    expect(view.sample).toBe(false);
-    expect(view.thirdParty).toBe("rapidapi");
-    expect(view.provenance).toBe("Retrieved 12:00 IST from RapidAPI · IRCTC (third-party) · every field as returned, none invented");
+    const view = terminalResult({ ok: true, result: { ...base, snapshot: { ...base.snapshot, source: "railkit" } } }, { pnr: "2345678901", attemptedAt: NOW, sampleMode: false, connected: true });
+    expect(view.provenance).toBe("Retrieved 12:00 IST from Trakline · every field as returned, none invented");
+    expect(Object.keys(view)).not.toContain("thirdParty");
   });
 
   it("says Not returned for a departure or chart the source did not send, and the chart state when it did", () => {
@@ -126,43 +125,16 @@ describe("result view", () => {
     expect(prepared["Chart"]).toBe("Prepared");
   });
 
-  it("names RapidAPI, not a missing connection, when the third-party source fails", () => {
-    const view = terminalResult({ ok: false, code: "SOURCE_UNAVAILABLE", message: "The third-party provider did not answer in time. Nothing was shown in its place." }, { pnr: "1234567890", attemptedAt: NOW, sampleMode: false, thirdPartySource: "rapidapi" });
-    expect(view).toMatchObject({ kind: "unavailable", thirdParty: "rapidapi", statusBig: "Source did not answer" });
-    expect(view.statusLong).toBe("The third-party provider did not answer in time. Nothing was shown in its place.");
-    expect(view.provenance).toBe("Attempted 12:00 IST · RapidAPI · IRCTC (third-party) did not answer");
+  it("says the service did not answer, in its own neutral words, when a connected source fails", () => {
+    const message = "The reservation service did not answer in time. Nothing was shown in its place.";
+    const view = terminalResult({ ok: false, code: "SOURCE_UNAVAILABLE", message }, { pnr: "1234567890", attemptedAt: NOW, sampleMode: false, connected: true });
+    expect(view).toMatchObject({ kind: "unavailable", statusBig: "No answer from the service", statusLong: message });
+    expect(view.provenance).toBe("Attempted 12:00 IST · Trakline did not answer");
   });
 
-  it("labels a RapidAPI no-record answer by its source", () => {
-    const view = terminalResult({ ok: false, code: "NOT_FOUND", message: "none" }, { pnr: "4949608635", attemptedAt: NOW, sampleMode: false, thirdPartySource: "rapidapi" });
-    expect(view).toMatchObject({ kind: "notfound", sample: false, thirdParty: "rapidapi", provenance: "Retrieved 12:00 IST from RapidAPI · IRCTC (third-party)" });
-  });
-
-  it("labels a RailKit result third-party and names RailKit in the provenance", () => {
-    const base = okResult("2345678901");
-    const view = terminalResult({ ok: true, result: { ...base, snapshot: { ...base.snapshot, source: "railkit" } } }, { pnr: "2345678901", attemptedAt: NOW, sampleMode: false, thirdPartySource: "railkit" });
-    expect(view.thirdParty).toBe("railkit");
-    expect(view.provenance).toBe("Retrieved 12:00 IST from RailKit (third-party) · every field as returned, none invented");
-  });
-
-  it("names the source that answered when the fallback stands in for RailKit", () => {
-    const base = okResult("2345678901");
-    const view = terminalResult({ ok: true, result: { ...base, snapshot: { ...base.snapshot, source: "rapidapi" } } }, { pnr: "2345678901", attemptedAt: NOW, sampleMode: false, thirdPartySource: "railkit" });
-    expect(view.thirdParty).toBe("rapidapi");
-    expect(view.provenance).toBe("Retrieved 12:00 IST from RapidAPI · IRCTC (third-party) · every field as returned, none invented");
-  });
-
-  it("names RailKit when it fails to answer", () => {
-    const view = terminalResult({ ok: false, code: "SOURCE_UNAVAILABLE", message: "RailKit did not answer in time. Nothing was shown in its place." }, { pnr: "1234567890", attemptedAt: NOW, sampleMode: false, thirdPartySource: "railkit" });
-    expect(view).toMatchObject({ kind: "unavailable", thirdParty: "railkit", statusLong: "RailKit did not answer in time. Nothing was shown in its place." });
-    expect(view.provenance).toBe("Attempted 12:00 IST · RailKit (third-party) did not answer");
-  });
-
-  it("carries no third-party label for the railway source or the fixture", () => {
-    const base = okResult("2345678901");
-    expect(terminalResult({ ok: true, result: base }, { pnr: "2345678901", attemptedAt: NOW, sampleMode: true }).thirdParty).toBeNull();
-    const live = { ...base, snapshot: { ...base.snapshot, source: "live" as const } };
-    expect(terminalResult({ ok: true, result: live }, { pnr: "2345678901", attemptedAt: NOW, sampleMode: false }).thirdParty).toBeNull();
+  it("labels a no-record answer as Trakline's", () => {
+    const view = terminalResult({ ok: false, code: "NOT_FOUND", message: "none" }, { pnr: "4949608635", attemptedAt: NOW, sampleMode: false, connected: true });
+    expect(view).toMatchObject({ kind: "notfound", sample: false, provenance: "Retrieved 12:00 IST from Trakline" });
   });
 
   it("reads a missing record as not found, labelled by where it came from", () => {

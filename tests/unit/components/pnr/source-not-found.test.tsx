@@ -16,21 +16,10 @@ describe("SourceNotFound", () => {
     expect(screen.getByText("Retrieved 12:00 IST from the development fixture")).toBeInTheDocument();
   });
 
-  it("drops the sample tag and names the railway source for live answers", () => {
+  it("drops the sample tag and names Trakline for real answers", () => {
     render(<SourceNotFound pnr="2345678900" source="live" retrievedAt={AT} />);
     expect(screen.queryByText("Sample data")).toBeNull();
-    expect(screen.getByText("Retrieved 12:00 IST from the railway source")).toBeInTheDocument();
-  });
-
-  it("wears the Third-party tag and names RailKit for its answers", () => {
-    render(<SourceNotFound pnr="5827194603" source="railkit" retrievedAt={AT} />);
-    expect(screen.getByText("Third-party")).toHaveAttribute("title", expect.stringMatching(/RailKit/));
-    expect(screen.getByText("Retrieved 12:00 IST from RailKit (third-party)")).toBeInTheDocument();
-  });
-
-  it("wears the Third-party tag and names RapidAPI for its answers", () => {
-    render(<SourceNotFound pnr="4949608635" source="rapidapi" retrievedAt={AT} />);
-    expect(screen.getByText("Third-party")).toBeInTheDocument();
-    expect(screen.getByText("Retrieved 12:00 IST from RapidAPI · IRCTC (third-party)")).toBeInTheDocument();
+    expect(screen.getByText("Retrieved 12:00 IST from Trakline")).toBeInTheDocument();
+    expect(screen.queryByText("Third-party")).toBeNull();
   });
 });

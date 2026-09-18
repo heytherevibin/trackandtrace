@@ -50,10 +50,15 @@ export const home = {
     journeyLine: (date: string, departs: string, quota: string) => `${date} · departs ${departs} IST · quota ${quota}`,
     caption: "Specimen passengers",
   },
-  sources: {
-    kicker: "04 · Connected right now",
-    title: "The state of every source",
-    lead: "When a data set is not connected, the product says so instead of guessing. This board is read from the real flags.",
+  reliability: {
+    kicker: "04 · Reliability",
+    title: "Real records, checked live",
+    lead: "Trakline asks for your reservation at the moment you check and shows exactly what comes back.",
+    facts: [
+      { legend: "Live at check", title: "Asked the moment you press Run", detail: "Each check asks for the current record. A repeat within a minute is marked as the last minute's read." },
+      { legend: "Time-stamped", title: "Every result shows when it was retrieved", detail: "The retrieval time sits beside the status, in IST, so an old answer never passes for a new one." },
+      { legend: "Never estimated", title: "A missing field reads “Not returned”", detail: "Nothing is predicted, filled in or rounded up. Confirmation odds are never shown." },
+    ],
     policy: "Read the data policy",
   },
   roadmap: {

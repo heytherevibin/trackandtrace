@@ -1,8 +1,12 @@
 import { z } from "zod";
 import type { PnrSource } from "@/types/domain";
-import { isThirdPartySource } from "@/utils/source";
 
-export { isThirdPartySource };
+/** Providers that are not an official railway source. Server knowledge: travellers only ever see Trakline. */
+export type ThirdPartySource = Extract<PnrSource, "rapidapi" | "railkit">;
+
+export function isThirdPartySource(source: PnrSource): source is ThirdPartySource {
+  return source === "rapidapi" || source === "railkit";
+}
 
 // ---------------------------------------------------------------------------
 // Typed environment. Parsed once through `env()`; application code never reads

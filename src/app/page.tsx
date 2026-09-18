@@ -8,10 +8,11 @@ import { HowItWorks } from "@/components/landing/how-it-works";
 import { PhotoSplit } from "@/components/landing/photo-split";
 import { PrinciplesSheet } from "@/components/landing/principles-sheet";
 import { Roadmap } from "@/components/landing/roadmap";
-import { SourcesBoard } from "@/components/landing/sources-board";
+import { ReliabilityBand } from "@/components/landing/reliability-band";
 import { buildSpecimen } from "@/components/landing/specimen-data";
 import { SpecimenRecord } from "@/components/landing/specimen-record";
-import { activePnrSource, env, isThirdPartySource } from "@/services/env";
+import { activePnrSource, env } from "@/services/env";
+import { serviceStatus } from "@/services/service-status";
 import { fixtureClock } from "@/services/sources/fixture";
 
 export const metadata: Metadata = {
@@ -21,24 +22,25 @@ export const metadata: Metadata = {
 
 /** The landing sheet, as Landing Redesign B draws it, section by section. */
 export default async function HomePage() {
-  // Per request: the sources board and sample mode read the live flags, and the specimen's retrieval time is real.
+  // Per request: service status and sample mode read the live configuration, and the specimen's retrieval time is real.
   await connection();
   const source = activePnrSource(env());
   const sampleMode = source === "fixture";
-  const thirdPartySource = isThirdPartySource(source) ? source : undefined;
+  const status = serviceStatus();
+  const connected = !sampleMode && status.checks === "operational";
   const specimen = buildSpecimen(fixtureClock());
   return (
     <div id="top" className="page-frame">
-      <Hero sampleMode={sampleMode} thirdPartySource={thirdPartySource} />
+      <Hero sampleMode={sampleMode} connected={connected} />
       <PrinciplesSheet />
       <HowItWorks />
       <SpecimenRecord specimen={specimen} />
-      <SourcesBoard />
+      <ReliabilityBand checks={status.checks} />
       <Roadmap />
       <Features />
       <PhotoSplit />
       <Faq />
-      <ClosingCta sampleMode={sampleMode} thirdPartySource={thirdPartySource} />
+      <ClosingCta sampleMode={sampleMode} connected={connected} />
     </div>
   );
 }

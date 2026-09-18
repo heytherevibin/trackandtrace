@@ -15,7 +15,7 @@ describe("TopNav", () => {
   it("lists Check a PNR with the product links on the landing, and sets Sign in apart on the right", () => {
     render(<TopNav />);
     const primary = screen.getByRole("navigation", { name: "Primary" });
-    for (const name of ["How it works", "The record", "Sources", "Roadmap", "FAQ", "Sign in"]) {
+    for (const name of ["How it works", "The record", "Roadmap", "FAQ", "Sign in"]) {
       expect(within(primary).queryByRole("link", { name }), name).toBeNull();
     }
     for (const name of ["Check a PNR", "Watchlist", "Pre-booking", "Accuracy"]) {

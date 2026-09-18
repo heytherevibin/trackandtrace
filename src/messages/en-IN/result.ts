@@ -1,4 +1,5 @@
 import type { MessageTree } from "../types";
+import { common } from "./common";
 
 export const result = {
   back: "Check another PNR",
@@ -30,8 +31,8 @@ export const result = {
     chartIn: (hours: number, minutes: number) => `in ${hours} h ${minutes} min`,
     chartPrepared: "Chart prepared",
   },
-  sources: { live: "the railway source", fixture: "the development fixture", rapidapi: "RapidAPI · IRCTC (third-party)", railkit: "RailKit (third-party)" },
-  sourceNames: { live: "Railway source", fixture: "Development fixture", rapidapi: "RapidAPI · IRCTC (third-party)", railkit: "RailKit (third-party)" },
+  sources: { live: common.productName, fixture: "the development fixture" },
+  sourceNames: { live: common.productName, fixture: "Development fixture" },
   facts: {
     passengers: "Passengers",
     quota: "Quota",
