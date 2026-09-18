@@ -16,7 +16,7 @@ import { serviceStatus } from "@/services/service-status";
 import { fixtureClock } from "@/services/sources/fixture";
 
 export const metadata: Metadata = {
-  title: "Check your PNR status",
+  title: { absolute: "Trakline — Check your PNR status" },
   description: "Enter a 10-digit Indian Railways PNR and read exactly what the source returned. Free, no account needed.",
 };
 
