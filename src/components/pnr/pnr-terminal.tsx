@@ -10,7 +10,7 @@ import { recentStore } from "@/services/stores/recent-store";
 import type { PnrOutcome } from "@/types/domain";
 import { cn } from "@/utils/cn";
 import { formatPnr } from "@/utils/pnr";
-import { PnrActions, PnrCells, PnrField, PnrHint, PnrInput, PnrStub, useShake } from "./pnr-field";
+import { PnrActions, PnrCells, PnrEntry, PnrField, PnrHint, PnrInput, PnrStub, useShake } from "./pnr-field";
 import { TerminalRecord } from "./pnr-terminal-result";
 import { MIN_RUNNING_MS, fieldStatus, terminalResult, type TerminalResult } from "./pnr-terminal-state";
 import { RecentChecks } from "./recent-checks";
@@ -173,8 +173,10 @@ export function PnrClosingTerminal({ sampleMode, title, meta, lead }: { readonly
       {plate.phase !== "done" || !plate.result ? (
         <>
           <p className="mb-4 text-body leading-normal text-ink-1/78">{lead}</p>
-          <PnrInput id="pnr-b" ariaLabel={messages.check.label} digits={plate.digits} status={plate.status} onDigits={plate.type} onEnter={plate.run} inputRef={plate.inputRef} />
-          <PnrCells digits={plate.digits} status={plate.status} onActivate={plate.focus} className="max-w-[640px]" />
+          <PnrEntry className="max-w-[640px]">
+            <PnrInput id="pnr-b" ariaLabel={messages.check.label} digits={plate.digits} status={plate.status} onDigits={plate.type} onEnter={plate.run} inputRef={plate.inputRef} />
+            <PnrCells digits={plate.digits} status={plate.status} onActivate={plate.focus} />
+          </PnrEntry>
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <PnrHint inputId="pnr-b" digits={plate.digits} status={plate.status} sampleMode={sampleMode} className="min-w-0 flex-1 leading-normal" />
             <PnrActions running={running} showClear={plate.digits.length > 0 && !running} onClear={plate.clear} onRun={plate.run} />

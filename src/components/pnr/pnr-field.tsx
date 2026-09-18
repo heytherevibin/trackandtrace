@@ -1,17 +1,19 @@
 "use client";
 
-import { useCallback, useState, type AnimationEvent, type KeyboardEvent, type Ref } from "react";
+import { useCallback, useState, type AnimationEvent, type ClipboardEvent, type KeyboardEvent, type ReactNode, type Ref, type SyntheticEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Led } from "@/components/ui/led";
 import { SweepBar } from "@/components/ui/sweep-bar";
 import { messages } from "@/messages";
 import { cn } from "@/utils/cn";
-import { formatPnr, normalizePnr } from "@/utils/pnr";
+import { formatPnr, normalizePnr, pnrInText } from "@/utils/pnr";
 import { caretIndex, hintFor, lampFor, type FieldStatus } from "./pnr-terminal-state";
 
 // The entry block of the check plate, as drawn: a steel legend and "N / 10"
-// counter, one visually hidden input that carries the value, and its face —
-// ten 52px cells punched 3-3-4 with a caret and the group rulers under them.
+// counter, and ten 52px cells punched 3-3-4 with a caret and the group rulers
+// under them. The one real input lies transparent over the cells, so a click,
+// tap, right-click or long-press lands on a genuine text field (with the
+// browser's own Paste), while the cells draw what it holds.
 
 const GROUPS = [
   { keys: [0, 1, 2], label: messages.check.groups.one, flex: "flex-[3_1_0%]" },
@@ -80,28 +82,61 @@ export interface PnrInputProps {
   readonly autoFocus?: boolean;
 }
 
-/** The one real input: visually hidden, numeric, formatted 3-3-4, Enter runs the check. */
+/**
+ * The cells draw digits filling from the left with the caret after the last one, so the real
+ * caret is held to match: at the end, or around everything (select all, then type or paste over).
+ */
+function holdCaretAtEnd(event: SyntheticEvent<HTMLInputElement>) {
+  const input = event.currentTarget;
+  const end = input.value.length;
+  const { selectionStart: start, selectionEnd: stop } = input;
+  if (start === null || stop === null) return;
+  if ((start === end && stop === end) || (start === 0 && stop === end)) return;
+  input.setSelectionRange(end, end);
+}
+
+/**
+ * The one real input: transparent over the cells, numeric, formatted 3-3-4, Enter runs the check.
+ * A paste is read whole before anything is inserted (no character cap to cut it short): a PNR
+ * found in the text replaces the entry; other digits follow the ones already typed.
+ */
 export function PnrInput({ id, digits, status, onDigits, onEnter, ariaLabel, inputRef, autoFocus }: PnrInputProps) {
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key !== "Enter") return;
     event.preventDefault();
     onEnter();
   };
+  const onPaste = (event: ClipboardEvent<HTMLInputElement>) => {
+    event.preventDefault();
+    if (status === "running") return;
+    const text = event.clipboardData.getData("text");
+    const whole = pnrInText(text);
+    if (whole) {
+      onDigits(whole);
+      return;
+    }
+    const pasted = normalizePnr(text);
+    if (pasted.length === 0) return;
+    const input = event.currentTarget;
+    const everything = input.value.length > 0 && input.selectionStart === 0 && input.selectionEnd === input.value.length;
+    onDigits(normalizePnr(everything ? pasted : digits + pasted));
+  };
   return (
     <input
       ref={inputRef}
       id={id}
       name="pnr"
-      className="peer sr-only"
+      className="absolute inset-0 z-10 m-0 size-full cursor-text appearance-none border-0 bg-transparent p-0 text-base opacity-0"
       inputMode="numeric"
       enterKeyHint="go"
       autoComplete="off"
       autoCorrect="off"
       spellCheck={false}
-      maxLength={12}
       value={formatPnr(digits)}
       readOnly={status === "running"}
       onChange={(event) => onDigits(normalizePnr(event.target.value))}
+      onPaste={onPaste}
+      onSelect={holdCaretAtEnd}
       onKeyDown={onKeyDown}
       aria-label={ariaLabel}
       aria-invalid={status === "invalid" || undefined}
@@ -109,6 +144,11 @@ export function PnrInput({ id, digits, status, onDigits, onEnter, ariaLabel, inp
       autoFocus={autoFocus}
     />
   );
+}
+
+/** Stacks the real input over the drawn cells so every pointer gesture on the cells reaches it. */
+export function PnrEntry({ className, children }: { readonly className?: string; readonly children: ReactNode }) {
+  return <div className={cn("relative", className)}>{children}</div>;
 }
 
 /** The hint line: an alert when the digits are refused, a polite live line otherwise. */
@@ -137,8 +177,10 @@ export function PnrField({ id, digits, status, sampleMode, onActivate, ...input 
         </label>
         <span className="text-label leading-normal text-ink-1/70 tnum">{messages.check.counter(digits.length)}</span>
       </div>
-      <PnrInput id={id} digits={digits} status={status} {...input} />
-      <PnrCells digits={digits} status={status} onActivate={onActivate ?? (() => document.getElementById(id)?.focus())} />
+      <PnrEntry>
+        <PnrInput id={id} digits={digits} status={status} {...input} />
+        <PnrCells digits={digits} status={status} onActivate={onActivate ?? (() => document.getElementById(id)?.focus())} />
+      </PnrEntry>
       <PnrHint inputId={id} digits={digits} status={status} sampleMode={sampleMode} className="leading-5" />
     </div>
   );
