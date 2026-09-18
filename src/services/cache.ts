@@ -1,10 +1,11 @@
-// In-memory TTL cache for deterministic public reads. Never stores anything
-// user-scoped; only successful PNR outcomes, and only for one minute.
+// TTL cache for deterministic public reads. Never stores anything user-scoped;
+// only successful PNR outcomes, and only for one minute. Async, so the shared
+// Redis cache (redis-cache.ts) can stand in for this instance's memory.
 
 export interface Cache {
-  get<T>(key: string): T | undefined;
-  set<T>(key: string, value: T, ttlMs: number): void;
-  delete(key: string): void;
+  get<T>(key: string): Promise<T | undefined>;
+  set<T>(key: string, value: T, ttlMs: number): Promise<void>;
+  delete(key: string): Promise<void>;
 }
 
 export class MemoryCache implements Cache {
@@ -12,7 +13,7 @@ export class MemoryCache implements Cache {
 
   constructor(private readonly now: () => number = Date.now) {}
 
-  get<T>(key: string): T | undefined {
+  async get<T>(key: string): Promise<T | undefined> {
     const hit = this.store.get(key);
     if (!hit) return undefined;
     if (hit.exp < this.now()) {
@@ -22,11 +23,11 @@ export class MemoryCache implements Cache {
     return hit.value as T;
   }
 
-  set<T>(key: string, value: T, ttlMs: number): void {
+  async set<T>(key: string, value: T, ttlMs: number): Promise<void> {
     this.store.set(key, { value, exp: this.now() + ttlMs });
   }
 
-  delete(key: string): void {
+  async delete(key: string): Promise<void> {
     this.store.delete(key);
   }
 }
@@ -46,9 +47,9 @@ export async function getOrCompute<T>(
   compute: () => Promise<T>,
   cacheable: (value: T) => boolean = () => true,
 ): Promise<{ readonly value: T; readonly cached: boolean }> {
-  const hit = cache.get<T>(key);
+  const hit = await cache.get<T>(key);
   if (hit !== undefined) return { value: hit, cached: true };
   const value = await compute();
-  if (cacheable(value)) cache.set(key, value, ttlMs);
+  if (cacheable(value)) await cache.set(key, value, ttlMs);
   return { value, cached: false };
 }

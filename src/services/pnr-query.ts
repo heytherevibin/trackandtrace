@@ -69,7 +69,7 @@ export async function queryPnr(pnr: string, ip: string, options: PnrQueryOptions
   }
 
   const key = `pnr:${parsed.data}`;
-  if (options.fresh) deps.cache.delete(key);
+  if (options.fresh) await deps.cache.delete(key);
   const { value: outcome, cached } = await getOrCompute(
     deps.cache,
     key,
