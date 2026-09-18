@@ -1,5 +1,6 @@
 import { AppError } from "./errors";
-import { createRateLimiter, type RateLimiter } from "./rate-limit";
+import type { RateLimiter } from "./rate-limit";
+import { createRateLimiter } from "./shared-store";
 
 // Lighter per-user limit for account writes so a stuck client cannot hammer the database.
 export const WRITE_RATE_LIMIT = { limit: 60, windowMs: 60_000 } as const;

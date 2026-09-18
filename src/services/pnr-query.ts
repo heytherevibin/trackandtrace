@@ -3,7 +3,8 @@ import { PNR_INVALID_MESSAGE, pnrSchema } from "@/utils/pnr";
 import { CACHE_TTLS, getOrCompute, pnrCache, type Cache } from "./cache";
 import { AppError, fromSourceCode, toApiError, type ApiErrorBody } from "./errors";
 import type { PnrDataSource } from "./pnr-source";
-import { PNR_RATE_LIMIT, createRateLimiter, type RateLimiter } from "./rate-limit";
+import { PNR_RATE_LIMIT, type RateLimiter } from "./rate-limit";
+import { createRateLimiter } from "./shared-store";
 import { getPnrSource } from "./sources";
 
 // The one server-side PNR query. The API route and the server-rendered result
