@@ -1,5 +1,20 @@
-import type { BookingClass, PassengerSeat, PnrOutcome, PnrResult, Quota, TicketStatus } from "@/types/domain";
+import type { BookingClass, PassengerSeat, PnrResult, Quota } from "@/types/domain";
 import { bookingClassSchema, quotaSchema } from "@/types/schemas";
+import {
+  chartPreparedFrom,
+  isNoRecordMessage,
+  isRecord,
+  journeyLabelFormat,
+  parseJourneyDate,
+  parseSeatStatus,
+  pick,
+  text,
+  whole,
+  type Failure,
+  type Json,
+} from "./irctc-record";
+
+export { parseJourneyDate, parseSeatStatus, type SeatParse } from "./irctc-record";
 
 // ---------------------------------------------------------------------------
 // Reads the RapidAPI "IRCTC" (IRCTCAPI, irctc1.p.rapidapi.com) PNR response into
@@ -13,136 +28,13 @@ import { bookingClassSchema, quotaSchema } from "@/types/schemas";
 // and passenger names are never read.
 // ---------------------------------------------------------------------------
 
-type Failure = Extract<PnrOutcome, { ok: false }>;
 export type Irctc1Parse = { readonly ok: true; readonly result: PnrResult } | Failure;
-
-export interface SeatParse {
-  readonly status: Exclude<TicketStatus, "NOT_FOUND">;
-  readonly position?: number;
-  readonly coach?: string;
-  readonly berth?: string;
-  /** The quota a waitlist code names: GNWL → GN, PQWL → PQWL. */
-  readonly quota?: Quota;
-}
 
 const UNREADABLE = "The third-party provider returned a record this product cannot read. Nothing was shown in its place.";
 
 function unavailable(message: string = UNREADABLE): Failure {
   return { ok: false, code: "SOURCE_UNAVAILABLE", message };
 }
-
-type Json = Readonly<Record<string, unknown>>;
-
-function isRecord(value: unknown): value is Json {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-/** The first present, non-empty value among the candidate keys. */
-function pick(source: Json, keys: readonly string[]): unknown {
-  for (const key of keys) {
-    const value = source[key];
-    if (value !== undefined && value !== null && value !== "") return value;
-  }
-  return undefined;
-}
-
-function text(source: Json, keys: readonly string[]): string | undefined {
-  const value = pick(source, keys);
-  if (typeof value === "string") return value.trim() || undefined;
-  if (typeof value === "number" && Number.isFinite(value)) return String(value);
-  return undefined;
-}
-
-function whole(source: Json, keys: readonly string[]): number | undefined {
-  const value = pick(source, keys);
-  const n = typeof value === "number" ? value : typeof value === "string" && /^\d+$/.test(value.trim()) ? Number(value) : Number.NaN;
-  return Number.isInteger(n) && n >= 0 ? n : undefined;
-}
-
-// ---- Seat status -----------------------------------------------------------
-
-const WAITLIST_QUOTA: Readonly<Record<string, Quota>> = {
-  GN: "GN",
-  WL: "GN",
-  PQ: "PQWL",
-  RL: "RLWL",
-  TQ: "TQWL",
-  RS: "RSWL",
-  RQ: "RQWL",
-  CK: "CKWL",
-};
-
-const COACH = /^[A-Z]{1,2}\d{1,2}$/;
-
-function seatFrom(coach: string, number: string | undefined, code: string | undefined): { coach: string; berth?: string } {
-  const berth = [number, code].filter(Boolean).join(" ");
-  return berth ? { coach, berth } : { coach };
-}
-
-/** IRCTC seat notation: CNF, CNF/B2/41/LB, S5/33/UB, RAC 12, RAC/S4/33/SL, GNWL/45, PQWL 3, CAN. Unknown → null. */
-export function parseSeatStatus(raw: string): SeatParse | null {
-  const s = raw.trim().toUpperCase();
-  if (!s) return null;
-  if (s === "CAN" || s === "CANCELLED" || s === "CNL") return { status: "CANCELLED" };
-
-  const waitlist = s.match(/^(GN|PQ|RL|TQ|RS|RQ|CK)?WL[\s/,-]*(\d+)$/);
-  if (waitlist) {
-    const quota = WAITLIST_QUOTA[waitlist[1] ?? "WL"];
-    const position = Number(waitlist[2]);
-    return waitlist[1] && quota ? { status: "WL", position, quota } : { status: "WL", position };
-  }
-
-  const tokens = s.split(/[\s/,-]+/).filter(Boolean);
-  const [head, ...rest] = tokens;
-  if (head === "RAC") {
-    if (rest.length === 1 && /^\d+$/.test(rest[0]!)) return { status: "RAC", position: Number(rest[0]) };
-    if (rest.length === 0) return null;
-    if (COACH.test(rest[0]!) && (rest[1] === undefined || /^\d+$/.test(rest[1]))) return { status: "RAC", ...seatFrom(rest[0]!, rest[1], rest[2]) };
-    return null;
-  }
-  const racJoined = s.match(/^RAC(\d+)$/);
-  if (racJoined) return { status: "RAC", position: Number(racJoined[1]) };
-
-  if (head === "CNF") {
-    if (rest.length === 0) return { status: "CNF" };
-    if (COACH.test(rest[0]!) && (rest[1] === undefined || /^\d+$/.test(rest[1]))) return { status: "CNF", ...seatFrom(rest[0]!, rest[1], rest[2]) };
-    return null;
-  }
-  if (head && COACH.test(head) && rest[0] && /^\d+$/.test(rest[0])) return { status: "CNF", ...seatFrom(head, rest[0], rest[1]) };
-  return null;
-}
-
-// ---- Dates -----------------------------------------------------------------
-
-const MONTHS: Readonly<Record<string, number>> = { JAN: 1, FEB: 2, MAR: 3, APR: 4, MAY: 5, JUN: 6, JUL: 7, AUG: 8, SEP: 9, OCT: 10, NOV: 11, DEC: 12 };
-
-function isoDate(year: number, month: number, day: number): string | null {
-  const probe = new Date(Date.UTC(year, month - 1, day));
-  if (probe.getUTCFullYear() !== year || probe.getUTCMonth() !== month - 1 || probe.getUTCDate() !== day) return null;
-  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-}
-
-/** 25-09-2026 · 25/09/2026 · 2026-09-25 · Sep 25, 2026 … · 25 Sep 2026 → 2026-09-25. Anything else → null. */
-export function parseJourneyDate(raw: string): string | null {
-  const s = raw.trim();
-  let m = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
-  if (m) return isoDate(Number(m[3]), Number(m[2]), Number(m[1]));
-  m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s].*)?$/);
-  if (m) return isoDate(Number(m[1]), Number(m[2]), Number(m[3]));
-  m = s.match(/^([A-Za-z]{3})[A-Za-z]*\s+(\d{1,2}),?\s+(\d{4})\b/);
-  if (m) {
-    const month = MONTHS[m[1]!.toUpperCase()];
-    return month ? isoDate(Number(m[3]), month, Number(m[2])) : null;
-  }
-  m = s.match(/^(\d{1,2})\s+([A-Za-z]{3})[A-Za-z]*,?\s+(\d{4})\b/);
-  if (m) {
-    const month = MONTHS[m[2]!.toUpperCase()];
-    return month ? isoDate(Number(m[3]), month, Number(m[1])) : null;
-  }
-  return null;
-}
-
-const journeyLabelFormat = new Intl.DateTimeFormat("en-IN", { weekday: "short", day: "2-digit", month: "short", timeZone: "Asia/Kolkata" });
 
 // ---- Record ----------------------------------------------------------------
 
@@ -171,18 +63,7 @@ const K = {
 } as const;
 
 function chartPrepared(record: Json): boolean | undefined {
-  const value = pick(record, K.chart);
-  if (typeof value === "boolean") return value;
-  if (typeof value === "string") {
-    const t = value.toLowerCase();
-    if (t.includes("not prepared")) return false;
-    if (t.includes("prepared")) return true;
-  }
-  return undefined;
-}
-
-function refusalCode(message: string): Failure["code"] {
-  return /not valid|invalid|flushed|not yet generated|not generated|no record|not found/i.test(message) ? "NOT_FOUND" : "SOURCE_UNAVAILABLE";
+  return chartPreparedFrom(pick(record, K.chart));
 }
 
 function passengerFrom(raw: unknown, fallbackIndex: number, quota: Quota): PassengerSeat | null {
@@ -214,7 +95,7 @@ export function parseIrctc1Response(body: unknown, pnr: string, now: Date): Irct
   if (!isRecord(body)) return unavailable();
   if (body.status === false) {
     const message = typeof body.message === "string" ? body.message : "";
-    return refusalCode(message) === "NOT_FOUND"
+    return isNoRecordMessage(message)
       ? { ok: false, code: "NOT_FOUND", message: "The third-party provider has no reservation record for this PNR." }
       : unavailable("The third-party provider could not answer for this PNR. Nothing was shown in its place.");
   }
