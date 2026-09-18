@@ -2,6 +2,12 @@ import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import { enterPnr, gotoReady } from "./helpers";
 
+/** The masthead's nav control at this width: the hamburger on a phone, a nav box on desktop. */
+function mastheadNavControl(page: Page, isMobile: boolean): Locator {
+  const banner = page.getByRole("banner");
+  return isMobile ? banner.getByRole("button", { name: "Open menu" }) : banner.getByRole("link", { name: "Watchlist", exact: true });
+}
+
 // Every button in the app settles inward while pressed and springs back on release. The press is a
 // transform only, so nothing around the button moves (stable), and it eases in and out (smooth).
 
@@ -42,10 +48,10 @@ async function expectPressAnimates(page: Page, target: Locator, label: string): 
   expect(released, `${label} springs back`).toBeCloseTo(1, 2);
 }
 
-test("buttons on the landing press and release smoothly", async ({ page }) => {
+test("buttons on the landing press and release smoothly", async ({ page, isMobile }) => {
   await gotoReady(page, "/");
   const banner = page.getByRole("banner");
-  await expectPressAnimates(page, banner.getByRole("link", { name: "Watchlist", exact: true }), "masthead nav box");
+  await expectPressAnimates(page, mastheadNavControl(page, isMobile), "masthead nav control");
   await expectPressAnimates(page, banner.getByRole("button", { name: /^Theme:/ }), "theme button");
   await expectPressAnimates(page, banner.getByTestId("sign-in"), "sign in");
   const plate = page.getByTestId("hero-instrument");

@@ -73,7 +73,7 @@ test("the PNR entry draws no outline around its cells", async ({ page }) => {
   expect(outline).toBe("none");
 });
 
-test("focusing a masthead control while scrolled down never moves the page", async ({ page }) => {
+test("focusing a masthead control while scrolled down never moves the page", async ({ page, isMobile }) => {
   // Keyboard focus, and the focus Next moves during navigation, used to make the browser smooth-scroll
   // to "reveal" controls under the old scroll-padding on <html>: a lurch on press and on page switch.
   await gotoReady(page, "/privacy");
@@ -82,7 +82,8 @@ test("focusing a masthead control while scrolled down never moves the page", asy
   const start = await page.evaluate(() => Math.round(window.scrollY));
   expect(start).toBeGreaterThan(0);
   const banner = page.getByRole("banner");
-  for (const target of [banner.getByRole("link", { name: "Accuracy", exact: true }), banner.getByRole("button", { name: /^Theme:/ }), banner.getByTestId("sign-in")]) {
+  const navControl = isMobile ? banner.getByRole("button", { name: "Open menu" }) : banner.getByRole("link", { name: "Accuracy", exact: true });
+  for (const target of [navControl, banner.getByRole("button", { name: /^Theme:/ }), banner.getByTestId("sign-in")]) {
     await target.evaluate((el) => (el as HTMLElement).focus());
     await page.waitForTimeout(500);
     expect(await page.evaluate(() => Math.round(window.scrollY))).toBe(start);

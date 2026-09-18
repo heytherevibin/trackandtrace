@@ -14,7 +14,7 @@ import { cn } from "@/utils/cn";
 import { MASTHEAD_CONTROL } from "./nav-config";
 
 function Placeholder() {
-  return <span className="inline-block h-9 w-[104px] border border-line" aria-hidden="true" />;
+  return <span className="inline-block h-9 w-9 border border-line xs:w-[104px]" aria-hidden="true" />;
 }
 
 function UserMenuInner() {
@@ -22,9 +22,9 @@ function UserMenuInner() {
   const user = useUser();
   if (!user) {
     return (
-      <Link href="/login" className={cn(buttonClassName({ variant: "secondary" }), MASTHEAD_CONTROL, "py-0")} data-testid="sign-in">
+      <Link href="/login" className={cn(buttonClassName({ variant: "secondary" }), MASTHEAD_CONTROL, "py-0 max-xs:w-9 max-xs:justify-center max-xs:px-0")} data-testid="sign-in">
         <PersonFilled className="size-5 shrink-0" aria-hidden="true" />
-        {messages.shell.nav.signIn}
+        <span className="max-xs:sr-only">{messages.shell.nav.signIn}</span>
       </Link>
     );
   }

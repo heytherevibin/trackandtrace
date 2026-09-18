@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
 export const PNR = {
@@ -43,6 +43,22 @@ export async function runCheck(page: Page, pnr: string): Promise<void> {
     await open.click();
     await page.waitForURL(target);
   }
+}
+
+/** Opens the masthead menu sheet on a phone; on desktop the nav row is already there. */
+export async function openMasthead(page: Page, isMobile: boolean): Promise<Locator> {
+  const banner = page.getByRole("banner");
+  if (!isMobile) return banner.getByRole("navigation", { name: "Primary" });
+  await banner.getByRole("button", { name: "Open menu" }).click();
+  const sheet = page.getByRole("dialog", { name: "Menu" });
+  await expect(sheet).toBeVisible();
+  return sheet.getByRole("navigation", { name: "Menu" });
+}
+
+/** Follows a masthead nav item, wherever this width keeps it. */
+export async function navigateFromMasthead(page: Page, name: string, isMobile: boolean): Promise<void> {
+  const nav = await openMasthead(page, isMobile);
+  await nav.getByRole("link", { name, exact: true }).click();
 }
 
 /** The Industry steel and its drawn hover step, tuned to the ground at 3:1 by the design (primary fill, outline tag, ghost text). */

@@ -10,6 +10,9 @@ export const shell = {
     signIn: "Sign in",
     signOut: "Sign out",
     primaryLabel: "Primary",
+    menu: "Menu",
+    openMenu: "Open menu",
+    closeMenu: "Close menu",
     tabsLabel: "Sections",
     cta: "Check a PNR",
     sections: {

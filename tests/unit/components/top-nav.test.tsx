@@ -74,10 +74,24 @@ describe("TopNav", () => {
     expect(signIn.querySelector("svg")).not.toBeNull();
   });
 
+  it("below lg puts the hamburger on the left of the logo mark, the name shown from lg only", () => {
+    nav.pathname = "/watchlist";
+    render(<TopNav />);
+    const menu = screen.getByRole("button", { name: "Open menu" });
+    const brand = screen.getByRole("link", { name: "Track & Trace" });
+    expect(menu).toHaveClass("lg:hidden");
+    expect(menu.compareDocumentPosition(brand) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(brand.querySelector("svg")).not.toBeNull();
+    expect(within(brand).getByText("Track & Trace").parentElement).toHaveClass("hidden", "lg:flex");
+    expect(screen.getByRole("navigation", { name: "Primary" })).toHaveClass("hidden", "lg:flex");
+  });
+
   it("shows only the brand on sign in", () => {
     nav.pathname = "/login";
     render(<TopNav />);
     expect(screen.queryByRole("navigation", { name: "Primary" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Open menu" })).toBeNull();
     expect(screen.queryByTestId("sign-in")).toBeNull();
+    expect(within(screen.getByRole("link", { name: "Track & Trace" })).getByText("Track & Trace").parentElement).not.toHaveClass("hidden");
   });
 });

@@ -18,6 +18,8 @@ describe("ThemeToggle", () => {
     expect(screen.getAllByRole("button")).toHaveLength(1);
     expect(button).toHaveAttribute("title", "Theme: System. Switch to Day");
     expect(button).toHaveClass("size-9");
+    // The turning icons are painted inside the box in every engine, whatever it composites.
+    expect(button).toHaveClass("overflow-hidden");
     expect(button.textContent).toBe("");
     expect(button.querySelectorAll("svg")).toHaveLength(1);
   });

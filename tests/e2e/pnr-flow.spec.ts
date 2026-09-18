@@ -1,7 +1,7 @@
 import { expect, test } from "./fixtures";
-import { PNR, expectAxeClean, runCheck, gotoReady } from "./helpers";
+import { PNR, expectAxeClean, navigateFromMasthead, runCheck, gotoReady } from "./helpers";
 
-test("check, save, remove, and undo a PNR", async ({ page }) => {
+test("check, save, remove, and undo a PNR", async ({ page, isMobile }) => {
   await gotoReady(page, "/");
   await expect(page.getByTestId("hero-instrument")).toBeVisible();
   await runCheck(page, PNR.cnf);
@@ -13,7 +13,7 @@ test("check, save, remove, and undo a PNR", async ({ page }) => {
   await page.getByTestId("save-watchlist").click();
   await expect(page.getByTestId("save-watchlist")).toHaveText(/Saved/);
 
-  await page.getByRole("link", { name: "Watchlist" }).first().click();
+  await navigateFromMasthead(page, "Watchlist", isMobile);
   await page.waitForURL("**/watchlist");
   const row = page.getByRole("link", { name: "234 567 8901" });
   await expect(row).toBeVisible();

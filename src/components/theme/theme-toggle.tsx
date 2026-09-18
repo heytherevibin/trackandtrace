@@ -4,7 +4,7 @@ import { AnimatePresence, m } from "motion/react";
 import { useSyncExternalStore } from "react";
 import { DarkThemeFilled, WeatherMoonFilled, WeatherSunnyFilled } from "@/components/icons";
 import { messages } from "@/messages";
-import { MASTHEAD_CONTROL } from "@/components/shell/nav-config";
+import { MASTHEAD_CONTROL, MASTHEAD_ICON_CONTROL } from "@/components/shell/nav-config";
 import { cn } from "@/utils/cn";
 import { useTheme, type ThemeChoice } from "./use-theme";
 
@@ -64,10 +64,11 @@ export function ThemeToggle({ className }: { readonly className?: string }) {
       onClick={() => switchTheme(setTheme, next.value)}
       aria-label={mounted ? label : messages.shell.theme.label}
       title={mounted ? label : undefined}
-      className={cn(MASTHEAD_CONTROL, "press size-9 cursor-pointer justify-center border-line bg-transparent px-0 text-accent-text hover:border-line-strong hover:bg-accent/12 active:bg-accent/20", className)}
+      className={cn(MASTHEAD_CONTROL, MASTHEAD_ICON_CONTROL, "overflow-hidden", className)}
     >
       {/* Entering and leaving icons overlap in one grid cell (no popLayout, which lifted the leaving icon out
-          of flow and flashed it outside the button on its last frame). */}
+          of flow and flashed it outside the button on its last frame). The button clips its content, so a
+          turning icon is never painted past the box, whatever layers an engine composites it on. */}
       <span aria-hidden="true" className="grid size-5 place-items-center">
         <AnimatePresence initial={false}>
           {mounted ? (

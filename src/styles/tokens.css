@@ -90,6 +90,9 @@
   --container-measure: 36rem; /* max-w-measure: lead paragraphs */
   --container-narrow: 30rem; /* max-w-narrow: sign in */
   --container-faq: 51.25rem; /* max-w-faq: 820px */
+
+  /* xs: 360px, the narrowest common Android width; below it the masthead keeps icons only where it must. */
+  --breakpoint-xs: 22.5rem;
 }
 
 @theme inline {
