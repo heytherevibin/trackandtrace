@@ -57,3 +57,4 @@ PNRs never travel in an address, because request paths and query strings are rec
 - `tests/unit/utils/cn.test.ts` — class merging keeps the custom type scale (`text-label`, `text-body`, …) beside colours.
 - `tests/integration` — route handlers against an in-memory Supabase fake.
 - `tests/e2e` — Playwright, desktop + mobile, fixture mode; `axe.spec.ts` scans every route in both faces, with the design-locked steel pairing as the only exemption.
+- `.github/workflows/ci.yml`: on every pull request into `main` and every push to `main`, `verify` runs types, lint, unit and integration tests and a production build, and `e2e` runs the Playwright suite. No secrets; fixture mode. `audit.yml` runs `npm audit` on production dependencies weekly and when the dependency files change. `tests/unit/ci-workflows.contract.test.ts` holds the policy.
