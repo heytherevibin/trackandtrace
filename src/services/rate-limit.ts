@@ -1,4 +1,4 @@
-import { env, type Env } from "@/services/env";
+import type { WindowLimiter, WindowLimiterFactory } from "./upstash";
 
 export interface RateLimitResult {
   ok: boolean;
@@ -32,57 +32,50 @@ export class MemoryRateLimiter implements RateLimiter {
   }
 }
 
-export class UpstashRateLimiter implements RateLimiter {
-  private readonly url: string;
-  private readonly token: string;
+export interface SharedRateLimiterOptions {
+  readonly windows: WindowLimiterFactory;
+  /** One-way: the store never sees an address or a user id. */
+  readonly identify: (key: string) => string;
+  /** Applies whenever the store is slow or failing, so traffic stays limited per instance. */
+  readonly fallback?: RateLimiter;
+  readonly onFallback?: (reason: "timeout" | "error") => void;
+  readonly now?: () => number;
+}
 
-  constructor(url: string, token: string) {
-    this.url = url;
-    this.token = token;
+/** Sliding windows shared by every instance; this instance's memory limiter when the store can't answer. */
+export class SharedRateLimiter implements RateLimiter {
+  private readonly windows = new Map<string, WindowLimiter>();
+  private readonly fallback: RateLimiter;
+  private readonly now: () => number;
+
+  constructor(private readonly options: SharedRateLimiterOptions) {
+    this.fallback = options.fallback ?? new MemoryRateLimiter();
+    this.now = options.now ?? Date.now;
+  }
+
+  private window(limit: number, windowMs: number): WindowLimiter {
+    const id = `${limit}:${windowMs}`;
+    const known = this.windows.get(id);
+    if (known) return known;
+    const made = this.options.windows(limit, windowMs);
+    this.windows.set(id, made);
+    return made;
   }
 
   async check(key: string, limit: number, windowMs: number): Promise<RateLimitResult> {
-    const windowSec = Math.ceil(windowMs / 1000);
-    const rkey = `rl:${key}`;
-
     try {
-      const pipeline = [
-        ["SET", rkey, "0", "EX", String(windowSec), "NX"],
-        ["INCR", rkey],
-      ];
-
-      const res = await fetch(`${this.url}/pipeline`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${this.token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(pipeline),
-      });
-
-      if (!res.ok) {
-        return { ok: true, remaining: limit, retryAfterSeconds: 0 };
+      const verdict = await this.window(limit, windowMs).limit(this.options.identify(key));
+      if (verdict.reason === "timeout") {
+        this.options.onFallback?.("timeout");
+        return this.fallback.check(key, limit, windowMs);
       }
-
-      const results = (await res.json()) as Array<{ result: unknown }>;
-      const count = Number(results[1]?.result ?? 0);
-
-      if (count > limit) {
-        return { ok: false, remaining: 0, retryAfterSeconds: windowSec };
-      }
-
-      return { ok: true, remaining: limit - count, retryAfterSeconds: 0 };
+      if (verdict.success) return { ok: true, remaining: verdict.remaining, retryAfterSeconds: 0 };
+      return { ok: false, remaining: 0, retryAfterSeconds: Math.max(1, Math.ceil((verdict.reset - this.now()) / 1000)) };
     } catch {
-      return { ok: true, remaining: limit, retryAfterSeconds: 0 };
+      this.options.onFallback?.("error");
+      return this.fallback.check(key, limit, windowMs);
     }
   }
-}
-
-export function createRateLimiter(current: Env = env()): RateLimiter {
-  if (current.RATE_LIMIT_STRATEGY === "upstash" && current.UPSTASH_REDIS_REST_URL && current.UPSTASH_REDIS_REST_TOKEN) {
-    return new UpstashRateLimiter(current.UPSTASH_REDIS_REST_URL, current.UPSTASH_REDIS_REST_TOKEN);
-  }
-  return new MemoryRateLimiter();
 }
 
 /** Client IP from a request — first XFF hop outside the loopback trust list. */

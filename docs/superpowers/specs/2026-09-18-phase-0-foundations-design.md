@@ -69,7 +69,7 @@ RailKit's terms allow temporary caching for performance; 60 s qualifies.
 
 **Single-flight.** Concurrent checks of the same PNR on one instance share one in-flight provider call (a `Map` of promises cleared on settle). Across instances the shared cache already absorbs repeats within 60 s.
 
-**Env schema.** `RATE_LIMIT_STRATEGY=upstash` plus `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` become **required in production builds** (`NODE_ENV=production`, which includes previews), along with `DATA_KEY`. Missing any of them refuses to boot, the same fail-loudly rule as `PNR_SOURCE=fixture`.
+**Env schema.** On a Vercel deployment (`VERCEL_ENV` is `production` or `preview`), the Upstash URL and token plus `DATA_KEY` are **required**. Missing any of them refuses to boot, the same fail-loudly rule as `PNR_SOURCE=fixture`. The requirement keys on `VERCEL_ENV` rather than `NODE_ENV`, so the secret-free CI build (part A) still passes. The URL and token are read as `UPSTASH_REDIS_REST_*`, or as the `KV_REST_API_*` names Vercel's Upstash integration injects. `RATE_LIMIT_STRATEGY` defaults to `auto` (the shared store when configured); `memory` is refused on a deployment. *(Adjusted 2026-09-19 during implementation.)*
 
 ### C. Provider resilience
 
@@ -125,9 +125,9 @@ Left:
 
 | Variable | Where | Secret | Notes |
 |---|---|---|---|
-| `RATE_LIMIT_STRATEGY=upstash` | Prod + Preview | no | required in production builds |
-| `UPSTASH_REDIS_REST_URL` | Prod + Preview | no | Mumbai database |
-| `UPSTASH_REDIS_REST_TOKEN` | Prod + Preview | **yes** | |
+| `UPSTASH_REDIS_REST_URL` (or `KV_REST_API_URL`) | Prod + Preview | no | Mumbai database; required on deployments |
+| `UPSTASH_REDIS_REST_TOKEN` (or `KV_REST_API_TOKEN`) | Prod + Preview | **yes** | required on deployments |
+| `RATE_LIMIT_STRATEGY` | not set | no | defaults to `auto`; `memory` is refused on deployments |
 | `DATA_KEY` | Prod + Preview | **yes** | `openssl rand -base64 32`; entered by the user |
 | `NEXT_PUBLIC_SENTRY_DSN` | Prod + Preview | no | public by design |
 | `SENTRY_ORG`, `SENTRY_PROJECT` | Prod + Preview | no | build-time |

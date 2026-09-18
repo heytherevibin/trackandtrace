@@ -9,7 +9,8 @@ Browser
   api-client (src/services/api-client.ts)  — validated fetch; malformed bodies become errors
 Next.js server
   route handlers (src/app/api/*)           — thin: guard → validate → repository/query → jsonOk/jsonError
-  pnr-query (src/services/pnr-query.ts)    — the one PNR path: validate → rate limit → cache → source
+  pnr-query (src/services/pnr-query.ts)    — the one PNR path: validate → rate limit → cache → single-flight → source
+  shared-store (src/services/shared-store.ts) — Upstash Redis (Mumbai) on deployments: shared limits + the encrypted 60 s PNR cache
   sources (src/services/sources/*)         — registry: live seam (unavailable until a provider lands) | railkit | rapidapi (third-party, labelled; optional fallback between them) | fixture (dev only)
   watchlist-repo (src/services/watchlist-repo.ts) — supabase-js over RLS-guarded tables
   session (src/services/session.ts)        — verified JWT claims → SessionUser DTO
@@ -39,6 +40,7 @@ PNRs never travel in an address, because request paths and query strings are rec
 | Source unavailable | UnavailableState with Response / Provenance / Fallback cells; retry |
 | Source answered, no record | "No record for this PNR", not an error |
 | Rate limited (20/min/IP) | 429 with Retry-After; UI counts down |
+| Upstash slow or down | Cache misses; limits fall back to this instance's memory; checks keep answering |
 | Malformed API body | Client zod validation fails → error state, never rendered as data |
 | Supabase unconfigured | Accounts surface says so; watchlist stays device-local; APIs 503 |
 | Session expired | 401 → UI returns to local mode |
@@ -49,6 +51,7 @@ PNRs never travel in an address, because request paths and query strings are rec
 
 - Device: `tt.watchlist.v2`, `tt.recent.v1`, `tt.theme`, `tt.install.v1`, `tt.mergePrompt.v1` — versioned keys, zod-validated on read, synced across tabs via `useSyncExternalStore`.
 - Account: `watchlist_entries` with unique `(user_id, pnr)`; local→account merge is planned by `planMerge` and executed by `POST /api/watchlist/merge`.
+- Shared (deployments only): Upstash Redis under `tt:{VERCEL_ENV}:`. The PNR cache is `pnr:v1:<HMAC>` → an AES-256-GCM value sealed to its key, 60 s. Limits are sliding windows keyed by an HMAC of the address or user id. The subkeys come from `DATA_KEY` (HKDF), so Upstash never holds a PNR, a record, an address or a user id in the clear. Any store failure is a cache miss, and the per-instance limiter. `upstash.ts` is the only module that imports Upstash.
 
 ## Testing
 

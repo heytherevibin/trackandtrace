@@ -1,9 +1,11 @@
-import type { PnrResult } from "@/types/domain";
+import type { PnrOutcome, PnrResult } from "@/types/domain";
 import { PNR_INVALID_MESSAGE, pnrSchema } from "@/utils/pnr";
-import { CACHE_TTLS, getOrCompute, pnrCache, type Cache } from "./cache";
+import { CACHE_TTLS, getOrCompute, type Cache } from "./cache";
 import { AppError, fromSourceCode, toApiError, type ApiErrorBody } from "./errors";
 import type { PnrDataSource } from "./pnr-source";
-import { PNR_RATE_LIMIT, createRateLimiter, type RateLimiter } from "./rate-limit";
+import { PNR_RATE_LIMIT, type RateLimiter } from "./rate-limit";
+import { createPnrCache, createRateLimiter } from "./shared-store";
+import { singleFlight } from "./single-flight";
 import { getPnrSource } from "./sources";
 
 // The one server-side PNR query. The API route and the server-rendered result
@@ -30,6 +32,8 @@ export interface PnrQueryDeps {
   readonly limiter: RateLimiter;
   readonly cache: Cache;
   readonly now: () => number;
+  /** Shares one provider call between concurrent checks of the same PNR on this instance. */
+  readonly flight: (pnr: string, run: () => Promise<PnrOutcome>) => Promise<PnrOutcome>;
 }
 
 export interface PnrQueryOptions {
@@ -38,11 +42,11 @@ export interface PnrQueryOptions {
   readonly deps?: Partial<PnrQueryDeps>;
 }
 
-let sharedLimiter: RateLimiter | null = null;
+let shared: Pick<PnrQueryDeps, "limiter" | "cache" | "flight"> | null = null;
 
 function defaultDeps(): PnrQueryDeps {
-  sharedLimiter ??= createRateLimiter();
-  return { source: getPnrSource(), limiter: sharedLimiter, cache: pnrCache, now: Date.now };
+  shared ??= { limiter: createRateLimiter(), cache: createPnrCache(), flight: singleFlight<PnrOutcome>() };
+  return { source: getPnrSource(), ...shared, now: Date.now };
 }
 
 export async function queryPnr(pnr: string, ip: string, options: PnrQueryOptions = {}): Promise<PnrQueryOutcome> {
@@ -68,13 +72,13 @@ export async function queryPnr(pnr: string, ip: string, options: PnrQueryOptions
     };
   }
 
-  const key = `pnr:${parsed.data}`;
-  if (options.fresh) deps.cache.delete(key);
+  const key = parsed.data;
+  if (options.fresh) await deps.cache.delete(key);
   const { value: outcome, cached } = await getOrCompute(
     deps.cache,
     key,
     CACHE_TTLS.snapshot,
-    () => deps.source.check(parsed.data),
+    () => deps.flight(parsed.data, () => deps.source.check(parsed.data)),
     (value) => value.ok,
   );
 

@@ -39,8 +39,14 @@ describe("getOrCompute", () => {
     const cache = new MemoryCache(() => 0);
     const compute = vi.fn(async () => 1);
     await getOrCompute(cache, "k", 1_000, compute);
-    cache.delete("k");
+    await cache.delete("k");
     const again = await getOrCompute(cache, "k", 1_000, compute);
     expect(again.cached).toBe(false);
+  });
+
+  it("answers asynchronously, so a shared store can stand in", async () => {
+    const cache = new MemoryCache(() => 0);
+    await cache.set("k", 1, 1_000);
+    await expect(cache.get("k")).resolves.toBe(1);
   });
 });

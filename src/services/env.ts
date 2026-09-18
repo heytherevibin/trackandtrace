@@ -44,9 +44,20 @@ const envSchema = z
       .regex(/^https:\/\/[a-z0-9.-]+(?::\d{2,5})?$/, "RAILKIT_BASE_URL must be an https origin such as https://api.railkit.in.")
       .default("https://api.railkit.in"),
     RAILKIT_TIMEOUT_MS: z.coerce.number().int().min(1000).max(30000).default(8000),
-    RATE_LIMIT_STRATEGY: z.enum(["memory", "upstash"]).default("memory"),
+    /** auto: the shared store when it is configured, this instance's memory otherwise. */
+    RATE_LIMIT_STRATEGY: z.enum(["auto", "memory", "upstash"]).default("auto"),
     UPSTASH_REDIS_REST_URL: z.url().optional(),
     UPSTASH_REDIS_REST_TOKEN: z.string().min(1).optional(),
+    /** The names Vercel's Upstash integration injects; read when the UPSTASH_ pair is absent. */
+    KV_REST_API_URL: z.url().optional(),
+    KV_REST_API_TOKEN: z.string().min(1).optional(),
+    /** Server only. 32 random bytes, base64: names and seals the shared cache, and hashes client ids. */
+    DATA_KEY: z
+      .string()
+      .regex(/^[A-Za-z0-9+/]{43}=$/, "DATA_KEY must be 32 random bytes in base64 (openssl rand -base64 32).")
+      .optional(),
+    /** Set by Vercel on every build and function. Absent in CI and local runs. */
+    VERCEL_ENV: z.enum(["production", "preview", "development"]).optional(),
     NEXT_PUBLIC_SUPABASE_URL: z.url().optional(),
     /** Supabase publishable key (sb_publishable_…): safe in the browser, RLS applies. */
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: keyLike.optional(),
@@ -75,8 +86,17 @@ const envSchema = z
     if (v.NODE_ENV === "production" && v.PNR_SOURCE === "fixture") {
       ctx.addIssue({ code: "custom", path: ["PNR_SOURCE"], message: "PNR_SOURCE=fixture is refused in production." });
     }
-    if (v.RATE_LIMIT_STRATEGY === "upstash" && !(v.UPSTASH_REDIS_REST_URL && v.UPSTASH_REDIS_REST_TOKEN)) {
-      ctx.addIssue({ code: "custom", path: ["RATE_LIMIT_STRATEGY"], message: "The upstash strategy needs both URL and token." });
+    const storeGaps = [
+      ...(upstashCredentials(v) ? [] : ["missing the Upstash URL and token (KV_REST_API_* or UPSTASH_REDIS_REST_*)"]),
+      ...(v.DATA_KEY ? [] : ["missing DATA_KEY"]),
+    ];
+    if (v.RATE_LIMIT_STRATEGY === "upstash" && storeGaps.length > 0) {
+      ctx.addIssue({ code: "custom", path: ["RATE_LIMIT_STRATEGY"], message: `The upstash strategy needs the shared store: ${storeGaps.join("; ")}.` });
+    }
+    const deployed = v.VERCEL_ENV === "production" || v.VERCEL_ENV === "preview";
+    const deployGaps = [...storeGaps, ...(v.RATE_LIMIT_STRATEGY === "memory" ? ["RATE_LIMIT_STRATEGY=memory is not allowed (remove it)"] : [])];
+    if (deployed && deployGaps.length > 0) {
+      ctx.addIssue({ code: "custom", path: ["DATA_KEY"], message: `Deployments need the shared store: ${deployGaps.join("; ")}.` });
     }
     if (Boolean(v.NEXT_PUBLIC_SUPABASE_URL) !== Boolean(v.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY)) {
       ctx.addIssue({ code: "custom", path: ["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"], message: "Set both Supabase URL and publishable key, or neither." });
@@ -170,7 +190,37 @@ export function fallbackPnrSource(current: Env = env()): Extract<PnrSource, "rap
   return null;
 }
 
+export interface UpstashCredentials {
+  readonly url: string;
+  readonly token: string;
+}
 
+type CredentialFields = Pick<Env, "UPSTASH_REDIS_REST_URL" | "UPSTASH_REDIS_REST_TOKEN" | "KV_REST_API_URL" | "KV_REST_API_TOKEN">;
+
+/** The Upstash REST pair: UPSTASH_REDIS_REST_*, else the KV_REST_API_* names Vercel's integration injects. */
+export function upstashCredentials(current: CredentialFields): UpstashCredentials | null {
+  if (current.UPSTASH_REDIS_REST_URL && current.UPSTASH_REDIS_REST_TOKEN) {
+    return { url: current.UPSTASH_REDIS_REST_URL, token: current.UPSTASH_REDIS_REST_TOKEN };
+  }
+  if (current.KV_REST_API_URL && current.KV_REST_API_TOKEN) {
+    return { url: current.KV_REST_API_URL, token: current.KV_REST_API_TOKEN };
+  }
+  return null;
+}
+
+export interface SharedStoreConfig {
+  readonly credentials: UpstashCredentials;
+  readonly dataKey: string;
+  /** Every shared key starts with this, so previews never touch production numbers. */
+  readonly prefix: string;
+}
+
+/** Where shared limits and the cache live; null keeps both inside this instance. */
+export function sharedStoreConfig(current: Env = env()): SharedStoreConfig | null {
+  const credentials = upstashCredentials(current);
+  if (current.RATE_LIMIT_STRATEGY === "memory" || !credentials || !current.DATA_KEY) return null;
+  return { credentials, dataKey: current.DATA_KEY, prefix: `tt:${current.VERCEL_ENV ?? current.NODE_ENV}` };
+}
 
 /** Feature flags read through one place. */
 export const flags = {
