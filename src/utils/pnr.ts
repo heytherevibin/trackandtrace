@@ -39,3 +39,23 @@ export function formatPnr(value: string): string {
 
 /** Shared validation for route params, request bodies, and forms. */
 export const pnrSchema = z.string().regex(PNR_PATTERN, PNR_INVALID_MESSAGE);
+
+// Result links keep the PNR after "#": browsers never send the fragment to a server, so it stays out of
+// request logs, link-preview fetches and Referer headers, while refresh, bookmarks and shares still work.
+
+/** The result page for a PNR. The one place result links are built. */
+export function pnrHref(pnr: string): `/pnr#${string}` {
+  return `/pnr#${pnr}`;
+}
+
+/** The PNR in a result page's hash ("#2345678901", grouping allowed), or null. */
+export function pnrFromHash(hash: string): string | null {
+  let raw: string;
+  try {
+    raw = decodeURIComponent(hash.replace(/^#/, ""));
+  } catch {
+    return null;
+  }
+  const digits = raw.replace(/[\s-]/g, "");
+  return isValidPnr(digits) ? digits : null;
+}

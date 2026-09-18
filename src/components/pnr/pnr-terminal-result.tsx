@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { messages } from "@/messages";
 import type { PaxRow, TerminalFact, TerminalResult } from "./pnr-terminal-state";
 import { SampleTag, SheetTag, ThirdPartyTag } from "./pnr-terminal-tags";
+import { pnrHref } from "@/utils/pnr";
 
 // The record rendered in place on the check plate, as drawn: status tag, sample
 // tag, PNR; the big status; its description; the framed fact grid and the
@@ -80,7 +81,7 @@ export function TerminalRecord({ result, full, onReset }: { readonly result: Ter
           {m.another}
         </Button>
         {result.kind === "ok" ? (
-          <Link href={`/pnr/${result.pnr}`} className="font-display text-label font-semibold uppercase leading-normal tracking-caps no-underline">
+          <Link href={pnrHref(result.pnr)} className="font-display text-label font-semibold uppercase leading-normal tracking-caps no-underline">
             {m.openRecord}
           </Link>
         ) : null}

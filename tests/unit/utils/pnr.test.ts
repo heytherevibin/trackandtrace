@@ -57,3 +57,18 @@ describe("pnrSchema", () => {
     expect(pnrSchema.parse("2345678901")).toBe("2345678901");
   });
 });
+
+describe("result links keep the PNR after #", () => {
+  it("builds /pnr#<pnr>, which browsers never send to a server", async () => {
+    const { pnrHref } = await import("@/utils/pnr");
+    expect(pnrHref("2345678901")).toBe("/pnr#2345678901");
+  });
+
+  it("reads the PNR back from the hash, tolerating grouping, and nothing else", async () => {
+    const { pnrFromHash } = await import("@/utils/pnr");
+    expect(pnrFromHash("#2345678901")).toBe("2345678901");
+    expect(pnrFromHash("#234-567-8901")).toBe("2345678901");
+    expect(pnrFromHash("#234%20567%208901")).toBe("2345678901");
+    for (const bad of ["", "#", "#abc", "#123", "#23456789012", "#%E0%A4%A"]) expect(pnrFromHash(bad)).toBeNull();
+  });
+});

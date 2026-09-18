@@ -2,7 +2,7 @@ import { expect, test } from "./fixtures";
 import { PNR, expectAxeClean, gotoReady } from "./helpers";
 
 // Every route, in both faces. The only exemption is the design-locked steel pairing (see helpers).
-const ROUTES = ["/", "/watchlist", "/pre-booking", "/accuracy", "/privacy", "/tos", "/login", "/account", `/pnr/${PNR.mixed}`, `/pnr/${PNR.notFound}`, "/pnr/abc", "/nowhere", "/offline"] as const;
+const ROUTES = ["/", "/watchlist", "/pre-booking", "/accuracy", "/privacy", "/tos", "/login", "/account", `/pnr#${PNR.mixed}`, `/pnr#${PNR.notFound}`, "/pnr/abc", "/nowhere", "/offline"] as const;
 
 for (const theme of ["light", "dark"] as const) {
   test.describe(`${theme} face`, () => {

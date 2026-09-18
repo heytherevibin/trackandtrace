@@ -18,9 +18,9 @@ test("an incomplete PNR alerts and never navigates", async ({ page }) => {
   await expect(page).toHaveURL(/\/$/);
 });
 
-test("a malformed PNR address lands on the not-found surface", async ({ page }) => {
-  // The route streams (a loading boundary commits the status early), so the
-  // contract is the rendered not-found surface, not the status code.
+test("a malformed PNR address lands on the check-again surface", async ({ page }) => {
+  // An old /pnr/<x> address redirects to /pnr; with no PNR after "#" the page offers a new check.
   await gotoReady(page, "/pnr/abc");
+  await expect(page).toHaveURL(/\/pnr$/);
   await expect(page.getByRole("heading", { name: "That is not a PNR" })).toBeVisible();
 });

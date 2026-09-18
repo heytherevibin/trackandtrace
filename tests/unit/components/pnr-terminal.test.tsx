@@ -82,7 +82,7 @@ describe("PnrTerminal", () => {
     expect(within(table).getByText("RAC 4")).toBeInTheDocument();
     expect(within(table).getByText("WL 9")).toBeInTheDocument();
     expect(screen.getByText("SBC → NDLS")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Open full record →" })).toHaveAttribute("href", "/pnr/2345678909");
+    expect(screen.getByRole("link", { name: "Open full record →" })).toHaveAttribute("href", "/pnr#2345678909");
 
     const stored = JSON.parse(window.localStorage.getItem(RECENT_KEY) ?? "[]") as { pnr: string; status?: string }[];
     expect(stored[0]).toMatchObject({ pnr: "2345678909", status: "CNF" });

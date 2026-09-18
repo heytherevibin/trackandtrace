@@ -31,10 +31,10 @@ function outcomeFromError(error: ApiErrorBody): PnrOutcome {
   }
 }
 
-/** Browser fetch of a PNR through the API route, validated against the wire contract. */
+/** Browser fetch of a PNR through the API route, validated against the wire contract. The PNR rides in the body, never the address. */
 export async function fetchPnr(pnr: string, options: { readonly fresh?: boolean } = {}): Promise<PnrFetchResult> {
-  const query = options.fresh ? "?fresh=1" : "";
-  const out = await apiRequest(`/api/pnr/${encodeURIComponent(pnr)}${query}`, { method: "GET", cache: "no-store" }, pnrApiOkSchema);
+  const body = JSON.stringify(options.fresh ? { pnr, fresh: true } : { pnr });
+  const out = await apiRequest("/api/pnr", { method: "POST", cache: "no-store", headers: { "content-type": "application/json" }, body }, pnrApiOkSchema);
   if (!out.ok) return { outcome: outcomeFromError(out.error), cached: false, latencyMs: 0 };
   return { outcome: { ok: true, result: out.data.data }, cached: out.data.cached, latencyMs: out.data.latencyMs };
 }

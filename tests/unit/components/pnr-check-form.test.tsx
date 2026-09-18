@@ -29,11 +29,24 @@ describe("PnrCheckForm", () => {
     expect(push).not.toHaveBeenCalled();
   });
 
+  it("on the result page itself, changes the hash so the page follows it", () => {
+    window.history.replaceState(null, "", "/pnr#12345");
+    const heard = vi.fn();
+    window.addEventListener("hashchange", heard);
+    render(<PnrCheckForm />);
+    fireEvent.change(screen.getByLabelText("PNR number"), { target: { value: "2345678901" } });
+    fireEvent.click(screen.getByRole("button", { name: "Run" }));
+    expect(window.location.hash).toBe("#2345678901");
+    expect(push).not.toHaveBeenCalled();
+    window.removeEventListener("hashchange", heard);
+    window.history.replaceState(null, "", "/");
+  });
+
   it("records the check and navigates to the full record", () => {
     render(<PnrCheckForm />);
     fireEvent.change(screen.getByLabelText("PNR number"), { target: { value: "2345678901" } });
     fireEvent.click(screen.getByRole("button", { name: "Run" }));
-    expect(push).toHaveBeenCalledWith("/pnr/2345678901");
+    expect(push).toHaveBeenCalledWith("/pnr#2345678901");
     expect(screen.getByRole("button", { name: "Running…" })).toBeInTheDocument();
     expect(screen.getByText("Requesting source")).toBeInTheDocument();
     expect(recentStore.get()[0]).toMatchObject({ pnr: "2345678901" });

@@ -64,7 +64,7 @@ test("buttons on app pages press and release smoothly", async ({ page }) => {
   await gotoReady(page, "/watchlist");
   await expectPressAnimates(page, page.getByRole("main").getByRole("link", { name: "Sign in to sync" }), "secondary link button");
   await expectPressAnimates(page, page.getByRole("main").getByRole("link", { name: "Run a check" }), "primary link button");
-  await gotoReady(page, "/pnr/2345678901");
+  await gotoReady(page, "/pnr#2345678901");
   await expectPressAnimates(page, page.getByTestId("refresh"), "refresh");
   await expectPressAnimates(page, page.getByTestId("save-watchlist"), "save");
 });

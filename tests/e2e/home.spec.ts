@@ -39,7 +39,7 @@ test("a check renders the record in place, then opens the full record", async ({
   await expect(page).toHaveURL(/\/$/);
   await expectAxeClean(page);
   await plate.getByRole("link", { name: "Open full record" }).click();
-  await page.waitForURL(`**/pnr/${PNR.mixed}`);
+  await page.waitForURL(new RegExp(`/pnr#${PNR.mixed}$`));
 });
 
 test("a recent check returns to the entry block in one tap", async ({ page }) => {

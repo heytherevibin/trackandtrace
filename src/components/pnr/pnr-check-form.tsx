@@ -6,11 +6,12 @@ import { recentStore } from "@/services/stores/recent-store";
 import { cn } from "@/utils/cn";
 import { PnrField, PnrStub, useShake } from "./pnr-field";
 import { fieldStatus } from "./pnr-terminal-state";
+import { pnrHref } from "@/utils/pnr";
 
 /**
  * The check in navigate mode, for surfaces that are not the landing sheet (the not-found pages):
  * the same entry block and stub as the plate, but Run records the check and opens the full record.
- * Without JavaScript the form still submits to /check.
+ * Before hydration the form still posts to /check, which redirects to /pnr#<pnr>.
  */
 export function PnrCheckForm({ id = "pnr", autoFocus = false, compact = false, className }: { readonly id?: string; readonly autoFocus?: boolean; readonly compact?: boolean; readonly className?: string }) {
   const router = useRouter();
@@ -30,7 +31,10 @@ export function PnrCheckForm({ id = "pnr", autoFocus = false, compact = false, c
     }
     recentStore.push({ pnr: digits, checkedAt: new Date().toISOString() });
     setRunning(true);
-    router.push(`/pnr/${digits}`);
+    // On the result page itself only the hash changes. Setting it directly fires hashchange, which the
+    // page listens for; a router push would change the address without telling it.
+    if (window.location.pathname === "/pnr") window.location.hash = digits;
+    else router.push(pnrHref(digits));
   };
 
   const onSubmit = (event: FormEvent) => {
@@ -39,7 +43,7 @@ export function PnrCheckForm({ id = "pnr", autoFocus = false, compact = false, c
   };
 
   return (
-    <form onSubmit={onSubmit} action="/check" method="get" noValidate className={cn("w-full", shaking && "shake", className)} onAnimationEnd={onAnimationEnd} data-testid="pnr-check-form">
+    <form onSubmit={onSubmit} action="/check" method="post" noValidate className={cn("w-full", shaking && "shake", className)} onAnimationEnd={onAnimationEnd} data-testid="pnr-check-form">
       <PnrField
         id={id}
         digits={digits}

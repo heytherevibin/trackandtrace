@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 
-// PNR result pages are keyed by the ticket number: never indexed.
+// The PNR result page is never indexed (its PNR lives after "#", which crawlers never see).
 export default function robots(): MetadataRoute.Robots {
-  return { rules: [{ userAgent: "*", allow: "/", disallow: ["/pnr/", "/api/", "/auth/"] }] };
+  return { rules: [{ userAgent: "*", allow: "/", disallow: ["/pnr", "/api/", "/auth/"] }] };
 }
