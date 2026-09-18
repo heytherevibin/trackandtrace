@@ -10,7 +10,7 @@ Browser
 Next.js server
   route handlers (src/app/api/*)           — thin: guard → validate → repository/query → jsonOk/jsonError
   pnr-query (src/services/pnr-query.ts)    — the one PNR path: validate → rate limit → cache → source
-  sources (src/services/sources/*)         — registry: live seam (unavailable until a provider lands) | fixture (dev only)
+  sources (src/services/sources/*)         — registry: live seam (unavailable until a provider lands) | rapidapi (third-party, labelled) | fixture (dev only)
   watchlist-repo (src/services/watchlist-repo.ts) — supabase-js over RLS-guarded tables
   session (src/services/session.ts)        — verified JWT claims → SessionUser DTO
   proxy (src/proxy.ts)                     — Supabase session refresh on page requests
@@ -24,7 +24,8 @@ The result page renders server-first: `pnr/[pnr]/page.tsx` validates, then a Sus
 
 1. `src/services/env.ts` — `PNR_SOURCE=fixture` refuses to boot in production.
 2. `src/services/sources/index.ts` — the registry refuses the fixture again at call time.
-3. `snapshot.source` — `"live" | "fixture"`; every fixture result renders a visible "Sample data" badge.
+3. `snapshot.source` — `"live" | "rapidapi" | "fixture"`; every fixture result renders a visible "Sample data" badge and every RapidAPI result a "Third-party" badge, with the provider named in its provenance.
+3a. `src/services/sources/rapidapi-parse.ts` — the RapidAPI adapter validates every rendered field, never reads the provider's predictions or passenger names, leaves unsent fields unset ("Not returned"), and fails closed on anything unreadable. `RAPIDAPI_KEY` is server-only and required by the env schema when `PNR_SOURCE=rapidapi`.
 4. `public/sw.js` — never caches `/api/*` or `/auth/*`; a stale record can never be served as live.
 5. `src/services/log.ts` — every log line is redacted; ten-digit runs never reach the console.
 6. Prediction fields exist in the type layer but no component renders them.
