@@ -11,8 +11,6 @@
 
 `npm run dev:fixture` also serves the team console at http://admin.localhost:3000 (Chrome and Firefox resolve `*.localhost` to this machine). The console refuses to run against the hosted Supabase project, and says so. To see its pages, point `NEXT_PUBLIC_SUPABASE_URL` at the local stack (`npm run db:start`), or start with both Supabase variables blank: `NEXT_PUBLIC_SUPABASE_URL= NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY= npm run dev:fixture`.
 
-   Why: `npm run dev:fixture` serves port 3000, as onboarding already says; 4210 is only the e2e server's port. Blank both variables because the env schema requires them together, and a set-but-empty variable wins over .env.local.
-
 ## Supabase
 
 - **Hosted project:** "Trakline", ref `xnykpktqtimadelfjgqf`, ap-south-1. Put `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env.local`; add `SUPABASE_SECRET_KEY` only where account deletion must work.
