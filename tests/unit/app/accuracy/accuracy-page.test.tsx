@@ -9,17 +9,13 @@ describe("AccuracyPage", () => {
     expect(screen.getByText("No accuracy figure is published until verified responses and confirmed outcomes exist and can be audited.")).toBeInTheDocument();
   });
 
-  it("states that reporting is unavailable and shows a ledger that opens at zero", () => {
+  it("states that reporting is unavailable and that every count is zero", () => {
     render(<AccuracyPage />);
     const heading = screen.getByRole("heading", { level: 2, name: "Accuracy reporting is not available yet" });
     const plate = heading.closest("[role=status]") as HTMLElement;
     expect(plate).not.toBeNull();
     expect(plate).toHaveClass("blueprint");
-    expect(
-      within(plate).getByText(
-        "There are no verified predictions and no confirmed outcomes to compare, so nothing is estimated. The ledger below opens at zero and earns every entry.",
-      ),
-    ).toBeInTheDocument();
+    expect(within(plate).getByText("There are no verified predictions and no confirmed outcomes to compare, so nothing is estimated.")).toBeInTheDocument();
     const facts = [...plate.querySelectorAll("dt")].map((dt) => [dt.textContent, dt.nextElementSibling?.textContent]);
     expect(facts).toEqual([
       ["Verified records", "0"],
@@ -50,7 +46,7 @@ describe("AccuracyPage", () => {
     ]);
   });
 
-  it("frames the status, the ledger, and the evidence as marked plates", () => {
+  it("frames the status, the service list, and the evidence as marked plates", () => {
     const { container } = render(<AccuracyPage />);
     const plates = [...container.querySelectorAll(".blueprint")];
     expect(plates).toHaveLength(3);
