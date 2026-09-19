@@ -78,9 +78,10 @@ describe("headers by host", () => {
       expect(headers.get("referrer-policy"), url).toBe("no-referrer");
       expect(headers.get("cross-origin-opener-policy"), url).toBe("same-origin");
       expect(headers.get("cross-origin-resource-policy"), url).toBe("same-origin");
-      expect(headers.get("permissions-policy"), url).toContain("publickey-credentials-get=(self)");
+      expect(headers.get("permissions-policy"), url).toBe("camera=(), microphone=(), geolocation=(), publickey-credentials-get=(self), publickey-credentials-create=(self)");
       expect(headers.get("x-frame-options"), url).toBe("DENY");
-      expect(headers.get("strict-transport-security"), url).toContain("includeSubDomains");
+      expect(headers.get("strict-transport-security"), url).toBe("max-age=63072000; includeSubDomains; preload");
+      expect(headers.get("x-content-type-options"), url).toBe("nosniff");
     }
   });
 
@@ -88,7 +89,11 @@ describe("headers by host", () => {
     const headers = await headersAt("https://trakline.in/pnr");
     expect(headers.get("content-security-policy")).toContain("default-src 'self'");
     expect(headers.get("x-robots-tag")).toBeNull();
+    expect(headers.get("x-frame-options")).toBe("DENY");
     expect(headers.get("referrer-policy")).toBe("strict-origin-when-cross-origin");
+    expect(headers.get("permissions-policy")).toBe("camera=(), microphone=(), geolocation=()");
+    expect(headers.get("x-dns-prefetch-control")).toBe("on");
     expect(headers.get("x-content-type-options")).toBe("nosniff");
+    expect(headers.get("strict-transport-security")).toBe("max-age=63072000; includeSubDomains; preload");
   });
 });
