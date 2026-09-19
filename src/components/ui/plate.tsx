@@ -28,7 +28,8 @@ export interface PlateProps extends Omit<HTMLAttributes<HTMLElement>, "title"> {
   /** Title cell text. Rendered as a heading when headingLevel is set, else as a legend span. */
   readonly title?: ReactNode;
   readonly titleId?: string;
-  readonly headingLevel?: 2 | 3;
+  /** 1 is for a plate that is a page's only heading (e.g. Unavailable); the sheets otherwise draw 2 or 3. */
+  readonly headingLevel?: 1 | 2 | 3;
   /** Meta cells to the right of the title, each behind a hairline. */
   readonly meta?: readonly ReactNode[];
   /** A trailing cell for compact actions. */
@@ -58,7 +59,7 @@ export function PlateHeader({
   titleMinCh = 16,
   stack = true,
 }: Pick<PlateProps, "title" | "titleId" | "headingLevel" | "meta" | "actions" | "cells" | "titleMinCh" | "stack">) {
-  const Heading = headingLevel === 2 ? "h2" : headingLevel === 3 ? "h3" : "span";
+  const Heading = headingLevel === 1 ? "h1" : headingLevel === 2 ? "h2" : headingLevel === 3 ? "h3" : "span";
   return (
     <div className="flex flex-wrap items-stretch border-b border-line">
       <Heading id={titleId} className={cn("legend flex-1 leading-6 text-ink-1", MIN_CH[titleMinCh], CELL[cells], stack && (meta.length > 0 || actions) && PLATE_TITLE_STACK)}>

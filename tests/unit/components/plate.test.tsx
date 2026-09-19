@@ -29,4 +29,11 @@ describe("Plate", () => {
     expect(screen.getByText("Email link")).not.toHaveClass("max-sm:basis-full");
     expect(container.querySelector("section")).not.toHaveAttribute("stack");
   });
+
+  it("renders the title as an h1 when headingLevel is 1, for a plate that is a page's only heading", () => {
+    render(<Plate title="Console" titleId="plate-h1" headingLevel={1} />);
+    const heading = screen.getByRole("heading", { level: 1, name: "Console" });
+    expect(heading.tagName).toBe("H1");
+    expect(screen.getByRole("region")).toHaveAttribute("aria-labelledby", "plate-h1");
+  });
 });

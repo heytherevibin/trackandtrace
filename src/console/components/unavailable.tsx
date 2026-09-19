@@ -10,8 +10,8 @@ const m = consoleMessages.availability;
 export function Unavailable({ reason }: { readonly reason: Exclude<ConsoleAvailability, "available"> }) {
   return (
     <SignedOutFrame>
-      <Plate title={m.plate} cells="tight" padding="none" bodyClassName="px-4 py-5 sm:p-6">
-        <p role="status" className="flex items-center gap-2.5 text-sm text-ink-1">
+      <Plate title={m.plate} titleId="console-unavailable-plate" headingLevel={1} cells="tight" padding="none" bodyClassName="px-4 py-5 sm:p-6">
+        <p className="flex items-center gap-2.5 text-sm text-ink-1">
           <Led />
           {reason === "production-only" ? m.productionOnly : m.localDatabase}
         </p>
