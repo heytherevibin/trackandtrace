@@ -24,7 +24,7 @@ const cspReportUri = (() => {
 })();
 
 // Enforced. Scripts keep 'unsafe-inline': Next 16 per-request nonces would force dynamic rendering
-// (the admin host gets nonces). tests/e2e/csp.spec.ts fails on any violation, on every route.
+// (the console host gets a nonce policy from src/proxy.ts). tests/e2e/csp.spec.ts fails on any violation, on every route.
 const csp = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ""}`,
@@ -48,6 +48,7 @@ const CANONICAL_HOST = "trakline.in";
 
 const nextConfig: NextConfig = {
   typedRoutes: true,
+  poweredByHeader: false,
   images: {
     remotePatterns: [{ protocol: "https", hostname: "*.googleusercontent.com" }],
   },
@@ -62,17 +63,38 @@ const nextConfig: NextConfig = {
     ];
   },
   async headers() {
+    // Constants, as the proxy's matcher: the console host in production, and admin.localhost everywhere else.
+    const consoleHost = { type: "host" as const, value: "(?:admin\\.trakline\\.in|admin\\.localhost)" };
     return [
       {
         source: "/:path*",
         headers: [
-          { key: "Content-Security-Policy", value: csp },
           { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
+        ],
+      },
+      {
+        source: "/:path*",
+        missing: [consoleHost],
+        headers: [
+          { key: "Content-Security-Policy", value: csp },
           { key: "X-Frame-Options", value: "DENY" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
           { key: "X-DNS-Prefetch-Control", value: "on" },
-          { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
+        ],
+      },
+      {
+        // The console's nonce policy is set per request by src/proxy.ts; nothing here may send a second one.
+        source: "/:path*",
+        has: [consoleHost],
+        headers: [
+          { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" },
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Referrer-Policy", value: "no-referrer" },
+          { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+          { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), publickey-credentials-get=(self), publickey-credentials-create=(self)" },
         ],
       },
     ];
