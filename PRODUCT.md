@@ -12,7 +12,7 @@ Indian rail travelers checking a 10-digit PNR on a phone: on a crowded platform 
 
 ## Product Purpose
 
-Accept a 10-digit PNR, request the current reservation record from a verified railway data source, and show exactly the fields that source returned, with its name and retrieval time. Optionally keep a watchlist of saved PNRs on the device and, with an account, across devices. Success is a traveler reading their status correctly in one glance and never being misled by an invented value.
+Accept a 10-digit PNR, ask a third-party railway data service for the current reservation record, and show only the fields it returned, with the retrieval time, under the one name Trakline; the provider is never named to the traveler. Optionally keep a watchlist of saved PNRs on the device and, with an account, across devices. Success is a traveler reading their status correctly in one glance and never being misled by an invented value.
 
 ## Positioning
 
@@ -20,7 +20,7 @@ Only fields returned by the reservation service are shown, each with its retriev
 
 ## Operating Context
 
-- Indian Standard Time everywhere; chart preparation (about four hours before departure) is the deadline travelers care about.
+- Indian Standard Time everywhere; chart preparation is the deadline travelers care about (since December 2025, the first chart is prepared at least 10 hours before departure, or at 20:00 the night before for trains leaving 05:00–14:00).
 - Installable PWA; used repeatedly for the same PNR over days.
 - Anonymous-first: the check works without sign-in; an account only adds a synced watchlist.
 - Development uses a clearly labeled sample-data fixture (`PNR_SOURCE=fixture`); production refuses it. Every fixture result is badged "Sample data".
@@ -28,9 +28,9 @@ Only fields returned by the reservation service are shown, each with its retriev
 
 ## Capabilities and Constraints
 
-Confirmed: PNR validation and the 3-3-4 digit entry control; a verified-source seam that resolves to an explicit unavailable state until a provider is connected; result surface (status band, passenger table, journey details, provenance timeline); local watchlist with account sync, merge, and undo; recent checks; share and copy of a result link; account export and deletion; pre-booking form with no inventory source; accuracy page with no records; privacy and terms pages.
+Confirmed: PNR validation and the 3-3-4 digit entry control; a live third-party source (RailKit, with a RapidAPI fallback) connected behind the source seam, with an honest unavailable state when it does not answer; result surface (status band, passenger table, journey details, provenance timeline); local watchlist with account sync, merge, and undo; recent checks; share and copy of a result link; account export and deletion; pre-booking form with no inventory source; accuracy page with no records; privacy and terms pages.
 
-Constraints: strict real-only data policy; prediction, trend, and factor fields exist in the type layer but are never rendered; passenger names are never stored or rendered; no railway provider is wired yet (identity undecided); English only for now with a locale-ready string structure (Hindi launch undecided).
+Constraints: strict real-only data policy; prediction, trend, and factor fields exist in the type layer but are never rendered; passenger names are never stored or rendered; the third-party providers are wired, and the official path (CRIS Pravah) is under evaluation; English only for now with a locale-ready string structure (Hindi planned for the traveller-features phase).
 
 Stack: Next.js 16 App Router, TypeScript strict, Tailwind CSS v4, Supabase (Auth + Postgres via supabase-js and @supabase/ssr), Base UI primitives, Sonner, Motion, Vitest, Testing Library, Playwright. Deploy target Vercel.
 
@@ -45,7 +45,7 @@ Stack: Next.js 16 App Router, TypeScript strict, Tailwind CSS v4, Supabase (Auth
 
 ## Evidence on Hand
 
-- No verified railway provider is connected. PNR checks are answered by RailKit (railkit.in), a third party not affiliated with IRCTC, with the RapidAPI "IRCTC" API (IRCTCAPI) as a fallback while RailKit is unavailable; results are tagged "Third-party" and name the provider that answered. The official path under evaluation is CRIS Pravah.
+- No official railway provider is connected. Behind the scenes, PNR checks are answered by RailKit (railkit.in), a third party not affiliated with IRCTC, with the RapidAPI "IRCTC" API (IRCTCAPI) as a fallback while RailKit is unavailable. Travellers see one service: results read "Retrieved … from Trakline", failures speak in one neutral voice, and travellers never see the provider's name. The official path under evaluation is CRIS Pravah.
 - No testimonials, customer names, usage metrics, ratings, or accuracy records exist. None may be fabricated.
 - No logo, icon, or social image assets exist; the mark is designed in this redesign.
 - The development fixture (deterministic sample records keyed by PNR digits) is design and test material only and must never be presented as real.

@@ -67,4 +67,8 @@ describe("GET /api/account/export", () => {
     expect(body).not.toHaveProperty("analyses");
     expect((body.profile as { email: string }).email).toBe("a@b.c");
   });
+  it("names the attachment trakline-export.json", async () => {
+    const res = await exportRoute.GET();
+    expect(res.headers.get("Content-Disposition")).toBe('attachment; filename="trakline-export.json"');
+  });
 });

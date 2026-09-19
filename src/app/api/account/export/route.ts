@@ -17,7 +17,7 @@ export async function GET(): Promise<Response> {
       status: 200,
       headers: {
         "Content-Type": "application/json; charset=utf-8",
-        "Content-Disposition": 'attachment; filename="trackandtrace-export.json"',
+        "Content-Disposition": 'attachment; filename="trakline-export.json"',
         "Cache-Control": "no-store",
         "X-Content-Type-Options": "nosniff",
       },

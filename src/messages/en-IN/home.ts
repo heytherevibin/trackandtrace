@@ -89,7 +89,7 @@ export const home = {
     },
     accuracy: {
       title: "Accuracy",
-      detail: "A public ledger of how results matched outcomes. It opens with zero records and earns every entry — nothing on it will ever be invented.",
+      detail: "How results matched outcomes, published only once there are real outcomes to compare. Until then it reads “not available yet” — nothing on it will ever be invented.",
     },
   },
   photo: {
@@ -108,8 +108,9 @@ export const home = {
       { q: "Is my PNR stored or logged?", a: "PNRs and passenger names are never written to our logs. Your PNR is used to make the request; recent checks stay on your device and you can clear them any time." },
       { q: "Why does a field say “not returned”?", a: "Because the source did not send it. The product never fills a gap with a guess — it fails closed: no source, no claim." },
       { q: "Does it predict my confirmation chances?", a: "No, and it never will here. Invented odds are the one thing this product exists to not show you. You get the record, its source, and its retrieval time." },
-      { q: "Where does the data come from?", a: "From a verified railway source, named on every result with the time of retrieval. Until one is connected, every check resolves to an explicit unavailable state — by design." },
-      { q: "When should I check?", a: "The reservation chart, prepared about four hours before departure, decides waitlisted and RAC tickets. Save the PNR to your watchlist and re-check as the chart approaches — in Indian Standard Time, everywhere." },
+      { q: "Where does the data come from?", a: "From a third-party railway data service. Trakline asks it for your reservation when you run a check and shows only the fields it returned, with the time of retrieval. If the service does not answer, Trakline says so and shows nothing in its place." },
+      // Chart timing per the Railway Board rule of December 2025; update this answer when the rule changes.
+      { q: "When should I check?", a: "The first reservation chart decides waitlisted and RAC tickets. It is prepared at least 10 hours before departure, or at 20:00 the night before for trains leaving between 05:00 and 14:00. Save the PNR to your watchlist and re-check as the chart approaches — in Indian Standard Time, everywhere." },
     ],
   },
   closing: {
