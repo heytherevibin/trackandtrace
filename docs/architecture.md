@@ -17,7 +17,7 @@ Next.js server
   watchlist-repo (src/services/watchlist-repo.ts) — supabase-js over RLS-guarded tables
   session (src/services/session.ts)        — verified JWT claims → SessionUser DTO
   proxy (src/proxy.ts)                     — one app, two hosts: the console host (admin.trakline.in; admin.localhost locally) is rewritten into src/app/console with a per-request nonce CSP; elsewhere /console answers 404 and Supabase sessions are refreshed on page requests (skips /api and /monitoring)
-  console (src/console/*, src/app/console/*) — the team console: its own root layout, copy and components; traveller code never imports it (tests/unit/console/boundary.contract.test.ts)
+  console (src/console/*, src/app/console/*) — the team console: its own root layout, copy and components; only the console tree and the host router (src/proxy.ts, src/app/global-not-found.tsx) import it (tests/unit/console/boundary.contract.test.ts)
   telemetry (src/instrumentation*.ts, src/services/telemetry/*) — Sentry on server, edge and browser via the /monitoring tunnel; every event scrubbed of PNRs, emails, tokens, cookies, bodies, queries and URL fragments; off without a DSN
 Supabase
   auth.users + public.watchlist_entries (supabase/migrations/*) — RLS: owner-only
