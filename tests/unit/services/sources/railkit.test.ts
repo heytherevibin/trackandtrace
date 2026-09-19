@@ -172,3 +172,36 @@ describe("createRailkitSource", () => {
     }
   });
 });
+
+describe("RailKit failure causes (server-only, for the breaker and retry policy)", () => {
+  const timeoutFetch = async () => {
+    throw new DOMException("The operation timed out.", "TimeoutError");
+  };
+  const networkFetch = async () => {
+    throw new TypeError("fetch failed");
+  };
+
+  it.each([
+    ["a timeout", timeoutFetch, { cause: "timeout" }],
+    ["an unreachable host", networkFetch, { cause: "network" }],
+    ["HTTP 401", async () => response(401, { success: false, error: "Invalid API key" }), { cause: "refused", status: 401 }],
+    ["HTTP 403", async () => response(403, { success: false, error: "API key is inactive" }), { cause: "refused", status: 403 }],
+    ["HTTP 429", async () => response(429, { success: false, error: "Usage limit exceeded" }, { "retry-after": "120" }), { cause: "quota", status: 429, retryAfter: 120 }],
+    ["HTTP 500", async () => response(500, { success: false, error: "Internal error" }), { cause: "server", status: 500 }],
+    ["HTTP 503", async () => response(503, "<html>Unavailable</html>"), { cause: "server", status: 503 }],
+    ["HTTP 422 without a refusal body", async () => response(422, "<html>Unprocessable</html>"), { cause: "server", status: 422 }],
+    ["a refusal it cannot read", async () => response(400, { success: false, error: "Invalid date format. Use DD-MM-YYYY." }), { cause: "unreadable" }],
+    ["an unreadable body", async () => response(200, "not json"), { cause: "unreadable" }],
+  ])("marks %s", async (_label, fetchImpl, expected) => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const out = await sourceWith(fetchImpl).check(PNR);
+    expect(out).toMatchObject({ ok: false, code: "SOURCE_UNAVAILABLE", ...expected });
+  });
+
+  it("gives no cause to an answer: no record is not a failure", async () => {
+    const out = await sourceWith(async () => response(400, { success: false, error: "No PNR data found or invalid PNR number" })).check(PNR);
+    expect(out).toMatchObject({ ok: false, code: "NOT_FOUND" });
+    expect(out).not.toHaveProperty("cause");
+  });
+});

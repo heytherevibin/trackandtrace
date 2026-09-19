@@ -1,8 +1,8 @@
 import type { PnrDataSource } from "@/services/pnr-source";
 import { log } from "@/services/log";
 import { isRecord } from "./irctc-record";
-import type { PnrOutcome } from "@/types/domain";
 import { PNR_INVALID_MESSAGE, isValidPnr } from "@/utils/pnr";
+import { markUnreadable, unavailable, type SourceOutcome } from "./outcome";
 import { parseRailkitPnrResponse } from "./railkit-parse";
 import { messages } from "@/messages";
 
@@ -33,10 +33,6 @@ export interface RailkitDeps {
 /** Travellers read one neutral voice; the provider, key, plan and HTTP status stay in the server log. */
 const OUT = messages.source.outcomes;
 
-function unavailable(message: string, retryAfter?: number): PnrOutcome {
-  return retryAfter === undefined ? { ok: false, code: "SOURCE_UNAVAILABLE", message } : { ok: false, code: "SOURCE_UNAVAILABLE", message, retryAfter };
-}
-
 function seconds(header: string | null): number | undefined {
   if (!header) return undefined;
   const value = Number(header);
@@ -65,7 +61,7 @@ export function createRailkitSource(config: RailkitConfig, deps: RailkitDeps = {
   const now = deps.now ?? (() => new Date());
 
   return {
-    async check(pnr: string): Promise<PnrOutcome> {
+    async check(pnr: string): Promise<SourceOutcome> {
       if (!isValidPnr(pnr)) return { ok: false, code: "INVALID", message: PNR_INVALID_MESSAGE };
 
       let response: Response;
@@ -79,19 +75,19 @@ export function createRailkitSource(config: RailkitConfig, deps: RailkitDeps = {
       } catch (error) {
         if (isTimeout(error)) {
           log.warn("[source:railkit] timed out", { timeoutMs: config.timeoutMs });
-          return unavailable(OUT.timeout);
+          return unavailable(OUT.timeout, "timeout");
         }
         log.warn("[source:railkit] request failed", { kind: error instanceof Error ? error.name : typeof error });
-        return unavailable(OUT.unreachable);
+        return unavailable(OUT.unreachable, "network");
       }
 
       if (response.status === 401 || response.status === 403) {
         log.error("[source:railkit] key or plan refused", { status: response.status });
-        return unavailable(OUT.refused);
+        return unavailable(OUT.refused, "refused", { status: response.status });
       }
       if (response.status === 429) {
         log.warn("[source:railkit] quota or rate limit reached", { status: response.status });
-        return unavailable(OUT.busy, retryAfterSeconds(response.headers));
+        return unavailable(OUT.busy, "quota", { status: response.status, retryAfter: retryAfterSeconds(response.headers) });
       }
 
       const body = await jsonOrNull(response);
@@ -100,20 +96,20 @@ export function createRailkitSource(config: RailkitConfig, deps: RailkitDeps = {
       if (response.status >= 400 && response.status < 500 && isRecord(body) && body.success === false) {
         const refused = parseRailkitPnrResponse(body, pnr, now());
         if (!refused.ok && refused.code === "SOURCE_UNAVAILABLE") log.warn("[source:railkit] request refused", { status: response.status });
-        return refused;
+        return markUnreadable(refused);
       }
       if (!response.ok) {
         log.warn("[source:railkit] provider error", { status: response.status });
-        return unavailable(OUT.error);
+        return unavailable(OUT.error, "server", { status: response.status });
       }
       if (body === null) {
         log.warn("[source:railkit] unreadable body", { status: response.status });
-        return unavailable(OUT.unreadable);
+        return unavailable(OUT.unreadable, "unreadable");
       }
 
       const parsed = parseRailkitPnrResponse(body, pnr, now());
       if (!parsed.ok && parsed.code === "SOURCE_UNAVAILABLE") log.warn("[source:railkit] record not readable");
-      return parsed;
+      return markUnreadable(parsed);
     },
   };
 }

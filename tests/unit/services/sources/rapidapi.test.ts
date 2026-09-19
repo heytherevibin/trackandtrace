@@ -101,3 +101,20 @@ describe("createRapidApiSource", () => {
     }
   });
 });
+
+describe("RapidAPI failure causes (server-only, for the breaker and retry policy)", () => {
+  it.each([
+    ["a timeout", async () => { throw new DOMException("The operation timed out.", "TimeoutError"); }, { cause: "timeout" }],
+    ["an unreachable host", async () => { throw new TypeError("fetch failed"); }, { cause: "network" }],
+    ["HTTP 401", async () => response(401, { message: "Invalid API key" }), { cause: "refused", status: 401 }],
+    ["HTTP 429", async () => response(429, { message: "Too many requests" }, { "retry-after": "30" }), { cause: "quota", status: 429, retryAfter: 30 }],
+    ["HTTP 502", async () => response(502, "<html>Bad gateway</html>"), { cause: "server", status: 502 }],
+    ["HTTP 500", async () => response(500, { message: "boom" }), { cause: "server", status: 500 }],
+    ["an unreadable body", async () => response(200, "not json"), { cause: "unreadable" }],
+  ])("marks %s", async (_label, fetchImpl, expected) => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const out = await sourceWith(fetchImpl as unknown as typeof fetch).check(PNR);
+    expect(out).toMatchObject({ ok: false, code: "SOURCE_UNAVAILABLE", ...expected });
+  });
+});
