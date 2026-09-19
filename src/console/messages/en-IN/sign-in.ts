@@ -14,6 +14,8 @@ export const signIn = {
   legend: "The link works once and expires in 1 hour.",
   invalid: "Enter an email address like name@example.com.",
   tooMany: "Too many sign-in requests. Try again in 10 minutes.",
+  unreachable: "The console could not be reached. Try again.",
+  crossSite: "Cross-site requests are refused.",
   sent: {
     title: "Check your inbox",
     detail: "If this address belongs to a console member, a sign-in link is on its way.",

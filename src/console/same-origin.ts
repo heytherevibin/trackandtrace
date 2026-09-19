@@ -1,3 +1,4 @@
+import { consoleMessages } from "@/console/messages";
 import { AppError } from "@/services/errors";
 
 /**
@@ -18,5 +19,5 @@ export function assertSameOrigin(req: Request): void {
       // An unreadable Origin is refused below.
     }
   }
-  throw new AppError("INVALID_INPUT", "Cross-site requests are refused.", { status: 403 });
+  throw new AppError("INVALID_INPUT", consoleMessages.signIn.crossSite, { status: 403 });
 }
