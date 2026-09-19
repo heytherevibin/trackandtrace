@@ -46,6 +46,7 @@ PNRs never travel in an address, because request paths and query strings are rec
 | Provider failing repeatedly | 5 failures in 60 s open its breaker for 30 s (doubling per failed probe, up to 10 min); the fallback answers at once and no request is spent on the failing provider |
 | Provider refuses the key or plan, or its quota | Breaker open 10 min (401/403), or for the provider's Retry-After (429) |
 | Sentry unreachable | Error reports are dropped; the app is unaffected |
+| A script, style or connection the policy doesn't allow | Blocked by the enforced CSP; reported to Sentry from production; `tests/e2e/csp.spec.ts` fails on any violation on every route in both faces |
 | Malformed API body | Client zod validation fails → error state, never rendered as data |
 | Supabase unconfigured | Accounts surface says so; watchlist stays device-local; APIs 503 |
 | Session expired | 401 → UI returns to local mode |
