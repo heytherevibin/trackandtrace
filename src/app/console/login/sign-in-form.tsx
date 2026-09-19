@@ -84,7 +84,7 @@ export function SignInForm() {
     <section className="blueprint" aria-labelledby="console-sign-in-plate">
       <Corners />
       {sending ? <SweepBar /> : null}
-      <PlateHeader title={m.plate} titleId="console-sign-in-plate" cells="tight" meta={[m.form]} />
+      <PlateHeader title={m.plate} titleId="console-sign-in-plate" cells="tight" meta={[m.form]} stack={false} />
       <div className="flex flex-col gap-4 px-4 py-5 sm:p-6">
         {stage.kind === "sent" ? (
           <>
@@ -114,7 +114,7 @@ export function SignInForm() {
                 disabled={sending}
                 onChange={(event) => setEmail(event.currentTarget.value)}
                 size="sm"
-                className="text-sm max-sm:h-11 max-sm:text-base"
+                className="text-sm max-sm:h-11 max-sm:text-base disabled:opacity-100"
               />
               {stage.kind === "email" && stage.error ? (
                 <FieldError match role="alert">

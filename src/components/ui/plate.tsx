@@ -37,6 +37,12 @@ export interface PlateProps extends Omit<HTMLAttributes<HTMLElement>, "title"> {
   readonly cells?: PlateCells;
   /** Minimum width of the title cell before meta cells wrap; the sheets draw 16ch, the specimen 12ch. */
   readonly titleMinCh?: 12 | 14 | 16;
+  /**
+   * Below sm, the title takes the header's first row and the meta and action cells share the
+   * row under it, as the sheets' `.tb.stack` draws. `false` keeps everything on one row, as a
+   * plain `.tb` draws — the meta/action cells still keep their `border-l` hairline. Default `true`.
+   */
+  readonly stack?: boolean;
   readonly corners?: boolean;
   readonly bodyClassName?: string;
   readonly children?: ReactNode;
@@ -50,19 +56,20 @@ export function PlateHeader({
   actions,
   cells = "regular",
   titleMinCh = 16,
-}: Pick<PlateProps, "title" | "titleId" | "headingLevel" | "meta" | "actions" | "cells" | "titleMinCh">) {
+  stack = true,
+}: Pick<PlateProps, "title" | "titleId" | "headingLevel" | "meta" | "actions" | "cells" | "titleMinCh" | "stack">) {
   const Heading = headingLevel === 2 ? "h2" : headingLevel === 3 ? "h3" : "span";
   return (
     <div className="flex flex-wrap items-stretch border-b border-line">
-      <Heading id={titleId} className={cn("legend flex-1 leading-6 text-ink-1", MIN_CH[titleMinCh], CELL[cells], (meta.length > 0 || actions) && PLATE_TITLE_STACK)}>
+      <Heading id={titleId} className={cn("legend flex-1 leading-6 text-ink-1", MIN_CH[titleMinCh], CELL[cells], stack && (meta.length > 0 || actions) && PLATE_TITLE_STACK)}>
         {title}
       </Heading>
       {meta.map((cell, i) => (
-        <span key={i} className={cn("legend whitespace-nowrap border-l border-line leading-6", CELL[cells], plateCellClass(i))}>
+        <span key={i} className={cn("legend whitespace-nowrap border-l border-line leading-6", CELL[cells], stack && plateCellClass(i))}>
           {cell}
         </span>
       ))}
-      {actions ? <span className={cn("flex items-center gap-2 border-l border-line px-3 py-1.5", plateCellClass(meta.length))}>{actions}</span> : null}
+      {actions ? <span className={cn("flex items-center gap-2 border-l border-line px-3 py-1.5", stack && plateCellClass(meta.length))}>{actions}</span> : null}
     </div>
   );
 }
@@ -77,6 +84,7 @@ export function Plate({
   padding = "md",
   cells,
   titleMinCh,
+  stack,
   corners = true,
   className,
   bodyClassName,
@@ -87,7 +95,7 @@ export function Plate({
   return (
     <Tag className={cn("blueprint", className)} aria-labelledby={hasHeader && titleId && headingLevel ? titleId : undefined} {...rest}>
       {corners ? <Corners /> : null}
-      {hasHeader ? <PlateHeader title={title} titleId={titleId} headingLevel={headingLevel} meta={meta} actions={actions} cells={cells} titleMinCh={titleMinCh} /> : null}
+      {hasHeader ? <PlateHeader title={title} titleId={titleId} headingLevel={headingLevel} meta={meta} actions={actions} cells={cells} titleMinCh={titleMinCh} stack={stack} /> : null}
       {children !== undefined ? <div className={cn(PAD[padding], bodyClassName)}>{children}</div> : null}
     </Tag>
   );

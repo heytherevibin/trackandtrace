@@ -21,6 +21,8 @@ describe("Console Sign In", () => {
     expect(screen.getByLabelText("Console email")).toHaveAttribute("placeholder", "name@example.com");
     expect(screen.getByText("The link works once and expires in 1 hour.")).toBeInTheDocument();
     expect(screen.getByText("Form TC-02")).toBeInTheDocument();
+    // The phone sheet draws a plain .tb: the title stays on one row with "Form TC-02", never stacking.
+    expect(screen.getByText("Email link")).not.toHaveClass("max-sm:basis-full");
   });
 
   it("refuses a malformed address before asking the server", async () => {
@@ -65,6 +67,11 @@ describe("Console Sign In", () => {
     render(<SignInForm />);
     submit("asha@example.com");
     expect(await screen.findByRole("button", { name: "Sending…" })).toBeDisabled();
+    // Every console drawing keeps the disabled well at full contrast; only .btn dims when disabled.
+    const field = screen.getByLabelText("Console email");
+    expect(field).toBeDisabled();
+    expect(field).toHaveClass("disabled:opacity-100");
+    expect(field).not.toHaveClass("disabled:opacity-45");
     await act(async () => release(new Response(JSON.stringify({ ok: true }), { status: 200 })));
   });
 });
