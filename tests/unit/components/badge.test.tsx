@@ -13,4 +13,15 @@ describe("Badge", () => {
     expect(tag).toHaveClass("border", "border-accent", "text-accent-text");
     expect(tag).not.toHaveClass("text-accent");
   });
+
+  it("draws the console's steel tag: readable steel edge and words, frame tags in capitals", () => {
+    render(
+      <Badge variant="steel" caps>
+        Console
+      </Badge>,
+    );
+    const tag = screen.getByText("Console");
+    expect(tag).toHaveClass("border", "border-accent-text", "text-accent-text", "font-display", "font-semibold", "uppercase", "tracking-caps");
+    expect(tag).not.toHaveClass("border-accent", "text-accent");
+  });
 });
