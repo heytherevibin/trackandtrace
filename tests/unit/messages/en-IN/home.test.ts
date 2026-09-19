@@ -26,3 +26,10 @@ describe("home FAQ", () => {
     expect(text).toContain("20:00 the night before");
   });
 });
+
+describe("home copy", () => {
+  // The accuracy page's ledger was removed on 2026-09-18, so no landing line may promise one.
+  it("never mentions a ledger", () => {
+    expect(JSON.stringify(home)).not.toMatch(/ledger/i);
+  });
+});

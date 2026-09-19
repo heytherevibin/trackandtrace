@@ -89,7 +89,7 @@ export const home = {
     },
     accuracy: {
       title: "Accuracy",
-      detail: "A public ledger of how results matched outcomes. It opens with zero records and earns every entry — nothing on it will ever be invented.",
+      detail: "How results matched outcomes, published only once there are real outcomes to compare. Until then it reads “not available yet” — nothing on it will ever be invented.",
     },
   },
   photo: {
