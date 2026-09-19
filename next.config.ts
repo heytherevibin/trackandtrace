@@ -49,6 +49,8 @@ const CANONICAL_HOST = "trakline.in";
 const nextConfig: NextConfig = {
   typedRoutes: true,
   poweredByHeader: false,
+  // Several root layouts ((site) and console), so unmatched addresses need global-not-found.
+  experimental: { globalNotFound: true },
   images: {
     remotePatterns: [{ protocol: "https", hostname: "*.googleusercontent.com" }],
   },
