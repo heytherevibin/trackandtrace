@@ -54,6 +54,11 @@ export class MemoryKv implements Kv {
     const entry = this.live(key);
     return entry ? entry.exp - this.now() : 0;
   }
+
+  /** Test seam: forget everything. */
+  clear(): void {
+    this.store.clear();
+  }
 }
 
 /** INCR and its expiry in one atomic step, so a count can never outlive its window. */

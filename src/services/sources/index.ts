@@ -1,8 +1,10 @@
 import type { Env } from "@/services/env";
 import { activePnrSource, env, fallbackPnrSource, fixtureAllowed, type ThirdPartySource } from "@/services/env";
 import type { PnrDataSource } from "@/services/pnr-source";
+import { providerGuard } from "@/services/shared-store";
 import { createFallbackSource } from "./fallback";
 import { fixtureSource } from "./fixture";
+import { createGuardedSource } from "./guarded";
 import { createLiveSource } from "./live";
 import { createRailkitSource } from "./railkit";
 import { createRapidApiSource } from "./rapidapi";
@@ -47,7 +49,13 @@ function withFallback(primary: PnrDataSource, fallback: PnrDataSource | null): P
   return fallback ? createFallbackSource(primary, fallback) : primary;
 }
 
+/** The provider's adapter behind its breaker, retry policy and usage counter. */
 function thirdPartySource(source: ThirdPartySource, current: Env): PnrDataSource | null {
+  const adapter = providerAdapter(source, current);
+  return adapter ? createGuardedSource(adapter, providerGuard(source, current)) : null;
+}
+
+function providerAdapter(source: ThirdPartySource, current: Env): PnrDataSource | null {
   if (source === "railkit") {
     return current.RAILKIT_API_KEY
       ? createRailkitSource({ key: current.RAILKIT_API_KEY, baseUrl: current.RAILKIT_BASE_URL, timeoutMs: current.RAILKIT_TIMEOUT_MS })
