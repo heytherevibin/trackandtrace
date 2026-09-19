@@ -17,14 +17,14 @@ const EMAIL = z.email();
 const SENT = z.object({ ok: z.literal(true) });
 
 type Stage =
-  | { readonly kind: "email"; readonly error: string | null; readonly blocked: boolean }
+  | { readonly kind: "email"; readonly error: string | null; readonly invalid: boolean; readonly blocked: boolean }
   | { readonly kind: "sending" }
   | { readonly kind: "sent"; readonly wait: number };
 
 /** Console Sign In (Form TC-02): the email states. The key step arrives with sessions (plan 2c). */
 export function SignInForm() {
   const [email, setEmail] = useState("");
-  const [stage, setStage] = useState<Stage>({ kind: "email", error: null, blocked: false });
+  const [stage, setStage] = useState<Stage>({ kind: "email", error: null, invalid: false, blocked: false });
   const emailRef = useRef<HTMLInputElement>(null);
   const sentRef = useRef<HTMLHeadingElement>(null);
   // One request in flight at a time: a fresh submit, or unmount, retires whichever came before it.
@@ -59,21 +59,23 @@ export function SignInForm() {
       setStage({ kind: "sent", wait: RESEND_AFTER_SECONDS });
       return;
     }
-    setStage({ kind: "email", error: result.error.message, blocked: result.error.code === "RATE_LIMITED" });
+    // The address is only ever "invalid" for a malformed input, never for a rate limit: the
+    // request count is what's limited, not the email itself, so "Too many" leaves the field alone.
+    setStage({ kind: "email", error: result.error.message, invalid: result.error.code === "INVALID_INPUT", blocked: result.error.code === "RATE_LIMITED" });
   }
 
   function onSubmit(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
     const address = email.trim();
     if (!EMAIL.safeParse(address).success) {
-      setStage({ kind: "email", error: m.invalid, blocked: false });
+      setStage({ kind: "email", error: m.invalid, invalid: true, blocked: false });
       return;
     }
     void send(address);
   }
 
   function differentEmail(): void {
-    setStage({ kind: "email", error: null, blocked: false });
+    setStage({ kind: "email", error: null, invalid: false, blocked: false });
     window.setTimeout(() => emailRef.current?.focus(), 0);
   }
 
@@ -101,7 +103,7 @@ export function SignInForm() {
           </>
         ) : (
           <form noValidate onSubmit={onSubmit} className="flex flex-col gap-4">
-            <Field invalid={stage.kind === "email" && stage.error !== null}>
+            <Field invalid={stage.kind === "email" && stage.invalid}>
               <FieldLabel>{m.emailLabel}</FieldLabel>
               <Input
                 ref={emailRef}

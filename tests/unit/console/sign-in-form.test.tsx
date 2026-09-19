@@ -56,6 +56,7 @@ describe("Console Sign In", () => {
     submit("asha@example.com");
     expect(await screen.findByText("Too many sign-in requests. Try again in 10 minutes.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Email me a sign-in link" })).toBeDisabled();
+    expect(screen.getByLabelText("Console email")).not.toHaveAttribute("aria-invalid", "true");
   });
 
   it("shows Sending… while the request is out", async () => {
