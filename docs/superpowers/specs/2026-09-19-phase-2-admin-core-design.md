@@ -45,7 +45,7 @@ Next 16 replaces middleware with `src/proxy.ts`, which runs on Node only (`node_
 - `src/app/(site)/` holds today's root layout and every traveller page, moved as they are.
 - `src/app/console/` has its own root layout (its own `<html>`, fonts, providers, no AppShell) and every console page, plus its route handlers under `src/app/console/api/`.
 - Traveller route handlers (`api/`, `auth/`, `check/`) stay where they are. `global-error`, `manifest`, `robots` and the icons stay at the app root.
-- Each tree has a catch-all (`[...missing]`) that calls `notFound()`, so an unmatched URL shows that tree's own not-found page, with no experimental flag.
+- Each tree has a catch-all (`[...missing]`), with no experimental flag. The traveller catch-all calls `notFound()`, so an unmatched address shows the site's own not-found page. The console's sends unknown addresses to sign in (signed-in members get a not-found state in the modules PR).
 
 **The proxy.** The host is read from the `Host` header: lower-cased, without the port. `request.nextUrl` reads `localhost` under `next dev`, so it can't be used.
 - **On a console host:**
@@ -54,7 +54,7 @@ Next 16 replaces middleware with `src/proxy.ts`, which runs on Node only (`node_
   - The Supabase session is refreshed under the console cookie name.
   - A fresh nonce CSP is set on the request and the response.
 - **On any other host,** `/console/*` answers 404, and everything else is as today.
-- **Console hosts** are `admin.trakline.in` in production and `admin.localhost` locally (`CONSOLE_HOST`). Matcher host values are escaped and anchored.
+- **Console hosts** are fixed: `admin.trakline.in` in production and `admin.localhost` anywhere else (so no setting is needed). Matcher host values are constants, escaped and anchored.
 - **Prefetches are rewritten too;** skipping them, as the CSP guide's example does, would break the console.
 
 **Headers.** `next.config.ts` splits its rules by host.
@@ -107,7 +107,7 @@ Console links go through a small `consoleHref()` helper, because `typedRoutes` k
 1. `POST /api/sign-in` gives one answer for every address. For a member only, it:
    - makes a link with `auth.admin.generateLink({ type: "magiclink" })`
    - sends it from `console@trakline.in` through Resend
-   - limits sends to 5 an hour per address and 20 an hour per connection, answering "Too many sign-in requests. Try again in 10 minutes." past the limit
+   - limits sends to 5 per 10 minutes per address and 20 per 10 minutes per connection, answering "Too many sign-in requests. Try again in 10 minutes." past the limit
 2. `GET /auth/confirm` calls `verifyOtp` and starts a console session, not yet key-verified. It opens the key step, or Setup for a member with fewer than two keys.
 3. The key step signs a server challenge. When it verifies, the session is marked key-verified and Overview opens.
 
@@ -270,7 +270,6 @@ Each field is validated on its own, and a bad field falls back to its default. A
 
 | Name | Where | Secret | Notes |
 |---|---|---|---|
-| `CONSOLE_HOST` | Production (and `.env.development.local`) | no | `admin.trakline.in`; `admin.localhost` locally |
 | `RESEND_API_KEY` | Production | **yes** | sending access, domain trakline.in; entered by you through a hidden prompt |
 | `CONSOLE_EMAIL_FROM` | not set | no | defaults to `Trakline Console <console@trakline.in>` |
 | `RAILKIT_MONTHLY_QUOTA`, `RAPIDAPI_MONTHLY_QUOTA` | not set | no | defaults 10,000 and 10 |
