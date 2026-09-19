@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { consoleCsp, newNonce, sentryReportUri } from "@/console/csp";
-import { isConsoleHost } from "@/console/hosts";
+import { CONSOLE_HOST_LOCAL, CONSOLE_HOST_PRODUCTION, isConsoleHost, requestHost } from "@/console/hosts";
 import { env } from "@/services/env";
 import { isSupabaseConfigured, supabasePublicEnv } from "@/services/supabase/public-env";
 import type { Database } from "@/types/supabase";
@@ -76,12 +76,18 @@ async function refreshSession(request: NextRequest): Promise<NextResponse> {
 }
 
 export async function proxy(request: NextRequest): Promise<NextResponse> {
-  if (isConsoleHost(request.headers.get("host"), env().VERCEL_ENV)) return consoleRequest(request);
+  const host = request.headers.get("host");
+  if (isConsoleHost(host, env().VERCEL_ENV)) return consoleRequest(request);
+  // A host that names a console constant for the *other* environment must fail closed, never
+  // fall through to the traveller branch: the matcher's static host pattern lists both constants,
+  // since it cannot know at build time which one this deployment answers to (see hosts.ts).
+  const parsedHost = requestHost(host);
+  if (parsedHost === CONSOLE_HOST_PRODUCTION || parsedHost === CONSOLE_HOST_LOCAL) return notFound();
   if (isConsolePath(request.nextUrl.pathname)) return notFound();
   return refreshSession(request);
 }
 
-// Literals only: Next reads the matcher statically. The host pattern is anchored and escaped by Next itself.
+// Literals only: Next reads the matcher statically. Next anchors the host pattern; the dots in it are escaped by hand below.
 export const config = {
   matcher: [
     {

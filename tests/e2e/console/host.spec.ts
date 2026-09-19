@@ -12,6 +12,11 @@ test("the console host serves sign in with a nonce policy and no indexing", asyn
   expect(response?.headers()["x-robots-tag"]).toBe("noindex, nofollow, noarchive");
 });
 
+test("the console advertises no manifest, since its own CSP forbids one", async ({ page }) => {
+  await page.goto("/login");
+  expect(await page.locator('link[rel="manifest"]').count()).toBe(0);
+});
+
 test("every console response carries a fresh nonce", async ({ request }) => {
   const nonce = async () => /'nonce-([^']+)'/.exec((await request.get("/login")).headers()["content-security-policy"] ?? "")?.[1];
   expect(await nonce()).not.toBe(await nonce());

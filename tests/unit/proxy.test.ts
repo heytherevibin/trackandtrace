@@ -10,7 +10,13 @@ function request(url: string): NextRequest {
   return new NextRequest(url, { headers: { host: new URL(url).host } });
 }
 
-afterEach(() => vi.unstubAllEnvs());
+// In afterEach, not inside the tests that stub env vars: a failed assertion there must not skip
+// this and leak a production-stubbed cache into the rest of the file.
+afterEach(async () => {
+  vi.unstubAllEnvs();
+  const { resetEnvCache } = await import("@/services/env");
+  resetEnvCache();
+});
 
 describe("the proxy on the console host", () => {
   it("rewrites a page into the console tree, with a nonce policy on the request and the response", async () => {
@@ -61,8 +67,35 @@ describe("the proxy on the console host", () => {
     const { resetEnvCache } = await import("@/services/env");
     resetEnvCache();
     expect((await proxy(request("https://admin.trakline.in/login"))).headers.get("x-middleware-rewrite")).toBe("https://admin.trakline.in/console/login");
-    expect((await proxy(request("http://admin.localhost:4210/login"))).headers.get("x-middleware-rewrite")).toBeNull();
+    // The other environment's console host constant: fails closed (404), never the traveller branch.
+    const otherConstant = await proxy(request("http://admin.localhost:4210/login"));
+    expect(otherConstant.headers.get("x-middleware-rewrite")).toBeNull();
+    expect(otherConstant.status).toBe(404);
+  });
+
+  it("answers 404 to the other environment's console host constant, never the traveller branch", async () => {
+    // Default test env: no VERCEL_ENV, so admin.localhost is this deployment's console host and
+    // admin.trakline.in — the production constant — is the "other" one.
+    const response = await proxy(request("https://admin.trakline.in/pnr"));
+    expect(response.status).toBe(404);
+    expect(response.headers.get("content-security-policy")).toBeNull();
+    expect(response.headers.get("x-middleware-next")).toBeNull();
+  });
+
+  it("treats an empty port the way Next does, so admin.localhost: still 404s in production", async () => {
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://example.upstash.io");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "token");
+    vi.stubEnv("DATA_KEY", `${"A".repeat(43)}=`);
+    const { resetEnvCache } = await import("@/services/env");
     resetEnvCache();
+    const response = await proxy(new NextRequest("https://trakline.in/pnr", { headers: { host: "admin.localhost:" } }));
+    expect(response.status).toBe(404);
+  });
+
+  it("rewrites a traveller-shaped API path into the console tree too, since the console host has no traveller routes", async () => {
+    const response = await proxy(request("http://admin.localhost:4210/api/pnr"));
+    expect(response.headers.get("x-middleware-rewrite")).toBe("http://admin.localhost:4210/console/api/pnr");
   });
 });
 

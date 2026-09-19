@@ -7,6 +7,9 @@ describe("requestHost", () => {
     ["ADMIN.Trakline.in:443", "admin.trakline.in"],
     ["admin.localhost:4210", "admin.localhost"],
     [" trakline.in ", "trakline.in"],
+    // Next strips the port by taking everything before the first colon, so an empty port (a
+    // colon with nothing after it) still reads as the bare host, not a malformed one.
+    ["admin.localhost:", "admin.localhost"],
   ])("reads %j as %j", (header, host) => {
     expect(requestHost(header)).toBe(host);
   });
