@@ -1,3 +1,4 @@
+import { INCR_SCRIPT } from "@/services/kv";
 import type { RedisLike, WindowLimiterFactory, WindowVerdict } from "@/services/upstash";
 
 // An in-memory stand-in for Upstash: shared by every "instance" a test builds,
@@ -37,6 +38,24 @@ export function createFakeUpstash(): FakeUpstash {
     async del(key) {
       guard();
       return store.delete(key) ? 1 : 0;
+    },
+    async pttl(key) {
+      guard();
+      const entry = store.get(key);
+      if (!entry || entry.exp <= state.now) return -2;
+      return entry.exp === Infinity ? -1 : entry.exp - state.now;
+    },
+    async eval(script, keys, args) {
+      guard();
+      if (script !== INCR_SCRIPT) throw new Error("fake-upstash: unknown script");
+      const [key] = keys;
+      const [ttlMs, refresh] = args;
+      const entry = store.get(key);
+      const live = entry && entry.exp > state.now ? entry : undefined;
+      const count = (live ? Number(live.value) : 0) + 1;
+      const exp = count === 1 || refresh === "1" ? state.now + Number(ttlMs) : (live?.exp ?? Infinity);
+      store.set(key, { value: String(count), exp });
+      return count;
     },
   };
 

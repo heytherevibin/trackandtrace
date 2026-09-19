@@ -9,6 +9,9 @@ export interface RedisLike {
   get(key: string): Promise<unknown>;
   set(key: string, value: string, options: { readonly px: number }): Promise<unknown>;
   del(key: string): Promise<unknown>;
+  /** Milliseconds to expiry; -2 when the key is absent, -1 when it has no expiry. */
+  pttl(key: string): Promise<number>;
+  eval(script: string, keys: string[], args: string[]): Promise<unknown>;
 }
 
 export interface WindowVerdict {
