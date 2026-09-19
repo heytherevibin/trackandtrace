@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 // (src/services), server env and internal docs, never in pages, components, messages, the wire
 // schema, the service worker or email templates.
 
-const ROOTS = ["src/app", "src/components", "src/messages", "src/utils", "src/styles", "src/types/schemas.ts", "public", "supabase/templates"];
+const ROOTS = ["src/app", "src/components", "src/messages", "src/utils", "src/styles", "src/types/schemas.ts", "src/services/telemetry", "src/instrumentation-client.ts", "public", "supabase/templates"];
 const PROVIDER = /railkit|rapidapi|irctcapi/i;
 
 function files(path: string): string[] {

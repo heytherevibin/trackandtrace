@@ -15,7 +15,8 @@ Next.js server
   guarded (src/services/sources/guarded.ts) — each provider behind its breaker, one safe retry (network, 502/503/504) and a daily usage count
   watchlist-repo (src/services/watchlist-repo.ts) — supabase-js over RLS-guarded tables
   session (src/services/session.ts)        — verified JWT claims → SessionUser DTO
-  proxy (src/proxy.ts)                     — Supabase session refresh on page requests
+  proxy (src/proxy.ts)                     — Supabase session refresh on page requests (skips /api and /monitoring)
+  telemetry (src/instrumentation*.ts, src/services/telemetry/*) — Sentry on server, edge and browser via the /monitoring tunnel; every event scrubbed of PNRs, emails, tokens, cookies, bodies, queries and URL fragments; off without a DSN
 Supabase
   auth.users + public.watchlist_entries (supabase/migrations/*) — RLS: owner-only
 ```
@@ -44,6 +45,7 @@ PNRs never travel in an address, because request paths and query strings are rec
 | Upstash slow or down | Cache misses; limits fall back to this instance's memory; checks keep answering |
 | Provider failing repeatedly | 5 failures in 60 s open its breaker for 30 s (doubling per failed probe, up to 10 min); the fallback answers at once and no request is spent on the failing provider |
 | Provider refuses the key or plan, or its quota | Breaker open 10 min (401/403), or for the provider's Retry-After (429) |
+| Sentry unreachable | Error reports are dropped; the app is unaffected |
 | Malformed API body | Client zod validation fails → error state, never rendered as data |
 | Supabase unconfigured | Accounts surface says so; watchlist stays device-local; APIs 503 |
 | Session expired | 401 → UI returns to local mode |

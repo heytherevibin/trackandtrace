@@ -26,6 +26,7 @@
 - Production refuses `PNR_SOURCE=fixture`. Set environment variables in the Vercel project, never in the repo; mark keys Sensitive (they then read back as `[SENSITIVE]` from `vercel env pull`, so verify behaviour on the live site instead).
 - PNR data: `PNR_SOURCE=railkit`, `RAILKIT_API_KEY`, and `PNR_FALLBACK=rapidapi` with `RAPIDAPI_KEY`. Watch the RailKit plan's renewal date: an expired plan quietly drops to 50 requests a month.
 - **Shared store** (required on Production and Preview, which refuse to boot without it). Upstash Redis (Mumbai, Free) connected to the project provides `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`. The `KV_REST_API_*` names from Vercel's integration also work. Add one `DATA_KEY` per environment, which no one ever needs to see: `openssl rand -base64 32 | tr -d '\n' | vercel env add DATA_KEY <production|preview> --sensitive --yes --scope trakline`. Rotating it empties the cache and resets limit windows. Local and CI runs keep limits and the cache in memory.
+- **Error tracking:** the Vercel Sentry integration (project `sentry-trakline`, connected to Production and Preview) supplies `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_ORG`, `SENTRY_PROJECT` and `SENTRY_AUTH_TOKEN`. There is no log drain, and none should be added: raw logs would bypass the scrubber. Without the DSN (local runs, CI), Sentry is off.
 
 ## Conventions
 

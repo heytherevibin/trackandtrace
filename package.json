@@ -36,6 +36,7 @@
   "dependencies": {
     "@base-ui/react": "1.8.0",
     "@fluentui/react-icons": "^2.0.339",
+    "@sentry/nextjs": "10.75.0",
     "@supabase/ssr": "0.12.7",
     "@supabase/supabase-js": "2.116.0",
     "@upstash/ratelimit": "2.1.0",
@@ -73,6 +74,7 @@
   "allowScripts": {
     "esbuild@0.28.2": true,
     "unrs-resolver@1.12.2": true,
-    "fsevents": false
+    "fsevents": false,
+    "@sentry/cli@2.58.6": true
   }
 }

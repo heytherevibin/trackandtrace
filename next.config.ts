@@ -1,3 +1,4 @@
+import { withSentryConfig } from "@sentry/nextjs/config";
 import type { NextConfig } from "next";
 
 const supabaseOrigin = (() => {
@@ -63,4 +64,17 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// Error reports travel through /monitoring (same origin: the CSP keeps connect-src 'self' and
+// ad-blockers don't drop them). Source maps upload only when the Sentry integration's token is
+// present, and are deleted from the output afterwards, so they never ship publicly.
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  silent: !process.env.CI,
+  telemetry: false,
+  tunnelRoute: "/monitoring",
+  widenClientFileUpload: true,
+  sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN, deleteSourcemapsAfterUpload: true },
+  webpack: { treeshake: { removeDebugLogging: true } },
+});
