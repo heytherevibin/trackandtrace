@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { isDesignLockedAccent } from "./axe-exemption";
 
 export const PNR = {
   cnf: "2345678901",
@@ -61,25 +62,12 @@ export async function navigateFromMasthead(page: Page, name: string, isMobile: b
   await nav.getByRole("link", { name, exact: true }).click();
 }
 
-/** The Industry steel and its drawn hover step, tuned to the ground at 3:1 by the design (primary fill, outline tag, ghost text). */
-const DESIGN_LOCKED_ACCENT: ReadonlySet<string> = new Set(["#5980a6", "#597ea3"]);
-
-type AxeNode = Awaited<ReturnType<AxeBuilder["analyze"]>>["violations"][number]["nodes"][number];
-
-function isDesignLockedAccent(node: AxeNode): boolean {
-  return node.any.some((check) => {
-    const data: unknown = check.data;
-    if (typeof data !== "object" || data === null) return false;
-    const { fgColor, bgColor } = data as { readonly fgColor?: unknown; readonly bgColor?: unknown };
-    return (typeof fgColor === "string" && DESIGN_LOCKED_ACCENT.has(fgColor)) || (typeof bgColor === "string" && DESIGN_LOCKED_ACCENT.has(bgColor));
-  });
-}
-
 /**
  * Zero serious or critical axe findings on the current page. The steel pairing is design-locked
  * (decided 2026-09-17: the reference is matched exactly), so by default only colour-contrast nodes
- * drawn in #5980a6 are exempt; every other finding still fails. Pass `allowDesignLockedAccent: false`
- * for a strict scan.
+ * on the steel fill (#5980a6, or its hover step) are exempt: the primary button, the skip link and
+ * the toast's action. Steel text on a ground fails, like every other finding (see axe-exemption.ts).
+ * Pass `allowDesignLockedAccent: false` for a strict scan.
  */
 export async function expectAxeClean(page: Page, options: { readonly allowDesignLockedAccent?: boolean } = {}): Promise<void> {
   // Park the pointer so no hover tint is mid-transition when colours are sampled.
