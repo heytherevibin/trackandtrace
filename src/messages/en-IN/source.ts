@@ -9,6 +9,7 @@ export const source = {
     refused: "The reservation service is unavailable right now. Nothing was shown in its place.",
     busy: "The reservation service is busy right now. Try again shortly.",
     resting: "The reservation service is not answering right now. Try again shortly.",
+    dailyLimit: "Trakline has used today's live checks. Try again after 00:00 IST.",
     error: "The reservation service returned an error. Nothing was shown in its place.",
     unreadable: "The reservation service returned a record this app cannot read. Nothing was shown in its place.",
     couldNotAnswer: "The reservation service could not answer for this PNR. Nothing was shown in its place.",

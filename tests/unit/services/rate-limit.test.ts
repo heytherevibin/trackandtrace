@@ -1,5 +1,5 @@
 import { beforeEach, describe, it, expect, vi } from "vitest";
-import { MemoryRateLimiter, SharedRateLimiter, clientIp } from "@/services/rate-limit";
+import { MemoryRateLimiter, SharedRateLimiter, addressKey, clientIp } from "@/services/rate-limit";
 import type { WindowLimiterFactory } from "@/services/upstash";
 import { createFakeUpstash } from "../../support/fake-upstash";
 
@@ -56,6 +56,45 @@ describe("clientIp", () => {
 
   it("returns unknown when no IP info", () => {
     expect(clientIp(null, null)).toBe("unknown");
+  });
+});
+
+describe("addressKey", () => {
+  it("keeps an IPv4 address whole", () => {
+    expect(addressKey("203.0.113.7")).toBe("203.0.113.7");
+  });
+
+  it("keys an IPv6 address by its /64 network, which one client controls", () => {
+    expect(addressKey("2001:db8:1:2:aaaa:bbbb:cccc:dddd")).toBe("2001:db8:1:2::/64");
+  });
+
+  it("gives every address in one /64 the same key, and the next /64 another", () => {
+    const home = addressKey("2001:db8:1:2::1");
+    expect(addressKey("2001:DB8:1:2:ffff:ffff:ffff:ffff")).toBe(home);
+    expect(addressKey("2001:0db8:0001:0002:0:0:0:9")).toBe(home);
+    expect(addressKey("2001:db8:1:3::1")).not.toBe(home);
+  });
+
+  it("expands compressed forms and drops a zone before cutting", () => {
+    expect(addressKey("2001:db8::1")).toBe("2001:db8:0:0::/64");
+    expect(addressKey("::1")).toBe("0:0:0:0::/64");
+    expect(addressKey("fe80::1%en0")).toBe("fe80:0:0:0::/64");
+  });
+
+  it("reads an IPv4-mapped IPv6 address as the IPv4 address it carries", () => {
+    expect(addressKey("::ffff:203.0.113.7")).toBe("203.0.113.7");
+    expect(addressKey("::FFFF:cb00:7107")).toBe("203.0.113.7");
+  });
+
+  it("drops a port", () => {
+    expect(addressKey("203.0.113.7:8080")).toBe("203.0.113.7");
+    expect(addressKey("[2001:db8:1:2::1]:443")).toBe("2001:db8:1:2::/64");
+  });
+
+  it("puts anything unreadable in one shared bucket, so garbage can't mint fresh limits", () => {
+    for (const bad of ["", "unknown", "not-an-ip", "1.2.3.999", "1.2.3", "01.2.3.4", "2001:db8:::1", "2001:db8::1::2", "12345::1", "::ffff:1.2.3.999", "1:2:3:4:5:6:7:8:9", "[2001:db8::1"]) {
+      expect(addressKey(bad), bad).toBe("unreadable");
+    }
   });
 });
 

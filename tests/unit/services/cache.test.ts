@@ -1,52 +1,27 @@
-import { describe, expect, it, vi } from "vitest";
-import { MemoryCache, getOrCompute } from "@/services/cache";
+import { describe, expect, it } from "vitest";
+import { MemoryCache } from "@/services/cache";
 
-describe("getOrCompute", () => {
-  it("misses, stores, then hits within the ttl", async () => {
+describe("MemoryCache", () => {
+  it("answers within the ttl, asynchronously, so a shared store can stand in", async () => {
     let now = 1_000;
     const cache = new MemoryCache(() => now);
-    const compute = vi.fn(async () => "value");
-    const first = await getOrCompute(cache, "k", 60_000, compute);
-    const second = await getOrCompute(cache, "k", 60_000, compute);
+    await cache.set("k", "value", 60_000);
     now += 59_000;
-    const third = await getOrCompute(cache, "k", 60_000, compute);
-    expect(first).toEqual({ value: "value", cached: false });
-    expect(second.cached).toBe(true);
-    expect(third.cached).toBe(true);
-    expect(compute).toHaveBeenCalledTimes(1);
+    await expect(cache.get("k")).resolves.toBe("value");
   });
 
-  it("recomputes after the ttl expires", async () => {
+  it("forgets a value once its ttl has passed", async () => {
     let now = 0;
     const cache = new MemoryCache(() => now);
-    const compute = vi.fn(async () => Math.random());
-    await getOrCompute(cache, "k", 1_000, compute);
+    await cache.set("k", 1, 1_000);
     now = 1_001;
-    const later = await getOrCompute(cache, "k", 1_000, compute);
-    expect(later.cached).toBe(false);
-    expect(compute).toHaveBeenCalledTimes(2);
+    await expect(cache.get("k")).resolves.toBeUndefined();
   });
 
-  it("does not store values the predicate rejects", async () => {
-    const cache = new MemoryCache(() => 0);
-    const compute = vi.fn(async () => ({ ok: false }));
-    await getOrCompute(cache, "k", 1_000, compute, (v) => v.ok);
-    await getOrCompute(cache, "k", 1_000, compute, (v) => v.ok);
-    expect(compute).toHaveBeenCalledTimes(2);
-  });
-
-  it("delete forces the next read to recompute", async () => {
-    const cache = new MemoryCache(() => 0);
-    const compute = vi.fn(async () => 1);
-    await getOrCompute(cache, "k", 1_000, compute);
-    await cache.delete("k");
-    const again = await getOrCompute(cache, "k", 1_000, compute);
-    expect(again.cached).toBe(false);
-  });
-
-  it("answers asynchronously, so a shared store can stand in", async () => {
+  it("forgets a deleted value at once", async () => {
     const cache = new MemoryCache(() => 0);
     await cache.set("k", 1, 1_000);
-    await expect(cache.get("k")).resolves.toBe(1);
+    await cache.delete("k");
+    await expect(cache.get("k")).resolves.toBeUndefined();
   });
 });

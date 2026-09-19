@@ -1,8 +1,9 @@
 import { createBreaker } from "./breaker";
 import { pnrCache, type Cache } from "./cache";
 import { deriveDataKeys, keyedHash } from "./data-key";
-import { env, sharedStoreConfig, type Env, type ThirdPartySource } from "./env";
+import { activePnrSource, env, isThirdPartySource, liveRequestsPerDay, sharedStoreConfig, type Env, type ThirdPartySource } from "./env";
 import { MemoryKv, redisKv, resilientKv, type Kv } from "./kv";
+import { UNLIMITED_BUDGET, createLiveBudget, type LiveBudget } from "./live-budget";
 import { log } from "./log";
 import { MemoryRateLimiter, SharedRateLimiter, type RateLimiter } from "./rate-limit";
 import { EncryptedRedisCache } from "./redis-cache";
@@ -27,6 +28,7 @@ interface SharedStore {
 const stores = new WeakMap<Env, SharedStore | null>();
 const states = new WeakMap<Env, { readonly kv: Kv; readonly prefix: string }>();
 const guards = new WeakMap<Env, Map<ThirdPartySource, GuardDeps>>();
+const budgets = new WeakMap<Env, LiveBudget>();
 /** Breaker state and usage counts without a shared store, and while it is down. */
 const localKv = new MemoryKv();
 const lastReport = new Map<string, number>();
@@ -86,6 +88,22 @@ function stateStore(current: Env): { readonly kv: Kv; readonly prefix: string } 
 /** Test seam: forget this instance's breaker state and usage counts. */
 export function resetLocalState(): void {
   localKv.clear();
+}
+
+/** Today's live-request budget, shared by every instance. Sources that spend no provider quota have none. */
+export function liveBudget(current: Env = env()): LiveBudget {
+  if (!isThirdPartySource(activePnrSource(current))) return UNLIMITED_BUDGET;
+  const known = budgets.get(current);
+  if (known) return known;
+  const { kv, prefix } = stateStore(current);
+  const made = createLiveBudget({
+    kv,
+    prefix,
+    limit: () => liveRequestsPerDay(current),
+    onReached: ({ day, limit }) => log.warn("[budget] today's live-request budget is spent; answering from the cache until 00:00 IST", { day, limit }),
+  });
+  budgets.set(current, made);
+  return made;
 }
 
 /** One breaker and one usage counter per provider, shared by every check in this environment. */

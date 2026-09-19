@@ -46,6 +46,8 @@ const envSchema = z
     RAILKIT_TIMEOUT_MS: z.coerce.number().int().min(1000).max(30000).default(8000),
     /** auto: the shared store when it is configured, this instance's memory otherwise. */
     RATE_LIMIT_STRATEGY: z.enum(["auto", "memory", "upstash"]).default("auto"),
+    /** Live requests allowed per day in India, across every address. RailKit's plan is 10,000 a month: 300 × 31 = 9,300. */
+    LIVE_REQUESTS_PER_DAY: z.coerce.number().int().min(1).max(1_000_000).default(300),
     UPSTASH_REDIS_REST_URL: z.url().optional(),
     UPSTASH_REDIS_REST_TOKEN: z.string().min(1).optional(),
     /** The names Vercel's Upstash integration injects; read when the UPSTASH_ pair is absent. */
@@ -179,6 +181,11 @@ export function activePnrSource(current: Env = env()): PnrSource {
   if (current.PNR_SOURCE === "railkit" && current.RAILKIT_API_KEY) return "railkit";
   if (current.PNR_SOURCE === "rapidapi" && current.RAPIDAPI_KEY) return "rapidapi";
   return "live";
+}
+
+/** The daily budget for live requests. The one place it is read, so the console can later own it. */
+export function liveRequestsPerDay(current: Env = env()): number {
+  return current.LIVE_REQUESTS_PER_DAY;
 }
 
 /** The source that answers while the active one is unavailable, if one is configured. */

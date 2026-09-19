@@ -69,6 +69,18 @@ describe("POST /api/pnr over the shared store", () => {
     expect(refused.body.code).toBe("RATE_LIMITED");
   });
 
+  it("limits a whole IPv6 /64 as one client across instances, and stores neither the address nor its network", async () => {
+    const a = await instance();
+    const b = await instance();
+    for (let i = 1; i <= 10; i += 1) await check(a, `2001:db8:1:2::${i}`);
+    for (let i = 11; i <= 20; i += 1) await check(b, `2001:db8:1:2:ffff::${i}`);
+    const same = await check(a, "2001:db8:1:2:abcd::1");
+    expect(same.status).toBe(429);
+    expect(same.body.code).toBe("RATE_LIMITED");
+    expect((await check(b, "2001:db8:1:3::1")).status).toBe(200);
+    expect(fake.dump()).not.toContain("2001:db8");
+  });
+
   it("keeps answering, and limiting per instance, while Upstash is down", async () => {
     fake.fail(true);
     const a = await instance();
