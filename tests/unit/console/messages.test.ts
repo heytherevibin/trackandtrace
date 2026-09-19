@@ -22,5 +22,7 @@ describe("console messages", () => {
     expect(consoleMessages.signIn.sent.detail).toBe("If this address belongs to a console member, a sign-in link is on its way.");
     expect(consoleMessages.signIn.sent.againIn(42)).toBe("Send again in 42 s");
     expect(consoleMessages.frame.environment.previewHost("admin.localhost:4210")).toBe("Staging data · admin.localhost:4210");
+    expect(consoleMessages.availability.productionOnly).toBe("The console runs only in production.");
+    expect(consoleMessages.availability.localDatabase).toBe("Point the app at a local Supabase to use the console.");
   });
 });
