@@ -5,10 +5,22 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 let route: typeof import("@/app/console/api/sign-in/route");
 
-function post(body: unknown, headers: Record<string, string> = {}): Request {
+function post(body: unknown, headers: Record<string, string | null> = {}): Request {
+  const finalHeaders: Record<string, string> = {
+    "content-type": "application/json",
+    "sec-fetch-site": "same-origin",
+    "x-forwarded-for": "198.51.100.7",
+  };
+  for (const [key, value] of Object.entries(headers)) {
+    if (value === null) {
+      delete finalHeaders[key];
+    } else {
+      finalHeaders[key] = value;
+    }
+  }
   return new Request("http://admin.localhost:4210/api/sign-in", {
     method: "POST",
-    headers: { "content-type": "application/json", "sec-fetch-site": "same-origin", "x-forwarded-for": "198.51.100.7", ...headers },
+    headers: finalHeaders,
     body: JSON.stringify(body),
   });
 }
@@ -48,5 +60,36 @@ describe("POST /api/sign-in on the console", () => {
   it("limits one connection to 20 requests in 10 minutes", async () => {
     for (let i = 0; i < 20; i++) expect((await route.POST(post({ email: `a${i}@example.com` }))).status).toBe(200);
     expect((await route.POST(post({ email: "b@example.com" }))).status).toBe(429);
+  });
+
+  describe("same-origin fallback (no Sec-Fetch-Site header)", () => {
+    it("allows matching origin header", async () => {
+      const response = await route.POST(
+        post({ email: "fallback1@example.com" }, { "sec-fetch-site": null, origin: "http://admin.localhost:4210" })
+      );
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ ok: true });
+    });
+
+    it("refuses mismatched origin header", async () => {
+      const response = await route.POST(
+        post({ email: "fallback2@example.com" }, { "sec-fetch-site": null, origin: "https://trakline.in" })
+      );
+      expect(response.status).toBe(403);
+    });
+
+    it("refuses null origin header", async () => {
+      const response = await route.POST(
+        post({ email: "fallback3@example.com" }, { "sec-fetch-site": null, origin: "null" })
+      );
+      expect(response.status).toBe(403);
+    });
+
+    it("refuses when both Sec-Fetch-Site and Origin are absent", async () => {
+      const response = await route.POST(
+        post({ email: "fallback4@example.com" }, { "sec-fetch-site": null, origin: null })
+      );
+      expect(response.status).toBe(403);
+    });
   });
 });
