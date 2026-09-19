@@ -12,7 +12,7 @@ The console's frame and its audit log, drawn on the Design canvas and approved o
 | `canvas.json` | The canvas layout |
 | `industry.css` | The console's classes |
 
-Each sheet's states are the props in its `data-props`: role, environment, notice, dialog, menu, page or state, and Day or Night. `industry.css` copies its tokens from `src/styles/theme.css` (same names and values), and its classes follow the components in `src/components/ui`. Each class names the component it mirrors.
+Each sheet's states are the props in its `data-props`: role, environment, notice, dialog, menu, page or state, and `defaultTheme` (system, light, dark), as in the B sheets. The theme button works like the app's: System → Day → Night, with System following the device. `industry.css` copies its tokens from `src/styles/theme.css` (same names and values), and its classes follow the components in `src/components/ui`. Each class names the component it mirrors.
 
 ## Decided at the review
 

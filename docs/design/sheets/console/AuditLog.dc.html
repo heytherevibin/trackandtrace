@@ -38,11 +38,14 @@ body{margin:0}
 <div style="flex-grow: 1;"></div>
 <div style="display: flex; align-items: center; gap: 8px;">
 <span style="display: inline-flex; align-items: baseline; gap: 8px; padding: 0 8px;"><span class="fig" style="font-size: 15px; letter-spacing: 0.06em;">14:32</span><span class="legend-sm">IST</span></span>
-<button type="button" class="box box-icon" aria-label="{{themeLabel}}" title="{{themeLabel}}">
-<sc-if value="{{isDay}}" hint-placeholder-val="{{ true }}">
-<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="10" cy="10" r="3.5"></circle><path d="M10 1.8v2.2M10 16v2.2M1.8 10H4M16 10h2.2M4.2 4.2l1.6 1.6M14.2 14.2l1.6 1.6M4.2 15.8l1.6-1.6M14.2 5.8l1.6-1.6"></path></svg>
+<button type="button" class="box box-icon" aria-label="{{themeLabel}}" title="{{themeLabel}}" onClick="{{cycleTheme}}">
+<sc-if value="{{modeSystem}}" hint-placeholder-val="{{ true }}">
+<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.25" fill="none" stroke="currentColor" stroke-width="1.5"></circle><path d="M10 2.75a7.25 7.25 0 0 1 0 14.5Z" fill="currentColor"></path></svg>
 </sc-if>
-<sc-if value="{{isNight}}" hint-placeholder-val="{{ false }}">
+<sc-if value="{{modeDay}}" hint-placeholder-val="{{ false }}">
+<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="4" fill="currentColor"></circle><path d="M10 1.5v2M10 16.5v2M1.5 10h2M16.5 10h2M4 4l1.4 1.4M14.6 14.6 16 16M4 16l1.4-1.4M14.6 5.4 16 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg>
+</sc-if>
+<sc-if value="{{modeNight}}" hint-placeholder-val="{{ false }}">
 <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M8.5 2.2a7.8 7.8 0 1 0 9.3 9.3A6.3 6.3 0 1 1 8.5 2.2Z"></path></svg>
 </sc-if>
 </button>
@@ -248,13 +251,25 @@ Export CSV
 </sc-if>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"state":{"editor":"enum","options":["Ready","Loading","Empty","Error","Export: confirm","Export: preparing","Export: ready","No access (Support)"],"default":"Ready","section":"State"},"drawer":{"editor":"enum","options":["Closed","Open"],"default":"Closed","section":"State"},"role":{"editor":"enum","options":["Owner","Admin"],"default":"Owner","section":"State"},"environment":{"editor":"enum","options":["Production","Preview"],"default":"Production","section":"State"},"face":{"editor":"enum","options":["Day","Night"],"default":"Day","section":"Appearance"},"$preview":{"width":1440,"height":1180}}'>
+<script type="text/x-dc" data-dc-script data-props='{"state":{"editor":"enum","options":["Ready","Loading","Empty","Error","Export: confirm","Export: preparing","Export: ready","No access (Support)"],"default":"Ready","section":"State"},"drawer":{"editor":"enum","options":["Closed","Open"],"default":"Closed","section":"State"},"role":{"editor":"enum","options":["Owner","Admin"],"default":"Owner","section":"State"},"environment":{"editor":"enum","options":["Production","Preview"],"default":"Production","section":"State"},"defaultTheme":{"editor":"enum","options":["system","light","dark"],"default":"system","section":"Appearance"},"$preview":{"width":1440,"height":1180}}'>
 class Component extends DCLogic {
+  state = { theme: null, sysDark: false };
+  componentDidMount() {
+    this._mq = window.matchMedia('(prefers-color-scheme: dark)');
+    this._onMq = () => this.setState({ sysDark: this._mq.matches });
+    this.setState({ sysDark: this._mq.matches });
+    this._mq.addEventListener('change', this._onMq);
+  }
+  componentWillUnmount() {
+    if (this._mq) this._mq.removeEventListener('change', this._onMq);
+  }
   renderVals() {
     var state = this.props.state ?? 'Ready';
     var drawer = this.props.drawer ?? 'Closed';
     var env = this.props.environment ?? 'Production';
-    var face = this.props.face ?? 'Day';
+    var mode = this.state.theme || this.props.defaultTheme || 'system';
+    var themeNames = { system: 'System', light: 'Day', dark: 'Night' };
+    var themeNext = { system: 'light', light: 'dark', dark: 'system' };
     var noAccess = state === 'No access (Support)';
     // The no-access state is drawn as Support opening 14 Audit log.
     var role = noAccess ? 'Support' : (this.props.role ?? 'Owner');
@@ -325,8 +340,10 @@ class Component extends DCLogic {
     var stRows = tableStates.indexOf(state) !== -1;
     var m = members[role] || members.Owner;
     return {
-      face: face === 'Night' ? 'night' : 'day', isDay: face !== 'Night', isNight: face === 'Night',
-      themeLabel: face === 'Night' ? 'Theme: Night. Switch to System' : 'Theme: Day. Switch to Night',
+      face: mode === 'dark' || (mode === 'system' && this.state.sysDark) ? 'night' : 'day',
+      modeSystem: mode === 'system', modeDay: mode === 'light', modeNight: mode === 'dark',
+      themeLabel: 'Theme: ' + themeNames[mode] + '. Switch to ' + themeNames[themeNext[mode]],
+      cycleTheme: () => this.setState({ theme: themeNext[mode] }),
       isProd: env !== 'Preview', isPreview: env === 'Preview',
       role: role, initials: m[1], memberLabel: m[0] + ', ' + role + '. Open the member menu',
       groups: groups, rows: rows, entry: entry, yes: true,
