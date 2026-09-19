@@ -8,6 +8,7 @@ Browser
   stores (src/services/stores/*)           — device state: watchlist, recent, share, install, merge
   api-client (src/services/api-client.ts)  — validated fetch; malformed bodies become errors
 Next.js server
+  pages (src/app/(site)/*)                 — every traveller page under the site's root layout; unmatched addresses get src/app/global-not-found.tsx (the site's not-found page, server-rendered, 404; sign in on the console host)
   route handlers (src/app/api/*)           — thin: guard → validate → repository/query → jsonOk/jsonError
   pnr-query (src/services/pnr-query.ts)    — the one PNR path: validate → rate limit (IPv6 per /64) → cache → daily live-request budget → single-flight → source
   shared-store (src/services/shared-store.ts) — Upstash Redis (Mumbai) on deployments: shared limits + the encrypted 60 s PNR cache
@@ -15,7 +16,8 @@ Next.js server
   guarded (src/services/sources/guarded.ts) — each provider behind its breaker, one safe retry (network, 502/503/504) and a daily usage count
   watchlist-repo (src/services/watchlist-repo.ts) — supabase-js over RLS-guarded tables
   session (src/services/session.ts)        — verified JWT claims → SessionUser DTO
-  proxy (src/proxy.ts)                     — Supabase session refresh on page requests (skips /api and /monitoring)
+  proxy (src/proxy.ts)                     — one app, two hosts: the console host (admin.trakline.in; admin.localhost locally) is rewritten into src/app/console with a per-request nonce CSP; elsewhere /console answers 404 and Supabase sessions are refreshed on page requests (skips /api and /monitoring)
+  console (src/console/*, src/app/console/*) — the team console: its own root layout, copy and components; traveller code never imports it (tests/unit/console/boundary.contract.test.ts)
   telemetry (src/instrumentation*.ts, src/services/telemetry/*) — Sentry on server, edge and browser via the /monitoring tunnel; every event scrubbed of PNRs, emails, tokens, cookies, bodies, queries and URL fragments; off without a DSN
 Supabase
   auth.users + public.watchlist_entries (supabase/migrations/*) — RLS: owner-only
