@@ -2,10 +2,10 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { describe, expect, it } from "vitest";
 
-// Console code (which may name providers) never reaches traveller code. Only the console tree, its pages, and the
-// host router may import @/console.
+// Console code (which may name providers) never reaches traveller code. Only the console tree, its pages, the
+// host router (src/proxy.ts) and its not-found fallback may import @/console.
 const ROOT = join(__dirname, "..", "..", "..");
-const ALLOWED = [`src${sep}console${sep}`, `src${sep}app${sep}console${sep}`, `src${sep}proxy.ts`];
+const ALLOWED = [`src${sep}console${sep}`, `src${sep}app${sep}console${sep}`, `src${sep}proxy.ts`, `src${sep}app${sep}global-not-found.tsx`];
 
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {

@@ -32,3 +32,9 @@ test("the traveller host has no console, and the console has one address per pag
   expect((await request.get("http://localhost:4210/console/login")).status()).toBe(404);
   expect((await request.get("/console/login")).status()).toBe(404);
 });
+
+test("an unmatched address the proxy passes through still goes to sign in", async ({ request }) => {
+  const response = await request.get("/brand/nope.svg", { maxRedirects: 0 });
+  expect(response.status()).toBe(307);
+  expect(response.headers()["location"]).toMatch(/\/login$/);
+});
