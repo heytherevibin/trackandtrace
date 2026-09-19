@@ -1,11 +1,11 @@
 import type { Metadata, Viewport } from "next";
-import "./globals.css";
+import "../globals.css";
 import { DARK, LIGHT } from "@/components/brand/brand-colors";
 import { Providers } from "@/components/providers";
 import { AppShell } from "@/components/shell/app-shell";
 import { PwaRegister } from "@/components/shell/pwa-register";
 import { currentUser } from "@/services/session";
-import { fontVars } from "./fonts";
+import { fontVars } from "../fonts";
 
 export const metadata: Metadata = {
   title: {

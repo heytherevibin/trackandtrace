@@ -9,7 +9,7 @@ vi.mock("@/services/auth-client", () => ({
 }));
 vi.mock("@/components/ui/toast", () => ({ notify: { success: vi.fn(), error: vi.fn() } }));
 
-const { PasskeysPlate } = await import("@/app/account/passkeys-plate");
+const { PasskeysPlate } = await import("@/app/(site)/account/passkeys-plate");
 const auth = await import("@/services/auth-client");
 const { notify } = await import("@/components/ui/toast");
 

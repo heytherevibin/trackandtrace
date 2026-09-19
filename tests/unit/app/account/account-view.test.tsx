@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }) }));
 vi.mock("@/services/auth-client", () => ({ signOutEverywhere: vi.fn(async () => undefined) }));
 
-const { AccountView } = await import("@/app/account/account-view");
+const { AccountView } = await import("@/app/(site)/account/account-view");
 const auth = await import("@/services/auth-client");
 
 const USER = { id: "u1", email: "asha@example.com", name: "Asha Rao", avatarUrl: null } as const;

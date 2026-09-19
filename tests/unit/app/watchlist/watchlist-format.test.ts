@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkedAgo, lastCheck, restoreAt, trendLabel } from "@/app/watchlist/watchlist-format";
+import { checkedAgo, lastCheck, restoreAt, trendLabel } from "@/app/(site)/watchlist/watchlist-format";
 import type { HistoryPoint, WatchlistEntry } from "@/types/domain";
 
 const at = (minute: number): string => new Date(Date.UTC(2026, 8, 17, 6, minute)).toISOString();
