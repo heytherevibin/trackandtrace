@@ -433,3 +433,4 @@ Everything below is written to 14 Audit log, as are sign-ins, lookups, failed ta
 - The five B sheets are in the repo under `docs/design/sheets/`.
 - The screenshot pack for B1 is made from a sample-data build (every route and state, Day and Night, 1440 and 390).
 - B0 is drawn, checked and approved, including the console tag contrast. That unblocks Phase 2's spec. Done 19 Sep 2026; the approved files are in `docs/design/sheets/console/`.
+- B1 and B2 are drawn, checked and approved (19 Sep 2026). The console sheets are in `docs/design/sheets/console/`, and the traveller sheets in `docs/design/sheets/traveller/`. Phase 2 builds from them.

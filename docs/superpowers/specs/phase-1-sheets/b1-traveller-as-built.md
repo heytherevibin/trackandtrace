@@ -1,5 +1,7 @@
 # B1: Traveller pages as built (draw after B0, before B2)
 
+**Approved 19 Sep 2026.** The approved drawings are in `docs/design/sheets/traveller/`. They were drawn from the running app itself, so they match the site except where the drawing changes it (dates read "Sep"). Where they differ from the prompts below, the drawings win.
+
 These pages work today but were never drawn. Drawing them lets you judge the look by eye and correct it in the drawing, and every later traveller sheet builds on them.
 
 - **When each page is transcribed:** before the first phase that changes it. /pnr and /login in Phase 2; /privacy in Phase 4; /account, /watchlist, the error pages and /offline in Phase 5.

@@ -1,0 +1,142 @@
+{
+ "v": 3,
+ "createdOnFiles": {
+  "v": 1,
+  "at": "2026-09-19T11:58:48Z"
+ },
+ "title": "Trakline B1 Traveller Pages",
+ "launch": {
+  "view": "canvas"
+ },
+ "pages": [],
+ "boards": {
+  "PnrResultPhone.dc.html": {
+   "x": 1520,
+   "y": 0,
+   "w": 390,
+   "h": 2232,
+   "title": "PNR Result \u00b7 390",
+   "is_interactive": true
+  },
+  "SignIn.dc.html": {
+   "x": 0,
+   "y": 2352,
+   "w": 1440,
+   "h": 900,
+   "title": "Sign In \u00b7 1440",
+   "is_interactive": true
+  },
+  "SignInPhone.dc.html": {
+   "x": 1520,
+   "y": 2352,
+   "w": 390,
+   "h": 851,
+   "title": "Sign In \u00b7 390",
+   "is_interactive": true
+  },
+  "Legal.dc.html": {
+   "x": 0,
+   "y": 3372,
+   "w": 1440,
+   "h": 1413,
+   "title": "Legal \u00b7 1440",
+   "is_interactive": true
+  },
+  "LegalPhone.dc.html": {
+   "x": 1520,
+   "y": 3372,
+   "w": 390,
+   "h": 1859,
+   "title": "Legal \u00b7 390",
+   "is_interactive": true
+  },
+  "Watchlist.dc.html": {
+   "x": 0,
+   "y": 5351,
+   "w": 1440,
+   "h": 900,
+   "title": "Watchlist Signed In \u00b7 1440",
+   "is_interactive": true
+  },
+  "WatchlistPhone.dc.html": {
+   "x": 1520,
+   "y": 5351,
+   "w": 390,
+   "h": 1434,
+   "title": "Watchlist Signed In \u00b7 390",
+   "is_interactive": true
+  },
+  "Account.dc.html": {
+   "x": 0,
+   "y": 6905,
+   "w": 1440,
+   "h": 1245,
+   "title": "Account \u00b7 1440",
+   "is_interactive": true
+  },
+  "AccountPhone.dc.html": {
+   "x": 1520,
+   "y": 6905,
+   "w": 390,
+   "h": 1484,
+   "title": "Account \u00b7 390",
+   "is_interactive": true
+  },
+  "Errors.dc.html": {
+   "x": 0,
+   "y": 8509,
+   "w": 1440,
+   "h": 900,
+   "title": "Errors \u00b7 1440",
+   "is_interactive": true
+  },
+  "ErrorsPhone.dc.html": {
+   "x": 1520,
+   "y": 8509,
+   "w": 390,
+   "h": 892,
+   "title": "Errors \u00b7 390",
+   "is_interactive": true
+  },
+  "PnrResult.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 1440,
+   "h": 1569,
+   "title": "PNR Result \u00b7 1440",
+   "is_interactive": true
+  }
+ },
+ "order": [
+  "PnrResult.dc.html",
+  "PnrResultPhone.dc.html",
+  "SignIn.dc.html",
+  "SignInPhone.dc.html",
+  "Legal.dc.html",
+  "LegalPhone.dc.html",
+  "Watchlist.dc.html",
+  "WatchlistPhone.dc.html",
+  "Account.dc.html",
+  "AccountPhone.dc.html",
+  "Errors.dc.html",
+  "ErrorsPhone.dc.html"
+ ],
+ "notes": {
+  "b1": {
+   "x": 0,
+   "y": -300,
+   "text": "B1 \u00b7 Traveller pages as built",
+   "kind": "title1",
+   "maxW": 1910
+  },
+  "howto": {
+   "x": 1990,
+   "y": 0,
+   "w": 560,
+   "size": "l",
+   "color": "blue",
+   "text": "How to review\n\nThese are the live pages, drawn from the running app with sample data. Each board has a Tweaks panel for its states and theme (System, Day or Night); the theme button works in Play.\n\nOne change from the live site is drawn: dates read \"Sep\" (the site prints \"Sept\").\n\nTell me in the chat what to change, or say approved."
+  }
+ },
+ "designSystems": []
+}
