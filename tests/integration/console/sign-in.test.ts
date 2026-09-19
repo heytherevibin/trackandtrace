@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // The console's sign-in route answers the same for every address and never says whether it belongs to a member.
 // Plan 2c adds sending, for members only, behind this same answer.
@@ -30,6 +30,25 @@ beforeEach(async () => {
   route = await import("@/app/console/api/sign-in/route");
 });
 
+afterEach(() => vi.unstubAllEnvs());
+
+describe("POST /api/sign-in where the console must not run", () => {
+  it("answers 503 with the local-database sentence for a hosted Supabase URL and no VERCEL_ENV, never reaching the rate limiter", async () => {
+    // Deliberately no matching publishable key: env() fails its own validation and falls back to
+    // defaults outside production, dropping NEXT_PUBLIC_SUPABASE_URL from its parsed result. The
+    // gate must still see it, since it reads supabasePublicEnv.url directly (see availability.test.ts).
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://abc.supabase.co");
+    vi.resetModules();
+    route = await import("@/app/console/api/sign-in/route");
+
+    for (let i = 0; i < 6; i++) {
+      const response = await route.POST(post({ email: "asha@example.com" }));
+      expect(response.status).toBe(503);
+      expect(await response.json()).toMatchObject({ code: "CONSOLE_UNAVAILABLE", message: "Point the app at a local Supabase to use the console." });
+    }
+  });
+});
+
 describe("POST /api/sign-in on the console", () => {
   it("answers the same for any valid address", async () => {
     for (const email of ["asha@example.com", "nobody@example.org"]) {
@@ -45,9 +64,10 @@ describe("POST /api/sign-in on the console", () => {
     expect(await response.json()).toMatchObject({ code: "INVALID_INPUT", message: "Enter an email address like name@example.com." });
   });
 
-  it("refuses requests from another site", async () => {
+  it("refuses requests from another site, with the console's own wording", async () => {
     const response = await route.POST(post({ email: "asha@example.com" }, { "sec-fetch-site": "same-site" }));
     expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ code: "INVALID_INPUT", message: "Cross-site requests are refused." });
   });
 
   it("limits one address to 5 requests in 10 minutes", async () => {

@@ -7,6 +7,7 @@ export type ErrorCode =
   | "RATE_LIMITED"
   | "UNAUTHENTICATED"
   | "SOURCE_UNAVAILABLE"
+  | "CONSOLE_UNAVAILABLE"
   | "INTERNAL";
 
 export class AppError extends Error {
@@ -34,6 +35,8 @@ function defaultStatus(code: ErrorCode): number {
     case "UNAUTHENTICATED":
       return 401;
     case "SOURCE_UNAVAILABLE":
+      return 503;
+    case "CONSOLE_UNAVAILABLE":
       return 503;
     default:
       return 500;

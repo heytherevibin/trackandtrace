@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { assertConsoleAvailable } from "@/console/availability";
 import { consoleMessages } from "@/console/messages";
 import { assertSameOrigin } from "@/console/same-origin";
 import { assertSignInAllowed } from "@/console/sign-in-limits";
@@ -16,6 +17,7 @@ const body = z.object({ email: z.email({ message: consoleMessages.signIn.invalid
  */
 export async function POST(req: Request): Promise<Response> {
   try {
+    assertConsoleAvailable();
     assertSameOrigin(req);
     const { email } = await readBody(req, body);
     await assertSignInAllowed(email.toLowerCase(), clientIp(null, req.headers.get("x-forwarded-for")));
