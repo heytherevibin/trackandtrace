@@ -1,0 +1,181 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/industry-63b731df-d7ae-4017-bebe-50975002238b/styles.css">
+<script src="_ds/industry-63b731df-d7ae-4017-bebe-50975002238b/_ds_bundle.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600&display=swap" rel="stylesheet">
+<style>
+html { background: var(--color-bg); }
+body { margin: 0; background: var(--color-bg); color: var(--color-text); font-family: var(--font-body); font-size: 16px; line-height: 1.5; text-wrap: pretty; -webkit-font-smoothing: antialiased; }
+a { color: var(--color-accent-700); text-underline-offset: .15em; text-decoration-thickness: 1px; }
+a:hover { color: var(--color-accent-800); }
+:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+html[data-face="dark"] {
+  --color-bg: #1d2d3d; --color-surface: #2c455d; --color-text: #f5f5f8;
+  --color-divider: rgba(245,245,248,.24);
+  --color-accent-700: #b5d9fd; --color-accent-800: #d6ebff;
+  --color-accent-100: #2c455d; --color-accent-200: #416180;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.5); --shadow-md: 0 3px 10px rgba(0,0,0,.5); --shadow-lg: 0 12px 32px rgba(0,0,0,.6);
+}
+@keyframes tt-flip { 0%{transform:rotateX(90deg);opacity:0} 100%{transform:rotateX(0);opacity:1} }
+</style>
+</helmet>
+<div data-screen-label="Accuracy" style="min-height:100vh;display:flex;flex-direction:column;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body)">
+  <header style="border-bottom:1px solid var(--color-divider);background:var(--color-bg);position:sticky;top:0;z-index:40">
+    <div style="max-width:1200px;margin:0 auto;padding:0 clamp(20px,5vw,72px);display:flex;flex-wrap:wrap;align-items:center;gap:8px 20px;min-height:64px">
+      <a href="Landing Redesign B.dc.html" style="display:inline-flex;align-items:center;gap:10px;text-decoration:none;color:var(--color-text);margin-right:8px">
+        <img src="public/brand/mark.svg" alt="" width="24" height="24" style="display:block">
+        <span style="font-family:var(--font-heading);font-weight:600;font-size:18px;letter-spacing:.06em;text-transform:uppercase">Track &amp; Trace</span>
+      </a>
+      <nav aria-label="Primary" style="display:flex;flex-wrap:wrap;align-items:center;gap:16px;font-family:var(--font-heading);font-weight:600;font-size:13px;letter-spacing:.08em;text-transform:uppercase">
+        <a href="Landing Redesign B.dc.html" style="text-decoration:none;color:color-mix(in srgb,var(--color-text) 70%,transparent)">Check</a>
+        <a href="Watchlist B.dc.html" style="text-decoration:none;color:color-mix(in srgb,var(--color-text) 70%,transparent)">Watchlist</a>
+        <a href="Pre-booking B.dc.html" style="text-decoration:none;color:color-mix(in srgb,var(--color-text) 70%,transparent)">Pre-booking</a>
+        <a href="Accuracy B.dc.html" aria-current="page" style="text-decoration:none;color:var(--color-accent-700);border-bottom:2px solid var(--color-accent)">Accuracy</a>
+      </nav>
+      <div style="display:flex;align-items:center;gap:12px;margin-left:auto">
+        <div role="group" aria-label="Theme" style="display:inline-flex;border:1px solid var(--color-divider)">
+          <sc-for list="{{ themeOptions }}" as="opt" hint-placeholder-count="3">
+            <button type="button" onClick="{{ opt.pick }}" aria-pressed="{{ opt.pressed }}" style="border:none;cursor:pointer;padding:5px 10px;font-family:var(--font-heading);font-weight:600;font-size:11px;letter-spacing:.08em;text-transform:uppercase;background:{{ opt.bg }};color:{{ opt.color }};border-left:{{ opt.bl }}" style-hover="background:color-mix(in srgb,var(--color-accent) 12%, transparent)">{{ opt.label }}</button>
+          </sc-for>
+        </div>
+        <a href="Sign in B.dc.html" class="btn btn-secondary" style="text-decoration:none">Sign in</a>
+      </div>
+    </div>
+  </header>
+
+  <main style="flex:1;width:100%;max-width:1200px;margin:0 auto;padding:clamp(32px,5vw,56px) clamp(20px,5vw,72px) 80px;box-sizing:border-box">
+    <div style="max-width:60ch">
+      <h1 style="margin:0 0 0 -.052em;font-family:var(--font-heading);font-weight:600;font-size:clamp(34px,4vw,52px);line-height:1.06;letter-spacing:.01em;text-transform:uppercase">Accuracy and data policy</h1>
+      <p style="margin:14px 0 0;font-size:16px;line-height:25px;color:color-mix(in srgb,var(--color-text) 78%,transparent)">No accuracy figure is published until verified responses and confirmed outcomes exist and can be audited.</p>
+    </div>
+
+    <div class="blueprint" role="status" style="position:relative;border:1px solid var(--color-divider);margin-top:32px;padding:24px">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <h2 style="margin:0;font-family:var(--font-heading);font-weight:600;font-size:24px;letter-spacing:.02em;text-transform:uppercase">Accuracy reporting is not available yet</h2>
+      <p style="margin:10px 0 0;font-size:15px;line-height:24px;max-width:64ch;color:color-mix(in srgb,var(--color-text) 78%,transparent)">There are no verified predictions and no confirmed outcomes to compare, so nothing is estimated. The ledger below opens at zero and earns every entry.</p>
+      <div style="margin-top:18px;border-top:1px solid var(--color-divider);padding-top:14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px">
+        <div><div style="font-family:var(--font-heading);font-weight:600;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:color-mix(in srgb,var(--color-text) 70%,transparent)">Verified records</div><div style="font-family:var(--font-heading);font-weight:600;font-size:22px;letter-spacing:.02em;font-feature-settings:'tnum' 1">0</div></div>
+        <div><div style="font-family:var(--font-heading);font-weight:600;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:color-mix(in srgb,var(--color-text) 70%,transparent)">Confirmed outcomes</div><div style="font-family:var(--font-heading);font-weight:600;font-size:22px;letter-spacing:.02em;font-feature-settings:'tnum' 1">0</div></div>
+        <div><div style="font-family:var(--font-heading);font-weight:600;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:color-mix(in srgb,var(--color-text) 70%,transparent)">Figures estimated</div><div style="font-family:var(--font-heading);font-weight:600;font-size:22px;letter-spacing:.02em;font-feature-settings:'tnum' 1">0</div></div>
+      </div>
+    </div>
+
+    <section style="margin-top:44px">
+      <span style="display:block;font-family:var(--font-heading);font-weight:600;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--color-accent-700);margin-bottom:12px">01 · What is connected right now</span>
+      <hr style="height:1px;border:0;margin:0 0 20px;background:var(--color-divider)">
+      <div class="blueprint" style="position:relative;border:1px solid var(--color-divider)">
+        <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:15px;min-width:560px">
+            <thead><tr>
+              <th style="text-align:left;padding:12px 20px;font-family:var(--font-heading);font-weight:600;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:color-mix(in srgb,var(--color-text) 70%,transparent);border-bottom:1px solid var(--color-divider)">Data set</th>
+              <th style="text-align:left;padding:12px 20px;font-family:var(--font-heading);font-weight:600;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:color-mix(in srgb,var(--color-text) 70%,transparent);border-bottom:1px solid var(--color-divider)">Used for</th>
+              <th style="text-align:left;padding:12px 20px;font-family:var(--font-heading);font-weight:600;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:color-mix(in srgb,var(--color-text) 70%,transparent);border-bottom:1px solid var(--color-divider)">State</th>
+            </tr></thead>
+            <tbody>
+              <sc-for list="{{ sourceRows }}" as="src" hint-placeholder-count="4">
+                <tr>
+                  <td style="padding:11px 20px;border-bottom:1px solid var(--color-divider);font-weight:500">{{ src.name }}</td>
+                  <td style="padding:11px 20px;border-bottom:1px solid var(--color-divider);color:color-mix(in srgb,var(--color-text) 74%,transparent)">{{ src.use }}</td>
+                  <td style="padding:11px 20px;border-bottom:1px solid var(--color-divider);font-family:var(--font-heading);font-weight:600;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:color-mix(in srgb,var(--color-text) 70%,transparent)">{{ src.state }}</td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section style="margin-top:44px">
+      <span style="display:block;font-family:var(--font-heading);font-weight:600;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--color-accent-700);margin-bottom:12px">02 · What would have to exist first</span>
+      <hr style="height:1px;border:0;margin:0 0 20px;background:var(--color-divider)">
+      <div class="blueprint" style="position:relative;border:1px solid var(--color-divider)">
+        <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+        <sc-for list="{{ evidence }}" as="row" hint-placeholder-count="3">
+          <div style="display:grid;grid-template-columns:minmax(120px,180px) 1fr;gap:0 24px;padding:18px 20px;border-top:{{ row.bt }}">
+            <span style="font-family:var(--font-heading);font-weight:600;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--color-accent-700)">{{ row.legend }}</span>
+            <span style="min-width:0">
+              <span style="display:block;font-family:var(--font-heading);font-weight:600;font-size:20px;letter-spacing:.02em;text-transform:uppercase">{{ row.title }}</span>
+              <span style="display:block;margin-top:6px;font-size:14px;line-height:22px;max-width:64ch;color:color-mix(in srgb,var(--color-text) 74%,transparent)">{{ row.detail }}</span>
+            </span>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+  </main>
+
+  <footer style="border-top:1px solid var(--color-divider)">
+    <div style="max-width:1200px;margin:0 auto;padding:16px clamp(20px,5vw,72px);display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px">
+      <p style="margin:0;font-size:13px;color:color-mix(in srgb,var(--color-text) 70%,transparent)">Not affiliated with IRCTC or Indian Railways. &nbsp;·&nbsp; © 2026 Track &amp; Trace</p>
+      <span style="display:inline-flex;align-items:baseline;gap:8px">
+        <span style="font-family:var(--font-heading);font-weight:600;font-size:15px;letter-spacing:.06em;font-feature-settings:'tnum' 1;display:inline-block;animation:{{ clockAnim }}">{{ clock }}</span>
+        <span style="font-family:var(--font-heading);font-weight:600;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:color-mix(in srgb,var(--color-text) 70%,transparent)">IST</span>
+      </span>
+    </div>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;defaultTheme&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;system&quot;, &quot;light&quot;, &quot;dark&quot;], &quot;default&quot;: &quot;system&quot;, &quot;tsType&quot;: &quot;\&quot;system\&quot; | \&quot;light\&quot; | \&quot;dark\&quot;&quot;, &quot;section&quot;: &quot;Appearance&quot; }
+}">
+class Component extends DCLogic {
+  state = { theme: null, sysDark: false, clock: "--:--", clockAnim: "none" };
+
+  componentDidMount() {
+    this._mq = window.matchMedia("(prefers-color-scheme: dark)");
+    this._onMq = () => this.setState({ sysDark: this._mq.matches });
+    this.setState({ sysDark: this._mq.matches });
+    this._mq.addEventListener("change", this._onMq);
+    this._clockT = setInterval(() => this.tick(), 5000);
+    this.tick(true);
+    this.applyFace();
+  }
+  componentDidUpdate() { this.applyFace(); }
+  componentWillUnmount() {
+    clearInterval(this._clockT);
+    if (this._mq) this._mq.removeEventListener("change", this._onMq);
+  }
+  theme() { return this.state.theme || this.props.defaultTheme || "system"; }
+  applyFace() {
+    const t = this.theme();
+    const face = t === "system" ? (this.state.sysDark ? "dark" : "light") : t;
+    document.documentElement.setAttribute("data-face", face);
+  }
+  tick(first) {
+    const next = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Kolkata" }).format(new Date());
+    if (next !== this.state.clock) this.setState({ clock: next, clockAnim: first ? "none" : "tt-flip 500ms ease-out" });
+  }
+
+  renderVals() {
+    const t = this.theme();
+    const themeOptions = ["system", "light", "dark"].map((v, i) => ({
+      label: v === "system" ? "Auto" : v === "light" ? "Day" : "Night",
+      pressed: t === v ? "true" : "false",
+      pick: () => this.setState({ theme: v }),
+      bg: t === v ? "color-mix(in srgb, var(--color-accent) 16%, transparent)" : "transparent",
+      color: t === v ? "var(--color-accent-700)" : "color-mix(in srgb, var(--color-text) 70%, transparent)",
+      bl: i > 0 ? "1px solid var(--color-divider)" : "none",
+    }));
+    const sourceRows = [
+      { name: "Reservation status", use: "PNR result", state: "Sample data (development)" },
+      { name: "Timetable and inventory", use: "Pre-booking", state: "Not connected" },
+      { name: "Outcome history", use: "Accuracy", state: "No verified records" },
+      { name: "Account storage", use: "Watchlist sync", state: "Not connected" },
+    ];
+    const evidence = [
+      { legend: "Live response", title: "A verified reservation response", detail: "Each record must come from a railway data source with its name and retrieval time attached." },
+      { legend: "Observed outcome", title: "The final status at chart time", detail: "The confirmed, RAC, or waitlisted outcome after the chart is prepared, recorded from the same source." },
+      { legend: "Audit record", title: "Both, stored side by side", detail: "Only when responses and outcomes exist together can an accuracy figure be computed and checked by anyone." },
+    ].map((r, i) => ({ ...r, bt: i > 0 ? "1px solid var(--color-divider)" : "none" }));
+    return { themeOptions, sourceRows, evidence, clock: this.state.clock, clockAnim: this.state.clockAnim };
+  }
+}
+</script>
+</body>
+</html>
