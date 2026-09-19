@@ -59,8 +59,9 @@ describe("theme roles", () => {
         expect(contrast(t[ink]!, t[surface]!), `${ink} on ${surface}`).toBeGreaterThanOrEqual(4.5);
       }
     }
-    // Design-locked: the Industry sheet tunes the steel accent to the ground at 3:1 (large text,
-    // interface chrome). The primary button and outline tag use it exactly as drawn.
+    // Design-locked: the Industry sheet tunes the steel accent to the ground at 3:1 (interface
+    // chrome: edges, lamps, the focus ring). Its one text pairing, the primary button's pale words
+    // on the steel fill, is kept as drawn; all other steel text uses accent-text (AA, above).
     expect(contrast(t["accent-ink"]!, t["accent-strong"]!), "accent-ink on accent-strong").toBeGreaterThanOrEqual(3);
     expect(contrast(t["accent-ink"]!, t["accent-strong-hover"]!), "accent-ink on accent-strong-hover").toBeGreaterThanOrEqual(3);
     expect(contrast(t["accent"]!, t["surface-0"]!), "accent on surface-0").toBeGreaterThanOrEqual(3);

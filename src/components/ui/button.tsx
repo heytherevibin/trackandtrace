@@ -17,7 +17,7 @@ const VARIANT: Record<ButtonVariant, string> = {
   run: PRIMARY,
   secondary: SECONDARY,
   key: SECONDARY,
-  ghost: "border-transparent bg-transparent px-[3.4px] text-accent hover:bg-accent/10 active:bg-accent/18",
+  ghost: "border-transparent bg-transparent px-[3.4px] text-accent-text hover:bg-accent/10 active:bg-accent/18",
   danger: "border-ink-alert bg-ink-alert text-ink-inverse hover:bg-ink-alert/90 active:bg-ink-alert/80",
 };
 

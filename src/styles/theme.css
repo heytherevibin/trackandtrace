@@ -20,8 +20,9 @@
   --ink-alert: #2c455d;
 
   /* Steel, exactly as the Industry sheet sets it. accent draws lines, carets, lamps, the
-     outline tag, the ghost button, and fills the primary button (the one solid object);
-     accent-text (ramp 700) is the readable step for links, kickers, and labels. */
+     outline tag's edge, the ghost button's tints, and fills the primary button (the one solid
+     object); accent-text (ramp 700) is the readable step for all steel text: links, kickers,
+     labels, outline tags and ghost buttons. */
   --accent: #5980a6;
   --accent-text: #416180;
   --accent-strong: #5980a6;
