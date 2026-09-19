@@ -135,7 +135,7 @@ SAMPLE DATA
 - Never draw an invented figure presented as real: no ratings, testimonials, odds, trends, predictions or projections.
 
 ACCESSIBILITY
-- AA text contrast on every surface. The one exception is the locked steel pairing (the primary button fill, outline tags and ghost-button text), kept as drawn. Console sheets keep only the primary button fill; their outline tags and ghost buttons use the readable steel (see the console rules).
+- AA text contrast on every surface. The one exception is the locked steel pairing, kept as drawn: the primary button fill with its pale words, which the skip link and the toast's action button share. Outline tags and ghost buttons use the readable steel on every sheet, as the console does (see the console rules). Changed 19 Sep 2026, PR #20.
 - A 2px steel focus ring.
 - On phones, 44px touch targets and 16px inputs.
 - Real tables for tabular data, and a table alternative for every chart.
@@ -378,7 +378,7 @@ Everything below is written to 14 Audit log, as are sign-ins, lookups, failed ta
 - **Access file:** name the services only in the DPDP access file, which goes only to the verified person (s.11(1)(b)).
 
 **Decided at the B0 review (19 Sep 2026):**
-- **Console tag contrast.** The locked steel (about 3.4–3.7:1) on 11px outline tags is below AA, and the console uses many more tags than the public site. Decision: the readable steel (#416180) for console tags. Ghost buttons follow, so all steel text in the console is readable. Traveller pages keep the locked steel.
+- **Console tag contrast.** The locked steel (about 3.4–3.7:1) on 11px outline tags is below AA, and the console uses many more tags than the public site. Decision: the readable steel (#416180) for console tags. Ghost buttons follow, so all steel text in the console is readable. Changed 19 Sep 2026, PR #20: traveller outline tags and ghost buttons use the readable steel too. The locked steel pairing stays only for the primary button fill with its pale words, which the skip link and the toast's action button share.
 
 ## 12. Notes for the phase specs (found while checking this brief)
 
