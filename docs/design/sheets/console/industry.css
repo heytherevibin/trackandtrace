@@ -1,0 +1,170 @@
+/* Trakline · Industry, for the console (admin.trakline.in).
+   Tokens copy the app's src/styles/theme.css: the same names and values, Day and Night.
+   Classes follow the app's components in src/components/ui; each notes the one it mirrors.
+   One console difference, decided at the B0 review: steel TEXT uses the readable step
+   (--accent-text), so outline tags and ghost buttons read #416180 by day and #b5d9fd by night.
+   The locked steel (#5980a6) stays for fills, rules, lamps and the focus ring. */
+.face {
+  --surface-0: #f2f2f3; --surface-1: #e9e9ea; --surface-2: #f5f5f8; --surface-3: #f5f5f8;
+  --ink-1: #1d1f20; --ink-2: #4c4d4e; --ink-3: #5d5e5f; --ink-inverse: #f2f2f3; --ink-alert: #2c455d;
+  --accent: #5980a6; --accent-text: #416180;
+  --accent-strong: #5980a6; --accent-strong-hover: #597ea3; --accent-strong-active: #416180;
+  --accent-ink: #f2f2f3; --accent-soft: #eef6ff; --accent-soft-ink: #2c455d;
+  --accent-wash: rgba(89, 128, 166, 0.08); --accent-busy: #94bce3;
+  --line: rgba(29, 31, 32, 0.16); --line-strong: rgba(29, 31, 32, 0.45); --mark: rgba(29, 31, 32, 0.55);
+  --focus-ring: #5980a6; --backdrop: rgba(43, 43, 45, 0.5); --skeleton-base: #e2e2e4;
+  --elevation-1: 0 1px 2px rgba(43, 43, 45, 0.14);
+  --elevation-2: 0 3px 10px rgba(43, 43, 45, 0.16);
+  --elevation-3: 0 12px 32px rgba(43, 43, 45, 0.22);
+  --display: "Barlow Condensed", "Arial Narrow", sans-serif;
+  --body: "Barlow", "Helvetica Neue", Arial, sans-serif;
+  background: var(--surface-0); color: var(--ink-1); font-family: var(--body);
+}
+.face[data-face="night"] {
+  --surface-0: #1d2d3d; --surface-1: #2c455d; --surface-2: #243a50; --surface-3: #243a50;
+  --ink-1: #f5f5f8; --ink-2: #c6c9cf; --ink-3: #b4b9c0; --ink-inverse: #1d2d3d; --ink-alert: #d6ebff;
+  --accent-text: #b5d9fd; --accent-strong-active: #b5d9fd;
+  --accent-ink: #1d2d3d; --accent-soft: #2c455d; --accent-soft-ink: #d6ebff;
+  --line: rgba(245, 245, 248, 0.24); --line-strong: rgba(245, 245, 248, 0.45); --mark: rgba(245, 245, 248, 0.55);
+  --backdrop: rgba(0, 0, 0, 0.6); --skeleton-base: #2c455d;
+  --elevation-1: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --elevation-2: 0 3px 10px rgba(0, 0, 0, 0.5);
+  --elevation-3: 0 12px 32px rgba(0, 0, 0, 0.6);
+}
+.face *, .face *::before, .face *::after { box-sizing: border-box; }
+:where(.face) button, :where(.face) input, :where(.face) textarea { font: inherit; color: inherit; }
+.face a { color: var(--accent-text); text-underline-offset: 0.15em; text-decoration-thickness: 1px; }
+.face :focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+/* Plate (.blueprint with <Corners />): square, hairline, + registration marks at the corners. */
+.plate { position: relative; border: 1px solid var(--line); }
+.plate > .rm { position: absolute; width: 11px; height: 11px; color: var(--mark); pointer-events: none; }
+.plate > .rm::before, .plate > .rm::after { content: ""; position: absolute; background: currentColor; }
+.plate > .rm::before { left: 5px; top: 0; width: 1px; height: 100%; }
+.plate > .rm::after { top: 5px; left: 0; width: 100%; height: 1px; }
+.plate > .tl { top: -6px; left: -6px; } .plate > .tr { top: -6px; right: -6px; }
+.plate > .bl { bottom: -6px; left: -6px; } .plate > .br { bottom: -6px; right: -6px; }
+
+/* Title block (PlateHeader, tight cells): 13px legends on a 24px line, 10 × 20 padding.
+   .stack is the app below 640px: the title takes the first row, meta cells share the second. */
+.tb { display: flex; align-items: stretch; border-bottom: 1px solid var(--line); }
+.tb > .cell { padding: 10px 20px; font-family: var(--display); font-weight: 600; font-size: 13px; line-height: 24px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); border-left: 1px solid var(--line); white-space: nowrap; }
+.tb > .cell.title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; border-left: 0; color: var(--ink-1); }
+.tb > .act { display: flex; align-items: center; padding: 6px 12px; border-left: 1px solid var(--line); }
+.tb.stack { flex-wrap: wrap; }
+.tb.stack > .cell.title { flex-basis: 100%; }
+.tb.stack > .cell:not(.title) { flex: 1; border-top: 1px solid var(--line); }
+.tb.stack > .title + .cell { border-left: 0; }
+
+/* Legends. The console legend is 12px (the app's legend-md); legend-sm is 11px. Kicker as the app's. */
+.legend { font-family: var(--display); font-weight: 600; font-size: 12px; line-height: 16px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+.legend-sm { font-family: var(--display); font-weight: 600; font-size: 11px; line-height: 16px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+.kicker { display: block; margin: 0; font-family: var(--display); font-weight: 600; font-size: 13px; line-height: 20px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent-text); }
+/* Figures (font-data): condensed, tabular. */
+.fig { font-family: var(--display); font-weight: 600; font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+.tnum { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+.hash { font-family: var(--display); font-weight: 600; font-size: 13px; letter-spacing: 0.04em; }
+
+/* Page header (PageHeader). The console title is a step smaller than the public page title. */
+.ph { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+.ph-main { min-width: 0; max-width: 60ch; }
+.ph-title { margin: 12px 0 0 -0.052em; font-family: var(--display); font-weight: 600; font-size: 32px; line-height: 36px; letter-spacing: 0.01em; text-transform: uppercase; }
+.ph-lead { margin: 14px 0 0; font-size: 16px; line-height: 25px; color: var(--ink-2); }
+.ph-meta { margin-top: 12px; }
+.ph-actions { display: flex; flex-shrink: 0; align-items: center; gap: 12px; }
+
+/* Buttons (Button): Barlow Condensed 600 14px/1.2, 6.8 × 12.24, square, hairline. The primary is the one solid object. */
+.btn { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 6.8px 12.24px; border: 1px solid transparent; border-radius: 0; background: transparent; color: var(--ink-1); font-family: var(--display); font-weight: 600; font-size: 14px; line-height: 1.2; white-space: nowrap; text-decoration: none; cursor: pointer; }
+.btn-sm { min-height: 32px; padding: 5px 10.2px; font-size: 13px; }
+.btn-lg { height: 44px; padding: 0 12.24px; }
+.btn-block { width: 100%; }
+.btn-primary { background: var(--accent-strong); border-color: var(--accent-strong); color: var(--accent-ink); }
+.btn-secondary { border-color: var(--line); }
+.btn-ghost { padding-left: 3.4px; padding-right: 3.4px; color: var(--accent-text); }
+.btn[disabled] { opacity: 0.45; cursor: not-allowed; }
+.face a.btn { color: var(--ink-1); text-decoration: none; }
+.face a.btn-primary { color: var(--accent-ink); }
+.face a.btn-ghost { color: var(--accent-text); }
+
+/* Box (MASTHEAD_CONTROL): a 36px hairline box, 13px condensed capitals.
+   .box-icon (MASTHEAD_ICON_CONTROL) is square with the icon in readable steel; .box-bare is IconButton ghost. */
+.box { display: inline-flex; flex: none; align-items: center; justify-content: center; gap: 8px; height: 36px; padding: 0 12px; border: 1px solid var(--line); background: transparent; color: var(--ink-1); font-family: var(--display); font-weight: 600; font-size: 13px; line-height: 1; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; cursor: pointer; }
+.box-icon { width: 36px; padding: 0; color: var(--accent-text); }
+.box-bare { border-color: transparent; }
+.box-sm { height: 32px; }
+.box-sm.box-icon { width: 32px; }
+.box-lg { height: 44px; }
+.box-lg.box-icon { width: 44px; }
+
+/* Avatar (Avatar sm): 32px, hairline, tinted ground, condensed initials. */
+.avatar { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 32px; height: 32px; border: 1px solid var(--line); background: var(--surface-1); color: var(--ink-1); font-family: var(--display); font-weight: 600; font-size: 13px; line-height: 1; letter-spacing: 0; text-transform: none; }
+
+/* Tags (Badge): 11px body face, .02em, 3 × 10, square. Mono tone by form.
+   .tag-caps is the frame's own tags (environment, CONSOLE, the member's role); data tags stay sentence case. */
+.tag { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; font-family: var(--body); font-size: 11px; font-weight: 400; line-height: 1.5; letter-spacing: 0.02em; white-space: nowrap; }
+.tag-filled { background: var(--accent-soft); color: var(--accent-soft-ink); }
+.tag-outline { border: 1px solid var(--accent-text); color: var(--accent-text); }
+.tag-grey { background: var(--surface-1); color: var(--ink-2); }
+.tag-caps { font-family: var(--display); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+
+/* Lamps (Led): a 9px ring on a hairline. The word beside it carries the meaning.
+   lit: steel · light: light steel · half: half-filled · hollow: empty · ringed: a deep-steel ring. */
+.lamp { position: relative; display: inline-block; flex: none; width: 9px; height: 9px; overflow: hidden; border-radius: 50%; border: 1px solid var(--line); background: transparent; }
+.lamp.lit { background: var(--accent); }
+.lamp.light { background: var(--accent-busy); }
+.lamp.half::after { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 50%; background: var(--accent); }
+.lamp.ringed { border: 2px solid var(--ink-alert); }
+
+/* Fields (Field, Input sm): wells on the tinted ground. 14px from 640px up, 16px on phones. */
+.label { display: block; margin-bottom: 6px; font-family: var(--display); font-weight: 600; font-size: 12px; line-height: 16px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent-text); }
+.well { display: block; width: 100%; min-height: 36px; padding: 6px 10px; background: var(--surface-1); border: 1px solid var(--line); border-radius: 0; color: var(--ink-1); caret-color: var(--accent); font-family: var(--body); font-size: 14px; line-height: 1.5; }
+.well::placeholder { color: var(--ink-3); opacity: 1; }
+.well[aria-invalid="true"] { border-color: var(--ink-alert); }
+.well-phone { min-height: 44px; font-size: 16px; }
+.hint { margin-top: 6px; font-size: 13px; line-height: 20px; color: var(--ink-3); }
+.alert { margin-top: 6px; font-size: 13px; line-height: 20px; font-weight: 500; color: var(--ink-alert); }
+
+/* Segmented control (Tabs): hairline cells, the selected one tinted steel. */
+.tabs { display: inline-flex; border: 1px solid var(--line); }
+.tab { display: inline-flex; flex: none; align-items: center; justify-content: center; height: 32px; padding: 0 12px; border: 0; background: transparent; font-family: var(--display); font-weight: 600; font-size: 11px; line-height: 1; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); cursor: pointer; }
+.tab + .tab { border-left: 1px solid var(--line); }
+.tab[aria-selected="true"], .tab[aria-pressed="true"] { background: color-mix(in oklab, var(--accent) 16%, transparent); color: var(--accent-text); }
+.tabs-lg .tab { height: 44px; flex: 1; }
+
+/* Filter bar: select triggers are wells (Select); an active filter is a grey tag with a remove button. */
+.face .pick { display: inline-flex; align-items: center; gap: 8px; width: auto; height: 36px; cursor: pointer; }
+.tag-x { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; margin-right: -4px; padding: 0; border: 0; background: transparent; color: inherit; cursor: pointer; }
+
+/* Dense table (DataTable dense) at the console sizes: 13px text, 14px first column, 36px rows. */
+.dt { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 13px; }
+.dt th { height: 36px; padding: 0 14px; text-align: left; font-family: var(--display); font-weight: 600; font-size: 12px; line-height: 16px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); border-bottom: 1px solid var(--line); white-space: nowrap; }
+.dt td { height: 36px; padding: 0 14px; border-bottom: 1px solid var(--line); color: var(--ink-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dt td.first { font-size: 14px; }
+.dt tr.hover td { background: var(--accent-wash); }
+
+/* Key–value rows (KeyValueList). */
+.kv { display: grid; grid-template-columns: minmax(96px, 35%) 1fr; column-gap: 16px; align-items: baseline; margin: 0; }
+.kv > dt { padding: 10px 0; }
+.kv > dd { margin: 0; min-width: 0; padding: 10px 0; font-size: 15px; line-height: 24px; color: var(--ink-1); overflow-wrap: anywhere; }
+.kv > dt + dd ~ dt, .kv > dt + dd ~ dd { border-top: 1px solid var(--line); }
+
+/* State block (StateBlock): empty, error and no-access plates. */
+.state { padding: 24px; }
+.state-title { margin: 0; font-family: var(--display); font-weight: 600; font-size: 24px; line-height: 28px; letter-spacing: 0.02em; text-transform: uppercase; }
+.state-detail { margin: 10px 0 0; max-width: 64ch; font-size: 15px; line-height: 24px; color: var(--ink-2); }
+.state-ref { margin: 8px 0 0; }
+.state-actions { margin-top: 20px; display: flex; flex-wrap: wrap; gap: 12px; }
+
+/* Menu (Menu): a small popup on the popover ground. */
+.menu { position: absolute; z-index: 5; display: flex; flex-direction: column; min-width: 192px; padding: 4px; background: var(--surface-2); border: 1px solid var(--line); box-shadow: var(--elevation-2); }
+.face .menu-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; font-size: 14px; line-height: 21px; color: var(--ink-1); text-decoration: none; }
+.menu-item-lg { min-height: 44px; }
+.menu-sep { margin: 4px 0; border-top: 1px solid var(--line); }
+
+/* Toast (ToastHost, success): a small plate with a 2px steel rule on its left. */
+.toast { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--surface-2); border: 1px solid var(--line); border-left: 2px solid var(--accent); box-shadow: var(--elevation-2); font-size: 14px; line-height: 21px; font-weight: 500; color: var(--ink-1); }
+
+/* Skeleton and the sweep bar (SweepBar: a 2px track, a 30% steel run). */
+.skeleton { background: var(--skeleton-base); }
+.sweep { height: 2px; overflow: hidden; background: color-mix(in oklab, var(--accent) 20%, transparent); }
+.sweep > i { display: block; width: 30%; height: 100%; margin-left: 35%; background: var(--accent); }

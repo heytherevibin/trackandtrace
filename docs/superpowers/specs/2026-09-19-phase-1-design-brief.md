@@ -65,7 +65,7 @@ Every new screen is drawn in the Claude Design project "App landing page redesig
 **2026-09-19, after the gap check:**
 - **Email plan:** Resend stays on the free plan.
 - **Access requests:** the file names the services we share data with, and nothing else does.
-- **Console tag contrast:** asked at the B0 review, with the drawing in front of the owner.
+- **Console tag contrast:** decided at the B0 review: console steel text uses the readable steel (see the console rules).
 
 **Changes from those decisions, made by this brief (object if any is wrong):**
 1. **Leads:** the lifecycle "Pending → Subscribed → Active account → Unsubscribed" becomes two separate facts, subscription and account. Having an account doesn't mean someone agreed to emails, and a ladder would email people who never opted in.
@@ -135,7 +135,7 @@ SAMPLE DATA
 - Never draw an invented figure presented as real: no ratings, testimonials, odds, trends, predictions or projections.
 
 ACCESSIBILITY
-- AA text contrast on every surface. The one exception is the locked steel pairing (the primary button fill, outline tags and ghost-button text), kept as drawn.
+- AA text contrast on every surface. The one exception is the locked steel pairing (the primary button fill, outline tags and ghost-button text), kept as drawn. Console sheets keep only the primary button fill; their outline tags and ghost buttons use the readable steel (see the console rules).
 - A 2px steel focus ring.
 - On phones, 44px touch targets and 16px inputs.
 - Real tables for tabular data, and a table alternative for every chart.
@@ -158,6 +158,7 @@ WHO USES IT
 
 LOOK
 - The same Industry world, denser. Table text 13px (the first column 14px), legends 12px capitals, 36px rows, tabular figures for numbers and times.
+- Steel text uses the readable steel (#416180 by day, #b5d9fd by night): outline tags, ghost buttons, links, kickers and field labels. The locked steel (#5980a6) stays for fills, rules, lamps and the focus ring.
 - Health is a lamp plus a word, never colour. The lamp forms and their words:
   - lit (steel fill): Answering, Operational, Connected, Sending, Healthy
   - light steel: Probing
@@ -296,7 +297,7 @@ Everything below is written to 14 Audit log, as are sign-ins, lookups, failed ta
   - checks today (212) = from cache (51) + live (157) + unavailable (4)
   - live (157) = RailKit (155) + RapidAPI (2)
   - RailKit requests today (158) = answered (155) + failed (3)
-  - live-check budget: 157 of 320 today (320 × 31 stays under 10,000)
+  - live-check budget: 157 of 300 today, the production default (300 × 31 = 9,300, under 10,000)
   - RailKit this month: 3,412 of 10,000 (an average of 180 a day)
   - accounts: 1,204
   - subscribed: 406
@@ -376,8 +377,8 @@ Everything below is written to 14 Audit log, as are sign-ins, lookups, failed ta
 - **Email plan:** stay on the free plan. The drawings show daily and monthly allowances, a reserve for sign-in links, and announcements sent over several days.
 - **Access file:** name the services only in the DPDP access file, which goes only to the verified person (s.11(1)(b)).
 
-**Asked at the B0 review:**
-- **Console tag contrast.** The locked steel (about 3.4–3.7:1) on 11px outline tags is below AA, and the console uses many more tags than the public site. Keep the locked steel exactly (design-exact), or use the readable steel (#416180) for console tags only?
+**Decided at the B0 review (19 Sep 2026):**
+- **Console tag contrast.** The locked steel (about 3.4–3.7:1) on 11px outline tags is below AA, and the console uses many more tags than the public site. Decision: the readable steel (#416180) for console tags. Ghost buttons follow, so all steel text in the console is readable. Traveller pages keep the locked steel.
 
 ## 12. Notes for the phase specs (found while checking this brief)
 
@@ -431,4 +432,4 @@ Everything below is written to 14 Audit log, as are sign-ins, lookups, failed ta
 - This brief and its seven batch files are merged through a docs PR, and published as a private copy page with a Copy button on each prompt.
 - The five B sheets are in the repo under `docs/design/sheets/`.
 - The screenshot pack for B1 is made from a sample-data build (every route and state, Day and Night, 1440 and 390).
-- B0 is drawn, checked and approved, including the console tag contrast. That unblocks Phase 2's spec.
+- B0 is drawn, checked and approved, including the console tag contrast. That unblocks Phase 2's spec. Done 19 Sep 2026; the approved files are in `docs/design/sheets/console/`.
