@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { accountsConfigured, fixtureAllowed, googleSignInEnabled, parseEnv, passkeysEnabled, sharedStoreConfig } from "@/services/env";
+import { accountsConfigured, fixtureAllowed, googleSignInEnabled, liveRequestsPerDay, parseEnv, passkeysEnabled, sharedStoreConfig } from "@/services/env";
 
 const dev = { NODE_ENV: "development" } as const;
 
@@ -257,5 +257,21 @@ describe("the shared store", () => {
   it("makes the explicit upstash strategy demand DATA_KEY", () => {
     expect(parseEnv({ ...dev, ...KV, RATE_LIMIT_STRATEGY: "upstash" }).ok).toBe(false);
     expect(parseEnv({ ...dev, ...KV, RATE_LIMIT_STRATEGY: "upstash", DATA_KEY }).ok).toBe(true);
+  });
+});
+
+describe("the daily live-request budget", () => {
+  it("allows 300 live requests a day unless LIVE_REQUESTS_PER_DAY says otherwise", () => {
+    const standard = parseEnv(dev);
+    const raised = parseEnv({ ...dev, LIVE_REQUESTS_PER_DAY: "1200" });
+    if (!standard.ok || !raised.ok) throw new Error("expected valid env");
+    expect(liveRequestsPerDay(standard.env)).toBe(300);
+    expect(liveRequestsPerDay(raised.env)).toBe(1200);
+  });
+
+  it("refuses a budget that isn't a whole number of at least 1", () => {
+    for (const value of ["0", "-5", "12.5", "lots"]) {
+      expect(parseEnv({ ...dev, LIVE_REQUESTS_PER_DAY: value }).ok, value).toBe(false);
+    }
   });
 });

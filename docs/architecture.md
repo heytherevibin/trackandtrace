@@ -9,7 +9,7 @@ Browser
   api-client (src/services/api-client.ts)  — validated fetch; malformed bodies become errors
 Next.js server
   route handlers (src/app/api/*)           — thin: guard → validate → repository/query → jsonOk/jsonError
-  pnr-query (src/services/pnr-query.ts)    — the one PNR path: validate → rate limit → cache → single-flight → source
+  pnr-query (src/services/pnr-query.ts)    — the one PNR path: validate → rate limit (IPv6 per /64) → cache → daily live-request budget → single-flight → source
   shared-store (src/services/shared-store.ts) — Upstash Redis (Mumbai) on deployments: shared limits + the encrypted 60 s PNR cache
   sources (src/services/sources/*)         — registry: live seam (unavailable until a provider lands) | railkit | rapidapi (third-party, shown as Trakline; optional fallback between them) | fixture (dev only)
   guarded (src/services/sources/guarded.ts) — each provider behind its breaker, one safe retry (network, 502/503/504) and a daily usage count
@@ -41,8 +41,10 @@ PNRs never travel in an address, because request paths and query strings are rec
 | --- | --- |
 | Source unavailable | UnavailableState with Response / Provenance / Fallback cells; retry |
 | Source answered, no record | "No record for this PNR", not an error |
-| Rate limited (20/min/IP) | 429 with Retry-After; UI counts down |
-| Upstash slow or down | Cache misses; limits fall back to this instance's memory; checks keep answering |
+| Rate limited (20/min per address; IPv6 per /64 network, which one client controls) | 429 with Retry-After; UI counts down. Unreadable addresses share one limit |
+| Refresh within 30 s of the record's retrieval | Answered from the cache (`cached: true`, the record's own retrieval time); no provider request |
+| Daily live-request budget spent (`LIVE_REQUESTS_PER_DAY`, 300 by default; every address together, per IST day) | Checks with a cached record are answered from the cache; the rest get 503 SOURCE_UNAVAILABLE, "Trakline has used today's live checks. Try again after 00:00 IST.", with Retry-After to midnight IST. No provider is asked. One `[budget]` warning a day, with the day and the limit only |
+| Upstash slow or down | Cache misses; limits and the daily budget fall back to this instance's memory; checks keep answering |
 | Provider failing repeatedly | 5 failures in 60 s open its breaker for 30 s (doubling per failed probe, up to 10 min); the fallback answers at once and no request is spent on the failing provider |
 | Provider refuses the key or plan, or its quota | Breaker open 10 min (401/403), or for the provider's Retry-After (429) |
 | Sentry unreachable | Error reports are dropped; the app is unaffected |
@@ -57,7 +59,7 @@ PNRs never travel in an address, because request paths and query strings are rec
 
 - Device: `tt.watchlist.v2`, `tt.recent.v1`, `tt.theme`, `tt.install.v1`, `tt.mergePrompt.v1` — versioned keys, zod-validated on read, synced across tabs via `useSyncExternalStore`.
 - Account: `watchlist_entries` with unique `(user_id, pnr)`; local→account merge is planned by `planMerge` and executed by `POST /api/watchlist/merge`.
-- Shared (deployments only): Upstash Redis under `tt:{VERCEL_ENV}:`. The PNR cache is `pnr:v1:<HMAC>` → an AES-256-GCM value sealed to its key, 60 s. Limits are sliding windows keyed by an HMAC of the address or user id. The subkeys come from `DATA_KEY` (HKDF), so Upstash never holds a PNR, a record, an address or a user id in the clear. Any store failure is a cache miss, and the per-instance limiter. `upstash.ts` is the only module that imports Upstash.
+- Shared (deployments only): Upstash Redis under `tt:{VERCEL_ENV}:`. The PNR cache is `pnr:v1:<HMAC>` → an AES-256-GCM value sealed to its key, 60 s. Limits are sliding windows keyed by an HMAC of the address (an IPv6 address by its /64) or user id. The daily live-request budget is a plain count per day in India, `budget:live:<date>`, kept two days, beside a marker that makes the day's `[budget]` warning fire once. The subkeys come from `DATA_KEY` (HKDF), so Upstash never holds a PNR, a record, an address or a user id in the clear. Any store failure is a cache miss, and the per-instance limiter. `upstash.ts` is the only module that imports Upstash.
 
 ## Testing
 

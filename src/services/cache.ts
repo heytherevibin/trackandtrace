@@ -38,18 +38,3 @@ export const CACHE_TTLS = {
   /** Reservation status can change at any moment; reads stay fresh. */
   snapshot: 60_000,
 } as const;
-
-/** Read-through helper: returns the cached value or computes, storing it only when `cacheable` agrees. */
-export async function getOrCompute<T>(
-  cache: Cache,
-  key: string,
-  ttlMs: number,
-  compute: () => Promise<T>,
-  cacheable: (value: T) => boolean = () => true,
-): Promise<{ readonly value: T; readonly cached: boolean }> {
-  const hit = await cache.get<T>(key);
-  if (hit !== undefined) return { value: hit, cached: true };
-  const value = await compute();
-  if (cacheable(value)) await cache.set(key, value, ttlMs);
-  return { value, cached: false };
-}

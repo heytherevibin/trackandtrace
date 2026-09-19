@@ -25,6 +25,7 @@ function post(route: Awaited<ReturnType<typeof loadRoute>>, body: unknown, ip = 
 }
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllEnvs();
 });
 
@@ -57,7 +58,9 @@ describe("POST /api/pnr", () => {
     expect(res.status).toBe(404);
   });
 
-  it("returns a validated envelope with source fixture, then a cached second read, and a fresh read on request", async () => {
+  it("returns a validated envelope with source fixture, then a cached second read; a Refresh reads the source again once the record is 30 seconds old", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(Date.parse("2026-09-19T08:00:00.000Z"));
     const route = await loadRoute();
     const first = await post(route, { pnr: "2345678901" });
     expect(first.status).toBe(200);
@@ -67,6 +70,9 @@ describe("POST /api/pnr", () => {
     expect(body.cached).toBe(false);
     const second = pnrApiOkSchema.parse(await (await post(route, { pnr: "2345678901" })).json());
     expect(second.cached).toBe(true);
+    const tooSoon = pnrApiOkSchema.parse(await (await post(route, { pnr: "2345678901", fresh: true })).json());
+    expect(tooSoon.cached).toBe(true);
+    vi.setSystemTime(Date.now() + 31_000);
     const fresh = pnrApiOkSchema.parse(await (await post(route, { pnr: "2345678901", fresh: true })).json());
     expect(fresh.cached).toBe(false);
   });
