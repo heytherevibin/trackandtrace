@@ -125,7 +125,7 @@ PLATES (two columns at 1440, one on phones)
    - Checks 212 · From cache 51 · Live 157 (RailKit 155, RapidAPI 2) · Unavailable 4.
    - Of the live answers: no record 9.
    - Legends: "Limited 3, refused before checking" and "Since 00:00 IST".
-   - A meter: "Live-check budget: 157 of 320 today".
+   - A meter: "Live-check budget: 157 of 300 today".
 4. "Quota this month" (all roles). Meters:
    - RailKit 3,412 of 10,000 · resets 1 Oct
    - RapidAPI 3 of 10 · resets 1 Oct
@@ -261,7 +261,7 @@ Each row has a name, the state as a tag, a one-line effect, "Last changed 18 Sep
 
 PLATE "Limits"
 - Checks per address: 20 per minute. The field accepts 5–60. Legend: "Every address, shared across servers. IPv6 is limited per /64 network."
-- Live checks per day: 320, across all addresses. A meter: "157 used today". Legend: "Past this, checks answer from recent results, or say the service is busy until 00:00 IST."
+- Live checks per day: 300, across all addresses. A meter: "157 used today". Legend: "Past this, checks answer from recent results, or say the service is busy until 00:00 IST."
 
 PLATE "Recent changes"
 The last five changes from the audit log, then "Open audit log".

@@ -117,7 +117,7 @@ PAGE HEADER
 
 PLATE "Limits"
 - "20 checks per minute per address (IPv6: per /64 network)".
-- "Live checks today: 157 of 320".
+- "Live checks today: 157 of 300".
 - "Limited today: 3".
 - A link "Change in Switches & settings".
 

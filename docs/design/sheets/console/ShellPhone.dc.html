@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Console shell on a phone</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="industry.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&amp;family=Barlow+Condensed:wght@500;600&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="face" data-face="{{face}}" style="width: 390px; height: 844px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--surface-0); color: var(--ink-1); font-family: var(--body);">
+
+<sc-if value="{{isProd}}" hint-placeholder-val="{{ true }}">
+<div style="height: 28px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 16px; border-bottom: 1px solid var(--line);">
+<span class="tag tag-filled tag-caps">Production</span>
+<span class="legend-sm">admin.trakline.in</span>
+</div>
+</sc-if>
+<sc-if value="{{isPreview}}" hint-placeholder-val="{{ false }}">
+<div style="height: 28px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 16px; border-bottom: 1px dashed var(--line-strong);">
+<span class="tag tag-outline tag-caps">Preview</span>
+<span class="legend-sm" style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Staging data · trakline-git-console-trakline.vercel.app</span>
+</div>
+</sc-if>
+
+<header style="height: 56px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 16px; border-bottom: 1px solid var(--line);">
+<sc-if value="{{showMember}}" hint-placeholder-val="{{ true }}">
+<button type="button" class="box box-icon box-lg" aria-label="Open menu" aria-expanded="{{drawerOpen}}">
+<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 5.5h14M3 10h14M3 14.5h14"></path></svg>
+</button>
+</sc-if>
+<a href="#" aria-label="Trakline console, Overview" style="display: inline-flex; flex: none; align-items: center; justify-content: center; width: 44px; height: 44px;">
+<svg width="24" height="24" viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="6" fill="#1a1a1c" stroke="#55555b"></rect><rect x="6" y="8" width="5" height="16" rx="1.5" fill="#ff3b30"></rect><rect x="13" y="8" width="5" height="16" rx="1.5" fill="#ff9a00"></rect><rect x="20" y="8" width="5" height="16" rx="1.5" fill="#ffe100"></rect><circle cx="27.5" cy="16" r="1.75" fill="#ff3b30"></circle></svg>
+</a>
+<span class="tag tag-outline tag-caps">Console</span>
+<div style="flex-grow: 1;"></div>
+<button type="button" class="box box-icon box-lg" aria-label="{{themeLabel}}" title="{{themeLabel}}" onClick="{{cycleTheme}}">
+<sc-if value="{{modeSystem}}" hint-placeholder-val="{{ true }}">
+<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.25" fill="none" stroke="currentColor" stroke-width="1.5"></circle><path d="M10 2.75a7.25 7.25 0 0 1 0 14.5Z" fill="currentColor"></path></svg>
+</sc-if>
+<sc-if value="{{modeDay}}" hint-placeholder-val="{{ false }}">
+<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="4" fill="currentColor"></circle><path d="M10 1.5v2M10 16.5v2M1.5 10h2M16.5 10h2M4 4l1.4 1.4M14.6 14.6 16 16M4 16l1.4-1.4M14.6 5.4 16 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg>
+</sc-if>
+<sc-if value="{{modeNight}}" hint-placeholder-val="{{ false }}">
+<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M8.5 2.2a7.8 7.8 0 1 0 9.3 9.3A6.3 6.3 0 1 1 8.5 2.2Z"></path></svg>
+</sc-if>
+</button>
+<sc-if value="{{showMember}}" hint-placeholder-val="{{ true }}">
+<button type="button" class="box box-icon box-lg" aria-haspopup="menu" aria-expanded="{{menuOpen}}" aria-label="{{memberLabel}}">
+<span class="avatar">{{initials}}</span>
+</button>
+</sc-if>
+</header>
+
+<sc-if value="{{noticePaused}}" hint-placeholder-val="{{ false }}">
+<div role="status" style="flex: none; display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--accent-wash);">
+<span class="lamp hollow"></span>
+<span style="flex-grow: 1; font-size: 14px; line-height: 20px;"><strong style="font-weight: 600;">PNR checks are paused</strong><br>since {{pausedSince}} IST · by {{pausedBy}}</span>
+<sc-if value="{{canResume}}" hint-placeholder-val="{{ true }}">
+<button type="button" class="btn btn-secondary btn-lg">Resume</button>
+</sc-if>
+</div>
+</sc-if>
+<sc-if value="{{noticeSite}}" hint-placeholder-val="{{ false }}">
+<div role="status" style="flex: none; display: flex; align-items: flex-start; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--accent-wash);">
+<span class="lamp lit" style="margin-top: 6px;"></span>
+<span style="font-size: 14px; line-height: 20px;"><strong style="font-weight: 600;">Site notice is on:</strong> Planned maintenance on 21 Sep, 02:00–03:00 IST. Checks may be slow.</span>
+</div>
+</sc-if>
+
+<sc-if value="{{showFrame}}" hint-placeholder-val="{{ true }}">
+<main style="flex-grow: 1; min-height: 0; overflow-y: auto; padding: 24px 16px 32px; display: flex; flex-direction: column; gap: 24px;">
+<div class="ph-main">
+<p class="kicker">{{headKicker}}</p>
+<h1 class="ph-title">{{headTitle}}</h1>
+<p class="ph-lead">{{headLead}}</p>
+<sc-if value="{{showMeta}}" hint-placeholder-val="{{ true }}">
+<p class="legend ph-meta" style="margin-bottom: 0;">Updated 14:32 IST · Sample data</p>
+</sc-if>
+</div>
+
+<sc-if value="{{pageReady}}" hint-placeholder-val="{{ true }}">
+<section class="plate" aria-labelledby="service-title" style="flex: none;">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+<div class="tb stack"><h2 class="cell title" id="service-title" style="margin: 0;">Service now</h2><span class="cell">Sample data</span></div>
+<sc-for list="{{service}}" as="s" hint-placeholder-count="3">
+<div style="{{s.rowStyle}}">
+<span class="{{s.lampClass}}"></span>
+<span style="flex-grow: 1; display: flex; flex-direction: column;"><span style="font-size: 14px; line-height: 20px;">{{s.name}}</span><span class="legend-sm">{{s.since}}</span></span>
+<span style="font-size: 14px; font-weight: 500;">{{s.word}}</span>
+</div>
+</sc-for>
+</section>
+<section class="plate" aria-labelledby="checks-title" style="flex: none;">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+<div class="tb stack"><h2 class="cell title" id="checks-title" style="margin: 0;">Checks today</h2><span class="cell">Since 00:00 IST</span><span class="cell">Sample data</span></div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));">
+<div style="padding: 14px 16px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px;"><span class="legend">Checks</span><span class="fig" style="font-size: 30px; line-height: 1;">212</span></div>
+<div style="padding: 14px 16px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px;"><span class="legend">From cache</span><span class="fig" style="font-size: 30px; line-height: 1;">51</span></div>
+<div style="padding: 14px 16px; border-right: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px;"><span class="legend">Live</span><span class="fig" style="font-size: 30px; line-height: 1;">157</span></div>
+<div style="padding: 14px 16px; display: flex; flex-direction: column; gap: 6px;"><span class="legend">Unavailable</span><span class="fig" style="font-size: 30px; line-height: 1;">4</span></div>
+</div>
+<p style="margin: 0; padding: 12px 16px; border-top: 1px solid var(--line); font-size: 13px; line-height: 20px; color: var(--ink-2);">Live 157 = RailKit 155 · RapidAPI 2. Limited 3, refused before checking.</p>
+</section>
+<sc-if value="{{showQueues}}" hint-placeholder-val="{{ true }}">
+<section class="plate" aria-labelledby="queues-title" style="flex: none;">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+<div class="tb stack"><h2 class="cell title" id="queues-title" style="margin: 0;">Queues</h2><span class="cell">Sample data</span></div>
+<a href="#" style="display: flex; align-items: center; gap: 12px; height: 48px; padding: 0 16px; text-decoration: none; color: var(--ink-1);">
+<span class="fig" style="width: 22px; font-size: 20px;">3</span><span style="flex-grow: 1; font-size: 14px;">Privacy requests open</span><span class="legend">Next due 24 Sep</span><span aria-hidden="true" style="color: var(--accent-text);">→</span>
+</a>
+<a href="#" style="display: flex; align-items: center; gap: 12px; height: 48px; padding: 0 16px; border-top: 1px solid var(--line); text-decoration: none; color: var(--ink-1);">
+<span class="fig" style="width: 22px; font-size: 20px;">5</span><span style="flex-grow: 1; font-size: 14px;">Wrong-status reports new</span><span class="legend">Since yesterday</span><span aria-hidden="true" style="color: var(--accent-text);">→</span>
+</a>
+</section>
+</sc-if>
+</sc-if>
+
+<sc-if value="{{pageLoading}}" hint-placeholder-val="{{ false }}">
+<div role="status" aria-busy="true" aria-label="Loading the overview" style="display: flex; flex-direction: column; gap: 24px;">
+<div class="plate" style="flex: none; height: 258px; display: flex; flex-direction: column;"><div style="height: 89px; padding: 0 20px; display: flex; align-items: center; border-bottom: 1px solid var(--line);"><div class="skeleton" style="width: 40%; height: 12px;"></div></div><div style="padding: 20px 16px; display: flex; flex-direction: column; gap: 36px;"><div class="skeleton" style="height: 12px;"></div><div class="skeleton" style="height: 12px;"></div><div class="skeleton" style="height: 12px;"></div></div></div>
+<div class="plate" style="flex: none; height: 276px; display: flex; flex-direction: column;"><div style="height: 89px; padding: 0 20px; display: flex; align-items: center; border-bottom: 1px solid var(--line);"><div class="skeleton" style="width: 40%; height: 12px;"></div></div><div style="padding: 16px; display: flex; flex-direction: column; gap: 14px;"><div class="skeleton" style="height: 110px;"></div><div class="skeleton" style="width: 70%; height: 12px;"></div></div></div>
+</div>
+</sc-if>
+
+<sc-if value="{{pageNoAccess}}" hint-placeholder-val="{{ false }}">
+<section class="plate state" style="flex: none;">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+<h2 class="state-title">This module isn't part of the Support role.</h2>
+<p class="state-detail">Ask an Owner if you need it.</p>
+<div class="state-actions"><a href="#" class="btn btn-secondary btn-lg">Back to Overview</a></div>
+</section>
+</sc-if>
+
+<sc-if value="{{pageError}}" hint-placeholder-val="{{ false }}">
+<section class="plate state" role="alert" style="flex: none;">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+<h2 class="state-title">This page didn't load</h2>
+<p class="state-detail">The console couldn't reach its data.</p>
+<p class="legend-sm tnum state-ref">Reference 7f3a2c</p>
+<div class="state-actions"><button type="button" class="btn btn-secondary btn-lg">Retry</button></div>
+</section>
+</sc-if>
+</main>
+</sc-if>
+
+<sc-if value="{{pageSessionEnded}}" hint-placeholder-val="{{ false }}">
+<div style="flex-grow: 1; display: flex; align-items: center; padding: 16px;">
+<section class="plate state" style="width: 100%;">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+<h1 class="state-title">Your session ended</h1>
+<p class="state-detail">Sign in again to keep working.</p>
+<div class="state-actions"><a href="#" class="btn btn-primary btn-lg">Sign in</a></div>
+</section>
+</div>
+</sc-if>
+
+<sc-if value="{{drawerOpen}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; inset: 0; background: var(--backdrop);">
+<nav aria-label="Console" style="position: absolute; left: 0; top: 0; bottom: 0; width: 320px; display: flex; flex-direction: column; background: var(--surface-0); border-right: 1px solid var(--line);">
+<div style="height: 56px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 12px 0 20px; border-bottom: 1px solid var(--line);">
+<svg width="24" height="24" viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="6" fill="#1a1a1c" stroke="#55555b"></rect><rect x="6" y="8" width="5" height="16" rx="1.5" fill="#ff3b30"></rect><rect x="13" y="8" width="5" height="16" rx="1.5" fill="#ff9a00"></rect><rect x="20" y="8" width="5" height="16" rx="1.5" fill="#ffe100"></rect><circle cx="27.5" cy="16" r="1.75" fill="#ff3b30"></circle></svg>
+<span style="font-family: var(--display); font-weight: 600; font-size: 18px; line-height: 24px; letter-spacing: 0.06em; text-transform: uppercase;">Trakline</span>
+<span class="tag tag-outline tag-caps">Console</span>
+<div style="flex-grow: 1;"></div>
+<button type="button" class="box box-icon box-lg" aria-label="Close menu">
+<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M5 5l10 10M15 5 5 15"></path></svg>
+</button>
+</div>
+<div style="flex-grow: 1; min-height: 0; overflow-y: auto; padding: 12px 0 4px; display: flex; flex-direction: column;">
+<sc-for list="{{groups}}" as="g" hint-placeholder-count="5">
+<div style="display: flex; flex-direction: column; padding-bottom: 8px;">
+<span class="legend" style="padding: 0 20px 4px;">{{g.legend}}</span>
+<sc-for list="{{g.items}}" as="it" hint-placeholder-count="3">
+<a href="#" aria-current="{{it.aria}}" style="{{it.rowStyle}}">
+<span class="fig" style="width: 22px; font-size: 13px; letter-spacing: 0.04em; color: var(--ink-3);">{{it.num}}</span>
+<span style="flex-grow: 1; font-size: 15px;">{{it.label}}</span>
+<sc-if value="{{it.hasCount}}" hint-placeholder-val="{{ false }}">
+<span class="fig" style="min-width: 22px; height: 20px; padding: 0 6px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--line-strong); font-size: 12px; color: var(--ink-1);">{{it.count}}</span>
+</sc-if>
+</a>
+</sc-for>
+</div>
+</sc-for>
+</div>
+<span class="legend-sm" style="flex: none; padding: 8px 20px; border-top: 1px solid var(--line);">Build 42c5317 · 19 Sep 2026</span>
+</nav>
+</div>
+</sc-if>
+
+<sc-if value="{{menuOpen}}" hint-placeholder-val="{{ false }}">
+<div role="menu" aria-label="Member" class="menu" style="right: 16px; top: 88px; width: 260px;">
+<div style="padding: 8px 12px; display: flex; flex-direction: column;">
+<span style="font-size: 14px; line-height: 21px; font-weight: 500;">{{memberName}}</span>
+<span style="font-size: 13px; line-height: 20px; color: var(--ink-3);">{{memberEmail}}</span>
+<span style="margin-top: 8px;"><span class="tag tag-outline tag-caps">{{role}}</span></span>
+</div>
+<div class="menu-sep" role="separator"></div>
+<a href="#" role="menuitem" class="menu-item menu-item-lg">My keys</a>
+<div class="menu-sep" role="separator"></div>
+<a href="#" role="menuitem" class="menu-item menu-item-lg"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M6 2.5H3.5v11H6M10 5l3 3-3 3M13 8H6.5"></path></svg>Sign out</a>
+</div>
+</sc-if>
+
+<sc-if value="{{dialogOpen}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; inset: 0; background: var(--backdrop); display: flex; flex-direction: column; justify-content: flex-end;">
+<section role="dialog" aria-modal="true" aria-labelledby="sheet-title" style="max-height: 85%; display: flex; flex-direction: column; background: var(--surface-3); border: 1px solid var(--line); border-bottom: 0; box-shadow: var(--elevation-3);">
+<div aria-hidden="true" style="flex: none; display: flex; justify-content: center; padding-top: 8px;"><span style="width: 48px; height: 4px; background: var(--line-strong);"></span></div>
+<div class="tb" style="flex: none;"><h2 class="cell title" id="sheet-title" style="margin: 0;">Confirm it's you</h2><span class="cell">Form TC-01</span><span class="act" style="padding: 0;"><button type="button" class="box box-icon box-bare box-lg" aria-label="Close"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M5 5l10 10M15 5 5 15"></path></svg></button></span></div>
+<div style="flex: 1; min-height: 0; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 16px;">
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<span style="font-size: 17px; line-height: 26px; font-weight: 500;">{{actionSummary}}</span>
+<span style="display: flex; align-items: baseline; gap: 10px;"><span class="legend">Change</span><span class="fig" style="font-size: 15px; letter-spacing: 0.02em;">PNR checks: On → Paused</span></span>
+</div>
+<div>
+<label class="label" for="sheet-message">Message to travellers</label>
+<textarea id="sheet-message" class="well well-phone" rows="2" style="resize: none;">Checks are paused for maintenance. Back by 15:00 IST.</textarea>
+<div class="hint">Shown on the check plate and the result page. Up to 120 characters.</div>
+</div>
+<div>
+<label class="label" for="sheet-reason">Reason</label>
+<sc-if value="{{reasonEmpty}}" hint-placeholder-val="{{ false }}">
+<textarea id="sheet-reason" class="well well-phone" rows="2" placeholder="Why? This goes in the audit log." style="resize: none;"></textarea>
+</sc-if>
+<sc-if value="{{reasonShort}}" hint-placeholder-val="{{ false }}">
+<textarea id="sheet-reason" class="well well-phone" rows="2" aria-invalid="true" aria-describedby="sheet-reason-alert" style="resize: none;">Pause</textarea>
+</sc-if>
+<sc-if value="{{reasonFull}}" hint-placeholder-val="{{ true }}">
+<textarea id="sheet-reason" class="well well-phone" rows="2" style="resize: none;">Provider maintenance window, 14:00–15:00 IST.</textarea>
+</sc-if>
+<div class="hint">Don't include PNRs, emails or IP addresses; they're removed. 10–200 characters.</div>
+<sc-if value="{{dlgReasonMissing}}" hint-placeholder-val="{{ false }}">
+<div class="alert" id="sheet-reason-alert" role="alert">Add a reason of at least 10 characters.</div>
+</sc-if>
+</div>
+<sc-if value="{{dlgStatusShown}}" hint-placeholder-val="{{ false }}">
+<div role="status" style="display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--line); background: var(--surface-1);">
+<span class="{{dlgLamp}}"></span>
+<span style="font-size: 14px; line-height: 20px;">{{dlgStatus}}</span>
+</div>
+</sc-if>
+</div>
+<div style="flex: none; display: flex; flex-direction: column; gap: 8px; padding: 12px 20px 16px; border-top: 1px solid var(--line);">
+<button type="button" class="btn btn-primary btn-lg btn-block" disabled="{{dlgWaiting}}">{{tapLabel}}</button>
+<button type="button" class="btn btn-secondary btn-lg btn-block">Cancel</button>
+</div>
+</section>
+</div>
+</sc-if>
+
+<sc-if value="{{dlgDone}}" hint-placeholder-val="{{ false }}">
+<div role="status" class="toast" style="position: absolute; left: 16px; right: 16px; bottom: 12px;">PNR checks paused · logged</div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"role":{"editor":"enum","options":["Owner","Admin","Support","Viewer"],"default":"Owner","section":"State"},"environment":{"editor":"enum","options":["Production","Preview"],"default":"Production","section":"State"},"notice":{"editor":"enum","options":["None","Checks paused","Site notice"],"default":"Checks paused","section":"State"},"drawer":{"editor":"enum","options":["Closed","Open"],"default":"Closed","section":"State"},"dialog":{"editor":"enum","options":["Closed","Idle","Reason missing","Waiting for key","Failed","Not your key","Done"],"default":"Closed","section":"State"},"menu":{"editor":"enum","options":["Closed","Open"],"default":"Closed","section":"State"},"page":{"editor":"enum","options":["Ready","Loading","No access","Error","Session ended"],"default":"Ready","section":"State"},"defaultTheme":{"editor":"enum","options":["system","light","dark"],"default":"system","section":"Appearance"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  state = { theme: null, sysDark: false };
+  componentDidMount() {
+    this._mq = window.matchMedia('(prefers-color-scheme: dark)');
+    this._onMq = () => this.setState({ sysDark: this._mq.matches });
+    this.setState({ sysDark: this._mq.matches });
+    this._mq.addEventListener('change', this._onMq);
+  }
+  componentWillUnmount() {
+    if (this._mq) this._mq.removeEventListener('change', this._onMq);
+  }
+  renderVals() {
+    var role = this.props.role ?? 'Owner';
+    var env = this.props.environment ?? 'Production';
+    var notice = this.props.notice ?? 'Checks paused';
+    var drawer = this.props.drawer ?? 'Closed';
+    var dialog = this.props.dialog ?? 'Closed';
+    var menu = this.props.menu ?? 'Closed';
+    var page = this.props.page ?? 'Ready';
+    var mode = this.state.theme || this.props.defaultTheme || 'system';
+    var themeNames = { system: 'System', light: 'Day', dark: 'Night' };
+    var themeNext = { system: 'light', light: 'dark', dark: 'system' };
+
+    var noAccess = page === 'No access';
+    var ended = page === 'Session ended';
+    // The no-access page is drawn as Support opening 14 Audit log.
+    var who = noAccess ? 'Support' : role;
+    var members = {
+      Owner: ['Asha Rao', 'asha@example.com', 'AR'],
+      Admin: ['Rohan Iyer', 'rohan@example.com', 'RI'],
+      Support: ['Kiran Das', 'kiran@example.com', 'KD'],
+      Viewer: ['Meera Nair', 'meera@example.com', 'MN']
+    };
+    var access = {
+      Owner: ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13', '14'],
+      Admin: ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '14'],
+      Support: ['01', '06', '09', '10'],
+      Viewer: ['01', '02', '03']
+    };
+    var allGroups = [
+      { legend: 'Operate', items: [['01', 'Overview'], ['02', 'Sources & usage'], ['03', 'Status & incidents'], ['04', 'Abuse & limits'], ['05', 'Alerts']] },
+      { legend: 'People', items: [['06', 'Leads'], ['07', 'Announcements'], ['08', 'Accounts']] },
+      { legend: 'Queues', items: [['09', 'Privacy requests', '3'], ['10', 'Wrong-status reports', '5']] },
+      { legend: 'Configure', items: [['11', 'Switches & settings'], ['12', 'Provider keys'], ['13', 'Team']] },
+      { legend: 'Record', items: [['14', 'Audit log']] }
+    ];
+    var current = noAccess ? '' : '01';
+    var allowed = access[who] || access.Owner;
+    var rowBase = 'display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 16px 0 20px; text-decoration: none; ';
+    var rowOn = 'color: var(--accent-text); background: color-mix(in oklab, var(--accent) 16%, transparent); box-shadow: inset 2px 0 0 var(--accent);';
+    var groups = allGroups.map(function (g) {
+      return {
+        legend: g.legend,
+        items: g.items.filter(function (i) { return allowed.indexOf(i[0]) !== -1; }).map(function (i) {
+          var on = i[0] === current;
+          return { num: i[0], label: i[1], count: i[2] || '', hasCount: !!i[2], aria: on ? 'page' : 'false', rowStyle: rowBase + (on ? rowOn : 'color: var(--ink-2);') };
+        })
+      };
+    }).filter(function (g) { return g.items.length > 0; });
+
+    var dlgOpen = ['Idle', 'Reason missing', 'Waiting for key', 'Failed', 'Not your key'].indexOf(dialog) !== -1;
+    var done = dialog === 'Done';
+    // The strip shows the pause once it is done, never while the sheet is asking for it.
+    var paused = !dlgOpen && !ended && (notice === 'Checks paused' || done);
+    var since = done ? '14:32' : '14:02';
+    var m = members[who] || members.Owner;
+    var service = [
+      paused ? { lampClass: 'lamp hollow', name: 'PNR checks', word: 'Paused', since: 'Since ' + since + ' IST' } : { lampClass: 'lamp lit', name: 'PNR checks', word: 'Answering', since: 'Since 09:12 IST' },
+      { lampClass: 'lamp lit', name: 'RailKit (primary)', word: 'Answering', since: 'Since 09:12 IST' },
+      { lampClass: 'lamp hollow', name: 'RapidAPI (fallback)', word: 'Standby', since: 'Since 09:12 IST' }
+    ].map(function (s, i) {
+      return { lampClass: s.lampClass, name: s.name, word: s.word, since: s.since, rowStyle: 'display: flex; align-items: center; gap: 12px; padding: 10px 16px;' + (i === 0 ? '' : ' border-top: 1px solid var(--line);') };
+    });
+    var statusText = { 'Waiting for key': 'Touch your security key or approve on your device', 'Failed': "That key didn't answer. Try again.", 'Not your key': "This key isn't one of yours." };
+
+    return {
+      face: mode === 'dark' || (mode === 'system' && this.state.sysDark) ? 'night' : 'day',
+      modeSystem: mode === 'system', modeDay: mode === 'light', modeNight: mode === 'dark',
+      themeLabel: 'Theme: ' + themeNames[mode] + '. Switch to ' + themeNames[themeNext[mode]],
+      cycleTheme: () => this.setState({ theme: themeNext[mode] }),
+      isProd: env !== 'Preview', isPreview: env === 'Preview',
+      noticePaused: paused, noticeSite: !ended && notice === 'Site notice',
+      pausedSince: since,
+      pausedBy: who === 'Viewer' ? 'an Owner' : (done ? m[0] : 'Asha Rao'),
+      canResume: who === 'Owner' || who === 'Admin',
+      showFrame: !ended, pageSessionEnded: ended, showMember: !ended,
+      pageReady: page === 'Ready', pageLoading: page === 'Loading', pageNoAccess: noAccess, pageError: page === 'Error',
+      showMeta: page === 'Ready',
+      headKicker: noAccess ? '14 · Audit log' : '01 · Overview',
+      headTitle: noAccess ? 'Audit log' : 'Overview',
+      headLead: noAccess ? 'Every action taken in the console: who took it, when and why.' : 'What travellers are getting right now, and what needs you.',
+      groups: groups, service: service, showQueues: who !== 'Viewer',
+      role: who, memberName: m[0], memberEmail: m[1], initials: m[2],
+      memberLabel: m[0] + ', ' + who + '. Open the member menu',
+      drawerOpen: drawer === 'Open' && !ended && !dlgOpen,
+      menuOpen: menu === 'Open' && !ended && !dlgOpen && drawer !== 'Open',
+      dialogOpen: dlgOpen, dlgDone: done,
+      actionSummary: 'Pause PNR checks on ' + (env === 'Preview' ? 'staging' : 'production'),
+      reasonEmpty: dialog === 'Idle', reasonShort: dialog === 'Reason missing',
+      reasonFull: ['Waiting for key', 'Failed', 'Not your key'].indexOf(dialog) !== -1,
+      dlgReasonMissing: dialog === 'Reason missing', dlgWaiting: dialog === 'Waiting for key',
+      dlgStatusShown: !!statusText[dialog], dlgStatus: statusText[dialog] || '',
+      dlgLamp: dialog === 'Waiting for key' ? 'lamp light' : 'lamp ringed',
+      tapLabel: dialog === 'Waiting for key' ? 'Waiting for your key…' : 'Tap your key'
+    };
+  }
+}
+</script>
+</body>
+</html>

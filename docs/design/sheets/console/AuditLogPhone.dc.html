@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Console audit log on a phone</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="industry.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&amp;family=Barlow+Condensed:wght@500;600&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="face" data-face="{{face}}" style="width: 390px; height: 844px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--surface-0); color: var(--ink-1); font-family: var(--body);">
+
+<sc-if value="{{isProd}}" hint-placeholder-val="{{ true }}">
+<div style="height: 28px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 16px; border-bottom: 1px solid var(--line);">
+<span class="tag tag-filled tag-caps">Production</span>
+<span class="legend-sm">admin.trakline.in</span>
+</div>
+</sc-if>
+<sc-if value="{{isPreview}}" hint-placeholder-val="{{ false }}">
+<div style="height: 28px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 16px; border-bottom: 1px dashed var(--line-strong);">
+<span class="tag tag-outline tag-caps">Preview</span>
+<span class="legend-sm" style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Staging data · trakline-git-console-trakline.vercel.app</span>
+</div>
+</sc-if>
+
+<header style="height: 56px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 16px; border-bottom: 1px solid var(--line);">
+<button type="button" class="box box-icon box-lg" aria-label="Open menu" aria-expanded="false">
+<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 5.5h14M3 10h14M3 14.5h14"></path></svg>
+</button>
+<a href="#" aria-label="Trakline console, Overview" style="display: inline-flex; flex: none; align-items: center; justify-content: center; width: 44px; height: 44px;">
+<svg width="24" height="24" viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="6" fill="#1a1a1c" stroke="#55555b"></rect><rect x="6" y="8" width="5" height="16" rx="1.5" fill="#ff3b30"></rect><rect x="13" y="8" width="5" height="16" rx="1.5" fill="#ff9a00"></rect><rect x="20" y="8" width="5" height="16" rx="1.5" fill="#ffe100"></rect><circle cx="27.5" cy="16" r="1.75" fill="#ff3b30"></circle></svg>
+</a>
+<span class="tag tag-outline tag-caps">Console</span>
+<div style="flex-grow: 1;"></div>
+<button type="button" class="box box-icon box-lg" aria-label="{{themeLabel}}" title="{{themeLabel}}" onClick="{{cycleTheme}}">
+<sc-if value="{{modeSystem}}" hint-placeholder-val="{{ true }}">
+<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.25" fill="none" stroke="currentColor" stroke-width="1.5"></circle><path d="M10 2.75a7.25 7.25 0 0 1 0 14.5Z" fill="currentColor"></path></svg>
+</sc-if>
+<sc-if value="{{modeDay}}" hint-placeholder-val="{{ false }}">
+<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="4" fill="currentColor"></circle><path d="M10 1.5v2M10 16.5v2M1.5 10h2M16.5 10h2M4 4l1.4 1.4M14.6 14.6 16 16M4 16l1.4-1.4M14.6 5.4 16 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg>
+</sc-if>
+<sc-if value="{{modeNight}}" hint-placeholder-val="{{ false }}">
+<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M8.5 2.2a7.8 7.8 0 1 0 9.3 9.3A6.3 6.3 0 1 1 8.5 2.2Z"></path></svg>
+</sc-if>
+</button>
+<button type="button" class="box box-icon box-lg" aria-haspopup="menu" aria-expanded="false" aria-label="{{memberLabel}}">
+<span class="avatar">{{initials}}</span>
+</button>
+</header>
+
+<main style="flex-grow: 1; min-height: 0; overflow-y: auto; padding: 24px 16px 32px; display: flex; flex-direction: column; gap: 16px;">
+<div class="ph-main">
+<p class="kicker">14 · Audit log</p>
+<h1 class="ph-title">Audit log</h1>
+<p class="ph-lead">Every action taken in the console: who took it, when and why.</p>
+<sc-if value="{{showMeta}}" hint-placeholder-val="{{ true }}">
+<p class="legend ph-meta" style="margin-bottom: 0;">Updated 14:32 IST · Sample data</p>
+<p style="margin: 6px 0 0; font-size: 13px; line-height: 20px; color: var(--ink-3);">Open on a larger screen to export.</p>
+</sc-if>
+</div>
+
+<sc-if value="{{stNoAccess}}" hint-placeholder-val="{{ false }}">
+<section class="plate state" style="flex: none;">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+<h2 class="state-title">This module isn't part of the Support role.</h2>
+<p class="state-detail">Ask an Owner if you need it.</p>
+<div class="state-actions"><a href="#" class="btn btn-secondary btn-lg">Back to Overview</a></div>
+</section>
+</sc-if>
+
+<sc-if value="{{showTableArea}}" hint-placeholder-val="{{ true }}">
+<div role="search" aria-label="Filter the audit log" style="flex: none; display: flex; gap: 8px;">
+<div class="tabs tabs-lg" role="group" aria-label="Date range" style="flex-grow: 1;">
+<button type="button" class="tab" aria-pressed="true">Today</button>
+<button type="button" class="tab" aria-pressed="false">7 days</button>
+<button type="button" class="tab" aria-pressed="false">30 days</button>
+<button type="button" class="tab" aria-pressed="false">Custom</button>
+</div>
+<button type="button" class="box box-icon box-lg" aria-label="Search and filters" aria-haspopup="dialog">
+<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 5h14M5.5 10h9M8 15h4"></path></svg>
+</button>
+</div>
+
+<sc-if value="{{hasActiveFilter}}" hint-placeholder-val="{{ false }}">
+<div style="flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px;">
+<button type="button" class="tag tag-grey" aria-label="Remove the filter Category: Messages" style="min-height: 44px; padding: 0 12px; gap: 8px; border: 0; font-size: 14px; cursor: pointer;">Category: Messages<svg width="12" height="12" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2 2l6 6M8 2 2 8"></path></svg></button>
+<button type="button" class="btn btn-ghost btn-lg">Clear filters</button>
+</div>
+</sc-if>
+
+<section class="plate" aria-labelledby="entries-title" style="flex: none;">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+<div class="tb stack"><h2 class="cell title" id="entries-title" style="margin: 0;">Entries</h2><span class="cell">{{rangeCell}}</span><span class="cell">Sample data</span></div>
+
+<sc-if value="{{stRows}}" hint-placeholder-val="{{ true }}">
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="14">
+<a href="#" aria-label="{{r.openLabel}}" style="{{r.recStyle}}">
+<span style="display: flex; align-items: center; gap: 10px;"><span class="legend-sm tnum" style="flex-grow: 1;">{{r.time}}</span><span class="{{r.resultClass}}">{{r.result}}</span></span>
+<span style="font-size: 15px; line-height: 22px; font-weight: 500;">{{r.action}}</span>
+<span style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px;">
+<span style="display: flex; flex-direction: column; min-width: 0;"><span class="legend-sm">Member</span><span style="display: flex; align-items: center; gap: 6px; font-size: 14px; line-height: 20px; color: var(--ink-1);"><span>{{r.member}}</span><sc-if value="{{r.hasRole}}" hint-placeholder-val="{{ true }}"><span class="tag tag-grey">{{r.role}}</span></sc-if></span></span>
+<span style="display: flex; flex-direction: column; min-width: 0;"><span class="legend-sm">Target</span><span style="font-size: 14px; line-height: 20px; color: var(--ink-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{r.target}}</span></span>
+<span style="display: flex; flex-direction: column; min-width: 0;"><span class="legend-sm">Reason</span><span style="font-size: 14px; line-height: 20px; color: var(--ink-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{r.reason}}</span></span>
+<span style="display: flex; flex-direction: column; min-width: 0;"><span class="legend-sm">Address</span><span class="hash" style="font-size: 14px; line-height: 20px; color: var(--ink-1);">{{r.address}}</span></span>
+</span>
+</a>
+</sc-for>
+<div style="display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--line);">
+<span class="legend" style="flex-grow: 1;">1–14 of 14</span>
+<button type="button" class="btn btn-secondary btn-lg" disabled="{{yes}}">Previous</button>
+<button type="button" class="btn btn-secondary btn-lg" disabled="{{yes}}">Next</button>
+</div>
+</sc-if>
+
+<sc-if value="{{stLoading}}" hint-placeholder-val="{{ false }}">
+<div role="status" aria-busy="true" aria-label="Loading audit entries" style="display: flex; flex-direction: column;">
+<sc-for list="{{skeletonRows}}" as="k" hint-placeholder-count="4">
+<div style="{{k.style}}"><div class="skeleton" style="width: 45%; height: 10px;"></div><div class="skeleton" style="width: 70%; height: 14px;"></div><div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;"><div class="skeleton" style="height: 28px;"></div><div class="skeleton" style="height: 28px;"></div></div></div>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{stEmpty}}" hint-placeholder-val="{{ false }}">
+<div class="state">
+<h2 class="state-title">No actions in this range</h2>
+<p class="state-detail">Nothing was done in the console with these filters.</p>
+<div class="state-actions"><button type="button" class="btn btn-secondary btn-lg">Clear filters</button></div>
+</div>
+</sc-if>
+
+<sc-if value="{{stError}}" hint-placeholder-val="{{ false }}">
+<div class="state" role="alert">
+<h2 class="state-title">The audit log didn't load</h2>
+<p class="state-detail">The console couldn't reach its database.</p>
+<p class="legend-sm tnum state-ref">Reference 7f3a2c</p>
+<div class="state-actions"><button type="button" class="btn btn-secondary btn-lg">Retry</button></div>
+</div>
+</sc-if>
+</section>
+</sc-if>
+</main>
+
+<sc-if value="{{sheetOpen}}" hint-placeholder-val="{{ false }}">
+<section role="dialog" aria-modal="true" aria-labelledby="sheet-entry" style="position: absolute; inset: 0; display: flex; flex-direction: column; background: var(--surface-3);">
+<div class="tb" style="flex: none;"><h2 class="cell title" id="sheet-entry" style="margin: 0;">Audit entry</h2><span class="cell">#58213</span><span class="act" style="padding: 0;"><button type="button" class="box box-icon box-bare box-lg" aria-label="Close"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M5 5l10 10M15 5 5 15"></path></svg></button></span></div>
+<div style="flex-grow: 1; min-height: 0; overflow-y: auto;">
+<dl class="kv" style="padding: 4px 20px 0;">
+<sc-for list="{{entry}}" as="e" hint-placeholder-count="9">
+<dt class="legend-sm">{{e.k}}</dt>
+<dd>{{e.v}}</dd>
+</sc-for>
+</dl>
+</div>
+<p style="flex: none; margin: 0; padding: 12px 20px 16px; border-top: 1px solid var(--line); font-size: 13px; line-height: 20px; color: var(--ink-3);">Entries can't be edited. They're deleted automatically after 2 years.</p>
+</section>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"state":{"editor":"enum","options":["Ready","Loading","Empty","Error","No access (Support)"],"default":"Ready","section":"State"},"sheet":{"editor":"enum","options":["Closed","Open"],"default":"Closed","section":"State"},"role":{"editor":"enum","options":["Owner","Admin"],"default":"Owner","section":"State"},"environment":{"editor":"enum","options":["Production","Preview"],"default":"Production","section":"State"},"defaultTheme":{"editor":"enum","options":["system","light","dark"],"default":"dark","section":"Appearance"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  state = { theme: null, sysDark: false };
+  componentDidMount() {
+    this._mq = window.matchMedia('(prefers-color-scheme: dark)');
+    this._onMq = () => this.setState({ sysDark: this._mq.matches });
+    this.setState({ sysDark: this._mq.matches });
+    this._mq.addEventListener('change', this._onMq);
+  }
+  componentWillUnmount() {
+    if (this._mq) this._mq.removeEventListener('change', this._onMq);
+  }
+  renderVals() {
+    var state = this.props.state ?? 'Ready';
+    var sheet = this.props.sheet ?? 'Closed';
+    var env = this.props.environment ?? 'Production';
+    var mode = this.state.theme || this.props.defaultTheme || 'dark';
+    var themeNames = { system: 'System', light: 'Day', dark: 'Night' };
+    var themeNext = { system: 'light', light: 'dark', dark: 'system' };
+    var noAccess = state === 'No access (Support)';
+    // The no-access state is drawn as Support opening 14 Audit log.
+    var role = noAccess ? 'Support' : (this.props.role ?? 'Owner');
+    var members = { Owner: ['Asha Rao', 'AR'], Admin: ['Rohan Iyer', 'RI'], Support: ['Kiran Das', 'KD'] };
+    var H = { Asha: 'a3f9…c2c1', Kiran: '7b20…9e04', Rohan: '51cd…07aa', Meera: 'e18a…3b56' };
+    var raw = [
+      ['14:02', 'Asha Rao', 'Owner', 'Paused PNR checks', 'PNR checks', 'Provider maintenance window, 14:00–15:00 IST.', 'Done', H.Asha],
+      ['13:58', 'Asha Rao', 'Owner', 'Signed in', 'Console', '', 'Done', H.Asha],
+      ['13:41', 'Kiran Das', 'Support', 'Revealed an email', 'r•••@example.com', 'Replying to privacy request PR-2026-0142.', 'Done', H.Kiran],
+      ['13:40', 'Kiran Das', 'Support', 'Looked up an email', 'r•••@example.com', '', 'Done', H.Kiran],
+      ['12:15', 'Rohan Iyer', 'Admin', 'Changed a switch', 'Site notice', 'Announce the 21 Sep maintenance window.', 'Done', H.Rohan],
+      ['11:50', 'Rohan Iyer', 'Admin', 'Key tap failed', "Confirm it's you", '', 'Failed', H.Rohan],
+      ['10:32', 'Asha Rao', 'Owner', 'Changed a role', 'Kiran Das', 'Moved to Support for the privacy queue.', 'Done', H.Asha],
+      ['10:05', 'Asha Rao', 'Owner', 'Added a provider key', 'RailKit key •••• 4F2A', 'Rotated after the plan renewal.', 'Done', H.Asha],
+      ['09:40', 'Meera Nair', 'Viewer', 'Opened the audit log', 'Audit log', '', 'Refused', H.Meera],
+      ['09:12', 'Rohan Iyer', 'Admin', 'Resumed PNR checks', 'PNR checks', 'Provider back after the night outage.', 'Done', H.Rohan],
+      ['08:30', 'Asha Rao', 'Owner', 'Blocked an address', '9c41…d2e7', 'Scripted checks from one network.', 'Done', H.Asha],
+      ['07:55', 'Rohan Iyer', 'Admin', 'Posted an incident', 'Slow PNR checks', '', 'Done', H.Rohan],
+      ['02:00', 'System', '', 'Purged unconfirmed sign-ups', '12 records', 'Retention rule: 7 days.', 'Done', ''],
+      ['00:05', 'Asha Rao', 'Owner', 'Invited a member', 'm•••@example.com', 'Read-only access for the weekly numbers.', 'Done', H.Asha]
+    ];
+    var rows = raw.map(function (r, i) {
+      return {
+        time: '19 Sep 2026, ' + r[0] + ' IST', member: r[1], role: r[2], hasRole: !!r[2], action: r[3], target: r[4],
+        reason: r[5] ? '“' + r[5] + '”' : '—', result: r[6],
+        resultClass: r[6] === 'Done' ? 'tag tag-outline' : 'tag tag-grey',
+        address: r[7] || '—',
+        openLabel: 'Open the entry: ' + r[3] + ' at ' + r[0] + ' IST',
+        recStyle: 'display: flex; flex-direction: column; gap: 6px; padding: 12px 16px; text-decoration: none; color: var(--ink-1);' + (i === 0 ? '' : ' border-top: 1px solid var(--line);')
+      };
+    });
+    var entry = [
+      { k: 'Time', v: '19 Sep 2026, 14:02:31 IST' },
+      { k: 'Member', v: 'Asha Rao · Owner · key “YubiKey 5C”' },
+      { k: 'Action', v: 'Paused PNR checks' },
+      { k: 'Target', v: 'PNR checks' },
+      { k: 'Reason', v: 'Provider maintenance window, 14:00–15:00 IST.' },
+      { k: 'Result', v: 'Done' },
+      { k: 'Address', v: 'a3f9…c2c1' },
+      { k: 'Session', v: 'Chrome on macOS' },
+      { k: 'Before → after', v: 'PNR checks: On → Paused. Message to travellers: none → “Checks are paused for maintenance. Back by 15:00 IST.”' }
+    ];
+    var skeletonRows = [0, 1, 2, 3].map(function (i) {
+      return { style: 'display: flex; flex-direction: column; gap: 10px; padding: 14px 16px;' + (i === 0 ? '' : ' border-top: 1px solid var(--line);') };
+    });
+    var m = members[role] || members.Owner;
+    var stRows = state === 'Ready';
+    return {
+      face: mode === 'dark' || (mode === 'system' && this.state.sysDark) ? 'night' : 'day',
+      modeSystem: mode === 'system', modeDay: mode === 'light', modeNight: mode === 'dark',
+      themeLabel: 'Theme: ' + themeNames[mode] + '. Switch to ' + themeNames[themeNext[mode]],
+      cycleTheme: () => this.setState({ theme: themeNext[mode] }),
+      isProd: env !== 'Preview', isPreview: env === 'Preview',
+      initials: m[1], memberLabel: m[0] + ', ' + role + '. Open the member menu',
+      rows: rows, entry: entry, skeletonRows: skeletonRows, yes: true,
+      showMeta: stRows || state === 'Empty',
+      stNoAccess: noAccess, showTableArea: !noAccess,
+      stRows: stRows, rangeCell: state === 'Empty' ? 'Today · 0' : (stRows ? 'Today · 14' : 'Today'),
+      hasActiveFilter: state === 'Empty',
+      stLoading: state === 'Loading', stEmpty: state === 'Empty', stError: state === 'Error',
+      sheetOpen: sheet === 'Open' && stRows
+    };
+  }
+}
+</script>
+</body>
+</html>

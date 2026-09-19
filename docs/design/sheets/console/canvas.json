@@ -1,0 +1,94 @@
+{
+ "v": 3,
+ "createdOnFiles": {
+  "v": 1,
+  "at": "2026-09-19T10:02:41Z"
+ },
+ "title": "Trakline Console B0",
+ "launch": {
+  "view": "canvas"
+ },
+ "pages": [],
+ "boards": {
+  "Main.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 1440,
+   "h": 1000,
+   "title": "Console Shell · 1440",
+   "is_interactive": true
+  },
+  "ShellPhone.dc.html": {
+   "x": 1520,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "title": "Console Shell · 390",
+   "is_interactive": true
+  },
+  "ShellConfirm.dc.html": {
+   "x": 1990,
+   "y": 0,
+   "w": 1440,
+   "h": 1000,
+   "title": "State · Confirm it's you, waiting for the key"
+  },
+  "ShellNight.dc.html": {
+   "x": 3510,
+   "y": 0,
+   "w": 1440,
+   "h": 1000,
+   "title": "State · Night, checks paused, Viewer, member menu"
+  },
+  "AuditLog.dc.html": {
+   "x": 0,
+   "y": 1120,
+   "w": 1440,
+   "h": 1180,
+   "title": "Console Audit Log · 1440",
+   "is_interactive": true
+  },
+  "AuditLogPhone.dc.html": {
+   "x": 1520,
+   "y": 1120,
+   "w": 390,
+   "h": 844,
+   "title": "Console Audit Log · 390 (Night)",
+   "is_interactive": true
+  },
+  "AuditRecord.dc.html": {
+   "x": 1990,
+   "y": 1120,
+   "w": 1440,
+   "h": 1180,
+   "title": "State · Audit record open"
+  }
+ },
+ "order": [
+  "Main.dc.html",
+  "ShellPhone.dc.html",
+  "ShellConfirm.dc.html",
+  "ShellNight.dc.html",
+  "AuditLog.dc.html",
+  "AuditLogPhone.dc.html",
+  "AuditRecord.dc.html"
+ ],
+ "notes": {
+  "b0": {
+   "x": 0,
+   "y": -300,
+   "text": "B0 · The console frame and the audit log",
+   "kind": "title1",
+   "maxW": 4950
+  },
+  "howto": {
+   "x": 3510,
+   "y": 1120,
+   "w": 560,
+   "size": "l",
+   "color": "blue",
+   "text": "Approved 19 Sep 2026\n\nEach board has a Tweaks panel for its states: role, environment, notice, dialog, menu, page state, and theme (System, Day or Night). The phone boards have the same states as the desktop ones. The theme button works in Play.\n\nThe three State boards show key states side by side.\n\nIn the console, steel text uses the readable steel: outline tags and ghost buttons are #416180 by day and #b5d9fd by night."
+  }
+ },
+ "designSystems": []
+}

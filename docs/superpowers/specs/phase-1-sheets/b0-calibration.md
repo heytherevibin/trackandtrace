@@ -1,5 +1,7 @@
 # B0: Calibration (draw first, then stop)
 
+**Approved 19 Sep 2026.** The approved drawings are in `docs/design/sheets/console/`. Where they differ from the prompts below, the drawings win: Refused and Failed results are grey tags, the export confirms today's 14 entries, and the record drawer floats 12px in from the window edges.
+
 These two sheets set the console's frame, its dense table and the "Confirm it's you" dialog, which every later console sheet reuses. Paste the house rules, then the console rules. When both sheets are drawn, send them to Claude Code and wait for your approval before drawing B1.
 
 ## Console Shell
