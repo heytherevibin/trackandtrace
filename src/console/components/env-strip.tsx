@@ -14,7 +14,7 @@ export function EnvStrip({ production, host }: { readonly production: boolean; r
       <Badge variant={production ? "accent" : "steel"} caps>
         {production ? m.production : m.preview}
       </Badge>
-      <span className="legend-md min-w-0 truncate">{production ? host : m.previewHost(host)}</span>
+      <span className="legend-md max-sm:legend-sm min-w-0 truncate">{production ? host : m.previewHost(host)}</span>
     </div>
   );
 }
