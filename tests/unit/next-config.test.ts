@@ -1,5 +1,5 @@
 import { getRedirectUrl, unstable_getResponseFromNextConfig } from "next/experimental/testing/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import nextConfig from "../../next.config";
 
 // trakline.in is the one address; www answers with a permanent redirect to it.
@@ -30,5 +30,37 @@ describe("next.config redirects", () => {
     for (const url of ["https://trakline.in/pnr", "https://trakline-bdq1lxt5p-trakline.vercel.app/", "http://localhost:3000/"]) {
       expect(getRedirectUrl(await request(url))).toBeNull();
     }
+  });
+});
+
+describe("the content security policy", () => {
+  async function headersFor(env: Record<string, string>) {
+    vi.resetModules();
+    for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value);
+    const { default: config } = await import("../../next.config");
+    const response = await unstable_getResponseFromNextConfig({ url: "https://trakline.in/", nextConfig: config });
+    vi.unstubAllEnvs();
+    return response.headers;
+  }
+
+  it("is enforced, not only reported", async () => {
+    const headers = await headersFor({ NODE_ENV: "production" });
+    expect(headers.get("content-security-policy")).toContain("default-src 'self'");
+    expect(headers.get("content-security-policy-report-only")).toBeNull();
+  });
+
+  it("upgrades insecure requests outside development", async () => {
+    expect((await headersFor({ NODE_ENV: "production" })).get("content-security-policy")).toContain("upgrade-insecure-requests");
+    expect((await headersFor({ NODE_ENV: "development" })).get("content-security-policy")).not.toContain("upgrade-insecure-requests");
+  });
+
+  it("reports violations to Sentry from production only", async () => {
+    const dsn = "https://abc@o1.ingest.de.sentry.io/2";
+    const production = await headersFor({ NODE_ENV: "production", VERCEL_ENV: "production", NEXT_PUBLIC_SENTRY_DSN: dsn });
+    expect(production.get("content-security-policy")).toContain("report-uri https://o1.ingest.de.sentry.io/api/2/security/?sentry_key=abc");
+    const preview = await headersFor({ NODE_ENV: "production", VERCEL_ENV: "preview", NEXT_PUBLIC_SENTRY_DSN: dsn });
+    expect(preview.get("content-security-policy")).not.toContain("report-uri");
+    const withoutDsn = await headersFor({ NODE_ENV: "production", VERCEL_ENV: "production" });
+    expect(withoutDsn.get("content-security-policy")).not.toContain("report-uri");
   });
 });
