@@ -1,5 +1,7 @@
 # B2: Admin core (draw before Phase 2)
 
+**Approved 19 Sep 2026.** The approved drawings are in `docs/design/sheets/console/` (the six console sheets) and `docs/design/sheets/traveller/` (Notices). Where they differ from the prompts below, the drawings win. Each folder's README lists the choices made in the drawings.
+
 Paste the house rules and the console rules, then these prompts in order. Console sheets use the frame exactly as approved in Console Shell. The last sheet, Notices, is for travellers: it follows the house rules only and builds on the B1 drawings.
 
 ## Console Sign In

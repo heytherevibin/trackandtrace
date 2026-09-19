@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Console sign in</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="industry.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&amp;family=Barlow+Condensed:wght@500;600&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="face" data-face="{{face}}" style="width: 1440px; height: 900px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--surface-0); color: var(--ink-1); font-family: var(--body);">
+<sc-if value="{{isProd}}" hint-placeholder-val="{{ true }}">
+<div style="height: 28px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 24px; border-bottom: 1px solid var(--line);">
+<span class="tag tag-filled tag-caps">Production</span>
+<span class="legend">admin.trakline.in</span>
+</div>
+</sc-if>
+<sc-if value="{{isPreview}}" hint-placeholder-val="{{ false }}">
+<div style="height: 28px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 24px; border-bottom: 1px dashed var(--line-strong);">
+<span class="tag tag-outline tag-caps">Preview</span>
+<span class="legend">Staging data · trakline-git-console-trakline.vercel.app</span>
+</div>
+</sc-if>
+<header style="height: 56px; flex: none; display: flex; align-items: center; gap: 12px; padding: 0 24px; border-bottom: 1px solid var(--line);">
+<a href="#" aria-label="Trakline console" style="display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink-1);">
+<svg width="24" height="24" viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="6" fill="#1a1a1c" stroke="#55555b"></rect><rect x="6" y="8" width="5" height="16" rx="1.5" fill="#ff3b30"></rect><rect x="13" y="8" width="5" height="16" rx="1.5" fill="#ff9a00"></rect><rect x="20" y="8" width="5" height="16" rx="1.5" fill="#ffe100"></rect><circle cx="27.5" cy="16" r="1.75" fill="#ff3b30"></circle></svg>
+<span style="font-family: var(--display); font-weight: 600; font-size: 18px; line-height: 24px; letter-spacing: 0.06em; text-transform: uppercase;">Trakline</span>
+</a>
+<span class="tag tag-outline tag-caps">Console</span>
+<div style="flex-grow: 1;"></div>
+<div style="display: flex; align-items: center; gap: 8px;">
+<button type="button" class="box box-icon" aria-label="{{themeLabel}}" title="{{themeLabel}}" onClick="{{cycleTheme}}">
+<sc-if value="{{modeSystem}}" hint-placeholder-val="{{ true }}">
+<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.25" fill="none" stroke="currentColor" stroke-width="1.5"></circle><path d="M10 2.75a7.25 7.25 0 0 1 0 14.5Z" fill="currentColor"></path></svg>
+</sc-if>
+<sc-if value="{{modeDay}}" hint-placeholder-val="{{ false }}">
+<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="4" fill="currentColor"></circle><path d="M10 1.5v2M10 16.5v2M1.5 10h2M16.5 10h2M4 4l1.4 1.4M14.6 14.6 16 16M4 16l1.4-1.4M14.6 5.4 16 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg>
+</sc-if>
+<sc-if value="{{modeNight}}" hint-placeholder-val="{{ false }}">
+<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M8.5 2.2a7.8 7.8 0 1 0 9.3 9.3A6.3 6.3 0 1 1 8.5 2.2Z"></path></svg>
+</sc-if>
+</button>
+</div>
+</header>
+<main style="flex-grow: 1; display: flex; justify-content: center; padding: 72px 24px;">
+<div style="width: 440px; display: flex; flex-direction: column;">
+<span style="display: inline-flex;"><svg width="40" height="40" viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="6" fill="#1a1a1c" stroke="#55555b"></rect><rect x="6" y="8" width="5" height="16" rx="1.5" fill="#ff3b30"></rect><rect x="13" y="8" width="5" height="16" rx="1.5" fill="#ff9a00"></rect><rect x="20" y="8" width="5" height="16" rx="1.5" fill="#ffe100"></rect><circle cx="27.5" cy="16" r="1.75" fill="#ff3b30"></circle></svg></span>
+<h1 class="ph-title" style="margin-top: 24px;">Console sign in</h1>
+<p class="ph-lead">For the Trakline team. Use your console email, not your everyday account.</p>
+<div style="margin-top: 32px;">
+<sc-if value="{{st_email}}" hint-placeholder-val="{{ true }}">
+<section class="plate" aria-labelledby="st_email-tb">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+
+<div class="tb"><span class="cell title" id="st_email-tb">Email link</span><span class="cell">Form TC-02</span></div>
+<div style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+<div>
+<label class="label" for="console-email">Console email</label>
+<input id="console-email" class="well" type="email" autocomplete="email" placeholder="name@example.com">
+
+</div>
+<button type="button" class="btn btn-primary btn-block">Email me a sign-in link</button>
+<p class="hint" style="margin: 0;">The link works once and expires in 1 hour.</p>
+</div>
+</section>
+</sc-if>
+<sc-if value="{{st_email_invalid}}" hint-placeholder-val="{{ false }}">
+<section class="plate" aria-labelledby="st_email_invalid-tb">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+
+<div class="tb"><span class="cell title" id="st_email_invalid-tb">Email link</span><span class="cell">Form TC-02</span></div>
+<div style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+<div>
+<label class="label" for="console-email">Console email</label>
+<input id="console-email" class="well" type="email" autocomplete="email" placeholder="name@example.com" value="asha@example" aria-invalid="true" aria-describedby="console-email-alert">
+<div class="alert" id="console-email-alert" role="alert">Enter an email address like name@example.com.</div>
+</div>
+<button type="button" class="btn btn-primary btn-block">Email me a sign-in link</button>
+<p class="hint" style="margin: 0;">The link works once and expires in 1 hour.</p>
+</div>
+</section>
+</sc-if>
+<sc-if value="{{st_sending}}" hint-placeholder-val="{{ false }}">
+<section class="plate" aria-labelledby="st_sending-tb">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+<div class="sweep"><i></i></div>
+<div class="tb"><span class="cell title" id="st_sending-tb">Email link</span><span class="cell">Form TC-02</span></div>
+<div style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+<div>
+<label class="label" for="console-email">Console email</label>
+<input id="console-email" class="well" type="email" autocomplete="email" placeholder="name@example.com" value="asha@example.com" disabled="true">
+
+</div>
+<button type="button" class="btn btn-primary btn-block" disabled="true">Sending…</button>
+<p class="hint" style="margin: 0;">The link works once and expires in 1 hour.</p>
+</div>
+</section>
+</sc-if>
+<sc-if value="{{st_sent}}" hint-placeholder-val="{{ false }}">
+<section class="plate" aria-labelledby="st_sent-tb">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+
+<div class="tb"><span class="cell title" id="st_sent-tb">Email link</span><span class="cell">Form TC-02</span></div>
+<div style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+<h2 class="state-title">Check your inbox</h2>
+<p class="state-detail" style="margin: 0;">If this address belongs to a console member, a sign-in link is on its way.</p>
+<div style="display: flex; flex-wrap: wrap; gap: 8px;"><button type="button" class="btn btn-secondary" disabled="true">Send again in 42 s</button><button type="button" class="btn btn-ghost">Use a different email</button></div>
+</div>
+</section>
+</sc-if>
+<sc-if value="{{st_too_many}}" hint-placeholder-val="{{ false }}">
+<section class="plate" aria-labelledby="st_too_many-tb">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+
+<div class="tb"><span class="cell title" id="st_too_many-tb">Email link</span><span class="cell">Form TC-02</span></div>
+<div style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+<div>
+<label class="label" for="console-email">Console email</label>
+<input id="console-email" class="well" type="email" autocomplete="email" placeholder="name@example.com" value="asha@example.com">
+<div class="alert" id="console-email-alert" role="alert">Too many sign-in requests. Try again in 10 minutes.</div>
+</div>
+<button type="button" class="btn btn-primary btn-block" disabled="true">Email me a sign-in link</button>
+<p class="hint" style="margin: 0;">The link works once and expires in 1 hour.</p>
+</div>
+</section>
+</sc-if>
+<sc-if value="{{st_link_expired}}" hint-placeholder-val="{{ false }}">
+<section class="plate" aria-labelledby="st_link_expired-tb">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+
+<div class="tb"><span class="cell title" id="st_link_expired-tb">Email link</span><span class="cell">Form TC-02</span></div>
+<div style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+<div role="alert" style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); background: var(--surface-1);"><span class="lamp ringed"></span><span style="font-size: 14px; line-height: 20px;">This link has expired or was already used.</span></div>
+<div>
+<label class="label" for="console-email">Console email</label>
+<input id="console-email" class="well" type="email" autocomplete="email" placeholder="name@example.com" value="asha@example.com">
+
+</div>
+<button type="button" class="btn btn-primary btn-block">Email me a new link</button>
+<p class="hint" style="margin: 0;">The link works once and expires in 1 hour.</p>
+</div>
+</section>
+</sc-if>
+<sc-if value="{{st_key_waiting}}" hint-placeholder-val="{{ false }}">
+<section class="plate" aria-labelledby="st_key_waiting-tb">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+
+<div class="tb"><span class="cell title" id="st_key_waiting-tb">Security key</span><span class="cell">Form TC-02</span></div>
+<div style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+<h2 class="state-title">Tap your security key</h2>
+<p class="state-detail" style="margin: 0;">Touch your key or approve on your device. Either of your keys works.</p>
+<div role="status" style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); background: var(--surface-1);"><span class="lamp light"></span><span style="font-size: 14px; line-height: 20px;">Waiting for your key…</span></div>
+<div><button type="button" class="btn btn-secondary">Try again</button></div>
+</div>
+</section>
+</sc-if>
+<sc-if value="{{st_key_failed}}" hint-placeholder-val="{{ false }}">
+<section class="plate" aria-labelledby="st_key_failed-tb">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+
+<div class="tb"><span class="cell title" id="st_key_failed-tb">Security key</span><span class="cell">Form TC-02</span></div>
+<div style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+<h2 class="state-title">Tap your security key</h2>
+<p class="state-detail" style="margin: 0;">Touch your key or approve on your device. Either of your keys works.</p>
+<div role="alert" style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); background: var(--surface-1);"><span class="lamp ringed"></span><span style="font-size: 14px; line-height: 20px;">That key didn't answer. Try again.</span></div>
+<div><button type="button" class="btn btn-secondary">Try again</button></div>
+</div>
+</section>
+</sc-if>
+<sc-if value="{{st_key_not_registered}}" hint-placeholder-val="{{ false }}">
+<section class="plate" aria-labelledby="st_key_not_registered-tb">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+
+<div class="tb"><span class="cell title" id="st_key_not_registered-tb">Security key</span><span class="cell">Form TC-02</span></div>
+<div style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+<h2 class="state-title">Tap your security key</h2>
+<p class="state-detail" style="margin: 0;">Touch your key or approve on your device. Either of your keys works.</p>
+<div role="alert" style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); background: var(--surface-1);"><span class="lamp ringed"></span><span style="font-size: 14px; line-height: 20px;">This key isn't registered to your console account.</span></div>
+<div><button type="button" class="btn btn-secondary">Try again</button></div>
+</div>
+</section>
+</sc-if>
+<sc-if value="{{st_setup_incomplete}}" hint-placeholder-val="{{ false }}">
+<section class="plate" aria-labelledby="st_setup_incomplete-tb">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+
+<div class="tb"><span class="cell title" id="st_setup_incomplete-tb">Security key</span><span class="cell">Form TC-02</span></div>
+<div style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+<div role="status" style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); background: var(--surface-1);"><span class="lamp hollow"></span><span style="font-size: 14px; line-height: 20px;">Tap your first key, then add a second to continue.</span></div>
+<a href="#" class="btn btn-primary btn-block">Continue setup</a>
+</div>
+</section>
+</sc-if>
+<sc-if value="{{st_no_access}}" hint-placeholder-val="{{ false }}">
+<section class="plate" aria-labelledby="st_no_access-tb">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+
+<div class="tb"><span class="cell title" id="st_no_access-tb">Security key</span><span class="cell">Form TC-02</span></div>
+<div style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+<div role="alert" style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); background: var(--surface-1);"><span class="lamp ringed"></span><span style="font-size: 14px; line-height: 20px;">This account has no console access.</span></div>
+<div><button type="button" class="btn btn-secondary">Sign out</button></div>
+</div>
+</section>
+</sc-if>
+<sc-if value="{{st_session_ended}}" hint-placeholder-val="{{ false }}">
+<section class="plate" aria-labelledby="st_session_ended-tb">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+
+<div class="tb"><span class="cell title" id="st_session_ended-tb">Email link</span><span class="cell">Form TC-02</span></div>
+<div style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+<div role="status" style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); background: var(--surface-1);"><span class="lamp hollow"></span><span style="font-size: 14px; line-height: 20px;">Your session ended. Sign in again.</span></div>
+<div>
+<label class="label" for="console-email">Console email</label>
+<input id="console-email" class="well" type="email" autocomplete="email" placeholder="name@example.com" value="asha@example.com">
+
+</div>
+<button type="button" class="btn btn-primary btn-block">Email me a sign-in link</button>
+<p class="hint" style="margin: 0;">The link works once and expires in 1 hour.</p>
+</div>
+</section>
+</sc-if>
+<sc-if value="{{st_authenticator_fallback}}" hint-placeholder-val="{{ false }}">
+<section class="plate" aria-labelledby="st_authenticator_fallback-tb">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+
+<div class="tb"><span class="cell title" id="st_authenticator_fallback-tb">Authenticator code</span><span class="cell">Form TC-02</span></div>
+<div style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+<h2 class="state-title">Enter your code</h2>
+<div>
+<label class="label" for="console-code">Code from your authenticator app</label>
+<input id="console-code" class="well fig" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="6 digits" style="letter-spacing: 0.3em; font-size: 18px;">
+</div>
+<button type="button" class="btn btn-primary btn-block">Verify</button>
+</div>
+</section>
+</sc-if>
+<sc-if value="{{st_done}}" hint-placeholder-val="{{ false }}">
+<section class="plate" aria-labelledby="st_done-tb">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+
+<div class="tb"><span class="cell title" id="st_done-tb">Security key</span><span class="cell">Form TC-02</span></div>
+<div style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+<div role="status" style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); background: var(--surface-1);"><span class="lamp lit"></span><span style="font-size: 14px; line-height: 20px;">Signed in</span></div>
+</div>
+</section>
+</sc-if>
+</div>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"state":{"editor":"enum","options":["Email","Email invalid","Sending","Sent","Too many","Link expired","Key waiting","Key failed","Key not registered","Setup incomplete","No access","Session ended","Authenticator fallback","Done"],"default":"Email","section":"State"},"environment":{"editor":"enum","options":["Production","Preview"],"default":"Production","section":"State"},"defaultTheme":{"editor":"enum","options":["system","light","dark"],"default":"system","section":"Appearance"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  state = { theme: null, sysDark: false };
+  componentDidMount() {
+    this._mq = window.matchMedia('(prefers-color-scheme: dark)');
+    this._onMq = () => this.setState({ sysDark: this._mq.matches });
+    this.setState({ sysDark: this._mq.matches });
+    this._mq.addEventListener('change', this._onMq);
+  }
+  componentWillUnmount() {
+    if (this._mq) this._mq.removeEventListener('change', this._onMq);
+  }
+  frame(p, opts) {
+    var o = opts || {};
+    var who = o.who || p.role || 'Owner';
+    var env = p.environment || 'Production';
+    var mode = this.state.theme || p.defaultTheme || 'system';
+    var themeNames = { system: 'System', light: 'Day', dark: 'Night' };
+    var themeNext = { system: 'light', light: 'dark', dark: 'system' };
+    var dark = mode === 'dark' || (mode === 'system' && this.state.sysDark);
+    var members = { Owner: ['Asha Rao', 'asha@example.com', 'AR'], Admin: ['Rohan Iyer', 'rohan@example.com', 'RI'], Support: ['Kiran Das', 'kiran@example.com', 'KD'], Viewer: ['Meera Nair', 'meera@example.com', 'MN'] };
+    var access = {
+      Owner: ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13', '14'],
+      Admin: ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '14'],
+      Support: ['01', '06', '09', '10'],
+      Viewer: ['01', '02', '03']
+    };
+    var allGroups = [
+      { legend: 'Operate', items: [['01', 'Overview'], ['02', 'Sources & usage'], ['03', 'Status & incidents'], ['04', 'Abuse & limits'], ['05', 'Alerts']] },
+      { legend: 'People', items: [['06', 'Leads'], ['07', 'Announcements'], ['08', 'Accounts']] },
+      { legend: 'Queues', items: [['09', 'Privacy requests', '3'], ['10', 'Wrong-status reports', '5']] },
+      { legend: 'Configure', items: [['11', 'Switches & settings'], ['12', 'Provider keys'], ['13', 'Team']] },
+      { legend: 'Record', items: [['14', 'Audit log']] }
+    ];
+    var allowed = access[who] || access.Owner;
+    var phone = !!o.phone;
+    var rowBase = phone ? 'display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 16px 0 20px; text-decoration: none; ' : 'display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 16px 0 22px; text-decoration: none; ';
+    var rowOn = 'color: var(--accent-text); background: color-mix(in oklab, var(--accent) 16%, transparent); box-shadow: inset 2px 0 0 var(--accent);';
+    var current = o.current || '';
+    var groups = allGroups.map(function (g) {
+      return {
+        legend: g.legend,
+        items: g.items.filter(function (i) { return allowed.indexOf(i[0]) !== -1; }).map(function (i) {
+          var on = i[0] === current;
+          return { num: i[0], label: i[1], count: i[2] || '', hasCount: !!i[2], aria: on ? 'page' : 'false', rowStyle: rowBase + (on ? rowOn : 'color: var(--ink-2);') };
+        })
+      };
+    }).filter(function (g) { return g.items.length > 0; });
+    var m = members[who] || members.Owner;
+    var notice = o.notice !== undefined ? o.notice : (p.notice || 'None');
+    var signedOut = !!o.signedOut;
+    return {
+      face: dark ? 'night' : 'day',
+      modeSystem: mode === 'system', modeDay: mode === 'light', modeNight: mode === 'dark',
+      themeLabel: 'Theme: ' + themeNames[mode] + '. Switch to ' + themeNames[themeNext[mode]],
+      cycleTheme: () => this.setState({ theme: themeNext[mode] }),
+      isProd: env !== 'Preview', isPreview: env === 'Preview', envWord: env === 'Preview' ? 'staging' : 'production',
+      who: who, role: who, memberName: m[0], memberEmail: m[1], initials: m[2],
+      memberLabel: m[0] + ', ' + who + '. Open the member menu',
+      showMember: !signedOut, groups: groups,
+      noticePaused: !signedOut && notice === 'Checks paused', noticeSite: !signedOut && notice === 'Site notice',
+      pausedSince: o.pausedSince || '14:02', pausedBy: who === 'Viewer' ? 'an Owner' : (o.pausedBy || 'Asha Rao'),
+      canResume: who === 'Owner' || who === 'Admin',
+      menuOpen: !signedOut && p.menu === 'Open' && !o.overlay,
+      drawerOpen: !signedOut && p.drawer === 'Open' && !o.overlay,
+      toastShown: !!o.toast, toastText: o.toast || ''
+    };
+  }
+  renderVals() {
+    var p = this.props;
+    var st = p.state || 'Email';
+    var f = this.frame(p, { signedOut: true, phone: false });
+    var flags = {};
+    ["Email","Email invalid","Sending","Sent","Too many","Link expired","Key waiting","Key failed","Key not registered","Setup incomplete","No access","Session ended","Authenticator fallback","Done"].forEach(function (s) { flags['st_' + s.toLowerCase().replace(/[^a-z]+/g, '_')] = s === st; });
+    return Object.assign(f, flags);
+  }
+}
+</script>
+</body>
+</html>

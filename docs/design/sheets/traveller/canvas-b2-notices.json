@@ -1,0 +1,88 @@
+{
+ "v": 3,
+ "createdOnFiles": {
+  "v": 1,
+  "at": "2026-09-19T13:07:04Z"
+ },
+ "title": "Trakline B2 Traveller Notices",
+ "launch": {
+  "view": "canvas"
+ },
+ "pages": [],
+ "boards": {
+  "Notices.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 1440,
+   "h": 5460,
+   "title": "Notices \u00b7 Landing \u00b7 1440",
+   "is_interactive": true
+  },
+  "NoticesPhone.dc.html": {
+   "x": 1520,
+   "y": 0,
+   "w": 390,
+   "h": 9220,
+   "title": "Notices \u00b7 Landing \u00b7 390",
+   "is_interactive": true
+  },
+  "NoticesResult.dc.html": {
+   "x": 0,
+   "y": 9340,
+   "w": 1440,
+   "h": 1612,
+   "title": "Notices \u00b7 Result \u00b7 1440",
+   "is_interactive": true
+  },
+  "NoticesResultPhone.dc.html": {
+   "x": 1520,
+   "y": 9340,
+   "w": 390,
+   "h": 2076,
+   "title": "Notices \u00b7 Result \u00b7 390",
+   "is_interactive": true
+  },
+  "NoticesSignIn.dc.html": {
+   "x": 0,
+   "y": 11536,
+   "w": 1440,
+   "h": 900,
+   "title": "Notices \u00b7 Sign in \u00b7 1440",
+   "is_interactive": true
+  },
+  "NoticesSignInPhone.dc.html": {
+   "x": 1520,
+   "y": 11536,
+   "w": 390,
+   "h": 860,
+   "title": "Notices \u00b7 Sign in \u00b7 390",
+   "is_interactive": true
+  }
+ },
+ "order": [
+  "Notices.dc.html",
+  "NoticesPhone.dc.html",
+  "NoticesResult.dc.html",
+  "NoticesResultPhone.dc.html",
+  "NoticesSignIn.dc.html",
+  "NoticesSignInPhone.dc.html"
+ ],
+ "notes": {
+  "notices": {
+   "x": 0,
+   "y": -220,
+   "text": "Traveller notices \u00b7 house rules only",
+   "kind": "title2",
+   "maxW": 1910
+  },
+  "noticesHow": {
+   "x": 1990,
+   "y": 9340,
+   "w": 560,
+   "size": "l",
+   "color": "blue",
+   "text": "The live pages, changed only where the console reaches travellers: the notice strip, paused checks, the live-check budget and closed sign-ups.\n\nBudget reached with a recent result: the ordinary result with its usual \"Retrieved \u2026\" line, as B1's PNR Result. Without one, the busy plate drawn here.\n\nA closed notice stays closed for that notice on this device."
+  }
+ },
+ "designSystems": []
+}

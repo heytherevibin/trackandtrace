@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Console overview on a phone</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="industry.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&amp;family=Barlow+Condensed:wght@500;600&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="face" data-face="{{face}}" style="width: 390px; height: 3020px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--surface-0); color: var(--ink-1); font-family: var(--body);">
+<sc-if value="{{isProd}}" hint-placeholder-val="{{ true }}">
+<div style="height: 28px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 16px; border-bottom: 1px solid var(--line);">
+<span class="tag tag-filled tag-caps">Production</span>
+<span class="legend-sm">admin.trakline.in</span>
+</div>
+</sc-if>
+<sc-if value="{{isPreview}}" hint-placeholder-val="{{ false }}">
+<div style="height: 28px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 16px; border-bottom: 1px dashed var(--line-strong);">
+<span class="tag tag-outline tag-caps">Preview</span>
+<span class="legend-sm" style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Staging data · trakline-git-console-trakline.vercel.app</span>
+</div>
+</sc-if>
+<header style="height: 56px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 16px; border-bottom: 1px solid var(--line);">
+<sc-if value="{{showMember}}" hint-placeholder-val="{{ true }}">
+<button type="button" class="box box-icon box-lg" aria-label="Open menu" aria-expanded="{{drawerOpen}}">
+<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 5.5h14M3 10h14M3 14.5h14"></path></svg>
+</button>
+</sc-if>
+<a href="#" aria-label="Trakline console, Overview" style="display: inline-flex; flex: none; align-items: center; justify-content: center; width: 44px; height: 44px;">
+<svg width="24" height="24" viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="6" fill="#1a1a1c" stroke="#55555b"></rect><rect x="6" y="8" width="5" height="16" rx="1.5" fill="#ff3b30"></rect><rect x="13" y="8" width="5" height="16" rx="1.5" fill="#ff9a00"></rect><rect x="20" y="8" width="5" height="16" rx="1.5" fill="#ffe100"></rect><circle cx="27.5" cy="16" r="1.75" fill="#ff3b30"></circle></svg>
+</a>
+<span class="tag tag-outline tag-caps">Console</span>
+<div style="flex-grow: 1;"></div>
+<button type="button" class="box box-icon box-lg" aria-label="{{themeLabel}}" title="{{themeLabel}}" onClick="{{cycleTheme}}">
+<sc-if value="{{modeSystem}}" hint-placeholder-val="{{ true }}">
+<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.25" fill="none" stroke="currentColor" stroke-width="1.5"></circle><path d="M10 2.75a7.25 7.25 0 0 1 0 14.5Z" fill="currentColor"></path></svg>
+</sc-if>
+<sc-if value="{{modeDay}}" hint-placeholder-val="{{ false }}">
+<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="4" fill="currentColor"></circle><path d="M10 1.5v2M10 16.5v2M1.5 10h2M16.5 10h2M4 4l1.4 1.4M14.6 14.6 16 16M4 16l1.4-1.4M14.6 5.4 16 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg>
+</sc-if>
+<sc-if value="{{modeNight}}" hint-placeholder-val="{{ false }}">
+<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M8.5 2.2a7.8 7.8 0 1 0 9.3 9.3A6.3 6.3 0 1 1 8.5 2.2Z"></path></svg>
+</sc-if>
+</button>
+<sc-if value="{{showMember}}" hint-placeholder-val="{{ true }}">
+<button type="button" class="box box-icon box-lg" aria-haspopup="menu" aria-expanded="{{menuOpen}}" aria-label="{{memberLabel}}">
+<span class="avatar">{{initials}}</span>
+</button>
+</sc-if>
+</header>
+<sc-if value="{{noticePaused}}" hint-placeholder-val="{{ false }}">
+<div role="status" style="flex: none; display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--accent-wash);">
+<span class="lamp hollow"></span>
+<span style="flex-grow: 1; font-size: 14px; line-height: 20px;"><strong style="font-weight: 600;">PNR checks are paused</strong><br>since {{pausedSince}} IST · by {{pausedBy}}</span>
+<sc-if value="{{canResume}}" hint-placeholder-val="{{ true }}">
+<button type="button" class="btn btn-secondary btn-lg">Resume</button>
+</sc-if>
+</div>
+</sc-if>
+<sc-if value="{{noticeSite}}" hint-placeholder-val="{{ false }}">
+<div role="status" style="flex: none; display: flex; align-items: flex-start; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--accent-wash);">
+<span class="lamp lit" style="margin-top: 6px;"></span>
+<span style="font-size: 14px; line-height: 20px;"><strong style="font-weight: 600;">Site notice is on:</strong> Planned maintenance on 21 Sep, 02:00–03:00 IST. Checks may be slow.</span>
+</div>
+</sc-if>
+<main style="flex-grow: 1; min-height: 0; padding: 24px 16px 32px; display: flex; flex-direction: column; gap: 24px;">
+<div class="ph">
+<div class="ph-main">
+<p class="kicker">01 · Overview</p>
+<h1 class="ph-title">Overview</h1>
+<p class="ph-lead">What travellers are getting right now, and what needs you.</p>
+<sc-if value="{{showMeta}}" hint-placeholder-val="{{ true }}">
+<p class="legend ph-meta" style="margin-bottom: 0;">Updated 14:32 IST · refreshes every minute · Sample data</p>
+</sc-if>
+</div>
+
+</div>
+<sc-if value="{{isLoading}}" hint-placeholder-val="{{ false }}"><div role="status" aria-busy="true" aria-label="Loading the overview" style="display: flex; flex-direction: column; gap: 24px;"><div class="plate" style="height: 180px; display: flex; flex-direction: column;"><div style="height: 45px; padding: 0 20px; display: flex; align-items: center; border-bottom: 1px solid var(--line);"><div class="skeleton" style="width: 34%; height: 12px;"></div></div><div style="padding: 18px 20px; display: flex; flex-direction: column; gap: 18px;"><div class="skeleton" style="height: 12px;"></div><div class="skeleton" style="height: 12px;"></div><div class="skeleton" style="width: 70%; height: 12px;"></div></div></div><div class="plate" style="height: 360px; display: flex; flex-direction: column;"><div style="height: 45px; padding: 0 20px; display: flex; align-items: center; border-bottom: 1px solid var(--line);"><div class="skeleton" style="width: 34%; height: 12px;"></div></div><div style="padding: 18px 20px; display: flex; flex-direction: column; gap: 18px;"><div class="skeleton" style="height: 12px;"></div><div class="skeleton" style="height: 12px;"></div><div class="skeleton" style="width: 70%; height: 12px;"></div></div></div><div class="plate" style="height: 250px; display: flex; flex-direction: column;"><div style="height: 45px; padding: 0 20px; display: flex; align-items: center; border-bottom: 1px solid var(--line);"><div class="skeleton" style="width: 34%; height: 12px;"></div></div><div style="padding: 18px 20px; display: flex; flex-direction: column; gap: 18px;"><div class="skeleton" style="height: 12px;"></div><div class="skeleton" style="height: 12px;"></div><div class="skeleton" style="width: 70%; height: 12px;"></div></div></div><div class="plate" style="height: 170px; display: flex; flex-direction: column;"><div style="height: 45px; padding: 0 20px; display: flex; align-items: center; border-bottom: 1px solid var(--line);"><div class="skeleton" style="width: 34%; height: 12px;"></div></div><div style="padding: 18px 20px; display: flex; flex-direction: column; gap: 18px;"><div class="skeleton" style="height: 12px;"></div><div class="skeleton" style="height: 12px;"></div><div class="skeleton" style="width: 70%; height: 12px;"></div></div></div></div></sc-if>
+<sc-if value="{{notLoading}}" hint-placeholder-val="{{ true }}"><div style="display: flex; flex-direction: column; gap: 24px;"><sc-if value="{{showUrgent}}" hint-placeholder-val="{{ true }}">
+<section class="plate" aria-labelledby="ov-urgent">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+<div class="tb stack"><h2 class="cell title" id="ov-urgent" style="margin: 0;">Urgent actions</h2></div>
+<div style="padding: 14px 16px; display: flex; flex-wrap: wrap; gap: 8px;">
+<button type="button" class="btn btn-secondary btn-lg">{{pauseLabel}}</button>
+<button type="button" class="btn btn-secondary btn-lg">Post an incident</button>
+<button type="button" class="btn btn-secondary btn-lg">Block an address</button>
+</div>
+</section>
+</sc-if><section class="plate" aria-labelledby="ov-service">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+<div class="tb stack"><h2 class="cell title" id="ov-service" style="margin: 0;">Service now</h2><span class="cell">Sample data</span></div>
+<sc-for list="{{service}}" as="s" hint-placeholder-count="7">
+<div style="{{s.rowStyle}}">
+<span class="{{s.lampClass}}" style="margin-top: 6px;"></span>
+<span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column;"><span style="font-size: 14px; line-height: 20px;">{{s.name}}</span><sc-if value="{{s.hasNote}}" hint-placeholder-val="{{ false }}"><span style="font-size: 13px; line-height: 18px; color: var(--ink-2);">{{s.note}}</span></sc-if></span>
+<span style="flex: none; display: flex; flex-direction: column; align-items: flex-end; text-align: right; white-space: nowrap;"><span style="font-size: 14px; line-height: 20px; font-weight: 500;">{{s.word}}</span><span class="legend-sm">{{s.since}}</span></span>
+</div>
+</sc-for>
+</section><section class="plate" aria-labelledby="ov-checks">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+<div class="tb stack"><h2 class="cell title" id="ov-checks" style="margin: 0;">Checks today</h2><span class="cell">Since 00:00 IST</span><span class="cell">Sample data</span></div>
+<sc-if value="{{storeDown}}" hint-placeholder-val="{{ false }}">
+<div role="status" style="display: flex; align-items: flex-start; gap: 10px; padding: 14px 16px;"><span class="lamp ringed" style="margin-top: 5px;"></span><span style="font-size: 14px; line-height: 20px;">Counts unavailable: the shared store didn't answer. Last good value 14:20 IST.</span></div>
+</sc-if>
+<sc-if value="{{firstRun}}" hint-placeholder-val="{{ false }}">
+<div role="status" style="display: flex; align-items: center; gap: 10px; padding: 14px 16px;"><span class="lamp hollow"></span><span style="font-size: 14px; line-height: 20px;">Counts start with the first check.</span></div>
+</sc-if>
+<sc-if value="{{countsShown}}" hint-placeholder-val="{{ true }}">
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));"><div style="border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 14px 16px; display: flex; flex-direction: column; gap: 6px;"><span class="legend">Checks</span><span class="fig" style="font-size: 30px; line-height: 1;">{{c.checks}}</span></div><div style="border-bottom: 1px solid var(--line); padding: 14px 16px; display: flex; flex-direction: column; gap: 6px;"><span class="legend">From cache</span><span class="fig" style="font-size: 30px; line-height: 1;">{{c.cache}}</span></div><div style="border-right: 1px solid var(--line); padding: 14px 16px; display: flex; flex-direction: column; gap: 6px;"><span class="legend">Live</span><span class="fig" style="font-size: 30px; line-height: 1;">{{c.live}}</span></div><div style="padding: 14px 16px; display: flex; flex-direction: column; gap: 6px;"><span class="legend">Unavailable</span><span class="fig" style="font-size: 30px; line-height: 1;">{{c.unavailable}}</span></div></div>
+<div style="padding: 14px 16px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 12px;">
+<p style="margin: 0; font-size: 13px; line-height: 20px; color: var(--ink-2);">Live {{c.live}} = RailKit {{c.railkit}} · RapidAPI 2. Of the live answers: no record 9. Limited 3, refused before checking.</p>
+<div style="display: flex; flex-direction: column; gap: 6px;"><span style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px;"><span style="font-size: 14px; line-height: 20px;">Live-check budget</span><span class="legend">{{c.live}} of 300 today</span></span><div class="meter" role="img" aria-label="Live-check budget: {{c.live}} of 300 today"><i style="width: {{c.budgetPct}};"></i></div></div>
+</div>
+</sc-if>
+</section><section class="plate" aria-labelledby="ov-quota">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+<div class="tb stack"><h2 class="cell title" id="ov-quota" style="margin: 0;">Quota this month</h2><span class="cell">Sample data</span></div>
+<sc-if value="{{storeDown}}" hint-placeholder-val="{{ false }}">
+<div role="status" style="display: flex; align-items: flex-start; gap: 10px; padding: 14px 16px;"><span class="lamp ringed" style="margin-top: 5px;"></span><span style="font-size: 14px; line-height: 20px;">Counts unavailable: the shared store didn't answer. Last good value 14:20 IST.</span></div>
+</sc-if>
+<sc-if value="{{quotaShown}}" hint-placeholder-val="{{ true }}">
+<div style="padding: 14px 16px; display: flex; flex-direction: column; gap: 16px;">
+<div style="display: flex; flex-direction: column; gap: 6px;"><span style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px;"><span style="font-size: 14px; line-height: 20px;">RailKit</span><span class="legend">{{q.railkit}} of 10,000 · resets 1 Oct</span></span><div class="meter" role="img" aria-label="RailKit: {{q.railkit}} of 10,000 · resets 1 Oct"><i style="width: {{q.railkitPct}};"></i></div></div>
+<div style="display: flex; flex-direction: column; gap: 6px;"><span style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px;"><span style="font-size: 14px; line-height: 20px;">RapidAPI</span><span class="legend">{{q.rapid}} of 10 · resets 1 Oct</span></span><div class="meter" role="img" aria-label="RapidAPI: {{q.rapid}} of 10 · resets 1 Oct"><i style="width: {{q.rapidPct}};"></i></div></div>
+</div>
+</sc-if>
+</section><sc-if value="{{showQueues}}" hint-placeholder-val="{{ true }}">
+<section class="plate" aria-labelledby="ov-queues">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+<div class="tb stack"><h2 class="cell title" id="ov-queues" style="margin: 0;">Queues</h2><span class="cell">Sample data</span></div>
+<a href="#" style="display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 0 16px; text-decoration: none; color: var(--ink-1);"><span class="fig" style="width: 28px; font-size: 20px;">3</span><span style="flex-grow: 1; display: flex; flex-direction: column; padding: 6px 0;"><span style="font-size: 14px; line-height: 20px;">Privacy requests open</span><span class="legend-sm">Next due 24 Sep</span></span><span aria-hidden="true" style="color: var(--accent-text);">→</span></a>
+<a href="#" style="display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 0 16px; border-top: 1px solid var(--line); text-decoration: none; color: var(--ink-1);"><span class="fig" style="width: 28px; font-size: 20px;">5</span><span style="flex-grow: 1; display: flex; flex-direction: column; padding: 6px 0;"><span style="font-size: 14px; line-height: 20px;">Wrong-status reports new</span><span class="legend-sm">Since yesterday</span></span><span aria-hidden="true" style="color: var(--accent-text);">→</span></a>
+<sc-if value="{{showInvites}}" hint-placeholder-val="{{ true }}">
+<a href="#" style="display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 0 16px; border-top: 1px solid var(--line); text-decoration: none; color: var(--ink-1);"><span class="fig" style="width: 28px; font-size: 20px;">1</span><span style="flex-grow: 1; display: flex; flex-direction: column; padding: 6px 0;"><span style="font-size: 14px; line-height: 20px;">Invites pending</span><span class="legend-sm">Expires 26 Sep</span></span><span aria-hidden="true" style="color: var(--accent-text);">→</span></a>
+</sc-if>
+</section>
+</sc-if><section class="plate" aria-labelledby="ov-people">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+<div class="tb stack"><h2 class="cell title" id="ov-people" style="margin: 0;">People</h2><span class="cell">Counts only</span><span class="cell">Sample data</span></div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));"><div style="border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 14px 16px; display: flex; flex-direction: column; gap: 6px;"><span class="legend">Accounts</span><span class="fig" style="font-size: 30px; line-height: 1;">{{pp.accounts}}</span></div><div style="border-bottom: 1px solid var(--line); padding: 14px 16px; display: flex; flex-direction: column; gap: 6px;"><span class="legend">Subscribers</span><span class="fig" style="font-size: 30px; line-height: 1;">{{pp.subscribers}}</span></div><div style="border-right: 1px solid var(--line); padding: 14px 16px; display: flex; flex-direction: column; gap: 6px;"><span class="legend">Pending confirmation</span><span class="fig" style="font-size: 30px; line-height: 1;">{{pp.pending}}</span></div><div style="padding: 14px 16px; display: flex; flex-direction: column; gap: 6px;"><span class="legend">Unsubscribed this week</span><span class="fig" style="font-size: 30px; line-height: 1;">{{pp.unsubscribed}}</span></div></div><p style="margin: 0; padding: 14px 16px; border-top: 1px solid var(--line); font-size: 13px; line-height: 20px; color: var(--ink-2);">{{pp.newToday}}</p>
+</section><section class="plate" aria-labelledby="ov-incident">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+<div class="tb stack"><h2 class="cell title" id="ov-incident" style="margin: 0;">Open incident</h2><span class="cell">Sample data</span></div>
+<sc-if value="{{incidentOpen}}" hint-placeholder-val="{{ true }}">
+<div style="padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;">
+<span style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;"><span style="font-size: 17px; line-height: 26px; font-weight: 500;">Slow PNR checks</span><span class="tag tag-outline">Monitoring</span></span>
+<span class="legend">Last update 14:10 IST · by {{incidentBy}}</span>
+<sc-if value="{{canPostUpdate}}" hint-placeholder-val="{{ true }}">
+<div><button type="button" class="btn btn-secondary btn-lg">Post update</button></div>
+</sc-if>
+</div>
+</sc-if>
+<sc-if value="{{incidentNone}}" hint-placeholder-val="{{ false }}">
+<p style="margin: 0; padding: 14px 16px; font-size: 14px; line-height: 20px; color: var(--ink-2);">No open incidents.</p>
+</sc-if>
+</section><sc-if value="{{showRecent}}" hint-placeholder-val="{{ true }}">
+<section class="plate" aria-labelledby="ov-recent">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+<div class="tb stack"><h2 class="cell title" id="ov-recent" style="margin: 0;">Recent actions</h2><span class="cell">Last five</span><span class="cell">Sample data</span></div>
+<sc-for list="{{recent}}" as="r" hint-placeholder-count="5"><div style="{{r.phoneStyle}}"><span class="legend-sm tnum">{{r.time}} IST · {{r.member}}</span><span style="font-size: 14px; line-height: 20px;">{{r.action}}</span></div></sc-for>
+<div style="padding: 4px 16px 12px;"><a href="#" style="font-family: var(--display); font-weight: 600; font-size: 13px; letter-spacing: 0.04em; text-decoration: none; display: inline-flex; align-items: center; min-height: 44px;">Open audit log →</a></div>
+</section>
+</sc-if></div></sc-if>
+</main>
+<sc-if value="{{drawerOpen}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; inset: 0; z-index: 4; background: var(--backdrop);">
+<nav aria-label="Console" style="position: absolute; left: 0; top: 0; bottom: 0; width: 320px; display: flex; flex-direction: column; background: var(--surface-0); border-right: 1px solid var(--line);">
+<div style="height: 56px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 12px 0 20px; border-bottom: 1px solid var(--line);">
+<svg width="24" height="24" viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="6" fill="#1a1a1c" stroke="#55555b"></rect><rect x="6" y="8" width="5" height="16" rx="1.5" fill="#ff3b30"></rect><rect x="13" y="8" width="5" height="16" rx="1.5" fill="#ff9a00"></rect><rect x="20" y="8" width="5" height="16" rx="1.5" fill="#ffe100"></rect><circle cx="27.5" cy="16" r="1.75" fill="#ff3b30"></circle></svg>
+<span style="font-family: var(--display); font-weight: 600; font-size: 18px; line-height: 24px; letter-spacing: 0.06em; text-transform: uppercase;">Trakline</span>
+<span class="tag tag-outline tag-caps">Console</span>
+<div style="flex-grow: 1;"></div>
+<button type="button" class="box box-icon box-lg" aria-label="Close menu">
+<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M5 5l10 10M15 5 5 15"></path></svg>
+</button>
+</div>
+<div style="flex-grow: 1; min-height: 0; overflow-y: auto; padding: 12px 0 4px; display: flex; flex-direction: column;">
+<sc-for list="{{groups}}" as="g" hint-placeholder-count="5">
+<div style="display: flex; flex-direction: column; padding: 0 0 8px;">
+<span class="legend" style="padding: 0 20px 4px;">{{g.legend}}</span>
+<sc-for list="{{g.items}}" as="it" hint-placeholder-count="3">
+<a href="#" aria-current="{{it.aria}}" style="{{it.rowStyle}}">
+<span class="fig" style="width: 22px; font-size: 13px; letter-spacing: 0.04em; color: var(--ink-3);">{{it.num}}</span>
+<span style="flex-grow: 1; font-size: 15px;">{{it.label}}</span>
+<sc-if value="{{it.hasCount}}" hint-placeholder-val="{{ false }}">
+<span class="fig" style="min-width: 22px; height: 20px; padding: 0 6px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--line-strong); font-size: 12px; color: var(--ink-1);">{{it.count}}</span>
+</sc-if>
+</a>
+</sc-for>
+</div>
+</sc-for>
+</div>
+<span class="legend-sm" style="flex: none; padding: 8px 20px; border-top: 1px solid var(--line);">Build 42c5317 · 19 Sep 2026</span>
+</nav>
+</div>
+</sc-if>
+<sc-if value="{{menuOpen}}" hint-placeholder-val="{{ false }}">
+<div role="menu" aria-label="Member" class="menu" style="right: 16px; top: 88px; width: 260px;">
+<div style="padding: 8px 12px; display: flex; flex-direction: column;">
+<span style="font-size: 14px; line-height: 21px; font-weight: 500;">{{memberName}}</span>
+<span style="font-size: 13px; line-height: 20px; color: var(--ink-3);">{{memberEmail}}</span>
+<span style="margin-top: 8px;"><span class="tag tag-outline tag-caps">{{role}}</span></span>
+</div>
+<div class="menu-sep" role="separator"></div>
+<a href="#" role="menuitem" class="menu-item menu-item-lg">My keys</a>
+<div class="menu-sep" role="separator"></div>
+<a href="#" role="menuitem" class="menu-item menu-item-lg"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M6 2.5H3.5v11H6M10 5l3 3-3 3M13 8H6.5"></path></svg>Sign out</a>
+</div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"role":{"editor":"enum","options":["Owner","Admin","Support","Viewer"],"default":"Owner","section":"State"},"environment":{"editor":"enum","options":["Production","Preview"],"default":"Production","section":"State"},"service":{"editor":"enum","options":["Normal","RailKit down","Checks paused","Budget reached"],"default":"Normal","section":"State"},"state":{"editor":"enum","options":["Ready","Loading","Plate unavailable","First run"],"default":"Ready","section":"State"},"incident":{"editor":"enum","options":["Open","None"],"default":"Open","section":"State"},"defaultTheme":{"editor":"enum","options":["system","light","dark"],"default":"system","section":"Appearance"},"$preview":{"width":390,"height":3020}}'>
+class Component extends DCLogic {
+  state = { theme: null, sysDark: false };
+  componentDidMount() {
+    this._mq = window.matchMedia('(prefers-color-scheme: dark)');
+    this._onMq = () => this.setState({ sysDark: this._mq.matches });
+    this.setState({ sysDark: this._mq.matches });
+    this._mq.addEventListener('change', this._onMq);
+  }
+  componentWillUnmount() {
+    if (this._mq) this._mq.removeEventListener('change', this._onMq);
+  }
+  frame(p, opts) {
+    var o = opts || {};
+    var who = o.who || p.role || 'Owner';
+    var env = p.environment || 'Production';
+    var mode = this.state.theme || p.defaultTheme || 'system';
+    var themeNames = { system: 'System', light: 'Day', dark: 'Night' };
+    var themeNext = { system: 'light', light: 'dark', dark: 'system' };
+    var dark = mode === 'dark' || (mode === 'system' && this.state.sysDark);
+    var members = { Owner: ['Asha Rao', 'asha@example.com', 'AR'], Admin: ['Rohan Iyer', 'rohan@example.com', 'RI'], Support: ['Kiran Das', 'kiran@example.com', 'KD'], Viewer: ['Meera Nair', 'meera@example.com', 'MN'] };
+    var access = {
+      Owner: ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13', '14'],
+      Admin: ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '14'],
+      Support: ['01', '06', '09', '10'],
+      Viewer: ['01', '02', '03']
+    };
+    var allGroups = [
+      { legend: 'Operate', items: [['01', 'Overview'], ['02', 'Sources & usage'], ['03', 'Status & incidents'], ['04', 'Abuse & limits'], ['05', 'Alerts']] },
+      { legend: 'People', items: [['06', 'Leads'], ['07', 'Announcements'], ['08', 'Accounts']] },
+      { legend: 'Queues', items: [['09', 'Privacy requests', '3'], ['10', 'Wrong-status reports', '5']] },
+      { legend: 'Configure', items: [['11', 'Switches & settings'], ['12', 'Provider keys'], ['13', 'Team']] },
+      { legend: 'Record', items: [['14', 'Audit log']] }
+    ];
+    var allowed = access[who] || access.Owner;
+    var phone = !!o.phone;
+    var rowBase = phone ? 'display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 16px 0 20px; text-decoration: none; ' : 'display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 16px 0 22px; text-decoration: none; ';
+    var rowOn = 'color: var(--accent-text); background: color-mix(in oklab, var(--accent) 16%, transparent); box-shadow: inset 2px 0 0 var(--accent);';
+    var current = o.current || '';
+    var groups = allGroups.map(function (g) {
+      return {
+        legend: g.legend,
+        items: g.items.filter(function (i) { return allowed.indexOf(i[0]) !== -1; }).map(function (i) {
+          var on = i[0] === current;
+          return { num: i[0], label: i[1], count: i[2] || '', hasCount: !!i[2], aria: on ? 'page' : 'false', rowStyle: rowBase + (on ? rowOn : 'color: var(--ink-2);') };
+        })
+      };
+    }).filter(function (g) { return g.items.length > 0; });
+    var m = members[who] || members.Owner;
+    var notice = o.notice !== undefined ? o.notice : (p.notice || 'None');
+    var signedOut = !!o.signedOut;
+    return {
+      face: dark ? 'night' : 'day',
+      modeSystem: mode === 'system', modeDay: mode === 'light', modeNight: mode === 'dark',
+      themeLabel: 'Theme: ' + themeNames[mode] + '. Switch to ' + themeNames[themeNext[mode]],
+      cycleTheme: () => this.setState({ theme: themeNext[mode] }),
+      isProd: env !== 'Preview', isPreview: env === 'Preview', envWord: env === 'Preview' ? 'staging' : 'production',
+      who: who, role: who, memberName: m[0], memberEmail: m[1], initials: m[2],
+      memberLabel: m[0] + ', ' + who + '. Open the member menu',
+      showMember: !signedOut, groups: groups,
+      noticePaused: !signedOut && notice === 'Checks paused', noticeSite: !signedOut && notice === 'Site notice',
+      pausedSince: o.pausedSince || '14:02', pausedBy: who === 'Viewer' ? 'an Owner' : (o.pausedBy || 'Asha Rao'),
+      canResume: who === 'Owner' || who === 'Admin',
+      menuOpen: !signedOut && p.menu === 'Open' && !o.overlay,
+      drawerOpen: !signedOut && p.drawer === 'Open' && !o.overlay,
+      toastShown: !!o.toast, toastText: o.toast || ''
+    };
+  }
+  renderVals() {
+    var p = this.props;
+    var who = p.role || 'Owner';
+    var svc = p.service || 'Normal';
+    var st = p.state || 'Ready';
+    var paused = svc === 'Checks paused';
+    var fr = this.frame(p, { phone: true, current: '01', notice: paused ? 'Checks paused' : (p.notice || 'None') });
+    var rowStyle = function (i) { return 'display: flex; align-items: flex-start; gap: 12px; padding: 10px 16px;' + (i === 0 ? '' : ' border-top: 1px solid var(--line);'); };
+    var rows = [
+      paused ? ['lamp hollow', 'PNR checks', 'Paused', 'since 14:02 IST', ''] : svc === 'Budget reached' ? ['lamp half', 'PNR checks', 'Degraded', 'since 13:48 IST', "Today's live-check budget is used; answering from recent results"] : ['lamp lit', 'PNR checks', 'Answering', 'since 09:12 IST', ''],
+      svc === 'RailKit down' ? ['lamp ringed', 'RailKit (primary)', 'Down', 'since 14:11 IST', 'Breaker open until 14:41 IST'] : ['lamp lit', 'RailKit (primary)', 'Answering', 'since 09:12 IST', ''],
+      svc === 'RailKit down' ? ['lamp lit', 'RapidAPI (fallback)', 'Answering', 'since 14:11 IST', ''] : ['lamp hollow', 'RapidAPI (fallback)', 'Standby', 'since 09:12 IST', ''],
+      ['lamp lit', 'Shared store', 'Connected', 'since 09:12 IST', ''],
+      ['lamp lit', 'Accounts', 'Connected', 'since 09:12 IST', ''],
+      ['lamp lit', 'Email', 'Sending', '37 of 100 today', ''],
+      ['lamp lit', 'Status probe', 'Operational', 'last run 14:30 IST', '']
+    ].map(function (r, i) { return { lampClass: r[0], name: r[1], word: r[2], since: r[3], note: r[4], hasNote: !!r[4], rowStyle: rowStyle(i) }; });
+    var budget = svc === 'Budget reached';
+    var first = st === 'First run';
+    var c = first ? { checks: '0', cache: '0', live: '0', unavailable: '0', railkit: '0', budgetPct: '0%' }
+      : budget ? { checks: '412', cache: '108', live: '300', unavailable: '4', railkit: '298', budgetPct: '100%' }
+      : { checks: '212', cache: '51', live: '157', unavailable: '4', railkit: '155', budgetPct: '52.3%' };
+    var q = first ? { railkit: '0', railkitPct: '0%', rapid: '0', rapidPct: '0%' } : { railkit: budget ? '3,555' : '3,412', railkitPct: budget ? '35.6%' : '34.1%', rapid: '3', rapidPct: '30%' };
+    var pp = first ? { accounts: '0', subscribers: '0', pending: '0', unsubscribed: '0', newToday: 'Accounts: 0 new today.' } : { accounts: '1,204', subscribers: '406', pending: '37', unsubscribed: '4', newToday: 'Accounts: 18 new today.' };
+    var recent = [
+      ['14:02', 'Asha Rao', 'Paused PNR checks'],
+      ['13:58', 'Asha Rao', 'Signed in'],
+      ['13:41', 'Kiran Das', 'Revealed an email'],
+      ['13:40', 'Kiran Das', 'Looked up an email'],
+      ['12:15', 'Rohan Iyer', 'Changed a switch'],
+      ['11:50', 'Rohan Iyer', 'Key tap failed']
+    ].slice(paused ? 0 : 1, paused ? 5 : 6).map(function (r, i) { return { time: r[0], member: r[1], action: r[2], phoneStyle: 'display: flex; flex-direction: column; gap: 2px; padding: 10px 16px;' + (i === 0 ? '' : ' border-top: 1px solid var(--line);') }; });
+    var manager = who === 'Owner' || who === 'Admin';
+    return Object.assign(fr, {
+      service: rows, c: c, q: q, pp: pp, recent: recent,
+      isLoading: st === 'Loading', notLoading: st !== 'Loading',
+      storeDown: st === 'Plate unavailable', countsShown: st === 'Ready', quotaShown: st !== 'Plate unavailable', firstRun: first,
+      showUrgent: manager, pauseLabel: paused ? 'Resume PNR checks' : 'Pause PNR checks',
+      showQueues: who !== 'Viewer', showInvites: who === 'Owner',
+      incidentOpen: (p.incident || 'Open') === 'Open', incidentNone: p.incident === 'None',
+      incidentBy: who === 'Viewer' ? 'an Admin' : 'Rohan Iyer', canPostUpdate: manager,
+      showRecent: manager,
+      showMeta: st !== 'Loading'
+    });
+  }
+}
+</script>
+</body>
+</html>

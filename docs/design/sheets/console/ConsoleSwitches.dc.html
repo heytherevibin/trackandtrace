@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Console switches and settings</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="industry.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&amp;family=Barlow+Condensed:wght@500;600&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="face" data-face="{{face}}" style="width: 1440px; height: 1780px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--surface-0); color: var(--ink-1); font-family: var(--body);">
+<sc-if value="{{isProd}}" hint-placeholder-val="{{ true }}">
+<div style="height: 28px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 24px; border-bottom: 1px solid var(--line);">
+<span class="tag tag-filled tag-caps">Production</span>
+<span class="legend">admin.trakline.in</span>
+</div>
+</sc-if>
+<sc-if value="{{isPreview}}" hint-placeholder-val="{{ false }}">
+<div style="height: 28px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 24px; border-bottom: 1px dashed var(--line-strong);">
+<span class="tag tag-outline tag-caps">Preview</span>
+<span class="legend">Staging data · trakline-git-console-trakline.vercel.app</span>
+</div>
+</sc-if>
+<header style="height: 56px; flex: none; display: flex; align-items: center; gap: 12px; padding: 0 24px; border-bottom: 1px solid var(--line);">
+<a href="#" aria-label="Trakline console, Overview" style="display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink-1);">
+<svg width="24" height="24" viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="6" fill="#1a1a1c" stroke="#55555b"></rect><rect x="6" y="8" width="5" height="16" rx="1.5" fill="#ff3b30"></rect><rect x="13" y="8" width="5" height="16" rx="1.5" fill="#ff9a00"></rect><rect x="20" y="8" width="5" height="16" rx="1.5" fill="#ffe100"></rect><circle cx="27.5" cy="16" r="1.75" fill="#ff3b30"></circle></svg>
+<span style="font-family: var(--display); font-weight: 600; font-size: 18px; line-height: 24px; letter-spacing: 0.06em; text-transform: uppercase;">Trakline</span>
+</a>
+<span class="tag tag-outline tag-caps">Console</span>
+<div style="flex-grow: 1;"></div>
+<div style="display: flex; align-items: center; gap: 8px;">
+<sc-if value="{{showMember}}" hint-placeholder-val="{{ true }}">
+<span style="display: inline-flex; align-items: baseline; gap: 8px; padding: 0 8px;"><span class="fig" style="font-size: 15px; letter-spacing: 0.06em;">14:32</span><span class="legend-sm">IST</span></span>
+</sc-if>
+<button type="button" class="box box-icon" aria-label="{{themeLabel}}" title="{{themeLabel}}" onClick="{{cycleTheme}}">
+<sc-if value="{{modeSystem}}" hint-placeholder-val="{{ true }}">
+<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.25" fill="none" stroke="currentColor" stroke-width="1.5"></circle><path d="M10 2.75a7.25 7.25 0 0 1 0 14.5Z" fill="currentColor"></path></svg>
+</sc-if>
+<sc-if value="{{modeDay}}" hint-placeholder-val="{{ false }}">
+<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="4" fill="currentColor"></circle><path d="M10 1.5v2M10 16.5v2M1.5 10h2M16.5 10h2M4 4l1.4 1.4M14.6 14.6 16 16M4 16l1.4-1.4M14.6 5.4 16 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg>
+</sc-if>
+<sc-if value="{{modeNight}}" hint-placeholder-val="{{ false }}">
+<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M8.5 2.2a7.8 7.8 0 1 0 9.3 9.3A6.3 6.3 0 1 1 8.5 2.2Z"></path></svg>
+</sc-if>
+</button>
+<sc-if value="{{showMember}}" hint-placeholder-val="{{ true }}">
+<button type="button" class="box" aria-haspopup="menu" aria-expanded="{{menuOpen}}" aria-label="{{memberLabel}}" style="gap: 10px; padding: 0 10px 0 1px;">
+<span class="avatar">{{initials}}</span>
+<span class="tag tag-outline tag-caps">{{role}}</span>
+<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5"></path></svg>
+</button>
+</sc-if>
+</div>
+</header>
+<sc-if value="{{noticePaused}}" hint-placeholder-val="{{ false }}">
+<div role="status" style="height: 44px; flex: none; display: flex; align-items: center; gap: 12px; padding: 0 24px; border-bottom: 1px solid var(--line); background: var(--accent-wash);">
+<span class="lamp hollow"></span>
+<span style="font-size: 14px; line-height: 20px;"><strong style="font-weight: 600;">PNR checks are paused</strong> · since {{pausedSince}} IST · by {{pausedBy}}</span>
+<div style="flex-grow: 1;"></div>
+<sc-if value="{{canResume}}" hint-placeholder-val="{{ true }}">
+<button type="button" class="btn btn-secondary btn-sm">Resume</button>
+</sc-if>
+</div>
+</sc-if>
+<sc-if value="{{noticeSite}}" hint-placeholder-val="{{ false }}">
+<div role="status" style="height: 44px; flex: none; display: flex; align-items: center; gap: 12px; padding: 0 24px; border-bottom: 1px solid var(--line); background: var(--accent-wash);">
+<span class="lamp lit"></span>
+<span style="font-size: 14px; line-height: 20px;"><strong style="font-weight: 600;">Site notice is on:</strong> Planned maintenance on 21 Sep, 02:00–03:00 IST. Checks may be slow.</span>
+</div>
+</sc-if>
+<div style="flex-grow: 1; display: flex; min-height: 0;">
+<nav aria-label="Console" style="width: 240px; flex: none; display: flex; flex-direction: column; border-right: 1px solid var(--line); padding: 20px 0 16px;">
+<sc-for list="{{groups}}" as="g" hint-placeholder-count="5">
+<div style="display: flex; flex-direction: column; padding: 0 0 14px;">
+<span class="legend" style="padding: 0 24px 6px;">{{g.legend}}</span>
+<sc-for list="{{g.items}}" as="it" hint-placeholder-count="3">
+<a href="#" aria-current="{{it.aria}}" style="{{it.rowStyle}}">
+<span class="fig" style="width: 22px; font-size: 13px; letter-spacing: 0.04em; color: var(--ink-3);">{{it.num}}</span>
+<span style="flex-grow: 1; font-size: 14px;">{{it.label}}</span>
+<sc-if value="{{it.hasCount}}" hint-placeholder-val="{{ false }}">
+<span class="fig" style="min-width: 22px; height: 20px; padding: 0 6px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--line-strong); font-size: 12px; color: var(--ink-1);">{{it.count}}</span>
+</sc-if>
+</a>
+</sc-for>
+</div>
+</sc-for>
+<div style="flex-grow: 1;"></div>
+<span class="legend-sm" style="padding: 0 24px;">Build 42c5317 · 19 Sep 2026</span>
+</nav>
+<main style="flex-grow: 1; min-width: 0; padding: 32px 40px; display: flex; flex-direction: column; gap: 28px;">
+<div class="ph">
+<div class="ph-main">
+<p class="kicker">11 · Switches & settings</p>
+<h1 class="ph-title">Switches & settings</h1>
+<p class="ph-lead">What travellers get, changed here and recorded in the audit log.</p>
+<sc-if value="{{showMeta}}" hint-placeholder-val="{{ true }}">
+<p class="legend ph-meta" style="margin-bottom: 0;">Updated 14:32 IST · Sample data</p>
+</sc-if>
+</div>
+
+</div>
+<sc-if value="{{hasAccess}}" hint-placeholder-val="{{ true }}"><div style="display: flex; flex-direction: column; gap: 28px;"><section class="plate" aria-labelledby="sw-switches">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+<div class="tb"><h2 class="cell title" id="sw-switches" style="margin: 0;">Switches</h2><span class="cell">Sample data</span></div>
+<sc-if value="{{saving}}" hint-placeholder-val="{{ false }}"><div class="sweep" role="progressbar" aria-label="Saving"><i></i></div></sc-if>
+<sc-if value="{{failed}}" hint-placeholder-val="{{ false }}">
+<div role="alert" style="display: flex; align-items: flex-start; gap: 10px; padding: 12px 20px; border-bottom: 1px solid var(--line);"><span class="lamp ringed" style="margin-top: 5px;"></span><span style="font-size: 14px; line-height: 20px;">Not saved: the change didn't reach the store. Nothing changed.</span></div>
+</sc-if>
+<div style="display: flex; align-items: flex-start; gap: 32px; padding: 16px 20px;">
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px;">
+<span style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;"><span style="font-size: 15px; line-height: 22px; font-weight: 500;">PNR checks</span><span class="tag tag-outline">{{pnrTag}}</span></span>
+<span style="font-size: 14px; line-height: 21px; color: var(--ink-2);">{{pnrEffect}}</span>
+<span class="legend-sm">{{pnrChanged}}</span>
+<sc-if value="{{checksPaused}}" hint-placeholder-val="{{ false }}">
+<div style="margin-top: 8px; display: flex; flex-direction: column; gap: 6px; max-width: 560px; padding: 12px 14px; border: 1px solid var(--line); background: var(--surface-1);">
+<span class="label" style="margin: 0;">Message to travellers</span>
+<span style="font-size: 14px; line-height: 21px;">Checks are paused for maintenance. Back by 15:00 IST.</span>
+<span style="margin-top: 4px;"><button type="button" class="btn btn-secondary btn-sm">Edit message</button></span>
+</div>
+</sc-if>
+</div>
+<div style="flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 6px;"><div class="tabs" role="group" aria-label="PNR checks"><button type="button" class="tab" aria-pressed="{{pnrOnP}}">On</button><button type="button" class="tab" aria-pressed="{{pnrPausedP}}">Paused</button></div></div>
+
+</div>
+<div style="display: flex; align-items: flex-start; gap: 32px; padding: 16px 20px; border-top: 1px solid var(--line);">
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px;">
+<span style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;"><span style="font-size: 15px; line-height: 22px; font-weight: 500;">Primary source</span><span class="tag tag-outline">RailKit</span></span>
+<span style="font-size: 14px; line-height: 21px; color: var(--ink-2);">Where every live check goes first.</span>
+<span class="legend-sm">Last changed 18 Sep 2026, 21:10 IST by Asha Rao</span>
+
+</div>
+<div style="flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 6px;"><div class="tabs" role="group" aria-label="Primary source"><button type="button" class="tab" aria-pressed="true">RailKit</button><button type="button" class="tab" aria-pressed="false" disabled="{{rapidMissing}}">RapidAPI</button></div>
+<span class="legend-sm">{{rapidQuota}}</span></div>
+
+</div>
+<div style="display: flex; align-items: flex-start; gap: 32px; padding: 16px 20px; border-top: 1px solid var(--line);">
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px;">
+<span style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;"><span style="font-size: 15px; line-height: 22px; font-weight: 500;">Fallback source</span><span class="tag tag-outline">{{fallbackTag}}</span></span>
+<span style="font-size: 14px; line-height: 21px; color: var(--ink-2);">When the primary can't answer, ask the other source.</span>
+<span class="legend-sm">Last changed 18 Sep 2026, 21:10 IST by Asha Rao</span>
+
+</div>
+<div style="flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 6px;"><sc-if value="{{rapidConfigured}}" hint-placeholder-val="{{ true }}"><div class="tabs" role="group" aria-label="Fallback source"><button type="button" class="tab" aria-pressed="true">On</button><button type="button" class="tab" aria-pressed="false">Off</button></div></sc-if>
+<sc-if value="{{rapidMissing}}" hint-placeholder-val="{{ false }}"><div class="tabs" role="group" aria-label="Fallback source"><button type="button" class="tab" aria-pressed="false" disabled="true">Not configured</button></div></sc-if></div>
+
+</div>
+<div style="display: flex; align-items: flex-start; gap: 32px; padding: 16px 20px; border-top: 1px solid var(--line);">
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px;">
+<span style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;"><span style="font-size: 15px; line-height: 22px; font-weight: 500;">New traveller accounts</span><span class="tag tag-outline">Open</span></span>
+<span style="font-size: 14px; line-height: 21px; color: var(--ink-2);">Closed: existing accounts still sign in, and new addresses get no link. Console invites aren't affected.</span>
+<span class="legend-sm">Last changed 2 Sep 2026, 10:00 IST by Asha Rao</span>
+
+</div>
+<div style="flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 6px;"><div class="tabs" role="group" aria-label="New traveller accounts"><button type="button" class="tab" aria-pressed="true">Open</button><button type="button" class="tab" aria-pressed="false">Closed</button></div></div>
+
+</div>
+<div style="display: flex; align-items: flex-start; gap: 32px; padding: 16px 20px; border-top: 1px solid var(--line);">
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px;">
+<span style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;"><span style="font-size: 15px; line-height: 22px; font-weight: 500;">Traveller passkey sign-in</span><span class="tag tag-outline">On</span></span>
+<span style="font-size: 14px; line-height: 21px; color: var(--ink-2);">Console keys aren't affected.</span>
+<span class="legend-sm">Last changed 16 Sep 2026, 11:30 IST by Asha Rao</span>
+
+</div>
+<div style="flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 6px;"><div class="tabs" role="group" aria-label="Traveller passkey sign-in"><button type="button" class="tab" aria-pressed="true">On</button><button type="button" class="tab" aria-pressed="false">Off</button></div></div>
+
+</div>
+<div style="display: flex; align-items: flex-start; gap: 32px; padding: 16px 20px; border-top: 1px solid var(--line);">
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px;">
+<span style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;"><span style="font-size: 15px; line-height: 22px; font-weight: 500;">Site notice</span><span class="tag tag-outline">Off</span></span>
+<span style="font-size: 14px; line-height: 21px; color: var(--ink-2);">A strip under the masthead on every page, until the traveller closes it.</span>
+<span class="legend-sm">Last changed 19 Sep 2026, 12:15 IST by Rohan Iyer</span>
+<div style="margin-top: 10px; max-width: 720px; display: flex; flex-direction: column; gap: 14px;">
+<div><label class="label" for="sw-notice">Notice text</label><textarea id="sw-notice" class="well" rows="2" style="resize: none;">Planned maintenance on 21 Sep, 02:00–03:00 IST. Checks may be slow.</textarea><div class="hint">Up to 160 characters.</div></div>
+<div><span class="label">Preview</span><div role="img" aria-label="Preview of the strip travellers see: Planned maintenance on 21 Sep, 02:00–03:00 IST. Checks may be slow." style="display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid var(--line); background: var(--surface-0);"><span class="lamp lit"></span><span style="flex-grow: 1; font-size: 14px; line-height: 20px;">Planned maintenance on 21 Sep, 02:00–03:00 IST. Checks may be slow.</span><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" style="flex: none; color: var(--ink-3);"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9"></path></svg></div></div>
+</div>
+</div>
+<div style="flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 6px;"><div class="tabs" role="group" aria-label="Site notice"><button type="button" class="tab" aria-pressed="true">Off</button><button type="button" class="tab" aria-pressed="false">On</button></div></div>
+
+</div>
+</section><div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; align-items: start;"><section class="plate" aria-labelledby="sw-limits">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+<div class="tb"><h2 class="cell title" id="sw-limits" style="margin: 0;">Limits</h2><span class="cell">Sample data</span></div>
+<div style="display: flex; align-items: flex-end; gap: 16px; padding: 16px 20px;">
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px;">
+<label class="label" for="sw-per-address" style="margin: 0;">Checks per address</label><span style="display: flex; align-items: center; gap: 10px;"><input id="sw-per-address" class="well fig" value="20" inputmode="numeric" style="width: 88px; font-size: 16px;"><span style="font-size: 14px; color: var(--ink-2);">per minute</span></span>
+
+<span class="hint" style="margin: 0;">Every address, shared across servers. IPv6 is limited per /64 network. 5 to 60.</span>
+<span class="legend-sm">Last changed 2 Sep 2026, 10:00 IST by Asha Rao</span>
+</div>
+<button type="button" class="btn btn-secondary" disabled="true">Save</button>
+</div>
+<div style="display: flex; align-items: flex-end; gap: 16px; padding: 16px 20px; border-top: 1px solid var(--line);">
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px;">
+<label class="label" for="sw-per-day" style="margin: 0;">Live checks per day</label><span style="display: flex; align-items: center; gap: 10px;"><input id="sw-per-day" class="well fig" value="300" inputmode="numeric" style="width: 88px; font-size: 16px;"><span style="font-size: 14px; color: var(--ink-2);">across all addresses</span></span>
+<div style="margin-top: 6px; display: flex; flex-direction: column; gap: 6px;"><span class="legend">157 used today</span><div class="meter" role="img" aria-label="Live checks: 157 of 300 used today"><i style="width: 52.3%;"></i></div></div>
+<span class="hint" style="margin: 0;">Past this, checks answer from recent results, or say the service is busy until 00:00 IST.</span>
+<span class="legend-sm">Last changed 18 Sep 2026, 21:10 IST by Asha Rao</span>
+</div>
+<button type="button" class="btn btn-secondary" disabled="true">Save</button>
+</div>
+</section><section class="plate" aria-labelledby="sw-recent">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+<div class="tb"><h2 class="cell title" id="sw-recent" style="margin: 0;">Recent changes</h2><span class="cell">Last five</span><span class="cell">Sample data</span></div>
+<table class="dt"><caption style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0);">The last five changes to switches and limits</caption><thead><tr><th scope="col" style="width: 132px;">Time</th><th scope="col" style="width: 118px;">Member</th><th scope="col">Change</th></tr></thead><tbody>
+<sc-for list="{{recent}}" as="r" hint-placeholder-count="5"><tr><td class="tnum">{{r.time}}</td><td>{{r.member}}</td><td>{{r.change}}</td></tr></sc-for>
+</tbody></table>
+<div style="padding: 10px 14px;"><a href="#" style="font-family: var(--display); font-weight: 600; font-size: 13px; letter-spacing: 0.04em; text-decoration: none;">Open audit log →</a></div>
+</section></div></div></sc-if>
+<sc-if value="{{noAccess}}" hint-placeholder-val="{{ false }}"><section class="plate state" style="max-width: 720px;"><i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i><h2 class="state-title">This module isn't part of the Support role.</h2><p class="state-detail">Ask an Owner if you need it.</p><div class="state-actions"><a href="#" class="btn btn-secondary">Back to Overview</a></div></section></sc-if>
+</main>
+</div>
+<sc-if value="{{menuOpen}}" hint-placeholder-val="{{ false }}">
+<div role="menu" aria-label="Member" class="menu" style="right: 24px; top: 88px; width: 260px;">
+<div style="padding: 8px 12px; display: flex; flex-direction: column;">
+<span style="font-size: 14px; line-height: 21px; font-weight: 500;">{{memberName}}</span>
+<span style="font-size: 13px; line-height: 20px; color: var(--ink-3);">{{memberEmail}}</span>
+<span style="margin-top: 8px;"><span class="tag tag-outline tag-caps">{{role}}</span></span>
+</div>
+<div class="menu-sep" role="separator"></div>
+<a href="#" role="menuitem" class="menu-item">My keys</a>
+<div class="menu-sep" role="separator"></div>
+<a href="#" role="menuitem" class="menu-item"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M6 2.5H3.5v11H6M10 5l3 3-3 3M13 8H6.5"></path></svg>Sign out</a>
+</div>
+</sc-if>
+<sc-if value="{{dlg_pause}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; inset: 0; z-index: 5; background: var(--backdrop); display: flex; align-items: center; justify-content: center; padding: 16px;">
+<section class="plate" role="dialog" aria-modal="true" aria-labelledby="pause" style="width: 480px; background: var(--surface-3); box-shadow: var(--elevation-3);">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+<div class="tb"><h2 class="cell title" id="pause" style="margin: 0;">Confirm it's you</h2><span class="cell">Form TC-01</span><span class="act"><button type="button" class="box box-icon box-bare box-sm" aria-label="Close"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9"></path></svg></button></span></div>
+<div style="padding: 20px; display: flex; flex-direction: column; gap: 18px;">
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<span style="font-size: 17px; line-height: 26px; font-weight: 500;">Pause PNR checks on {{envWord}}</span>
+<span style="display: flex; align-items: baseline; gap: 10px;"><span class="legend">Change</span><span class="fig" style="font-size: 15px; letter-spacing: 0.02em;">PNR checks: On → Paused</span></span>
+
+</div>
+<div>
+<label class="label" for="pause-message">Message to travellers</label>
+<textarea id="pause-message" class="well" rows="2" style="resize: none;">Checks are paused for maintenance. Back by 15:00 IST.</textarea>
+<div class="hint">Shown on the check plate and the result page. Up to 120 characters.</div>
+</div>
+<div>
+<label class="label" for="pause-reason">Reason</label>
+<textarea id="pause-reason" class="well" rows="3" style="resize: none;">Provider maintenance window, 14:00–15:00 IST.</textarea>
+<div class="hint">Don't include PNRs, emails or IP addresses; they're removed. 10–200 characters.</div>
+</div>
+</div>
+<div style="display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--line);">
+<button type="button" class="btn btn-secondary">Cancel</button>
+<button type="button" class="btn btn-primary">Tap your key</button>
+</div>
+</section>
+</div>
+</sc-if>
+<sc-if value="{{dlg_source}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; inset: 0; z-index: 5; background: var(--backdrop); display: flex; align-items: center; justify-content: center; padding: 16px;">
+<section class="plate" role="dialog" aria-modal="true" aria-labelledby="source" style="width: 480px; background: var(--surface-3); box-shadow: var(--elevation-3);">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+<div class="tb"><h2 class="cell title" id="source" style="margin: 0;">Confirm it's you</h2><span class="cell">Form TC-01</span><span class="act"><button type="button" class="box box-icon box-bare box-sm" aria-label="Close"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9"></path></svg></button></span></div>
+<div style="padding: 20px; display: flex; flex-direction: column; gap: 18px;">
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<span style="font-size: 17px; line-height: 26px; font-weight: 500;">Change the primary source on {{envWord}}</span>
+<span style="display: flex; align-items: baseline; gap: 10px;"><span class="legend">Change</span><span class="fig" style="font-size: 15px; letter-spacing: 0.02em;">Primary source: RailKit → RapidAPI</span></span>
+
+</div>
+<p class="alert" role="note" style="margin: 0;">Low quota: RapidAPI has 7 of 10 checks left this month. When they run out, checks go to RailKit.</p>
+<div>
+<label class="label" for="source-reason">Reason</label>
+<textarea id="source-reason" class="well" rows="3" style="resize: none;">RailKit maintenance tonight, 23:00–01:00 IST.</textarea>
+<div class="hint">Don't include PNRs, emails or IP addresses; they're removed. 10–200 characters.</div>
+</div>
+</div>
+<div style="display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--line);">
+<button type="button" class="btn btn-secondary">Cancel</button>
+<button type="button" class="btn btn-primary">Tap your key</button>
+</div>
+</section>
+</div>
+</sc-if>
+<sc-if value="{{toastShown}}" hint-placeholder-val="{{ false }}">
+<div role="status" class="toast" style="position: absolute; z-index: 6; left: 542px; bottom: 16px; width: 356px;">{{toastText}}</div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"role":{"editor":"enum","options":["Owner","Admin"],"default":"Owner","section":"State"},"environment":{"editor":"enum","options":["Production","Preview"],"default":"Production","section":"State"},"state":{"editor":"enum","options":["Ready","Confirm: pause","Saving","Saved","Failed","Checks paused","Source not configured","Confirm: primary source","No access (Support)"],"default":"Ready","section":"State"},"defaultTheme":{"editor":"enum","options":["system","light","dark"],"default":"system","section":"Appearance"},"$preview":{"width":1440,"height":1780}}'>
+class Component extends DCLogic {
+  state = { theme: null, sysDark: false };
+  componentDidMount() {
+    this._mq = window.matchMedia('(prefers-color-scheme: dark)');
+    this._onMq = () => this.setState({ sysDark: this._mq.matches });
+    this.setState({ sysDark: this._mq.matches });
+    this._mq.addEventListener('change', this._onMq);
+  }
+  componentWillUnmount() {
+    if (this._mq) this._mq.removeEventListener('change', this._onMq);
+  }
+  frame(p, opts) {
+    var o = opts || {};
+    var who = o.who || p.role || 'Owner';
+    var env = p.environment || 'Production';
+    var mode = this.state.theme || p.defaultTheme || 'system';
+    var themeNames = { system: 'System', light: 'Day', dark: 'Night' };
+    var themeNext = { system: 'light', light: 'dark', dark: 'system' };
+    var dark = mode === 'dark' || (mode === 'system' && this.state.sysDark);
+    var members = { Owner: ['Asha Rao', 'asha@example.com', 'AR'], Admin: ['Rohan Iyer', 'rohan@example.com', 'RI'], Support: ['Kiran Das', 'kiran@example.com', 'KD'], Viewer: ['Meera Nair', 'meera@example.com', 'MN'] };
+    var access = {
+      Owner: ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13', '14'],
+      Admin: ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '14'],
+      Support: ['01', '06', '09', '10'],
+      Viewer: ['01', '02', '03']
+    };
+    var allGroups = [
+      { legend: 'Operate', items: [['01', 'Overview'], ['02', 'Sources & usage'], ['03', 'Status & incidents'], ['04', 'Abuse & limits'], ['05', 'Alerts']] },
+      { legend: 'People', items: [['06', 'Leads'], ['07', 'Announcements'], ['08', 'Accounts']] },
+      { legend: 'Queues', items: [['09', 'Privacy requests', '3'], ['10', 'Wrong-status reports', '5']] },
+      { legend: 'Configure', items: [['11', 'Switches & settings'], ['12', 'Provider keys'], ['13', 'Team']] },
+      { legend: 'Record', items: [['14', 'Audit log']] }
+    ];
+    var allowed = access[who] || access.Owner;
+    var phone = !!o.phone;
+    var rowBase = phone ? 'display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 16px 0 20px; text-decoration: none; ' : 'display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 16px 0 22px; text-decoration: none; ';
+    var rowOn = 'color: var(--accent-text); background: color-mix(in oklab, var(--accent) 16%, transparent); box-shadow: inset 2px 0 0 var(--accent);';
+    var current = o.current || '';
+    var groups = allGroups.map(function (g) {
+      return {
+        legend: g.legend,
+        items: g.items.filter(function (i) { return allowed.indexOf(i[0]) !== -1; }).map(function (i) {
+          var on = i[0] === current;
+          return { num: i[0], label: i[1], count: i[2] || '', hasCount: !!i[2], aria: on ? 'page' : 'false', rowStyle: rowBase + (on ? rowOn : 'color: var(--ink-2);') };
+        })
+      };
+    }).filter(function (g) { return g.items.length > 0; });
+    var m = members[who] || members.Owner;
+    var notice = o.notice !== undefined ? o.notice : (p.notice || 'None');
+    var signedOut = !!o.signedOut;
+    return {
+      face: dark ? 'night' : 'day',
+      modeSystem: mode === 'system', modeDay: mode === 'light', modeNight: mode === 'dark',
+      themeLabel: 'Theme: ' + themeNames[mode] + '. Switch to ' + themeNames[themeNext[mode]],
+      cycleTheme: () => this.setState({ theme: themeNext[mode] }),
+      isProd: env !== 'Preview', isPreview: env === 'Preview', envWord: env === 'Preview' ? 'staging' : 'production',
+      who: who, role: who, memberName: m[0], memberEmail: m[1], initials: m[2],
+      memberLabel: m[0] + ', ' + who + '. Open the member menu',
+      showMember: !signedOut, groups: groups,
+      noticePaused: !signedOut && notice === 'Checks paused', noticeSite: !signedOut && notice === 'Site notice',
+      pausedSince: o.pausedSince || '14:02', pausedBy: who === 'Viewer' ? 'an Owner' : (o.pausedBy || 'Asha Rao'),
+      canResume: who === 'Owner' || who === 'Admin',
+      menuOpen: !signedOut && p.menu === 'Open' && !o.overlay,
+      drawerOpen: !signedOut && p.drawer === 'Open' && !o.overlay,
+      toastShown: !!o.toast, toastText: o.toast || ''
+    };
+  }
+  renderVals() {
+    var p = this.props;
+    var st = p.state || 'Ready';
+    var noAccess = st === 'No access (Support)';
+    var who = noAccess ? 'Support' : (p.role || 'Owner');
+    // Checks paused: Asha paused them at 14:02 (as on Overview). Saved: this member paused them just now, at 14:32.
+    var justNow = st === 'Saved';
+    var paused = st === 'Checks paused' || justNow;
+    var overlay = st === 'Confirm: pause' || st === 'Confirm: primary source';
+    var fr = this.frame(p, { who: who, phone: false, current: noAccess ? '' : '11', notice: paused ? 'Checks paused' : 'None', pausedSince: justNow ? '14:32' : '14:02', overlay: overlay, toast: justNow ? 'PNR checks paused · logged' : '' });
+    var pausedBy = justNow ? fr.memberName : 'Asha Rao';
+    fr.pausedBy = pausedBy;
+    var missing = st === 'Source not configured';
+    var history = [
+      ['19 Sep, 12:15', 'Rohan Iyer', 'Site notice: On → Off'],
+      ['19 Sep, 09:12', 'Rohan Iyer', 'PNR checks: Paused → On'],
+      ['19 Sep, 01:55', 'Rohan Iyer', 'PNR checks: On → Paused'],
+      ['18 Sep, 22:40', 'Rohan Iyer', 'Site notice: Off → On'],
+      ['18 Sep, 21:10', 'Asha Rao', 'Primary source: RapidAPI → RailKit']
+    ];
+    if (paused) history = [[justNow ? '19 Sep, 14:32' : '19 Sep, 14:02', pausedBy, 'PNR checks: On → Paused']].concat(history.slice(0, 4));
+    var recent = history.map(function (r, i) { return { time: r[0], member: r[1], change: r[2], phoneStyle: 'display: flex; flex-direction: column; gap: 2px; padding: 10px 16px;' + (i === 0 ? '' : ' border-top: 1px solid var(--line);') }; });
+    return Object.assign(fr, {
+      hasAccess: !noAccess, noAccess: noAccess,
+      checksPaused: paused,
+      pnrTag: paused ? 'Paused' : 'On',
+      pnrEffect: paused ? 'Travellers see your message on the check plate and the result page.' : 'Travellers can check PNRs. Pausing asks for a message to travellers.',
+      pnrChanged: paused ? 'Last changed 19 Sep 2026, ' + (justNow ? '14:32' : '14:02') + ' IST by ' + pausedBy : 'Last changed 19 Sep 2026, 09:12 IST by Rohan Iyer',
+      pnrOnP: paused ? 'false' : 'true', pnrPausedP: paused ? 'true' : 'false',
+      saving: st === 'Saving', failed: st === 'Failed',
+      rapidConfigured: !missing, rapidMissing: missing,
+      rapidQuota: missing ? 'RapidAPI: Not configured' : 'RapidAPI: 7 of 10 left this month',
+      fallbackTag: missing ? 'Off' : 'On',
+      recent: recent,
+      dlg_pause: st === 'Confirm: pause', dlg_source: st === 'Confirm: primary source',
+      showMeta: !noAccess
+    });
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>My keys on a phone</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="industry.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&amp;family=Barlow+Condensed:wght@500;600&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="face" data-face="{{face}}" style="width: 390px; height: 1760px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--surface-0); color: var(--ink-1); font-family: var(--body);">
+<sc-if value="{{isProd}}" hint-placeholder-val="{{ true }}">
+<div style="height: 28px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 16px; border-bottom: 1px solid var(--line);">
+<span class="tag tag-filled tag-caps">Production</span>
+<span class="legend-sm">admin.trakline.in</span>
+</div>
+</sc-if>
+<sc-if value="{{isPreview}}" hint-placeholder-val="{{ false }}">
+<div style="height: 28px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 16px; border-bottom: 1px dashed var(--line-strong);">
+<span class="tag tag-outline tag-caps">Preview</span>
+<span class="legend-sm" style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Staging data · trakline-git-console-trakline.vercel.app</span>
+</div>
+</sc-if>
+<header style="height: 56px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 16px; border-bottom: 1px solid var(--line);">
+<sc-if value="{{showMember}}" hint-placeholder-val="{{ true }}">
+<button type="button" class="box box-icon box-lg" aria-label="Open menu" aria-expanded="{{drawerOpen}}">
+<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 5.5h14M3 10h14M3 14.5h14"></path></svg>
+</button>
+</sc-if>
+<a href="#" aria-label="Trakline console, Overview" style="display: inline-flex; flex: none; align-items: center; justify-content: center; width: 44px; height: 44px;">
+<svg width="24" height="24" viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="6" fill="#1a1a1c" stroke="#55555b"></rect><rect x="6" y="8" width="5" height="16" rx="1.5" fill="#ff3b30"></rect><rect x="13" y="8" width="5" height="16" rx="1.5" fill="#ff9a00"></rect><rect x="20" y="8" width="5" height="16" rx="1.5" fill="#ffe100"></rect><circle cx="27.5" cy="16" r="1.75" fill="#ff3b30"></circle></svg>
+</a>
+<span class="tag tag-outline tag-caps">Console</span>
+<div style="flex-grow: 1;"></div>
+<button type="button" class="box box-icon box-lg" aria-label="{{themeLabel}}" title="{{themeLabel}}" onClick="{{cycleTheme}}">
+<sc-if value="{{modeSystem}}" hint-placeholder-val="{{ true }}">
+<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.25" fill="none" stroke="currentColor" stroke-width="1.5"></circle><path d="M10 2.75a7.25 7.25 0 0 1 0 14.5Z" fill="currentColor"></path></svg>
+</sc-if>
+<sc-if value="{{modeDay}}" hint-placeholder-val="{{ false }}">
+<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="4" fill="currentColor"></circle><path d="M10 1.5v2M10 16.5v2M1.5 10h2M16.5 10h2M4 4l1.4 1.4M14.6 14.6 16 16M4 16l1.4-1.4M14.6 5.4 16 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg>
+</sc-if>
+<sc-if value="{{modeNight}}" hint-placeholder-val="{{ false }}">
+<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M8.5 2.2a7.8 7.8 0 1 0 9.3 9.3A6.3 6.3 0 1 1 8.5 2.2Z"></path></svg>
+</sc-if>
+</button>
+<sc-if value="{{showMember}}" hint-placeholder-val="{{ true }}">
+<button type="button" class="box box-icon box-lg" aria-haspopup="menu" aria-expanded="{{menuOpen}}" aria-label="{{memberLabel}}">
+<span class="avatar">{{initials}}</span>
+</button>
+</sc-if>
+</header>
+<sc-if value="{{noticePaused}}" hint-placeholder-val="{{ false }}">
+<div role="status" style="flex: none; display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--accent-wash);">
+<span class="lamp hollow"></span>
+<span style="flex-grow: 1; font-size: 14px; line-height: 20px;"><strong style="font-weight: 600;">PNR checks are paused</strong><br>since {{pausedSince}} IST · by {{pausedBy}}</span>
+<sc-if value="{{canResume}}" hint-placeholder-val="{{ true }}">
+<button type="button" class="btn btn-secondary btn-lg">Resume</button>
+</sc-if>
+</div>
+</sc-if>
+<sc-if value="{{noticeSite}}" hint-placeholder-val="{{ false }}">
+<div role="status" style="flex: none; display: flex; align-items: flex-start; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--accent-wash);">
+<span class="lamp lit" style="margin-top: 6px;"></span>
+<span style="font-size: 14px; line-height: 20px;"><strong style="font-weight: 600;">Site notice is on:</strong> Planned maintenance on 21 Sep, 02:00–03:00 IST. Checks may be slow.</span>
+</div>
+</sc-if>
+<main style="flex-grow: 1; min-height: 0; padding: 24px 16px 32px; display: flex; flex-direction: column; gap: 24px;">
+<div class="ph">
+<div class="ph-main">
+<p class="kicker">Your account</p>
+<h1 class="ph-title">My keys</h1>
+<p class="ph-lead">The keys you sign in with, and where you're signed in.</p>
+<sc-if value="{{showMeta}}" hint-placeholder-val="{{ true }}">
+<p class="legend ph-meta" style="margin-bottom: 0;">Updated 14:32 IST · Sample data</p>
+</sc-if>
+</div>
+
+</div>
+<sc-if value="{{isReady}}" hint-placeholder-val="{{ true }}"><div style="display: flex; flex-direction: column; gap: 24px;"><section class="plate" aria-labelledby="mk-profile">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+<div class="tb stack"><h2 class="cell title" id="mk-profile" style="margin: 0;">Profile</h2><span class="cell">Sample data</span></div>
+<dl class="kv" style="padding: 4px 16px 8px;">
+<dt class="legend-sm">Name</dt><dd>{{memberName}}</dd>
+<dt class="legend-sm">Email</dt><dd>{{memberEmail}}</dd>
+<dt class="legend-sm">Role</dt><dd><span class="tag tag-outline tag-caps">{{role}}</span></dd>
+<dt class="legend-sm">Member since</dt><dd>{{memberSince}}</dd>
+</dl>
+</section><section class="plate" aria-labelledby="mk-keys">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+<div class="tb stack"><h2 class="cell title" id="mk-keys" style="margin: 0;">Keys</h2><span class="cell">{{keyCount}}</span></div>
+<div style="display: flex; flex-direction: column; gap: 4px; padding: 12px 16px;"><span style="font-size: 15px; line-height: 22px; font-weight: 500;">YubiKey 5C</span><span class="legend-sm">Security key · added 2 Sep 2026 · last used Today, 14:02 IST</span><span style="display: flex; gap: 8px; margin-top: 4px;"><button type="button" class="btn btn-secondary btn-lg">Rename</button><button type="button" class="btn btn-secondary btn-lg" disabled="{{removeDisabled}}">Remove</button></span></div><sc-if value="{{threeKeys}}" hint-placeholder-val="{{ true }}"><div style="display: flex; flex-direction: column; gap: 4px; padding: 12px 16px; border-top: 1px solid var(--line);"><span style="font-size: 15px; line-height: 22px; font-weight: 500;">YubiKey 5 NFC</span><span class="legend-sm">Security key · added 2 Sep 2026 · last used 11 Sep 2026</span><span style="display: flex; gap: 8px; margin-top: 4px;"><button type="button" class="btn btn-secondary btn-lg">Rename</button><button type="button" class="btn btn-secondary btn-lg" disabled="{{removeDisabled}}">Remove</button></span></div></sc-if><div style="display: flex; flex-direction: column; gap: 4px; padding: 12px 16px; border-top: 1px solid var(--line);"><span style="font-size: 15px; line-height: 22px; font-weight: 500;">MacBook Pro</span><span class="legend-sm">Passkey · added 5 Sep 2026 · last used 17 Sep 2026</span><span style="display: flex; gap: 8px; margin-top: 4px;"><button type="button" class="btn btn-secondary btn-lg">Rename</button><button type="button" class="btn btn-secondary btn-lg" disabled="{{removeDisabled}}">Remove</button></span></div>
+<div style="padding: 12px 16px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 12px;">
+<div><button type="button" class="btn btn-primary btn-lg">Add a key</button></div>
+<p class="{{blockedClass}}" style="margin: 0;">You need at least two keys. Add another before removing one.</p>
+<p class="hint" style="margin: 0;">Only keys added here or during setup work for the console.</p>
+<p class="hint" style="margin: 0;">Adding a key starts with a tap of a key you already have.</p>
+</div>
+</section><section class="plate" aria-labelledby="mk-sessions">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+<div class="tb stack"><h2 class="cell title" id="mk-sessions" style="margin: 0;">Sessions</h2><span class="cell">Sample data</span></div>
+<div style="display: flex; align-items: center; gap: 12px; padding: 12px 16px;"><span style="flex-grow: 1; font-size: 14px; line-height: 20px;">Chrome on macOS · signed in 09:12 IST</span><span class="tag tag-filled">This device</span></div>
+<sc-if value="{{othersShown}}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--line);"><span style="flex-grow: 1; font-size: 14px; line-height: 20px;">Safari on iPhone · last seen yesterday, 22:40 IST</span></div>
+<div style="padding: 12px 16px; border-top: 1px solid var(--line);"><button type="button" class="btn btn-secondary btn-lg">Sign out other sessions</button></div>
+</sc-if>
+</section><sc-if value="{{isOwner}}" hint-placeholder-val="{{ true }}">
+<section class="plate" aria-labelledby="mk-lost">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+<div class="tb stack"><h2 class="cell title" id="mk-lost" style="margin: 0;">If you lose your keys</h2></div>
+<p style="margin: 0; padding: 12px 16px; font-size: 14px; line-height: 21px; color: var(--ink-2);">Another Owner can reset them. If you're the only Owner, they're reset in the Supabase dashboard, so keep your keys in different places.</p>
+</section>
+</sc-if></div></sc-if>
+<sc-if value="{{isError}}" hint-placeholder-val="{{ false }}"><section class="plate state" role="alert" style="max-width: 720px;"><i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i><h2 class="state-title">Your keys didn't load</h2><p class="state-detail">The console couldn't reach its database.</p><p class="legend-sm tnum state-ref">Reference 7f3a2c</p><div class="state-actions"><button type="button" class="btn btn-secondary btn-lg">Retry</button></div></section></sc-if>
+</main>
+<sc-if value="{{drawerOpen}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; inset: 0; z-index: 4; background: var(--backdrop);">
+<nav aria-label="Console" style="position: absolute; left: 0; top: 0; bottom: 0; width: 320px; display: flex; flex-direction: column; background: var(--surface-0); border-right: 1px solid var(--line);">
+<div style="height: 56px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 12px 0 20px; border-bottom: 1px solid var(--line);">
+<svg width="24" height="24" viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="6" fill="#1a1a1c" stroke="#55555b"></rect><rect x="6" y="8" width="5" height="16" rx="1.5" fill="#ff3b30"></rect><rect x="13" y="8" width="5" height="16" rx="1.5" fill="#ff9a00"></rect><rect x="20" y="8" width="5" height="16" rx="1.5" fill="#ffe100"></rect><circle cx="27.5" cy="16" r="1.75" fill="#ff3b30"></circle></svg>
+<span style="font-family: var(--display); font-weight: 600; font-size: 18px; line-height: 24px; letter-spacing: 0.06em; text-transform: uppercase;">Trakline</span>
+<span class="tag tag-outline tag-caps">Console</span>
+<div style="flex-grow: 1;"></div>
+<button type="button" class="box box-icon box-lg" aria-label="Close menu">
+<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M5 5l10 10M15 5 5 15"></path></svg>
+</button>
+</div>
+<div style="flex-grow: 1; min-height: 0; overflow-y: auto; padding: 12px 0 4px; display: flex; flex-direction: column;">
+<sc-for list="{{groups}}" as="g" hint-placeholder-count="5">
+<div style="display: flex; flex-direction: column; padding: 0 0 8px;">
+<span class="legend" style="padding: 0 20px 4px;">{{g.legend}}</span>
+<sc-for list="{{g.items}}" as="it" hint-placeholder-count="3">
+<a href="#" aria-current="{{it.aria}}" style="{{it.rowStyle}}">
+<span class="fig" style="width: 22px; font-size: 13px; letter-spacing: 0.04em; color: var(--ink-3);">{{it.num}}</span>
+<span style="flex-grow: 1; font-size: 15px;">{{it.label}}</span>
+<sc-if value="{{it.hasCount}}" hint-placeholder-val="{{ false }}">
+<span class="fig" style="min-width: 22px; height: 20px; padding: 0 6px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--line-strong); font-size: 12px; color: var(--ink-1);">{{it.count}}</span>
+</sc-if>
+</a>
+</sc-for>
+</div>
+</sc-for>
+</div>
+<span class="legend-sm" style="flex: none; padding: 8px 20px; border-top: 1px solid var(--line);">Build 42c5317 · 19 Sep 2026</span>
+</nav>
+</div>
+</sc-if>
+<sc-if value="{{menuOpen}}" hint-placeholder-val="{{ false }}">
+<div role="menu" aria-label="Member" class="menu" style="right: 16px; top: 88px; width: 260px;">
+<div style="padding: 8px 12px; display: flex; flex-direction: column;">
+<span style="font-size: 14px; line-height: 21px; font-weight: 500;">{{memberName}}</span>
+<span style="font-size: 13px; line-height: 20px; color: var(--ink-3);">{{memberEmail}}</span>
+<span style="margin-top: 8px;"><span class="tag tag-outline tag-caps">{{role}}</span></span>
+</div>
+<div class="menu-sep" role="separator"></div>
+<a href="#" role="menuitem" class="menu-item menu-item-lg">My keys</a>
+<div class="menu-sep" role="separator"></div>
+<a href="#" role="menuitem" class="menu-item menu-item-lg"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M6 2.5H3.5v11H6M10 5l3 3-3 3M13 8H6.5"></path></svg>Sign out</a>
+</div>
+</sc-if>
+<sc-if value="{{dlg_add}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; inset: 0; z-index: 5; background: var(--backdrop); display: flex; flex-direction: column; justify-content: flex-end;">
+<section role="dialog" aria-modal="true" aria-labelledby="add-title" style="max-height: 85%; display: flex; flex-direction: column; background: var(--surface-3); border: 1px solid var(--line); border-bottom: 0; box-shadow: var(--elevation-3);">
+<div aria-hidden="true" style="flex: none; display: flex; justify-content: center; padding-top: 8px;"><span style="width: 48px; height: 4px; background: var(--line-strong);"></span></div>
+<div class="tb" style="flex: none;"><h2 class="cell title" id="add-title" style="margin: 0;">Add a key</h2><span class="act" style="padding: 0;"><button type="button" class="box box-icon box-bare box-lg" aria-label="Close"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M5 5l10 10M15 5 5 15"></path></svg></button></span></div>
+<div style="flex: 1; min-height: 0; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 16px;">
+<div><label class="label" for="new-key">Name this key</label><input id="new-key" class="well well-phone" value="YubiKey 5 NFC"></div>
+<div role="status" style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); background: var(--surface-1);"><span class="lamp light"></span><span style="font-size: 14px; line-height: 20px;">1 · Tap one of your keys: waiting…</span></div>
+<div role="status" style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); background: var(--surface-1);"><span class="lamp hollow"></span><span style="font-size: 14px; line-height: 20px;">2 · Then touch the new key</span></div>
+</div>
+<div style="flex: none; display: flex; flex-direction: column; gap: 8px; padding: 12px 20px 16px; border-top: 1px solid var(--line);">
+<button type="button" class="btn btn-primary btn-lg btn-block" disabled="true">Waiting for your key…</button>
+<button type="button" class="btn btn-secondary btn-lg btn-block">Cancel</button>
+</div>
+</section>
+</div>
+</sc-if>
+<sc-if value="{{dlg_remove}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; inset: 0; z-index: 5; background: var(--backdrop); display: flex; flex-direction: column; justify-content: flex-end;">
+<section role="dialog" aria-modal="true" aria-labelledby="remove-key" style="max-height: 85%; display: flex; flex-direction: column; background: var(--surface-3); border: 1px solid var(--line); border-bottom: 0; box-shadow: var(--elevation-3);">
+<div aria-hidden="true" style="flex: none; display: flex; justify-content: center; padding-top: 8px;"><span style="width: 48px; height: 4px; background: var(--line-strong);"></span></div>
+<div class="tb" style="flex: none;"><h2 class="cell title" id="remove-key" style="margin: 0;">Confirm it's you</h2><span class="cell">Form TC-01</span><span class="act" style="padding: 0;"><button type="button" class="box box-icon box-bare box-lg" aria-label="Close"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M5 5l10 10M15 5 5 15"></path></svg></button></span></div>
+<div style="flex: 1; min-height: 0; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 16px;">
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<span style="font-size: 17px; line-height: 26px; font-weight: 500;">Remove YubiKey 5 NFC</span>
+<span style="display: flex; align-items: baseline; gap: 10px;"><span class="legend">Change</span><span class="fig" style="font-size: 15px; letter-spacing: 0.02em;">Keys: 3 → 2</span></span>
+
+</div>
+
+<div>
+<label class="label" for="remove-key-reason">Reason</label>
+<textarea id="remove-key-reason" class="well well-phone" rows="2" style="resize: none;">Left at the old office; replaced by the iPhone passkey.</textarea>
+<div class="hint">Don't include PNRs, emails or IP addresses; they're removed. 10–200 characters.</div>
+</div>
+</div>
+<div style="flex: none; display: flex; flex-direction: column; gap: 8px; padding: 12px 20px 16px; border-top: 1px solid var(--line);">
+<button type="button" class="btn btn-primary btn-lg btn-block">Tap your key</button>
+<button type="button" class="btn btn-secondary btn-lg btn-block">Cancel</button>
+</div>
+</section>
+</div>
+</sc-if>
+<sc-if value="{{dlg_others}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; inset: 0; z-index: 5; background: var(--backdrop); display: flex; flex-direction: column; justify-content: flex-end;">
+<section role="alertdialog" aria-modal="true" aria-labelledby="others-title" style="display: flex; flex-direction: column; gap: 10px; padding: 20px 20px 16px; background: var(--surface-3); border: 1px solid var(--line); border-bottom: 0; box-shadow: var(--elevation-3);">
+<h2 class="state-title" id="others-title">Sign out other sessions?</h2>
+<p class="state-detail" style="margin: 0;">Safari on iPhone is signed out at once. This device stays signed in.</p>
+<div style="margin-top: 8px; display: flex; flex-direction: column; gap: 8px;">
+<button type="button" class="btn btn-primary btn-lg btn-block">Sign out others</button>
+<button type="button" class="btn btn-secondary btn-lg btn-block">Cancel</button>
+</div>
+</section>
+</div>
+</sc-if>
+<sc-if value="{{toastShown}}" hint-placeholder-val="{{ false }}">
+<div role="status" class="toast" style="position: absolute; z-index: 6; left: 16px; right: 16px; bottom: 12px;">{{toastText}}</div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"role":{"editor":"enum","options":["Owner","Admin","Support","Viewer"],"default":"Owner","section":"State"},"environment":{"editor":"enum","options":["Production","Preview"],"default":"Production","section":"State"},"state":{"editor":"enum","options":["Ready","Error","Adding","Remove blocked","Removing","Removed","Sign out others","Others signed out"],"default":"Ready","section":"State"},"defaultTheme":{"editor":"enum","options":["system","light","dark"],"default":"system","section":"Appearance"},"$preview":{"width":390,"height":1760}}'>
+class Component extends DCLogic {
+  state = { theme: null, sysDark: false };
+  componentDidMount() {
+    this._mq = window.matchMedia('(prefers-color-scheme: dark)');
+    this._onMq = () => this.setState({ sysDark: this._mq.matches });
+    this.setState({ sysDark: this._mq.matches });
+    this._mq.addEventListener('change', this._onMq);
+  }
+  componentWillUnmount() {
+    if (this._mq) this._mq.removeEventListener('change', this._onMq);
+  }
+  frame(p, opts) {
+    var o = opts || {};
+    var who = o.who || p.role || 'Owner';
+    var env = p.environment || 'Production';
+    var mode = this.state.theme || p.defaultTheme || 'system';
+    var themeNames = { system: 'System', light: 'Day', dark: 'Night' };
+    var themeNext = { system: 'light', light: 'dark', dark: 'system' };
+    var dark = mode === 'dark' || (mode === 'system' && this.state.sysDark);
+    var members = { Owner: ['Asha Rao', 'asha@example.com', 'AR'], Admin: ['Rohan Iyer', 'rohan@example.com', 'RI'], Support: ['Kiran Das', 'kiran@example.com', 'KD'], Viewer: ['Meera Nair', 'meera@example.com', 'MN'] };
+    var access = {
+      Owner: ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13', '14'],
+      Admin: ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '14'],
+      Support: ['01', '06', '09', '10'],
+      Viewer: ['01', '02', '03']
+    };
+    var allGroups = [
+      { legend: 'Operate', items: [['01', 'Overview'], ['02', 'Sources & usage'], ['03', 'Status & incidents'], ['04', 'Abuse & limits'], ['05', 'Alerts']] },
+      { legend: 'People', items: [['06', 'Leads'], ['07', 'Announcements'], ['08', 'Accounts']] },
+      { legend: 'Queues', items: [['09', 'Privacy requests', '3'], ['10', 'Wrong-status reports', '5']] },
+      { legend: 'Configure', items: [['11', 'Switches & settings'], ['12', 'Provider keys'], ['13', 'Team']] },
+      { legend: 'Record', items: [['14', 'Audit log']] }
+    ];
+    var allowed = access[who] || access.Owner;
+    var phone = !!o.phone;
+    var rowBase = phone ? 'display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 16px 0 20px; text-decoration: none; ' : 'display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 16px 0 22px; text-decoration: none; ';
+    var rowOn = 'color: var(--accent-text); background: color-mix(in oklab, var(--accent) 16%, transparent); box-shadow: inset 2px 0 0 var(--accent);';
+    var current = o.current || '';
+    var groups = allGroups.map(function (g) {
+      return {
+        legend: g.legend,
+        items: g.items.filter(function (i) { return allowed.indexOf(i[0]) !== -1; }).map(function (i) {
+          var on = i[0] === current;
+          return { num: i[0], label: i[1], count: i[2] || '', hasCount: !!i[2], aria: on ? 'page' : 'false', rowStyle: rowBase + (on ? rowOn : 'color: var(--ink-2);') };
+        })
+      };
+    }).filter(function (g) { return g.items.length > 0; });
+    var m = members[who] || members.Owner;
+    var notice = o.notice !== undefined ? o.notice : (p.notice || 'None');
+    var signedOut = !!o.signedOut;
+    return {
+      face: dark ? 'night' : 'day',
+      modeSystem: mode === 'system', modeDay: mode === 'light', modeNight: mode === 'dark',
+      themeLabel: 'Theme: ' + themeNames[mode] + '. Switch to ' + themeNames[themeNext[mode]],
+      cycleTheme: () => this.setState({ theme: themeNext[mode] }),
+      isProd: env !== 'Preview', isPreview: env === 'Preview', envWord: env === 'Preview' ? 'staging' : 'production',
+      who: who, role: who, memberName: m[0], memberEmail: m[1], initials: m[2],
+      memberLabel: m[0] + ', ' + who + '. Open the member menu',
+      showMember: !signedOut, groups: groups,
+      noticePaused: !signedOut && notice === 'Checks paused', noticeSite: !signedOut && notice === 'Site notice',
+      pausedSince: o.pausedSince || '14:02', pausedBy: who === 'Viewer' ? 'an Owner' : (o.pausedBy || 'Asha Rao'),
+      canResume: who === 'Owner' || who === 'Admin',
+      menuOpen: !signedOut && p.menu === 'Open' && !o.overlay,
+      drawerOpen: !signedOut && p.drawer === 'Open' && !o.overlay,
+      toastShown: !!o.toast, toastText: o.toast || ''
+    };
+  }
+  renderVals() {
+    var p = this.props;
+    var st = p.state || 'Ready';
+    var who = p.role || 'Owner';
+    var overlay = st === 'Adding' || st === 'Removing' || st === 'Sign out others';
+    var toastText = st === 'Removed' ? 'Key removed · logged' : st === 'Others signed out' ? 'Other sessions signed out · logged' : '';
+    var fr = this.frame(p, { phone: true, current: '', overlay: overlay, toast: toastText });
+    var since = { Owner: '2 Sep 2026', Admin: '5 Sep 2026', Support: '10 Sep 2026', Viewer: '19 Sep 2026' };
+    var two = st === 'Remove blocked' || st === 'Removed';
+    return Object.assign(fr, {
+      isReady: st !== 'Error', isError: st === 'Error',
+      memberSince: since[who] || since.Owner, isOwner: who === 'Owner',
+      threeKeys: !two, keyCount: two ? '2 keys' : '3 keys', removeDisabled: two,
+      blockedClass: st === 'Remove blocked' ? 'alert' : 'hint',
+      othersShown: st !== 'Others signed out',
+      dlg_add: st === 'Adding', dlg_remove: st === 'Removing', dlg_others: st === 'Sign out others',
+      showMeta: st !== 'Error'
+    });
+  }
+}
+</script>
+</body>
+</html>

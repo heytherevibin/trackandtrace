@@ -168,3 +168,21 @@
 .skeleton { background: var(--skeleton-base); }
 .sweep { height: 2px; overflow: hidden; background: color-mix(in oklab, var(--accent) 20%, transparent); }
 .sweep > i { display: block; width: 30%; height: 100%; margin-left: 35%; background: var(--accent); }
+
+/* ---- Added for B2 ---- */
+/* A segmented option that can't be chosen (a source not configured), as Button's disabled. */
+.tab[disabled] { opacity: 0.45; cursor: not-allowed; }
+/* Meter (console rules): a hairline track, a steel fill, the figure and a legend. */
+.meter { position: relative; height: 8px; border: 1px solid var(--line-strong); }
+.meter > i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent); }
+/* Roles matrix: a filled square is full access, half-filled is read-only or counts only, hollow is none. */
+.sq { position: relative; display: inline-block; flex: none; width: 14px; height: 14px; overflow: hidden; border: 1px solid var(--accent); }
+.sq.full { background: var(--accent); }
+.sq.half::after { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 50%; background: var(--accent); }
+.sq.none { border-color: var(--line-strong); }
+/* Radio choice rows (a role in the invite form): hairline boxes, the chosen one tinted steel. */
+.choice { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); cursor: pointer; }
+.choice + .choice { border-top: 0; }
+.choice[aria-checked="true"] { background: color-mix(in oklab, var(--accent) 16%, transparent); }
+.dot { position: relative; flex: none; width: 16px; height: 16px; margin-top: 2px; border-radius: 50%; border: 1.5px solid var(--line-strong); }
+.choice[aria-checked="true"] .dot { border-color: var(--accent); background: var(--accent); box-shadow: inset 0 0 0 3px var(--surface-3); }
