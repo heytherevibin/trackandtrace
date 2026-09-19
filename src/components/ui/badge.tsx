@@ -11,7 +11,7 @@ export type TagVariant = "accent" | "outline" | "neutral";
 // .tag has no edge; only .tag-outline draws one.
 const VARIANT: Record<TagVariant, string> = {
   accent: "bg-accent-soft text-accent-soft-ink",
-  outline: "border border-accent text-accent",
+  outline: "border border-accent text-accent-text",
   neutral: "bg-surface-1 text-ink-2",
 };
 

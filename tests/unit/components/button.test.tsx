@@ -19,4 +19,18 @@ describe("Button", () => {
     expect(buttonClassName({ variant: "run" })).toContain("bg-accent");
     expect(buttonClassName({ variant: "primary" })).toContain("press");
   });
+  // Ghost words are small steel text, so they take the readable steel (AA); the locked steel
+  // stays in the hover and press tints. Whole class tokens: text-accent-text is not text-accent.
+  it("sets ghost words in the readable steel and keeps the steel tints", () => {
+    render(<Button variant="ghost">Check another PNR</Button>);
+    const button = screen.getByRole("button", { name: "Check another PNR" });
+    expect(button).toHaveClass("text-accent-text", "hover:bg-accent/10", "active:bg-accent/18");
+    expect(button).not.toHaveClass("text-accent");
+    // Links dressed as ghost buttons share these classes, at every size.
+    for (const size of ["sm", "md", "lg"] as const) {
+      const tokens = buttonClassName({ variant: "ghost", size }).split(/\s+/);
+      expect(tokens, size).toEqual(expect.arrayContaining(["text-accent-text", "hover:bg-accent/10", "active:bg-accent/18"]));
+      expect(tokens, size).not.toContain("text-accent");
+    }
+  });
 });
