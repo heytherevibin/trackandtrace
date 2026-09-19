@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }) }));
 vi.mock("@/services/auth-client", () => ({ signOutEverywhere: vi.fn(async () => undefined) }));
@@ -8,6 +8,10 @@ const { AccountView } = await import("@/app/account/account-view");
 const auth = await import("@/services/auth-client");
 
 const USER = { id: "u1", email: "asha@example.com", name: "Asha Rao", avatarUrl: null } as const;
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("AccountView", () => {
   it("signed out: says there is nothing to sync and offers both ways on", () => {
@@ -29,6 +33,18 @@ describe("AccountView", () => {
     expect(screen.getByRole("link", { name: "Open watchlist" })).toHaveAttribute("href", "/watchlist");
     expect(screen.getByRole("button", { name: /^Theme:/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Export JSON" })).toBeInTheDocument();
+  });
+
+  it("saves the export as trakline-export.json", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 200 })));
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:export");
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+    render(<AccountView user={USER} savedCount={0} />);
+    fireEvent.click(screen.getByRole("button", { name: "Export JSON" }));
+    await waitFor(() => expect(click).toHaveBeenCalledTimes(1));
+    const [anchor] = click.mock.contexts;
+    expect(anchor instanceof HTMLAnchorElement && anchor.download).toBe("trakline-export.json");
   });
 
   it("signs out everywhere", () => {

@@ -68,7 +68,7 @@ export function AccountView({ user, savedCount, passkeys = false }: { readonly u
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "trackandtrace-export.json";
+      a.download = "trakline-export.json";
       a.click();
       URL.revokeObjectURL(url);
     } catch {
