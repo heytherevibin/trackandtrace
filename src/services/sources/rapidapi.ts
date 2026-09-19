@@ -1,7 +1,7 @@
 import type { PnrDataSource } from "@/services/pnr-source";
 import { log } from "@/services/log";
-import type { PnrOutcome } from "@/types/domain";
 import { PNR_INVALID_MESSAGE, isValidPnr } from "@/utils/pnr";
+import { markUnreadable, unavailable, type SourceOutcome } from "./outcome";
 import { parseIrctc1Response } from "./rapidapi-parse";
 import { messages } from "@/messages";
 
@@ -30,10 +30,6 @@ export interface RapidApiDeps {
 /** Travellers read one neutral voice; the provider, key, plan and HTTP status stay in the server log. */
 const OUT = messages.source.outcomes;
 
-function unavailable(message: string, retryAfter?: number): PnrOutcome {
-  return retryAfter === undefined ? { ok: false, code: "SOURCE_UNAVAILABLE", message } : { ok: false, code: "SOURCE_UNAVAILABLE", message, retryAfter };
-}
-
 function retryAfterSeconds(header: string | null): number | undefined {
   if (!header) return undefined;
   const seconds = Number(header);
@@ -49,7 +45,7 @@ export function createRapidApiSource(config: RapidApiConfig, deps: RapidApiDeps 
   const now = deps.now ?? (() => new Date());
 
   return {
-    async check(pnr: string): Promise<PnrOutcome> {
+    async check(pnr: string): Promise<SourceOutcome> {
       if (!isValidPnr(pnr)) return { ok: false, code: "INVALID", message: PNR_INVALID_MESSAGE };
 
       const url = `https://${config.host}${config.path}?pnrNumber=${encodeURIComponent(pnr)}`;
@@ -64,23 +60,23 @@ export function createRapidApiSource(config: RapidApiConfig, deps: RapidApiDeps 
       } catch (error) {
         if (isTimeout(error)) {
           log.warn("[source:rapidapi] timed out", { timeoutMs: config.timeoutMs });
-          return unavailable(OUT.timeout);
+          return unavailable(OUT.timeout, "timeout");
         }
         log.warn("[source:rapidapi] request failed", { kind: error instanceof Error ? error.name : typeof error });
-        return unavailable(OUT.unreachable);
+        return unavailable(OUT.unreachable, "network");
       }
 
       if (response.status === 401 || response.status === 403) {
         log.error("[source:rapidapi] credentials refused", { status: response.status });
-        return unavailable(OUT.refused);
+        return unavailable(OUT.refused, "refused", { status: response.status });
       }
       if (response.status === 429) {
         log.warn("[source:rapidapi] quota exhausted", { status: response.status });
-        return unavailable(OUT.busy, retryAfterSeconds(response.headers.get("retry-after")));
+        return unavailable(OUT.busy, "quota", { status: response.status, retryAfter: retryAfterSeconds(response.headers.get("retry-after")) });
       }
       if (!response.ok) {
         log.warn("[source:rapidapi] provider error", { status: response.status });
-        return unavailable(OUT.error);
+        return unavailable(OUT.error, "server", { status: response.status });
       }
 
       let body: unknown;
@@ -88,12 +84,12 @@ export function createRapidApiSource(config: RapidApiConfig, deps: RapidApiDeps 
         body = await response.json();
       } catch {
         log.warn("[source:rapidapi] unreadable body", { status: response.status });
-        return unavailable(OUT.unreadable);
+        return unavailable(OUT.unreadable, "unreadable");
       }
 
       const parsed = parseIrctc1Response(body, pnr, now());
       if (!parsed.ok && parsed.code === "SOURCE_UNAVAILABLE") log.warn("[source:rapidapi] record not readable");
-      return parsed;
+      return markUnreadable(parsed);
     },
   };
 }

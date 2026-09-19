@@ -11,7 +11,8 @@ Next.js server
   route handlers (src/app/api/*)           — thin: guard → validate → repository/query → jsonOk/jsonError
   pnr-query (src/services/pnr-query.ts)    — the one PNR path: validate → rate limit → cache → single-flight → source
   shared-store (src/services/shared-store.ts) — Upstash Redis (Mumbai) on deployments: shared limits + the encrypted 60 s PNR cache
-  sources (src/services/sources/*)         — registry: live seam (unavailable until a provider lands) | railkit | rapidapi (third-party, labelled; optional fallback between them) | fixture (dev only)
+  sources (src/services/sources/*)         — registry: live seam (unavailable until a provider lands) | railkit | rapidapi (third-party, shown as Trakline; optional fallback between them) | fixture (dev only)
+  guarded (src/services/sources/guarded.ts) — each provider behind its breaker, one safe retry (network, 502/503/504) and a daily usage count
   watchlist-repo (src/services/watchlist-repo.ts) — supabase-js over RLS-guarded tables
   session (src/services/session.ts)        — verified JWT claims → SessionUser DTO
   proxy (src/proxy.ts)                     — Supabase session refresh on page requests
@@ -41,6 +42,8 @@ PNRs never travel in an address, because request paths and query strings are rec
 | Source answered, no record | "No record for this PNR", not an error |
 | Rate limited (20/min/IP) | 429 with Retry-After; UI counts down |
 | Upstash slow or down | Cache misses; limits fall back to this instance's memory; checks keep answering |
+| Provider failing repeatedly | 5 failures in 60 s open its breaker for 30 s (doubling per failed probe, up to 10 min); the fallback answers at once and no request is spent on the failing provider |
+| Provider refuses the key or plan, or its quota | Breaker open 10 min (401/403), or for the provider's Retry-After (429) |
 | Malformed API body | Client zod validation fails → error state, never rendered as data |
 | Supabase unconfigured | Accounts surface says so; watchlist stays device-local; APIs 503 |
 | Session expired | 401 → UI returns to local mode |

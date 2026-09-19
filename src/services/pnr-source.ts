@@ -2,6 +2,7 @@ import type { PnrOutcome, PnrResult } from "@/types/domain";
 import { pnrApiOkSchema } from "@/types/schemas";
 import { apiRequest } from "./api-client";
 import type { ApiErrorBody } from "./errors";
+import type { SourceOutcome } from "./sources/outcome";
 
 /**
  * The only data contract consumed by the UI. Implementations must return
@@ -9,7 +10,8 @@ import type { ApiErrorBody } from "./errors";
  * product does not generate substitute records.
  */
 export interface PnrDataSource {
-  check(pnr: string): Promise<PnrOutcome>;
+  /** Failures may carry a server-only `cause` for the breaker and retry policy; it never reaches the wire. */
+  check(pnr: string): Promise<SourceOutcome>;
 }
 
 export interface PnrFetchResult {

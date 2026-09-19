@@ -1,6 +1,10 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { parseEnv, type Env } from "@/services/env";
+import { resetLocalState } from "@/services/shared-store";
 import { resolvePnrSource } from "@/services/sources";
+
+// Breaker state lives in this instance's memory here; each test starts closed.
+afterEach(() => resetLocalState());
 
 function envOf(source: Record<string, string>): Env {
   const parsed = parseEnv(source);
@@ -86,7 +90,8 @@ describe("resolvePnrSource", () => {
       }),
     );
     const out = await resolvePnrSource(current).check("5827194603");
-    expect(hosts).toEqual(["api.railkit.in", "irctc1.p.rapidapi.com"]);
+    // A 502 is a safe failure: RailKit is asked once more before the fallback.
+    expect(hosts).toEqual(["api.railkit.in", "api.railkit.in", "irctc1.p.rapidapi.com"]);
     expect(out).toMatchObject({ ok: false, code: "NOT_FOUND" });
 
     hosts.length = 0;
