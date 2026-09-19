@@ -486,3 +486,15 @@ verify_enabled = true
 [remotes.production.storage.analytics]
 enabled = true
 max_namespaces = 10
+
+# Passkeys are bound to the domain they are made on (the WebAuthn relying party): trakline.in.
+# www redirects there; previews on vercel.app and localhost cannot use hosted passkeys.
+# Record only: CLI 2.117 neither compares nor pushes these. They are set in the Dashboard
+# (Authentication > Passkeys), and changing rp_id invalidates every existing passkey.
+[remotes.production.auth.passkey]
+enabled = true
+
+[remotes.production.auth.webauthn]
+rp_display_name = "Trakline"
+rp_id = "trakline.in"
+rp_origins = ["https://trakline.in"]
