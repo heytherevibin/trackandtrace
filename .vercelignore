@@ -1,0 +1,13 @@
+# Only the app goes to Vercel. Local tool state, notes and generated reports never do,
+# whether a deployment comes from Git or from a CLI upload of this folder.
+.claude/
+.claude-flow/
+.freebuff/
+.impeccable/
+.swarm/
+.hive-mind/
+coverage/
+playwright-report/
+test-results/
+docs/
+.env*
