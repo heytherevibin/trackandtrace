@@ -1,7 +1,9 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const PORT = 4210;
-const baseURL = `http://localhost:${PORT}`;
+// E2E_BASE_URL points the suite at a deployed site instead (no local server starts).
+const remote = process.env.E2E_BASE_URL;
+const baseURL = remote ?? `http://localhost:${PORT}`;
 
 // Fixture mode is the default for e2e: deterministic sample data, no network.
 // Signed-in specs run only when E2E_SUPABASE=1 and a local Supabase stack is up.
@@ -26,7 +28,7 @@ export default defineConfig({
       use: { ...devices["Pixel 7"], viewport: { width: 390, height: 844 } },
     },
   ],
-  webServer: {
+  webServer: remote ? undefined : {
     command: `npx next dev --port ${PORT}`,
     url: baseURL,
     reuseExistingServer: !process.env.CI,
