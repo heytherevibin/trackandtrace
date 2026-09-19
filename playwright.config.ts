@@ -21,12 +21,21 @@ export default defineConfig({
   projects: [
     {
       name: "desktop",
+      testIgnore: /console\//,
       use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 } },
     },
     {
       name: "mobile",
+      testIgnore: /console\//,
       use: { ...devices["Pixel 7"], viewport: { width: 390, height: 844 } },
     },
+    // The console host, served by the same dev server: Chromium resolves *.localhost to this machine.
+    ...(remote
+      ? []
+      : [
+          { name: "console-desktop", testMatch: /console\/.*\.spec\.ts/, use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 }, baseURL: `http://admin.localhost:${PORT}` } },
+          { name: "console-mobile", testMatch: /console\/.*\.spec\.ts/, use: { ...devices["Pixel 7"], viewport: { width: 390, height: 844 }, baseURL: `http://admin.localhost:${PORT}` } },
+        ]),
   ],
   webServer: remote ? undefined : {
     command: `npx next dev --port ${PORT}`,
