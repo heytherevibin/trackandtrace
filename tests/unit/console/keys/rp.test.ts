@@ -28,6 +28,22 @@ describe("relyingParty", () => {
     expect(() => relyingParty(null)).toThrow(expect.objectContaining({ code: "INVALID_INPUT" }));
   });
 
+  it("refuses a header that only looks like the local host up to its first colon", () => {
+    // requestHost reads only the substring before the first colon; consoleOrigin (which this
+    // delegates to) checks the WHOLE authority instead, so the "@evil.com" suffix here can't
+    // sneak into the origin the way it would if this function built the string itself.
+    expect(() => relyingParty("admin.localhost:4210@evil.com")).toThrow(expect.objectContaining({ code: "INVALID_INPUT" }));
+  });
+
+  it("answers with the production constant, not the header's own port, in production", () => {
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://example.upstash.io");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "token");
+    vi.stubEnv("DATA_KEY", `${"A".repeat(43)}=`);
+    resetEnvCache();
+    expect(relyingParty("admin.trakline.in:9999")).toMatchObject({ id: "admin.trakline.in", origin: "https://admin.trakline.in" });
+  });
+
   it("refuses the production host outside production, and the local host inside it", () => {
     expect(() => relyingParty("admin.trakline.in")).toThrow();
     vi.stubEnv("VERCEL_ENV", "production");

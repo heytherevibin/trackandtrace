@@ -80,6 +80,18 @@ describe("verifyRegistration", () => {
     await expect(verifyRegistration({ rp: RP, response: { id: "Y3JlZA" } as never, expectedChallenge: "c" })).resolves.toMatchObject({ keyType: "security_key", transports: [] });
   });
 
+  it("records a passkey when the flags disagree: not yet multiDevice, but already backed up", async () => {
+    // Pins the rule to `||`, not `&&`: a backup-eligible credential that hasn't completed its
+    // first sync yet is real WebAuthn state (singleDevice, credentialBackedUp: true), and it
+    // must still read as a passkey. The other two cases above set both flags the same way, so
+    // either operator would pass them.
+    verifyRegistrationResponse.mockResolvedValue({
+      verified: true,
+      registrationInfo: { credential: { id: "Y3JlZA", publicKey: new Uint8Array([1]), counter: 0 }, credentialDeviceType: "singleDevice", credentialBackedUp: true },
+    });
+    await expect(verifyRegistration({ rp: RP, response: { id: "Y3JlZA" } as never, expectedChallenge: "c" })).resolves.toMatchObject({ keyType: "passkey" });
+  });
+
   it("checks the origin and the RP id exactly, and does not demand user verification", async () => {
     verifyRegistrationResponse.mockResolvedValue({
       verified: true,
@@ -122,5 +134,12 @@ describe("verifyAuthentication", () => {
   it("throws when it does not verify", async () => {
     verifyAuthenticationResponse.mockResolvedValue({ verified: false, authenticationInfo: { credentialID: "Y3JlZA", newCounter: 8 } });
     await expect(verifyAuthentication({ rp: RP, response: { id: "Y3JlZA" } as never, expectedChallenge: "c", key: STORED })).rejects.toMatchObject({ code: "INVALID_INPUT" });
+  });
+
+  it("throws rather than leaking the library's own message", async () => {
+    verifyAuthenticationResponse.mockRejectedValue(new Error("Unexpected authentication response origin"));
+    await expect(verifyAuthentication({ rp: RP, response: { id: "Y3JlZA" } as never, expectedChallenge: "c", key: STORED })).rejects.toMatchObject({
+      message: "That key didn't answer. Try again.",
+    });
   });
 });

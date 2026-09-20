@@ -1,4 +1,4 @@
-import { consoleHostFor, requestHost } from "@/console/hosts";
+import { consoleHostFor, consoleOrigin } from "@/console/hosts";
 import { env } from "@/services/env";
 import { AppError } from "@/services/errors";
 
@@ -14,13 +14,12 @@ export interface RelyingParty {
  * that is not this environment's console host gets no relying party at all.
  */
 export function relyingParty(hostHeader: string | null): RelyingParty {
-  const expected = consoleHostFor(env().VERCEL_ENV);
-  const host = requestHost(hostHeader);
-  if (!host || host !== expected) {
-    throw new AppError("INVALID_INPUT", "Security keys are scoped to the console's own address.", { status: 403 });
-  }
-  // The origin keeps the port; the RP ID never has one.
-  const authority = (hostHeader ?? "").trim().toLowerCase();
-  const scheme = host === "admin.localhost" ? "http" : "https";
-  return { id: host, origin: `${scheme}://${authority}`, name: "Trakline Console" };
+  const current = env().VERCEL_ENV;
+  // consoleOrigin is the one place the console's own origin is decided: it checks the WHOLE
+  // authority, and in production returns the constant rather than anything from the header.
+  // An empty answer means this is not the console's host, which is the same refusal §D's scope
+  // rule asks for -- a console key must not be reachable from trakline.in.
+  const origin = consoleOrigin(hostHeader, current);
+  if (!origin) throw new AppError("INVALID_INPUT", "Security keys are scoped to the console's own address.", { status: 403 });
+  return { id: consoleHostFor(current), origin, name: "Trakline Console" };
 }
