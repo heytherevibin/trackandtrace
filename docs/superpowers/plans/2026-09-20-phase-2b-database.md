@@ -741,8 +741,9 @@ git commit -m "feat(console): the append-only audit log, its scrubber and its pu
 **Interfaces:**
 - Consumes: `console.members`, `console.sessions`, `console.challenges`, `console.role_rank`.
 - Produces:
-  - `console.current_member() returns console.members` — raises `28000` ("session ended") when the claims, the session or the member fail; the session must be key-verified, unexpired, unrevoked, and the member active. It also refreshes `last_seen_at`.
-  - `console.require_role(p_least console.member_role) returns console.members` — raises `42501` ("no access") when the caller's role ranks below `p_least`.
+  - `console.claim_uuid(p_key text) returns uuid` — reads one claim and raises `28000` when it is not a uuid, so a malformed claim reads as "session ended" rather than a Postgres parse error.
+  - `console.current_member() returns console.members` — raises `28000` ("session ended") when the claims, the session or the member fail; the session must be key-verified, unexpired, unrevoked, used within the last 24 hours, and the member active. It also refreshes `last_seen_at`.
+  - `console.require_role(p_least console.member_role) returns console.members` — raises `42501` ("no access") when the caller's role ranks below `p_least`, and also when the asked-for rank is null, because `role_rank` has no `else` and a null comparison would otherwise pass the gate.
   - `console.action_digest(p_action text, p_target text, p_value text, p_reason text) returns bytea` — sha256 of the four joined by `U&'\001F'`.
   - `console.use_tap(p_action text, p_target text, p_value text, p_reason text) returns uuid` — finds this member and session's unused, unexpired `action` challenge whose digest matches, marks it used, returns its `key_id`-bearing challenge id; raises `42501` when there is none.
 
@@ -899,9 +900,11 @@ $$;
 
 revoke all on function console.require_role(console.member_role) from public, anon, authenticated;
 
--- The four things a tap approves, joined by a unit separator so no field can
--- impersonate another, then hashed. The server stores this digest with the
--- challenge; the database recomputes it from its own arguments.
+-- The four things a tap approves. Each field is hashed on its own and the
+-- fixed-length digests are hashed together: a separator can appear inside a
+-- field, and joining with one would let one field's text be read as another's.
+-- The server stores this digest with the challenge; the database recomputes it
+-- from its own arguments.
 create or replace function console.action_digest(p_action text, p_target text, p_value text, p_reason text)
 returns bytea
 language sql
@@ -910,7 +913,10 @@ security invoker
 set search_path = ''
 as $$
   select extensions.digest(
-    concat_ws(U&'\001F', p_action, coalesce(p_target, ''), coalesce(p_value, ''), coalesce(p_reason, '')),
+    extensions.digest(coalesce(p_action, ''), 'sha256') ||
+    extensions.digest(coalesce(p_target, ''), 'sha256') ||
+    extensions.digest(coalesce(p_value,  ''), 'sha256') ||
+    extensions.digest(coalesce(p_reason, ''), 'sha256'),
     'sha256'
   );
 $$;
