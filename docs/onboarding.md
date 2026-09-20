@@ -11,6 +11,8 @@
 
 `npm run dev:fixture` also serves the team console at http://admin.localhost:3000 (Chrome and Firefox resolve `*.localhost` to this machine). The console refuses to run against the hosted Supabase project, and says so. To see its pages, point both `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` at the local stack (`npm run db:start`) — the env schema requires them together, and the hosted key won't authenticate against a local stack — or start with both Supabase variables blank: `NEXT_PUBLIC_SUPABASE_URL= NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY= npm run dev:fixture`.
 
+The console's tables live in the private `console` schema. `npm run db:reset` applies its migrations to the local stack, and `npm run db:test` runs the pgTAP tests (CI runs the same). Nothing reads those tables directly: every caller goes through a `public.console_*` function.
+
 ## Supabase
 
 - **Hosted project:** "Trakline", ref `xnykpktqtimadelfjgqf`, ap-south-1. Put `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env.local`; add `SUPABASE_SECRET_KEY` only where account deletion must work.

@@ -21,6 +21,7 @@ Next.js server
   telemetry (src/instrumentation*.ts, src/services/telemetry/*) — Sentry on server, edge and browser via the /monitoring tunnel; every event scrubbed of PNRs, emails, tokens, cookies, bodies, queries and URL fragments; off without a DSN
 Supabase
   auth.users + public.watchlist_entries (supabase/migrations/*) — RLS: owner-only
+  console schema (supabase/migrations/2026092009*.sql) — the console's own tables, reached only through security-definer public.console_* functions; the audit log is append-only and console.purge_audit() drops rows past two years
 ```
 
 PNRs never travel in an address, because request paths and query strings are recorded in platform request logs. The result page is `/pnr#<pnr>`: a static shell whose client body (`PnrHashResult`) reads the PNR from the hash and asks `POST /api/pnr` with `{ pnr, fresh? }` in the body. Links are built only by `pnrHref()`. The pre-hydration form posts to `/check` (303 to the hash form), old `/pnr/<pnr>` links answer 308, and `tests/unit/privacy/no-pnr-in-urls.test.ts` fails the build if code puts a PNR in a path or query string again.
