@@ -1680,17 +1680,32 @@ declare
   v_invite console.invites;
   v_member console.members;
 begin
-  update console.invites
-     set accepted_at = now()
+  -- Read the invite first and spend it last: a mismatch below must leave it
+  -- live, and returning null raises nothing, so nothing would roll back.
+  -- `for update` stops two concurrent acceptances both passing this check.
+  select * into v_invite
+    from console.invites
    where token_hash = p_token_hash
      and accepted_at is null
      and revoked_at is null
      and expires_at > now()
-  returning * into v_invite;
+   for update;
 
   if not found then
     return null;
   end if;
+
+  -- The token proves someone holds the invite; this proves it is the person it
+  -- was sent to. Without it, any live invite could be redeemed against any
+  -- member row, resetting that member's role up to owner.
+  if not exists (
+    select 1 from auth.users u
+     where u.id = p_user and lower(u.email) = v_invite.email
+  ) then
+    return null;
+  end if;
+
+  update console.invites set accepted_at = now() where id = v_invite.id;
 
   insert into console.members (user_id, email, name, role, status, invited_by)
   values (p_user, v_invite.email, p_name, v_invite.role, 'setup', v_invite.invited_by)
