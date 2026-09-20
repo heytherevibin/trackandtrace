@@ -28,13 +28,13 @@ select is(has_function_privilege('service_role', 'public.console_auth_revoke_mem
 select is(has_function_privilege('authenticated', 'public.console_auth_revoke_member_sessions(uuid, uuid)', 'execute')::text, 'false', 'authenticated cannot revoke a member''s sessions directly');
 select is(has_function_privilege('anon', 'public.console_auth_revoke_member_sessions(uuid, uuid)', 'execute')::text, 'false', 'anon cannot revoke a member''s sessions directly');
 
-select is(has_function_privilege('service_role', 'public.console_auth_new_challenge(uuid, uuid, console.challenge_purpose, text, bytea)', 'execute')::text, 'true', 'service_role can mint a challenge');
-select is(has_function_privilege('authenticated', 'public.console_auth_new_challenge(uuid, uuid, console.challenge_purpose, text, bytea)', 'execute')::text, 'false', 'authenticated cannot mint a challenge directly');
-select is(has_function_privilege('anon', 'public.console_auth_new_challenge(uuid, uuid, console.challenge_purpose, text, bytea)', 'execute')::text, 'false', 'anon cannot mint a challenge directly');
+select is(has_function_privilege('service_role', 'public.console_auth_new_challenge(uuid, uuid, text, text, bytea)', 'execute')::text, 'true', 'service_role can mint a challenge');
+select is(has_function_privilege('authenticated', 'public.console_auth_new_challenge(uuid, uuid, text, text, bytea)', 'execute')::text, 'false', 'authenticated cannot mint a challenge directly');
+select is(has_function_privilege('anon', 'public.console_auth_new_challenge(uuid, uuid, text, text, bytea)', 'execute')::text, 'false', 'anon cannot mint a challenge directly');
 
-select is(has_function_privilege('service_role', 'public.console_auth_take_challenge(text, uuid, console.challenge_purpose)', 'execute')::text, 'true', 'service_role can take a challenge');
-select is(has_function_privilege('authenticated', 'public.console_auth_take_challenge(text, uuid, console.challenge_purpose)', 'execute')::text, 'false', 'authenticated cannot take a challenge directly');
-select is(has_function_privilege('anon', 'public.console_auth_take_challenge(text, uuid, console.challenge_purpose)', 'execute')::text, 'false', 'anon cannot take a challenge directly');
+select is(has_function_privilege('service_role', 'public.console_auth_take_challenge(text, uuid, text)', 'execute')::text, 'true', 'service_role can take a challenge');
+select is(has_function_privilege('authenticated', 'public.console_auth_take_challenge(text, uuid, text)', 'execute')::text, 'false', 'authenticated cannot take a challenge directly');
+select is(has_function_privilege('anon', 'public.console_auth_take_challenge(text, uuid, text)', 'execute')::text, 'false', 'anon cannot take a challenge directly');
 
 insert into auth.users (id, email) values ('11111111-1111-1111-1111-111111111111', 'owner@trakline.in');
 insert into console.members (user_id, email, name, role, status)

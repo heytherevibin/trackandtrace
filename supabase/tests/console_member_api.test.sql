@@ -14,9 +14,9 @@ select is(has_function_privilege('service_role', 'public.console_auth_activate_m
 select is(has_function_privilege('authenticated', 'public.console_auth_activate_member(uuid)', 'execute')::text, 'false', 'a member cannot activate themselves');
 select is(has_function_privilege('anon', 'public.console_auth_activate_member(uuid)', 'execute')::text, 'false', 'anon cannot activate a member');
 
-select is(has_function_privilege('service_role', 'public.console_auth_read_challenge(text, uuid, console.challenge_purpose)', 'execute')::text, 'true', 'service_role can read a challenge');
-select is(has_function_privilege('authenticated', 'public.console_auth_read_challenge(text, uuid, console.challenge_purpose)', 'execute')::text, 'false', 'a member cannot read a challenge directly');
-select is(has_function_privilege('anon', 'public.console_auth_read_challenge(text, uuid, console.challenge_purpose)', 'execute')::text, 'false', 'anon cannot read a challenge');
+select is(has_function_privilege('service_role', 'public.console_auth_read_challenge(text, uuid, text)', 'execute')::text, 'true', 'service_role can read a challenge');
+select is(has_function_privilege('authenticated', 'public.console_auth_read_challenge(text, uuid, text)', 'execute')::text, 'false', 'a member cannot read a challenge directly');
+select is(has_function_privilege('anon', 'public.console_auth_read_challenge(text, uuid, text)', 'execute')::text, 'false', 'anon cannot read a challenge');
 
 select is(has_function_privilege('service_role', 'public.console_auth_session(uuid)', 'execute')::text, 'true', 'service_role can read a live session');
 select is(has_function_privilege('authenticated', 'public.console_auth_session(uuid)', 'execute')::text, 'false', 'a member cannot read a session row directly');
