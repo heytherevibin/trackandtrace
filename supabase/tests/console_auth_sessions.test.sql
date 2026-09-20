@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(38);
+select plan(43);
 
 -- Every function here is service_role's alone: these are the steps that
 -- happen before a key-verified session exists, so nothing that already holds
@@ -190,6 +190,65 @@ select is(
   (select revoked_at is null from console.sessions where session_id = '77777777-7777-7777-7777-777777777777'),
   true,
   'the excepted session is left alone'
+);
+
+-- Fix round 1: verify_session must scope its key check to the session's own
+-- member. A nullable FK never checks a null, so p_key_id = null alone used to
+-- satisfy the update; and a key that merely exists somewhere in console.keys
+-- proved nothing about whose key it was. Both must miss exactly as a revoked
+-- or missing session does, and the raise alone doesn't prove the row was left
+-- untouched, so each case is checked both ways.
+
+select public.console_auth_start_session(
+  'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '11111111-1111-1111-1111-111111111111', 'Null key attempt', 'hash-nullkey'
+);
+select throws_ok(
+  $$select public.console_auth_verify_session('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', null)$$,
+  '28000',
+  null,
+  'verifying with a null key raises instead of verifying with no credential'
+);
+select is(
+  (select key_verified_at is null from console.sessions where session_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'),
+  true,
+  'the session is still not key-verified after the null-key attempt'
+);
+
+-- A key that exists, just not this member's, must miss the same way.
+insert into console.keys (id, member_id, credential_id, public_key, counter, name, type)
+values ('cccccccc-cccc-cccc-cccc-cccccccccccc', '66666666-6666-6666-6666-666666666666', '\x03'::bytea, '\x04'::bytea, 0, 'Someone else''s key', 'security_key');
+
+select public.console_auth_start_session(
+  'dddddddd-dddd-dddd-dddd-dddddddddddd', '11111111-1111-1111-1111-111111111111', 'Wrong member key attempt', 'hash-wrongkey'
+);
+select throws_ok(
+  $$select public.console_auth_verify_session('dddddddd-dddd-dddd-dddd-dddddddddddd', 'cccccccc-cccc-cccc-cccc-cccccccccccc')$$,
+  '28000',
+  null,
+  'verifying with another member''s key raises instead of verifying'
+);
+select is(
+  (select key_verified_at is null from console.sessions where session_id = 'dddddddd-dddd-dddd-dddd-dddddddddddd'),
+  true,
+  'the session is still not key-verified after the wrong-member-key attempt'
+);
+
+-- The ownership check must not turn into an accidental "same key every time"
+-- check: a member's second key verifies their session just as well as the
+-- first one did, re-verifying and rolling the expiry forward again.
+insert into console.keys (id, member_id, credential_id, public_key, counter, name, type)
+values ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', '11111111-1111-1111-1111-111111111111', '\x05'::bytea, '\x06'::bytea, 0, 'Second key', 'security_key');
+
+select public.console_auth_start_session(
+  'ffffffff-ffff-ffff-ffff-ffffffffffff', '11111111-1111-1111-1111-111111111111', 'Rolling verification', 'hash-rolling'
+);
+select public.console_auth_verify_session('ffffffff-ffff-ffff-ffff-ffffffffffff', '33333333-3333-3333-3333-333333333333');
+select public.console_auth_verify_session('ffffffff-ffff-ffff-ffff-ffffffffffff', 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee');
+select is(
+  (select key_verified_at is not null and key_id = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee' and expires_at > now() + interval '6 days'
+     from console.sessions where session_id = 'ffffffff-ffff-ffff-ffff-ffffffffffff'),
+  true,
+  'a member''s own second key still verifies their session, extending it again'
 );
 
 select * from finish();
