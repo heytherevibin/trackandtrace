@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(17);
+select plan(30);
 
 -- Only service_role may redeem a setup link. Supabase's default privileges
 -- auto-grant EXECUTE on a new public-schema function to anon, authenticated
@@ -10,6 +10,37 @@ select plan(17);
 select is(has_function_privilege('service_role', 'public.console_auth_redeem_setup_link(bytea, uuid, text, text, text)', 'execute')::text, 'true', 'service_role can redeem a setup link');
 select is(has_function_privilege('authenticated', 'public.console_auth_redeem_setup_link(bytea, uuid, text, text, text)', 'execute')::text, 'false', 'authenticated cannot redeem a setup link directly');
 select is(has_function_privilege('anon', 'public.console_auth_redeem_setup_link(bytea, uuid, text, text, text)', 'execute')::text, 'false', 'anon cannot redeem a setup link directly');
+
+-- Fix round 1: create_first_owner_link is run only from the SQL editor, as
+-- the database owner -- no role holds execute, not even service_role. The
+-- extracted guard is exactly as owner-only: it is a building block for the
+-- two functions above, never an entry point of its own.
+select is(has_function_privilege('anon', 'console.create_first_owner_link(text, text)', 'execute')::text, 'false', 'anon cannot create a first-Owner link');
+select is(has_function_privilege('authenticated', 'console.create_first_owner_link(text, text)', 'execute')::text, 'false', 'authenticated cannot create a first-Owner link');
+select is(has_function_privilege('service_role', 'console.create_first_owner_link(text, text)', 'execute')::text, 'false', 'service_role cannot create a first-Owner link');
+select is(has_function_privilege('anon', 'console.has_owner()', 'execute')::text, 'false', 'anon cannot call has_owner directly');
+select is(has_function_privilege('authenticated', 'console.has_owner()', 'execute')::text, 'false', 'authenticated cannot call has_owner directly');
+select is(has_function_privilege('service_role', 'console.has_owner()', 'execute')::text, 'false', 'service_role cannot call has_owner directly');
+
+-- Fix round 1: has_owner() is the one place the "does an Owner already
+-- exist" guard is spelled out, shared by create_first_owner_link and the
+-- redemption function alike -- pin its meaning here so an edit to one
+-- caller's copy can never again silently diverge from the other's.
+insert into auth.users (id, email) values ('e1111111-1111-1111-1111-111111111111', 'has-owner-check@trakline.in');
+
+select is(console.has_owner(), false, 'has_owner is false on an empty console');
+
+insert into console.members (user_id, email, name, role, status)
+values ('e1111111-1111-1111-1111-111111111111', 'has-owner-check@trakline.in', 'Check', 'owner', 'setup');
+select is(console.has_owner(), true, 'has_owner is true with an Owner in setup');
+
+update console.members set status = 'active' where email = 'has-owner-check@trakline.in';
+select is(console.has_owner(), true, 'has_owner is true with an Owner active');
+
+update console.members set status = 'removed' where email = 'has-owner-check@trakline.in';
+select is(console.has_owner(), false, 'has_owner is false again once that Owner is removed');
+
+delete from auth.users;
 
 -- ---------------------------------------------------------------------------
 -- Additions beyond the brief's seven. Each block runs against a clean slate
@@ -112,6 +143,40 @@ select is(
   ),
   null,
   'an expired setup link cannot be redeemed'
+);
+
+delete from console.setup_links;
+delete from auth.users;
+
+-- Fix round 1, finding 2: the guard treats a removed Owner as "no Owner", so
+-- the console can be recovered -- but redeeming a fresh link for that same
+-- removed Owner's own address must reinstate them, not raise a unique
+-- violation against their still-existing (removed) console.members row.
+-- lives_ok, not is(): before the fix this call raised, and asserting on a
+-- raising expression directly would abort the whole transaction rather than
+-- report one clean "not ok".
+insert into auth.users (id, email) values ('d1111111-1111-1111-1111-111111111111', 'reinstated-owner@trakline.in');
+insert into console.members (user_id, email, name, role, status)
+values ('d1111111-1111-1111-1111-111111111111', 'reinstated-owner@trakline.in', 'Former Owner', 'owner', 'removed');
+
+select console.create_first_owner_link('reinstated-owner@trakline.in') as reinstate_link;
+
+select lives_ok(
+  $$select public.console_auth_redeem_setup_link(
+    (select token_hash from console.setup_links where email = 'reinstated-owner@trakline.in'),
+    'd1111111-1111-1111-1111-111111111111', 'reinstated-owner@trakline.in', 'Reinstated Owner', 'development'
+  )$$,
+  'redeeming a fresh link for a removed Owner reinstates them instead of raising a unique violation'
+);
+select is(
+  (select role from console.members where user_id = 'd1111111-1111-1111-1111-111111111111')::text,
+  'owner',
+  'the reinstated Owner keeps the owner role'
+);
+select is(
+  (select status from console.members where user_id = 'd1111111-1111-1111-1111-111111111111')::text,
+  'setup',
+  'the reinstated Owner returns to setup, not straight to active'
 );
 
 delete from console.setup_links;

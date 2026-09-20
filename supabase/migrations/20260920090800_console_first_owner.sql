@@ -2,6 +2,24 @@
 -- console, and the redemption the server performs when the link is opened.
 -- There is no invite to accept here, because there is nobody yet to send one.
 
+-- Shared by both functions below, so the guard's meaning lives in exactly one
+-- place. It also has no caller of its own: revoked from every role, the same
+-- as create_first_owner_link, since letting it stand alone would only be
+-- another way to leak whether the console already has an Owner.
+create or replace function console.has_owner()
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1 from console.members where role = 'owner' and status <> 'removed'
+  );
+$$;
+
+revoke all on function console.has_owner() from public, anon, authenticated, service_role;
+
 create or replace function console.create_first_owner_link(
   p_email    text,
   p_base_url text default 'https://admin.trakline.in'
@@ -14,7 +32,7 @@ as $$
 declare
   v_token text;
 begin
-  if exists (select 1 from console.members where role = 'owner' and status <> 'removed') then
+  if console.has_owner() then
     raise exception 'the console already has an Owner';
   end if;
 
@@ -28,7 +46,9 @@ end;
 $$;
 
 -- Run only from the Supabase SQL editor, as the owner of the database: no
--- role is granted execute, not even service_role.
+-- role is granted execute, not even service_role. Losing a link before it is
+-- redeemed is a real scenario, so this stays free to issue more than one --
+-- the redemption side below is what makes only the first one count.
 revoke all on function console.create_first_owner_link(text, text) from public, anon, authenticated, service_role;
 
 create or replace function public.console_auth_redeem_setup_link(
@@ -47,10 +67,17 @@ declare
   v_link   console.setup_links;
   v_member console.members;
 begin
+  -- Redemption happens once in the console's life, and two links redeemed at
+  -- the same moment would both pass an unlocked guard: has_owner() is a
+  -- plain, unlocked read under READ COMMITTED, so two concurrent callers
+  -- could each see "no Owner yet", each pass, and each insert their own
+  -- member row before either commits. Serialise them first.
+  perform pg_advisory_xact_lock(hashtext('console.first_owner'));
+
   -- The same guard `create_first_owner_link` uses. Matching on `active` alone
   -- would let a second link redeem while the first Owner is still in setup,
   -- and the console would have two Owners.
-  if exists (select 1 from console.members where role = 'owner' and status <> 'removed') then
+  if console.has_owner() then
     return null;
   end if;
 
@@ -79,8 +106,14 @@ begin
 
   update console.setup_links set used_at = now() where id = v_link.id;
 
+  -- has_owner() treats a removed Owner as "no Owner", so the console can be
+  -- recovered -- but that removed Owner's own console.members row still
+  -- exists at their user_id. Mirror console_auth_accept_invite's own upsert
+  -- so reinstating them updates that row instead of raising a unique
+  -- violation against it.
   insert into console.members (user_id, email, name, role, status)
   values (p_user, v_link.email, p_name, 'owner', 'setup')
+  on conflict (user_id) do update set role = excluded.role, status = 'setup'
   returning * into v_member;
 
   perform console.write_audit(
