@@ -19,4 +19,19 @@ describe("the e2e outbox", () => {
     expect(held).toHaveLength(50);
     expect(held[0]?.to).toBe("10@trakline.in");
   });
+
+  it("a filtered take returns only the letters for that address", () => {
+    outbox.put(letter("a@trakline.in"));
+    outbox.put(letter("b@trakline.in"));
+    outbox.put(letter("a@trakline.in"));
+    expect(outbox.take("a@trakline.in").map((l) => l.to)).toEqual(["a@trakline.in", "a@trakline.in"]);
+  });
+
+  it("leaves every non-matching letter in place, in order, for a later read", () => {
+    outbox.put(letter("a@trakline.in"));
+    outbox.put(letter("b@trakline.in"));
+    outbox.put(letter("c@trakline.in"));
+    outbox.take("b@trakline.in");
+    expect(outbox.take().map((l) => l.to)).toEqual(["a@trakline.in", "c@trakline.in"]);
+  });
 });

@@ -11,11 +11,20 @@ export const outbox = {
   put(letter: ConsoleLetter): void {
     held = [...held, letter].slice(-LIMIT);
   },
-  /** Everything captured since the last read, oldest first. Reading empties it. */
-  take(): readonly ConsoleLetter[] {
-    const taken = held;
-    held = [];
-    return taken;
+  /**
+   * Oldest first. With no `to`, everything captured since the last read, and reading empties it.
+   * With `to`, only that address's letters -- so one test cannot drain another's -- leaving every
+   * non-matching letter in place, in order, for a later read.
+   */
+  take(to?: string): readonly ConsoleLetter[] {
+    if (to === undefined) {
+      const taken = held;
+      held = [];
+      return taken;
+    }
+    const matching = held.filter((letter) => letter.to === to);
+    held = held.filter((letter) => letter.to !== to);
+    return matching;
   },
   clear(): void {
     held = [];

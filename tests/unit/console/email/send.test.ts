@@ -1,7 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { outbox } from "@/console/email/outbox";
 import { sendConsoleEmail } from "@/console/email/send";
-import { resetEnvCache } from "@/services/env";
+import { env, resetEnvCache } from "@/services/env";
+
+// `env` becomes a spy that calls straight through to the real implementation, so every test below
+// keeps behaving exactly as it did against the unmocked module (env() still driven by vi.stubEnv).
+// Only "reports a failure rather than throwing when the environment itself cannot be read" overrides
+// it, for a single call, to prove sendConsoleEmail catches a throw from env() and not only from fetch.
+vi.mock("@/services/env", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/services/env")>();
+  return { ...actual, env: vi.fn(actual.env) };
+});
 
 const letter = { to: "asha@trakline.in", subject: "Your Trakline console sign-in link", text: "Open this once: https://admin.trakline.in/auth/confirm?token_hash=x&type=magiclink" };
 
@@ -58,9 +67,28 @@ describe("sendConsoleEmail", () => {
     await expect(sendConsoleEmail(letter)).resolves.toBe("failed");
   });
 
-  it("reports a failure when a send is not configured at all", async () => {
+  it("reports a failure when fetch itself rejects, spec §5's literal DNS/TLS/timeout case", async () => {
+    vi.stubEnv("RESEND_API_KEY", "re_aaaaaaaaaaaaaaaaaaaaaaaa");
+    vi.stubGlobal("fetch", vi.fn(() => Promise.reject(new Error("network unreachable"))));
+    resetEnvCache();
+    await expect(sendConsoleEmail(letter)).resolves.toBe("failed");
+  });
+
+  it("reports a failure rather than throwing when the environment itself cannot be read", async () => {
+    vi.mocked(env).mockImplementationOnce(() => {
+      throw new Error("Invalid environment: DATA_KEY: missing DATA_KEY.");
+    });
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
+    await expect(sendConsoleEmail(letter)).resolves.toBe("failed");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("reports a failure when a send is not configured at all", async () => {
+    vi.stubEnv("RESEND_API_KEY", "");
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    resetEnvCache();
     await expect(sendConsoleEmail(letter)).resolves.toBe("failed");
     expect(fetchSpy).not.toHaveBeenCalled();
   });

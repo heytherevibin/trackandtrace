@@ -92,7 +92,7 @@ const envSchema = z
     if (v.NODE_ENV === "production" && v.PNR_SOURCE === "fixture") {
       ctx.addIssue({ code: "custom", path: ["PNR_SOURCE"], message: "PNR_SOURCE=fixture is refused in production." });
     }
-    if (v.NODE_ENV === "production" && v.E2E) {
+    if ((v.NODE_ENV === "production" || v.VERCEL_ENV === "production") && v.E2E) {
       ctx.addIssue({ code: "custom", path: ["E2E"], message: "E2E=1 is refused in production." });
     }
     const storeGaps = [

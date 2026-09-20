@@ -19,16 +19,19 @@ const RESEND_URL = "https://api.resend.com/emails";
  * decides what to do with the outcome.
  */
 export async function sendConsoleEmail(letter: ConsoleLetter): Promise<SendOutcome> {
-  const current = env();
-  if (current.E2E) {
-    outbox.put(letter);
-    return "captured";
-  }
-  if (!current.RESEND_API_KEY) {
-    log.warn("[console] no RESEND_API_KEY: console email is not configured for this deployment");
-    return "failed";
-  }
+  // Everything, including env(), runs inside the try: a cold instance whose environment fails to
+  // parse throws from env() itself, not only from fetch, and this function's one contract is that
+  // it never rejects.
   try {
+    const current = env();
+    if (current.E2E) {
+      outbox.put(letter);
+      return "captured";
+    }
+    if (!current.RESEND_API_KEY) {
+      log.warn("[console] no RESEND_API_KEY: console email is not configured for this deployment");
+      return "failed";
+    }
     const response = await fetch(RESEND_URL, {
       method: "POST",
       headers: { Authorization: `Bearer ${current.RESEND_API_KEY}`, "Content-Type": "application/json" },
@@ -38,7 +41,7 @@ export async function sendConsoleEmail(letter: ConsoleLetter): Promise<SendOutco
     log.warn("[console] resend refused a send", { status: response.status });
     return "failed";
   } catch (err) {
-    log.warn("[console] resend could not be reached", err);
+    log.warn("[console] could not send console email", err);
     return "failed";
   }
 }

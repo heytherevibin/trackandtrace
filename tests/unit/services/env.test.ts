@@ -45,6 +45,12 @@ describe("parseEnv", () => {
     if (!parsed.ok) expect(parsed.issues.join(" ")).toMatch(/E2E=1 is refused in production/);
   });
 
+  it("refuses the e2e outbox on a production deployment even when NODE_ENV itself says otherwise", () => {
+    const parsed = parseEnv({ NODE_ENV: "development", VERCEL_ENV: "production", E2E: "1" });
+    expect(parsed.ok).toBe(false);
+    if (!parsed.ok) expect(parsed.issues.join(" ")).toMatch(/E2E=1 is refused in production/);
+  });
+
   it("defaults the console's sender without needing a variable", () => {
     const parsed = parseEnv({});
     expect(parsed.ok && parsed.env.CONSOLE_EMAIL_FROM).toBe("Trakline Console <console@trakline.in>");
