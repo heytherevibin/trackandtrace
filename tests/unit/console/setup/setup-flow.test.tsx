@@ -1,12 +1,13 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { AddKeyOutcome } from "@/console/keys/client";
 
-// vi.mock's factory is hoisted above a plain top-level const, and this one reads addKey directly in
-// the object it returns rather than inside a nested closure, so it needs vi.hoisted (same trap as
-// tests/integration/console/setup.test.ts's startConsoleSession mock).
-const { addKey } = vi.hoisted(() => ({ addKey: vi.fn() }));
-vi.mock("@/console/keys/client", () => ({ addKey, keysUsable: () => true, tapToSignIn: vi.fn() }));
+// vi.mock's factory is hoisted above a plain top-level const, and this one reads addKey/keysUsable
+// directly in the object it returns rather than inside a nested closure, so it needs vi.hoisted
+// (same trap as tests/integration/console/setup.test.ts's startConsoleSession mock).
+const { addKey, keysUsable } = vi.hoisted(() => ({ addKey: vi.fn(), keysUsable: vi.fn(() => true) }));
+vi.mock("@/console/keys/client", () => ({ addKey, keysUsable, tapToSignIn: vi.fn() }));
 const replace = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace, refresh: vi.fn() }) }));
 
@@ -15,6 +16,7 @@ import { SetupFlow } from "@/app/console/setup/setup-flow";
 beforeEach(() => {
   vi.clearAllMocks();
   addKey.mockResolvedValue({ kind: "done", keyCount: 1, activated: false });
+  keysUsable.mockReturnValue(true);
 });
 
 describe("Setup", () => {
@@ -61,5 +63,43 @@ describe("Setup", () => {
     await userEvent.type(screen.getByLabelText("Name this key"), "YubiKey 5C");
     await userEvent.click(screen.getByRole("button", { name: "Add key" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("That key is already added. Use a different one.");
+  });
+
+  it("says nothing new when the member dismisses the prompt themselves, and does not advance", async () => {
+    addKey.mockResolvedValue({ kind: "cancelled" });
+    render(<SetupFlow keyCount={0} />);
+    await userEvent.type(screen.getByLabelText("Name this key"), "YubiKey 5C");
+    await userEvent.click(screen.getByRole("button", { name: "Add key" }));
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByRole("heading", { name: "Add your first key" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Add key" })).toBeEnabled();
+  });
+
+  it("reads Touch your key… while a ceremony is running, and disables the button", async () => {
+    let resolveAdd: ((outcome: AddKeyOutcome) => void) | undefined;
+    addKey.mockImplementation(() => new Promise<AddKeyOutcome>((resolve) => (resolveAdd = resolve)));
+    render(<SetupFlow keyCount={0} />);
+    await userEvent.type(screen.getByLabelText("Name this key"), "YubiKey 5C");
+    await userEvent.click(screen.getByRole("button", { name: "Add key" }));
+    expect(await screen.findByRole("button", { name: "Touch your key…" })).toBeDisabled();
+    resolveAdd?.({ kind: "done", keyCount: 1, activated: false });
+    await screen.findByRole("heading", { name: "Add a second key" });
+  });
+
+  it("says so when the browser cannot use keys at all, and disables Add key", () => {
+    keysUsable.mockReturnValue(false);
+    render(<SetupFlow keyCount={0} />);
+    expect(screen.getByRole("alert")).toHaveTextContent("This browser can't use security keys. Try a current Chrome, Safari, Edge or Firefox.");
+    expect(screen.getByRole("button", { name: "Add key" })).toBeDisabled();
+  });
+
+  it("stays off step 3 on keyCount alone -- only activation means key-verified", async () => {
+    addKey.mockResolvedValue({ kind: "done", keyCount: 2, activated: false });
+    render(<SetupFlow keyCount={1} />);
+    await userEvent.type(screen.getByLabelText("Name this key"), "iPhone");
+    await userEvent.click(screen.getByRole("button", { name: "Add key" }));
+    expect(await screen.findByText("iPhone")).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Add a second key" })).toBeVisible();
+    expect(screen.queryByRole("heading", { name: "You're set up" })).not.toBeInTheDocument();
   });
 });

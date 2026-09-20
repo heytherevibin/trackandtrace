@@ -17,6 +17,12 @@ const REDEEMED = z.object({ ok: z.literal(true) });
 
 type Stage = { readonly kind: "working" } | { readonly kind: "failed"; readonly message: string };
 
+// /api/setup runs the link lookup, createUser, generateLink, verifyOtp, the redeem RPC and
+// startConsoleSession in sequence -- six-odd round trips to Supabase, not the one or two apiRequest's
+// 8-second default assumes. A timeout here does not just fail the request: it can land after the
+// link was already spent, so the member sees a failure with no way to tell whether it also worked.
+const REDEEM_TIMEOUT_MS = 20_000;
+
 /**
  * The one-time link out of the Supabase SQL editor (spec: no invite, no email -- opening it is the
  * whole credential). Redeems it once against /api/setup, then hands off to the plain /setup route,
@@ -40,8 +46,9 @@ export function RedeemToken({ token }: { readonly token: string }) {
     void (async () => {
       const result = await apiRequest(
         "/api/setup",
-        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token }) },
+        { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token }) },
         REDEEMED,
+        { timeoutMs: REDEEM_TIMEOUT_MS },
       );
       if (result.ok) {
         router.replace(consoleHref("/setup"));

@@ -5,6 +5,7 @@ import { sessionIdFromClaims } from "@/console/auth/member";
 import { consoleEnvironment, startConsoleSession } from "@/console/auth/session";
 import { consoleMessages } from "@/console/messages";
 import { AppError } from "@/services/errors";
+import { log } from "@/services/log";
 import { clientIp } from "@/services/rate-limit";
 
 const s = consoleMessages.session;
@@ -45,12 +46,12 @@ function unavailable(): AppError {
   return new AppError("SOURCE_UNAVAILABLE", s.unavailable, { status: 503 });
 }
 
-/** Best effort: a failed sign-out must never mask the real refusal it follows. */
+/** Best effort: a failed sign-out must never mask the real refusal it follows, but it is logged. */
 async function bestEffortSignOut(db: ConsoleDb): Promise<void> {
   try {
     await db.auth.signOut();
-  } catch {
-    // Nothing to do here: the caller is already refusing.
+  } catch (err) {
+    log.warn("[console] could not sign out an unredeemed setup session", err);
   }
 }
 
@@ -98,7 +99,13 @@ export async function redeemSetupToken(args: {
     const claims = await db.auth.getClaims();
     const sessionId = sessionIdFromClaims(claims.data?.claims);
     const sub = (claims.data?.claims as { sub?: unknown } | undefined)?.sub;
-    if (!sessionId || typeof sub !== "string") return { ok: false, reason: "expired" };
+    if (!sessionId || typeof sub !== "string") {
+      // Told to the member as "expired" (the signature this function returns has no other
+      // reason), but a freshly-verified magic link should always carry both claims -- this is a
+      // technical anomaly, not a spent link, so the real cause is not left silent.
+      log.warn("[console] a verified setup session had no session_id or sub in its claims");
+      return { ok: false, reason: "expired" };
+    }
 
     const redemption = await service.rpc("console_auth_redeem_setup_link", {
       p_token_hash: tokenHashArg,
