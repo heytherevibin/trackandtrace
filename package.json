@@ -38,6 +38,8 @@
     "@base-ui/react": "1.8.0",
     "@fluentui/react-icons": "^2.0.339",
     "@sentry/nextjs": "10.75.0",
+    "@simplewebauthn/browser": "14.0.0",
+    "@simplewebauthn/server": "14.0.2",
     "@supabase/ssr": "0.12.7",
     "@supabase/supabase-js": "2.116.0",
     "@upstash/ratelimit": "2.1.0",
