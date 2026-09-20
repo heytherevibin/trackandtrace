@@ -1,11 +1,27 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(29);
+select plan(38);
 
 select has_table('console', 'audit_log', 'the audit log exists');
 
 -- The enum must carry exactly these labels.
 select enum_has_labels('console', 'audit_result', array['done', 'refused', 'failed'], 'every audit result the plan names');
+
+-- These three are internal-only -- called only from within other
+-- security-definer functions or by trigger machinery in this schema -- and
+-- must lose the default PUBLIC EXECUTE a fresh function is created with, the
+-- same as every other console.* function already does.
+select is(has_function_privilege('service_role', 'console.scrub(text)', 'execute')::text, 'false', 'service_role cannot call the scrubber directly');
+select is(has_function_privilege('authenticated', 'console.scrub(text)', 'execute')::text, 'false', 'authenticated cannot call the scrubber directly');
+select is(has_function_privilege('anon', 'console.scrub(text)', 'execute')::text, 'false', 'anon cannot call the scrubber directly');
+
+select is(has_function_privilege('service_role', 'console.audit_refuse_update()', 'execute')::text, 'false', 'service_role cannot call the update-refusal trigger function directly');
+select is(has_function_privilege('authenticated', 'console.audit_refuse_update()', 'execute')::text, 'false', 'authenticated cannot call the update-refusal trigger function directly');
+select is(has_function_privilege('anon', 'console.audit_refuse_update()', 'execute')::text, 'false', 'anon cannot call the update-refusal trigger function directly');
+
+select is(has_function_privilege('service_role', 'console.audit_only_purge_old()', 'execute')::text, 'false', 'service_role cannot call the purge-guard trigger function directly');
+select is(has_function_privilege('authenticated', 'console.audit_only_purge_old()', 'execute')::text, 'false', 'authenticated cannot call the purge-guard trigger function directly');
+select is(has_function_privilege('anon', 'console.audit_only_purge_old()', 'execute')::text, 'false', 'anon cannot call the purge-guard trigger function directly');
 
 -- All three indexes the migration creates.
 select has_index('console', 'audit_log', 'console_audit_at_idx', 'the at index exists');
