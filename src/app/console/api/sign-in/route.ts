@@ -2,10 +2,12 @@ import { after } from "next/server";
 import { z } from "zod";
 import { assertConsoleAvailable } from "@/console/availability";
 import { sendSignInLink } from "@/console/auth/sign-in-link";
+import { consoleOrigin } from "@/console/hosts";
 import { consoleMessages } from "@/console/messages";
 import { assertSameOrigin } from "@/console/same-origin";
 import { assertSignInAllowed } from "@/console/sign-in-limits";
 import { jsonError, jsonOk } from "@/services/api-response";
+import { env } from "@/services/env";
 import { clientIp } from "@/services/rate-limit";
 import { readBody } from "@/services/request-body";
 
@@ -25,8 +27,10 @@ export async function POST(req: Request): Promise<Response> {
     const { email } = await readBody(req, body);
     const address = email.toLowerCase();
     await assertSignInAllowed(address, clientIp(null, req.headers.get("x-forwarded-for")));
-    const host = req.headers.get("host") ?? new URL(req.url).host;
-    after(() => sendSignInLink(address, host));
+    // Never the raw Host header: consoleOrigin checks it against this environment's console host
+    // first, and in production returns the constant, not whatever a caller sent.
+    const origin = consoleOrigin(req.headers.get("host"), env().VERCEL_ENV);
+    after(() => sendSignInLink(address, origin));
     return jsonOk({ ok: true });
   } catch (err) {
     return jsonError(err);

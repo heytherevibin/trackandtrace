@@ -17,6 +17,9 @@ function post(body: unknown, headers: Record<string, string | null> = {}): Reque
     "content-type": "application/json",
     "sec-fetch-site": "same-origin",
     "x-forwarded-for": "198.51.100.7",
+    // consoleOrigin reads this directly -- it is never inferred from the request URL -- so a test
+    // that wants the route to recognise this connection as the console must set it explicitly.
+    host: "admin.localhost:4210",
   };
   for (const [key, value] of Object.entries(headers)) {
     if (value === null) {
@@ -135,10 +138,10 @@ describe("POST /api/sign-in on the console", () => {
 
     it("lower-cases the address before it reaches the lookup", async () => {
       await route.POST(post({ email: "Asha@Trakline.IN" }));
-      expect(sendSignInLink).toHaveBeenCalledWith("asha@trakline.in", "admin.localhost:4210");
+      expect(sendSignInLink).toHaveBeenCalledWith("asha@trakline.in", "http://admin.localhost:4210");
     });
 
-    it("schedules the send after the answer, so the answer's timing says nothing", async () => {
+    it("sends through after(), not before the answer", async () => {
       const response = await route.POST(post({ email: "asha@trakline.in" }));
       expect(response.headers.get("Cache-Control")).toBe("no-store");
       expect(sendSignInLink).toHaveBeenCalledOnce();

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { consoleHostFor, isConsoleHost, requestHost } from "@/console/hosts";
+import { consoleHostFor, consoleOrigin, isConsoleHost, requestHost } from "@/console/hosts";
 
 describe("requestHost", () => {
   it.each([
@@ -33,5 +33,26 @@ describe("the console host", () => {
     expect(isConsoleHost("admin.trakline.in", "preview")).toBe(false);
     expect(isConsoleHost("trakline.in", "production")).toBe(false);
     expect(isConsoleHost("admin.trakline.in.evil.com", "production")).toBe(false);
+  });
+});
+
+describe("consoleOrigin", () => {
+  it("is the production constant in production, ignoring a forged port on the header", () => {
+    expect(consoleOrigin("admin.trakline.in", "production")).toBe("https://admin.trakline.in");
+    expect(consoleOrigin("admin.trakline.in:9999", "production")).toBe("https://admin.trakline.in");
+  });
+
+  it("is the header, port included, for the local host outside production", () => {
+    expect(consoleOrigin("admin.localhost:4210", undefined)).toBe("http://admin.localhost:4210");
+    expect(consoleOrigin("admin.localhost:4211", "preview")).toBe("http://admin.localhost:4211");
+  });
+
+  it.each([
+    ["a traveller host", "trakline.in", "production"],
+    ["an unrelated host", "evil.example", "production"],
+    ["a missing Host header", null, "production"],
+    ["the production host outside production", "admin.trakline.in", undefined],
+  ])("is empty for %s", (_label, header, vercelEnv) => {
+    expect(consoleOrigin(header, vercelEnv)).toBe("");
   });
 });

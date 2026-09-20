@@ -23,3 +23,17 @@ export function consoleHostFor(vercelEnv: string | undefined): typeof CONSOLE_HO
 export function isConsoleHost(header: string | null, vercelEnv: string | undefined): boolean {
   return requestHost(header) === consoleHostFor(vercelEnv);
 }
+
+/**
+ * The console's own origin for this request, for building an address we will mail someone. The
+ * Host header decides which host answered, so it is read — but only after it is checked against
+ * this environment's console host, and in production the origin is the constant, not the header:
+ * a member-facing link must never be assemblable from client input.
+ */
+export function consoleOrigin(hostHeader: string | null, vercelEnv: string | undefined): string {
+  if (!isConsoleHost(hostHeader, vercelEnv)) return "";
+  if (vercelEnv === "production") return `https://${CONSOLE_HOST_PRODUCTION}`;
+  // Outside production the port matters (the dev server is on 4210, the console e2e on 4211) and
+  // the hostname has already been checked against admin.localhost above.
+  return `http://${(hostHeader ?? "").trim().toLowerCase()}`;
+}
