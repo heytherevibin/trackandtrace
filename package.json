@@ -30,6 +30,7 @@
     "db:config:diff": "npx supabase@2.117.0 config diff",
     "db:config": "npx supabase@2.117.0 config push",
     "db:migration": "npx supabase@2.117.0 migration new",
+    "db:test": "npx supabase@2.117.0 test db",
     "source:probe": "node --env-file=.env.local scripts/probe-rapidapi.mjs",
     "source:probe:railkit": "node --env-file=.env.local scripts/probe-railkit.mjs"
   },
