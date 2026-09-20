@@ -74,6 +74,10 @@ const envSchema = z
     E2E: flag.default("0").transform((v) => v === "1"),
     /** Pins the fixture clock so end-to-end runs are deterministic. */
     E2E_NOW: z.iso.datetime().optional(),
+    /** Server only. Resend sending key for console email; entered by the owner through a hidden prompt. */
+    RESEND_API_KEY: z.string().min(20).optional(),
+    /** Who console email comes from. One default, so no deployment has to set it. */
+    CONSOLE_EMAIL_FROM: z.string().min(5).max(120).default("Trakline Console <console@trakline.in>"),
   })
   .superRefine((v, ctx) => {
     if ((v.PNR_SOURCE === "rapidapi" || v.PNR_FALLBACK === "rapidapi") && !v.RAPIDAPI_KEY) {
@@ -87,6 +91,9 @@ const envSchema = z
     }
     if (v.NODE_ENV === "production" && v.PNR_SOURCE === "fixture") {
       ctx.addIssue({ code: "custom", path: ["PNR_SOURCE"], message: "PNR_SOURCE=fixture is refused in production." });
+    }
+    if (v.NODE_ENV === "production" && v.E2E) {
+      ctx.addIssue({ code: "custom", path: ["E2E"], message: "E2E=1 is refused in production." });
     }
     const storeGaps = [
       ...(upstashCredentials(v) ? [] : ["missing the Upstash URL and token (KV_REST_API_* or UPSTASH_REDIS_REST_*)"]),

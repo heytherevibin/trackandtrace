@@ -38,6 +38,17 @@ describe("parseEnv", () => {
   it("rejects an unknown PNR_SOURCE value", () => {
     expect(parseEnv({ ...dev, PNR_SOURCE: "demo" }).ok).toBe(false);
   });
+
+  it("refuses the e2e outbox in production", () => {
+    const parsed = parseEnv({ NODE_ENV: "production", E2E: "1" });
+    expect(parsed.ok).toBe(false);
+    if (!parsed.ok) expect(parsed.issues.join(" ")).toMatch(/E2E=1 is refused in production/);
+  });
+
+  it("defaults the console's sender without needing a variable", () => {
+    const parsed = parseEnv({});
+    expect(parsed.ok && parsed.env.CONSOLE_EMAIL_FROM).toBe("Trakline Console <console@trakline.in>");
+  });
 });
 
 describe("derived flags", () => {
