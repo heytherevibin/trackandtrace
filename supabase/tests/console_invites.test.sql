@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(14);
+select plan(18);
 
 select has_table('console', 'invites', 'invites exists');
 select has_table('console', 'setup_links', 'setup_links exists');
@@ -92,6 +92,39 @@ select throws_ok(
   '23514'::char(5),
   null,
   'setup_links must have lowercase email'
+);
+
+-- Expiry window constraints: invites must fall within 7 days
+select throws_ok(
+  $$insert into console.invites (email, role, invited_by, token_hash, expires_at)
+    values ('toolong@trakline.in', 'viewer', '11111111-1111-1111-1111-111111111111', '\x11'::bytea, now() + interval '30 days')$$,
+  '23514'::char(5),
+  null,
+  'an invite cannot outlast a week'
+);
+
+select throws_ok(
+  $$insert into console.invites (email, role, invited_by, token_hash, expires_at)
+    values ('tooearly@trakline.in', 'viewer', '11111111-1111-1111-1111-111111111111', '\x22'::bytea, now() - interval '1 hour')$$,
+  '23514'::char(5),
+  null,
+  'an invite cannot arrive expired'
+);
+
+-- Expiry window constraints: setup links must fall within 24 hours
+select throws_ok(
+  $$insert into console.setup_links (email, token_hash, expires_at)
+    values ('toolong@trakline.in', '\x33'::bytea, now() + interval '48 hours')$$,
+  '23514'::char(5),
+  null,
+  'the first-Owner link cannot outlast a day'
+);
+
+-- Boundary test: exactly 7 days should be accepted
+select lives_ok(
+  $$insert into console.invites (email, role, invited_by, token_hash, expires_at)
+    values ('boundary@trakline.in', 'viewer', '11111111-1111-1111-1111-111111111111', '\x44'::bytea, now() + interval '7 days')$$,
+  'a week to the second is still a week'
 );
 
 select * from finish();

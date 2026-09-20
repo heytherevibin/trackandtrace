@@ -1,4 +1,6 @@
 -- Invites for new members, and the one-time link that makes the first Owner.
+-- The spec fixes the window at 7 days for invites; the creating function still supplies expires_at,
+-- but the database enforces it stays within bounds.
 
 create table console.invites (
   id           uuid primary key default gen_random_uuid(),
@@ -11,7 +13,8 @@ create table console.invites (
   accepted_at  timestamptz,
   revoked_at   timestamptz,
   created_at   timestamptz not null default now(),
-  constraint console_invites_token_key unique (token_hash)
+  constraint console_invites_token_key unique (token_hash),
+  constraint console_invites_expiry_window check (expires_at > created_at and expires_at <= created_at + interval '7 days')
 );
 
 -- One live invite per address. Accepted and revoked ones fall out of the index.
@@ -25,7 +28,8 @@ create table console.setup_links (
   expires_at  timestamptz not null,
   used_at     timestamptz,
   created_at  timestamptz not null default now(),
-  constraint console_setup_links_token_key unique (token_hash)
+  constraint console_setup_links_token_key unique (token_hash),
+  constraint console_setup_links_expiry_window check (expires_at > created_at and expires_at <= created_at + interval '24 hours')
 );
 
 revoke all on console.invites, console.setup_links from anon, authenticated;
