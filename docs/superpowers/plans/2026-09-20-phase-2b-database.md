@@ -21,6 +21,7 @@
 - **The audit log is append-only.** `update` and `delete` are revoked from every role and refused by a trigger. Only `console.purge_audit()` deletes, and only rows older than two years.
 - **Reasons are scrubbed in SQL as well as in the server**: PNR-like ten-digit runs, email addresses and IP addresses never reach storage.
 - **TDD:** the pgTAP test lands first and is run to see it fail. Conventional commits, with **no Co-Authored-By trailer**.
+- **Tests hold the constraints, not the names.** `has_table` and `has_enum` prove nothing about shape, so every task's test also asserts what it creates: `enum_has_labels` for each enum, `has_index` for each index, `col_not_null` and `col_is_unique` for the columns that carry a rule, and a `throws_ok` on the SQLSTATE for each CHECK and foreign key that matters (`23514`, `23503`, `23505`). Use the four-argument `throws_ok` — the three-argument form matches the error message text exactly, which is brittle.
 - **Before each commit:** `npm run db:test` (and `npm run db:reset` when a migration changed). **Before the PR:** also `npm run typecheck && npm run lint && npm run test:unit && npm run build`.
 - **PR:** into `main`, with `verify` and `e2e` green, a body ending "🤖 Generated with [Claude Code](https://claude.com/claude-code)", and merged only with the owner's go-ahead.
 
