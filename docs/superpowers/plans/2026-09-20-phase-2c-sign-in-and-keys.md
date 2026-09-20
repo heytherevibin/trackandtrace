@@ -1037,7 +1037,14 @@ git commit -m "feat(console): the session guard every console surface runs first
   - `outbox.take(): readonly ConsoleLetter[]`, `outbox.put(letter)`, `outbox.clear()`
   - `consoleMessages.email.signIn({ name, link })` → `{ subject, text }`
   - `env().RESEND_API_KEY`, `env().CONSOLE_EMAIL_FROM` (default `Trakline Console <console@trakline.in>`)
-  - `E2E=1` is refused when `NODE_ENV=production`.
+  - `E2E=1` is refused when `NODE_ENV=production` **or** `VERCEL_ENV=production`.
+
+> **Amended during execution, after this task's review.** The code blocks below are the first draft; five defects in them were found and fixed in the same task, and the landed code is the authority:
+> 1. `const current = env();` moves **inside** `sendConsoleEmail`'s `try`. `env()` throws in production on a cold instance when any unrelated variable is invalid, which would have broken the one contract this function has.
+> 2. A test stubs `fetch` to **reject**, asserting `"failed"` — spec §5's literal "Resend down" case, which nothing covered.
+> 3. A second test stubs `env` itself to throw, so defect 1 cannot silently return.
+> 4. `outbox.take(to?)` takes an optional recipient, returning only that address's letters and **putting the rest back in order**; the route reads `to` from its query string. Without it, two specs signing in at once can each drain the other's letter.
+> 5. The `E2E=1` rule also fires on `VERCEL_ENV=production`, matching the `deployed` convention in the same file, and the "not configured" test stubs `RESEND_API_KEY` to `""` rather than relying on it being ambiently unset.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -4125,8 +4132,12 @@ export async function addVirtualKey(page: Page, transport: "usb" | "internal" = 
 }
 
 /** The letters the console captured since the last read (src/app/console/api/test-outbox). */
-export async function readOutbox(page: Page): Promise<readonly { to: string; subject: string; text: string }[]> {
-  const response = await page.request.get("/api/test-outbox");
+export async function readOutbox(page: Page, to?: string): Promise<readonly { to: string; subject: string; text: string }[]> {
+  // Always ask for one address when you have one: an unfiltered read drains the whole outbox, so
+  // two specs signing in at once would each be able to swallow the other's letter. With `to`, the
+  // route hands back only that address's letters and puts the rest back.
+  const path = to ? `/api/test-outbox?to=${encodeURIComponent(to)}` : "/api/test-outbox";
+  const response = await page.request.get(path);
   const body = (await response.json()) as { letters?: { to: string; subject: string; text: string }[] };
   return body.letters ?? [];
 }
@@ -4242,10 +4253,10 @@ const BASE = "http://admin.localhost:4211";
 
 test.beforeEach(() => resetConsole());
 
-/** Follows the one sign-in link in the outbox, or fails saying what was there instead. */
-async function openTheLink(page: Parameters<typeof readOutbox>[0]): Promise<void> {
-  await expect.poll(async () => (await readOutbox(page)).length, { timeout: 10_000 }).toBeGreaterThan(0);
-  const [letter] = await readOutbox(page);
+/** Follows the one sign-in link sent to `email`, or fails saying what was there instead. */
+async function openTheLink(page: Parameters<typeof readOutbox>[0], email: string): Promise<void> {
+  await expect.poll(async () => (await readOutbox(page, email)).length, { timeout: 10_000 }).toBeGreaterThan(0);
+  const [letter] = await readOutbox(page, email);
   expect(letter?.subject).toBe("Your Trakline console sign-in link");
   const link = /https?:\/\/\S+\/auth\/confirm\S+/.exec(letter?.text ?? "")?.[0];
   expect(link, `no confirm link in: ${letter?.text}`).toBeTruthy();
@@ -4259,12 +4270,12 @@ test("a member signs out and back in with the link and a tap", async ({ page, ba
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Console sign in" })).toBeVisible();
 
-  await readOutbox(page); // drain anything setup left behind
+  await readOutbox(page, email); // drain anything setup left behind for this address
   await page.getByLabel("Console email").fill(email);
   await page.getByRole("button", { name: "Email me a sign-in link" }).click();
   await expect(page.getByRole("heading", { name: "Check your inbox" })).toBeVisible();
 
-  await openTheLink(page);
+  await openTheLink(page, email);
   await page.getByRole("button", { name: "Tap your key" }).click();
   await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
 });
@@ -4272,10 +4283,10 @@ test("a member signs out and back in with the link and a tap", async ({ page, ba
 test("the link alone opens nothing: without a tap the console stays shut", async ({ page, baseURL }) => {
   const email = await setUpFirstOwner(page, baseURL ?? BASE);
   await page.getByRole("button", { name: "Sign out" }).click();
-  await readOutbox(page);
+  await readOutbox(page, email);
   await page.getByLabel("Console email").fill(email);
   await page.getByRole("button", { name: "Email me a sign-in link" }).click();
-  await openTheLink(page);
+  await openTheLink(page, email);
 
   // The link session exists but is not key-verified, so the console's home sends it back.
   await page.goto("/");
@@ -4283,14 +4294,14 @@ test("the link alone opens nothing: without a tap the console stays shut", async
 });
 
 test("a stranger's address gets the same answer and no letter", async ({ page }) => {
+  const stranger = `stranger-${Date.now()}@example.com`;
   await page.goto("/login");
-  await readOutbox(page); // drain
-  await page.getByLabel("Console email").fill(`stranger-${Date.now()}@example.com`);
+  await page.getByLabel("Console email").fill(stranger);
   await page.getByRole("button", { name: "Email me a sign-in link" }).click();
   await expect(page.getByText("If this address belongs to a console member, a sign-in link is on its way.")).toBeVisible();
   // The send runs in after(), so give it longer than it could possibly need before saying nothing came.
   await page.waitForTimeout(2000);
-  expect(await readOutbox(page)).toEqual([]);
+  expect(await readOutbox(page, stranger)).toEqual([]);
 });
 ```
 
