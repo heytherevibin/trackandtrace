@@ -50,6 +50,11 @@ export function consoleAddressHash(ip: string): string {
   return keyedHash(deriveDataKeys(dataKey).clientId, addressKey(ip)).slice(0, 128);
 }
 
+/** Which deployment a row belongs to. Settings and the audit log are per environment (spec §F). */
+export function consoleEnvironment(): string {
+  return env().VERCEL_ENV ?? env().NODE_ENV;
+}
+
 /** Setup until two keys exist (spec §C step 2), the key step afterwards. */
 export function nextAfterConfirm(keyCount: number): "/setup" | "/keys" {
   return keyCount < 2 ? "/setup" : "/keys";

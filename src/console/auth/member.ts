@@ -55,6 +55,39 @@ export function parseAuthMember(value: unknown): AuthMember | null {
   return { userId: user_id, email, name, role, status, keyCount: key_count };
 }
 
+export interface LinkSession {
+  readonly sessionId: string;
+  readonly memberId: string;
+  readonly email: string;
+  readonly name: string;
+  readonly role: ConsoleRole;
+  readonly status: ConsoleMemberStatus;
+  readonly keyVerified: boolean;
+  readonly keyCount: number;
+}
+
+const linkSessionShape = shape.omit({ user_id: true }).extend({
+  session_id: z.guid(),
+  member_id: z.guid(),
+  key_verified: z.boolean(),
+  key_count: z.number().int().nonnegative(),
+});
+
+/**
+ * `console_auth_session` returns this shape: the pre-guard for the key step, which runs before a
+ * session is key-verified (that is what these endpoints exist to produce). Parsed, not cast, for
+ * the same reason as `parseAuthMember` -- a drifted field name must fail closed rather than hand a
+ * caller a malformed session it treats as real. Its caller (`requireLinkSession`) is the one that
+ * turns a null here into "session ended"; nothing about "not a session" is an ordinary answer this
+ * deep into the key step, unlike the address lookup `parseAuthMember` guards.
+ */
+export function parseLinkSession(value: unknown): LinkSession | null {
+  const parsed = linkSessionShape.safeParse(value);
+  if (!parsed.success) return null;
+  const { session_id, member_id, email, name, role, status, key_verified, key_count } = parsed.data;
+  return { sessionId: session_id, memberId: member_id, email, name, role, status, keyVerified: key_verified, keyCount: key_count };
+}
+
 /**
  * The console session is keyed by the JWT's own `session_id` claim, because that is what
  * `console.current_member()` reads back out of `request.jwt.claims`. No other id would ever match.

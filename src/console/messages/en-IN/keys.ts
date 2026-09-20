@@ -6,4 +6,5 @@ export const keys = {
   notYours: "This key isn't one of yours.",
   alreadyAdded: "That key is already added. Use a different one.",
   unsupported: "This browser can't use security keys. Try a current Chrome, Safari, Edge or Firefox.",
+  noKeysYet: "Add a security key before signing in with one.",
 } as const satisfies MessageTree;

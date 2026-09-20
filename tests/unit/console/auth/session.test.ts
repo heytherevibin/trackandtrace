@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ConsoleDb } from "@/console/auth/db";
-import { consoleAddressHash, deviceLabel, nextAfterConfirm, startConsoleSession } from "@/console/auth/session";
+import { consoleAddressHash, consoleEnvironment, deviceLabel, nextAfterConfirm, startConsoleSession } from "@/console/auth/session";
 import { resetEnvCache } from "@/services/env";
 
 const CHROME_MAC = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36";
@@ -83,5 +83,22 @@ describe("startConsoleSession", () => {
       p_device_label: "Chrome on macOS",
       p_address_hash: "local",
     });
+  });
+});
+
+describe("consoleEnvironment", () => {
+  it("names the deployment, falling back to the run mode", () => {
+    expect(consoleEnvironment()).toBe("test");
+    // Ruling R1 (tests/unit/proxy.test.ts, tests/unit/console/keys/rp.test.ts): env()'s superRefine
+    // refuses a deployed VERCEL_ENV without the shared store, so a bare VERCEL_ENV=production stub
+    // fails that parse and silently falls back to defaults -- dropping VERCEL_ENV entirely and
+    // leaving this assertion checking the non-production branch. The shared store must be stubbed
+    // too for "production" to be the value actually under test.
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://example.upstash.io");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "token");
+    vi.stubEnv("DATA_KEY", `${"A".repeat(43)}=`);
+    resetEnvCache();
+    expect(consoleEnvironment()).toBe("production");
   });
 });
