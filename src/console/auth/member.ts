@@ -34,6 +34,27 @@ export function parseConsoleMember(value: unknown): ConsoleMember {
   return { userId: user_id, email, name, role, status };
 }
 
+export interface AuthMember extends ConsoleMember {
+  readonly keyCount: number;
+}
+
+const authMemberShape = shape.extend({ key_count: z.number().int().nonnegative() });
+
+/**
+ * `console_auth_member_by_email` returns the same shape `console_me` does, plus `key_count`. This
+ * runs on the confirm route's last gate before a console session exists, where "not a member" is an
+ * ordinary answer, not a failure -- unlike `parseConsoleMember`'s callers, who are already inside a
+ * session and for whom a bad shape really does mean "ended" -- so this returns null rather than
+ * throwing. Parsing the whole shape (not just casting the fields a caller happens to read) means a
+ * drifted field name fails closed here instead of silently no longer excluding a removed member.
+ */
+export function parseAuthMember(value: unknown): AuthMember | null {
+  const parsed = authMemberShape.safeParse(value);
+  if (!parsed.success) return null;
+  const { user_id, email, name, role, status, key_count } = parsed.data;
+  return { userId: user_id, email, name, role, status, keyCount: key_count };
+}
+
 /**
  * The console session is keyed by the JWT's own `session_id` claim, because that is what
  * `console.current_member()` reads back out of `request.jwt.claims`. No other id would ever match.

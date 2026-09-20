@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseConsoleMember, ROLE_RANK, sessionIdFromClaims } from "@/console/auth/member";
+import { parseAuthMember, parseConsoleMember, ROLE_RANK, sessionIdFromClaims } from "@/console/auth/member";
 
 const VALID = {
   user_id: "11111111-1111-1111-1111-111111111111",
@@ -8,6 +8,8 @@ const VALID = {
   role: "owner",
   status: "active",
 };
+
+const VALID_AUTH = { ...VALID, key_count: 2 };
 
 describe("parseConsoleMember", () => {
   it("reads the shape console_me returns", () => {
@@ -26,6 +28,32 @@ describe("parseConsoleMember", () => {
 
   it("refuses null, which is what a missing row looks like over PostgREST", () => {
     expect(() => parseConsoleMember(null)).toThrow(expect.objectContaining({ code: "UNAUTHENTICATED" }));
+  });
+});
+
+describe("parseAuthMember", () => {
+  it("reads the shape console_auth_member_by_email returns", () => {
+    expect(parseAuthMember(VALID_AUTH)).toEqual({
+      userId: "11111111-1111-1111-1111-111111111111",
+      email: "asha@trakline.in",
+      name: "Asha Rao",
+      role: "owner",
+      status: "active",
+      keyCount: 2,
+    });
+  });
+
+  it("is null for a missing row -- 'not a member' is an ordinary answer here, not a thrown error", () => {
+    expect(parseAuthMember(null)).toBeNull();
+  });
+
+  it("is null when status is missing", () => {
+    const { user_id, email, name, role, key_count } = VALID_AUTH;
+    expect(parseAuthMember({ user_id, email, name, role, key_count })).toBeNull();
+  });
+
+  it("is null for a role that isn't one of the four", () => {
+    expect(parseAuthMember({ ...VALID_AUTH, role: "root" })).toBeNull();
   });
 });
 
