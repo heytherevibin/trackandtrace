@@ -33,44 +33,46 @@ export async function addVirtualKey(page: Page, transport: "usb" | "internal" = 
 }
 
 /**
- * UNRESOLVED (see task-12-report.md's "what the real run revealed" section for the full writeup).
- *
  * Registering a second-or-later key always taps an existing one first, then excludes it, in one
- * browser call with no pause the test can step into between the two. Verified directly against a
- * bare `navigator.credentials.create()`, independent of this app and in nine independent variations
- * (order of attachment, presence toggling vs. removal, an assertion chained before the create, a
- * real network round trip, an AbortSignal, the exact `transports` hint the app sends): Chromium's
- * virtual authenticator checks `excludeCredentials` against every authenticator currently attached,
- * not only whichever one would go on to serve the ceremony -- so with both attached at once, the tap
- * succeeds but the registration that follows it fails. A single attached authenticator that already
- * holds the excluded credential still correctly refuses on its own (spec-compliant, and exactly what
- * "the same key twice is refused" below relies on) -- the failure is specific to two being present
- * together, and every one of those nine isolated variations, reproducing this app's exact shape one
- * piece at a time, succeeded once the excluded authenticator's presence simulation was turned off
- * (removal isn't even necessary). Only going through this app's own real click, with a route
- * intercepting `/api/keys/verify` to perform that same swap between the tap and the registration
- * (below), still reproduces the original failure -- consistently, not intermittently, and a 200ms
- * delay after the swap made no difference either way, which rules out a timing explanation rather
- * than supporting one. What differs between the isolated repro and this app's own click was not
- * found in the time this task had. `page.route`'s glob-string form also matched nothing at all
- * against this exact route in this Playwright version, unrelated to the above but worth recording:
- * a `RegExp` is used here instead.
+ * browser call with no pause a test can step into between the two -- so the first key's authenticator
+ * has to be swapped out for a fresh one at exactly that boundary. Verified directly against a bare
+ * `navigator.credentials.create()`, independent of this app, and confirmed with CDP's own
+ * `WebAuthn.getCredentials` (not just trusting the id `create()` returns): Chromium's virtual
+ * authenticator checks `excludeCredentials` against every authenticator currently attached, not only
+ * whichever one would go on to serve the ceremony, even when the excluded credential is a real one a
+ * prior ceremony genuinely registered -- so with both attached at once, the tap succeeds but the
+ * registration that follows it fails. A single attached authenticator that already holds the excluded
+ * credential still correctly refuses on its own (spec-compliant, and exactly what "the same key twice
+ * is refused" below relies on) -- the failure is specific to two being present together, and turning
+ * off the excluded one's presence simulation (removal isn't even necessary) is enough to clear it,
+ * confirmed in isolation every time this was tried.
+ *
+ * That fix intervening from a `page.route` on `/api/keys/verify`'s own network round trip
+ * reproduced the original failure anyway, consistently -- every isolated success above intervenes at
+ * the JS call boundary instead (between an assertion and the following `create()`, in one continuous
+ * chain), never at the network layer, and swapping there is what actually works against this app's
+ * own click too. `navigator.credentials.create` is wrapped once, before the ceremony that needs it:
+ * the wrapped version performs the swap only the first time it sees a call whose own
+ * `excludeCredentials` is non-empty (the tap's assertion doesn't call `create` at all, and the first
+ * key's own registration has nothing to exclude), then defers to the real implementation.
  */
-export const KEYS_VERIFY_URL = /\/api\/keys\/verify$/;
-
 export async function swapAuthenticatorAfterTap(page: Page, spent: VirtualKey, transport: "usb" | "internal"): Promise<void> {
   let swapped = false;
-  await page.route(KEYS_VERIFY_URL, async (route) => {
-    const response = await route.fetch();
-    if (!swapped) {
-      const body = (await response.json().catch(() => null)) as { step?: string } | null;
-      if (body?.step === "register") {
-        swapped = true;
-        await spent.setPresent(false);
-        await addVirtualKey(page, transport);
+  await page.exposeFunction("__ttSwapBeforeExclude", async () => {
+    if (swapped) return;
+    swapped = true;
+    await spent.setPresent(false);
+    await addVirtualKey(page, transport);
+  });
+  await page.evaluate(() => {
+    const real = navigator.credentials.create.bind(navigator.credentials);
+    navigator.credentials.create = (async (options?: CredentialCreationOptions) => {
+      const excludeCredentials = options?.publicKey?.excludeCredentials;
+      if (excludeCredentials && excludeCredentials.length > 0) {
+        await (window as unknown as { __ttSwapBeforeExclude: () => Promise<void> }).__ttSwapBeforeExclude();
       }
-    }
-    await route.fulfill({ response });
+      return real(options);
+    }) as typeof navigator.credentials.create;
   });
 }
 
@@ -118,7 +120,6 @@ export async function setUpFirstOwner(page: Page, baseUrl: string): Promise<stri
   await swapAuthenticatorAfterTap(page, firstKey, "internal");
   await page.getByLabel("Name this key").fill("iPhone");
   await page.getByRole("button", { name: "Add key" }).click();
-  await page.unroute(KEYS_VERIFY_URL);
   await page.getByRole("button", { name: "Open the console" }).click();
   return email;
 }

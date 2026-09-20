@@ -1,4 +1,4 @@
-import { KEYS_VERIFY_URL, addVirtualKey, expect, firstOwnerLink, resetConsole, swapAuthenticatorAfterTap, test } from "./fixtures";
+import { addVirtualKey, expect, firstOwnerLink, resetConsole, swapAuthenticatorAfterTap, test } from "./fixtures";
 
 const BASE = "http://admin.localhost:4211";
 
@@ -21,7 +21,6 @@ test("the first Owner sets up with two keys and lands in the console", async ({ 
   await swapAuthenticatorAfterTap(page, firstKey, "internal");
   await page.getByLabel("Name this key").fill("iPhone");
   await page.getByRole("button", { name: "Add key" }).click();
-  await page.unroute(KEYS_VERIFY_URL);
 
   await expect(page.getByRole("heading", { name: "You're set up" })).toBeVisible();
   await page.getByRole("button", { name: "Open the console" }).click();

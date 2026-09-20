@@ -4,10 +4,27 @@ const BASE = "http://admin.localhost:4211";
 
 test.beforeEach(() => resetConsole());
 
-/** Follows the one sign-in link sent to `email`, or fails saying what was there instead. */
+/**
+ * Follows the one sign-in link sent to `email`, or fails saying what was there instead.
+ *
+ * `readOutbox`'s own `to` filter removes the matching letter as it returns it (by design, so two
+ * specs signing in at once can't swallow each other's mail) -- so the poll below has to keep
+ * whatever letters its own read finds, in `found`, rather than reading a second time afterward: a
+ * second read past the one that first satisfies the poll finds nothing, because the first read
+ * already took it.
+ */
 async function openTheLink(page: Parameters<typeof readOutbox>[0], email: string): Promise<void> {
-  await expect.poll(async () => (await readOutbox(page, email)).length, { timeout: 10_000 }).toBeGreaterThan(0);
-  const [letter] = await readOutbox(page, email);
+  let found: Awaited<ReturnType<typeof readOutbox>> = [];
+  await expect
+    .poll(
+      async () => {
+        found = await readOutbox(page, email);
+        return found.length;
+      },
+      { timeout: 10_000 },
+    )
+    .toBeGreaterThan(0);
+  const [letter] = found;
   expect(letter?.subject).toBe("Your Trakline console sign-in link");
   const link = /https?:\/\/\S+\/auth\/confirm\S+/.exec(letter?.text ?? "")?.[0];
   expect(link, `no confirm link in: ${letter?.text}`).toBeTruthy();
