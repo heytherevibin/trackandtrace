@@ -65,6 +65,16 @@ jobs:
         if: steps.browsers.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
       - run: npx playwright test
+      # The console suite resets `console.members` between specs through psql, because
+      # `console.create_first_owner_link` refuses to issue a second link while an Owner exists.
+      # ubuntu-24.04 ships PostgreSQL 16's client tools, so this is normally a no-op — but an
+      # implicit dependency on the runner image's contents is worth one line to make explicit.
+      - name: Make sure psql is on PATH
+        run: |
+          if ! command -v psql > /dev/null; then
+            sudo apt-get update && sudo apt-get install -y postgresql-client
+          fi
+          psql --version
       - name: Console end-to-end
         run: npm run test:e2e:console
       - name: Keep the report
