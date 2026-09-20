@@ -1880,6 +1880,23 @@ Expected: FAIL — `function console.create_first_owner_link(unknown) does not e
 -- The one statement the owner runs in the Supabase SQL editor to start the
 -- console, and the redemption the server performs when the link is opened.
 
+-- One definition of "the console has an Owner", shared by the statement that
+-- makes a link and the function that redeems one. Two copies of this guard
+-- would let an edit to one silently reopen the two-Owner race.
+create or replace function console.has_owner()
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1 from console.members where role = 'owner' and status <> 'removed'
+  );
+$$;
+
+revoke all on function console.has_owner() from public, anon, authenticated, service_role;
+
 create or replace function console.create_first_owner_link(
   p_email    text,
   p_base_url text default 'https://admin.trakline.in'
@@ -1892,7 +1909,7 @@ as $$
 declare
   v_token text;
 begin
-  if exists (select 1 from console.members where role = 'owner' and status <> 'removed') then
+  if console.has_owner() then
     raise exception 'the console already has an Owner';
   end if;
 
@@ -1923,10 +1940,16 @@ declare
   v_link   console.setup_links;
   v_member console.members;
 begin
-  -- The same guard `create_first_owner_link` uses. Matching on `active` alone
-  -- would let a second link redeem while the first Owner is still in setup,
-  -- and the console would have two Owners.
-  if exists (select 1 from console.members where role = 'owner' and status <> 'removed') then
+  -- Redemption happens once in the console's life, and two links redeemed at
+  -- the same moment would both pass an unlocked guard before either inserted.
+  -- Serialise them. A unique index would be wrong: the console is meant to
+  -- have several Owners in time; only the first-Owner link is once-only.
+  perform pg_advisory_xact_lock(hashtext('console.first_owner'));
+
+  -- The same guard `create_first_owner_link` uses, through one shared helper.
+  -- Matching on `active` alone would let a second link redeem while the first
+  -- Owner is still in setup, and the console would have two Owners.
+  if console.has_owner() then
     return null;
   end if;
 
@@ -1955,8 +1978,11 @@ begin
 
   update console.setup_links set used_at = now() where id = v_link.id;
 
+  -- `on conflict`, like accept_invite: the guard treats a removed Owner as no
+  -- Owner so a console can be recovered, and that recovery must not raise.
   insert into console.members (user_id, email, name, role, status)
   values (p_user, v_link.email, p_name, 'owner', 'setup')
+  on conflict (user_id) do update set role = excluded.role, status = 'setup'
   returning * into v_member;
 
   perform console.write_audit(
