@@ -616,10 +616,14 @@ create index console_audit_actor_idx on console.audit_log (actor_id, at desc);
 
 revoke all on console.audit_log from anon, authenticated;
 -- Append-only means append-only for every role, including the one the server holds.
-revoke update, delete on console.audit_log from service_role, authenticator;
+-- `all`, not `update, delete`: truncate is a delete no row trigger would see.
+revoke all on console.audit_log from service_role, authenticator;
 
 -- Reasons are free text. The server scrubs them; SQL scrubs them again, because
 -- the audit log is the one place a slip would be permanent.
+-- Addresses go first: an address whose local part is itself a long digit run
+-- ("2345678901@example.com") must be taken whole, or the digit pass eats the
+-- local part, the address pattern no longer matches, and the domain survives.
 create or replace function console.scrub(p_text text)
 returns text
 language sql
@@ -629,8 +633,8 @@ set search_path = ''
 as $$
   select regexp_replace(
            regexp_replace(
-             regexp_replace(coalesce(p_text, ''), '[0-9]{10,}', '[removed]', 'g'),
-             '[[:alnum:]._%+-]+@[[:alnum:].-]+[.][[:alpha:]]{2,}', '[removed]', 'g'),
+             regexp_replace(coalesce(p_text, ''), '[[:alnum:]._%+-]+@[[:alnum:].-]+[.][[:alpha:]]{2,}', '[removed]', 'g'),
+             '[0-9]{10,}', '[removed]', 'g'),
            '([0-9]{1,3}[.]){3}[0-9]{1,3}|([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}', '[removed]', 'g');
 $$;
 
