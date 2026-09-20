@@ -25,11 +25,14 @@ beforeEach(() => {
 });
 
 describe("POST /api/sign-out", () => {
-  it("revokes the console session row and ends the Supabase session", async () => {
+  it("revokes the console session row and ends the Supabase session, locally only", async () => {
     const response = await POST(post());
     expect(response.status).toBe(200);
     expect(serviceRpc).toHaveBeenCalledWith("console_auth_revoke_session", { p_session_id: "22222222-2222-2222-2222-222222222222" });
-    expect(signOut).toHaveBeenCalledOnce();
+    // Not the auth-js default ("global"): a console sign-out must never also revoke this person's
+    // trakline.in sessions. The console session row above is already the authority for console
+    // access, so global scope would only cost the traveller side.
+    expect(signOut).toHaveBeenCalledExactlyOnceWith({ scope: "local" });
   });
 
   it("still clears the cookie when there is no session row to revoke", async () => {
@@ -37,7 +40,7 @@ describe("POST /api/sign-out", () => {
     const response = await POST(post());
     expect(response.status).toBe(200);
     expect(serviceRpc).not.toHaveBeenCalled();
-    expect(signOut).toHaveBeenCalledOnce();
+    expect(signOut).toHaveBeenCalledExactlyOnceWith({ scope: "local" });
   });
 
   it("refuses a cross-site post", async () => {

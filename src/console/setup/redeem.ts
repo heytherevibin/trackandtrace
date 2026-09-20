@@ -46,10 +46,14 @@ function unavailable(): AppError {
   return new AppError("SOURCE_UNAVAILABLE", s.unavailable, { status: 503 });
 }
 
-/** Best effort: a failed sign-out must never mask the real refusal it follows, but it is logged. */
+/**
+ * Best effort: a failed sign-out must never mask the real refusal it follows, but it is logged.
+ * scope: "local" -- see the comment at src/app/console/api/sign-out/route.ts. This undoes the
+ * session verifyOtp just created a moment ago in this same call, which is local by definition.
+ */
 async function bestEffortSignOut(db: ConsoleDb): Promise<void> {
   try {
-    await db.auth.signOut();
+    await db.auth.signOut({ scope: "local" });
   } catch (err) {
     log.warn("[console] could not sign out an unredeemed setup session", err);
   }

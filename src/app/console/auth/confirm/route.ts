@@ -78,7 +78,10 @@ export async function GET(req: Request): Promise<NextResponse> {
       confirmed = true;
       return to(req, consoleHref(nextAfterConfirm(member.keyCount)));
     } finally {
-      if (!confirmed) await db.auth.signOut();
+      // scope: "local" -- see the comment at src/app/console/api/sign-out/route.ts. We are undoing
+      // the very session verifyOtp just created moments ago, on this same request; that is local by
+      // definition, and global scope would also revoke this person's trakline.in sessions.
+      if (!confirmed) await db.auth.signOut({ scope: "local" });
     }
   } catch (err) {
     log.warn("[console] a sign-in link could not be confirmed", err);
