@@ -76,9 +76,19 @@ select console.write_audit(
   'because 2345678901 asked', 'done', 'hash', '{"role":"viewer"}'::jsonb, '{"role":"support"}'::jsonb
 ) as written;
 
-select is((select count(*) from console.audit_log)::int, 1, 'the row landed');
 select is(
-  (select reason from console.audit_log limit 1),
+  (select count(*) from console.audit_log
+     where actor_id = '11111111-1111-1111-1111-111111111111'
+       and action = 'Role changed'
+       and target = 'asha@trakline.in')::int,
+  1,
+  'the row landed'
+);
+select is(
+  (select reason from console.audit_log
+     where actor_id = '11111111-1111-1111-1111-111111111111'
+       and action = 'Role changed'
+       and target = 'asha@trakline.in'),
   'because [removed] asked',
   'the stored reason is scrubbed again in SQL'
 );
