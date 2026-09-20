@@ -1807,7 +1807,7 @@ git commit -m "feat(console): the service-role functions for keys, invites and O
 - Consumes: `console.setup_links`, `console.members`, `console.write_audit`.
 - Produces:
   - `console.create_first_owner_link(p_email text, p_base_url text default 'https://admin.trakline.in') returns text` — the statement the owner runs in the Supabase SQL editor. It works only while the console has no Owner, stores only the token's hash, and returns the full one-time link, good for 24 hours.
-  - `public.console_auth_redeem_setup_link(p_token_hash bytea, p_user uuid, p_email text, p_name text, p_environment text) returns jsonb` — service role; makes the first Owner in `setup`, marks the link used, writes its audit row; returns `null` when the link is missing, used, expired, for another address, or when an Owner already exists.
+  - `public.console_auth_redeem_setup_link(p_token_hash bytea, p_user uuid, p_email text, p_name text, p_environment text) returns jsonb` — service role; makes the first Owner in `setup`, marks the link used, writes its audit row; returns `null` when the link is missing, used, expired, for another address, when the accepting account's own address is not the link's, or when the console already has an Owner in any state but `removed`. It reads the link `for update` and spends it only after every check, so a refusal leaves the link usable.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1923,21 +1923,37 @@ declare
   v_link   console.setup_links;
   v_member console.members;
 begin
-  if exists (select 1 from console.members where role = 'owner' and status = 'active') then
+  -- The same guard `create_first_owner_link` uses. Matching on `active` alone
+  -- would let a second link redeem while the first Owner is still in setup,
+  -- and the console would have two Owners.
+  if exists (select 1 from console.members where role = 'owner' and status <> 'removed') then
     return null;
   end if;
 
-  update console.setup_links
-     set used_at = now()
+  -- Read the link first and spend it last: a mismatch below must leave it live,
+  -- and returning null raises nothing, so nothing would roll back.
+  select * into v_link
+    from console.setup_links
    where token_hash = p_token_hash
      and used_at is null
      and expires_at > now()
      and email = lower(p_email)
-  returning * into v_link;
+   for update;
 
   if not found then
     return null;
   end if;
+
+  -- The token proves someone holds the link; this proves it is the person it
+  -- was made for. `p_email` is the caller's word; `auth.users` is not.
+  if not exists (
+    select 1 from auth.users u
+     where u.id = p_user and lower(u.email) = v_link.email
+  ) then
+    return null;
+  end if;
+
+  update console.setup_links set used_at = now() where id = v_link.id;
 
   insert into console.members (user_id, email, name, role, status)
   values (p_user, v_link.email, p_name, 'owner', 'setup')
