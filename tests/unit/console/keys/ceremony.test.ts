@@ -294,6 +294,46 @@ describe("completeRegistration", () => {
     expect(rpc).not.toHaveBeenCalledWith("console_auth_verify_session", expect.anything());
   });
 
+  it("signs the member out when the database refuses to verify the session right after activation", async () => {
+    // The `if (error) throw ended()` check sits inside the `justActivated && !session.keyVerified`
+    // gate that the same fix round introduced (Task 8's Ruling 25), so this is two pieces of
+    // brand-new logic composing at one line -- no fixture anywhere set console_auth_verify_session's
+    // error before this test (Task 8's Ruling 28; deferred to this final review by name). Copies the
+    // injection pattern from "turns the database's unique-credential refusal..." below: a custom rpc
+    // mock, because fakes() only ever answers with data, never an error.
+    const rpc = vi.fn((name: string) => {
+      if (name === "console_auth_verify_session") {
+        return Promise.resolve({ data: null, error: { message: "session already revoked", code: "P0001" } });
+      }
+      const data =
+        name === "console_auth_session"
+          ? SESSION
+          : name === "console_auth_take_challenge"
+            ? { challenge: "c", session_id: SESSION.session_id, purpose: "add_key" }
+            : name === "console_auth_record_key"
+              ? "55555555-5555-5555-5555-555555555555"
+              : name === "console_auth_activate_member"
+                ? true
+                : null;
+      return Promise.resolve({ data, error: null });
+    });
+    const service = { rpc } as unknown as ConsoleDb;
+    const member = { auth: { getClaims: () => Promise.resolve({ data: { claims: { sub: SESSION.member_id, session_id: SESSION.session_id } }, error: null }) } } as unknown as ConsoleDb;
+    // SESSION defaults to status "setup" and key_verified false, so wasActive is false and this
+    // call's activation.data: true makes justActivated true -- the gate's condition is met, and
+    // console_auth_verify_session's error must surface rather than be swallowed.
+    await expect(
+      completeRegistration({
+        req: REQUEST,
+        response: responseWithChallenge("bmV3", { type: "webauthn.create" }) as never,
+        name: "iPhone",
+        db: member,
+        service,
+        verified: { credentialId: "bmV3", publicKey: "cHVia2V5", counter: 0, transports: ["internal"], keyType: "passkey" },
+      }),
+    ).rejects.toMatchObject({ code: "UNAUTHENTICATED", status: 401 });
+  });
+
   it("turns the database's unique-credential refusal into the sheet's own line", async () => {
     const rpc = vi.fn((name: string) =>
       name === "console_auth_record_key"
