@@ -228,7 +228,7 @@ git commit -m "feat(console): the console schema, its members table and the pgTA
 ```sql
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(9);
+select plan(10);
 
 select has_table('console', 'keys', 'keys exists');
 select has_table('console', 'sessions', 'sessions exists');
@@ -264,13 +264,23 @@ select is(
   'a new session is not revoked'
 );
 
+-- A sign-in challenge carries no digest; only an action tap does.
 insert into console.challenges (member_id, session_id, purpose, challenge, expires_at)
-values ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'action', 'abc', now() + interval '5 minutes');
+values ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'sign_in', 'sign-in-challenge-0001', now() + interval '5 minutes');
 
 select is(
-  (select used_at is null from console.challenges where challenge = 'abc'),
+  (select used_at is null from console.challenges where challenge = 'sign-in-challenge-0001'),
   true,
   'a new challenge is unused'
+);
+
+-- An action tap is meaningless without the digest of what it approves.
+select throws_ok(
+  $$insert into console.challenges (member_id, session_id, purpose, challenge, expires_at)
+    values ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'action', 'action-challenge-0009', now() + interval '5 minutes')$$,
+  '23514'::char(5),
+  null,
+  'an action challenge without a digest is refused'
 );
 
 -- A member's rows go when the member goes.
@@ -780,7 +790,7 @@ update console.sessions set last_seen_at = now()
 
 -- A tap approves exactly one action, once.
 insert into console.challenges (member_id, session_id, purpose, challenge, digest, expires_at)
-values ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'action', 'chal-1',
+values ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'action', 'action-challenge-0001',
         console.action_digest('role.change', 'asha@trakline.in', 'support', 'cover'), now() + interval '5 minutes');
 
 select lives_ok(
@@ -795,7 +805,7 @@ select throws_ok(
 );
 
 insert into console.challenges (member_id, session_id, purpose, challenge, digest, expires_at)
-values ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'action', 'chal-2',
+values ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'action', 'action-challenge-0002',
         console.action_digest('role.change', 'asha@trakline.in', 'support', 'cover'), now() + interval '5 minutes');
 
 select throws_ok(
@@ -1013,7 +1023,7 @@ select throws_ok(
 -- function hashes (`p_changes::text`). Cast in the test too, so the two agree
 -- whatever jsonb does with spacing.
 insert into console.challenges (member_id, session_id, purpose, challenge, digest, expires_at)
-values ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'action', 'chal-set',
+values ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'action', 'settings-challenge-0001',
         console.action_digest('settings.save', 'development', ('{"checks_paused": true}'::jsonb)::text, 'maintenance'),
         now() + interval '5 minutes');
 
@@ -1035,7 +1045,7 @@ select is(
 
 -- Two saves cannot clash: the second one carries a stale version.
 insert into console.challenges (member_id, session_id, purpose, challenge, digest, expires_at)
-values ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'action', 'chal-stale',
+values ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'action', 'settings-challenge-0002',
         console.action_digest('settings.save', 'development', ('{"checks_paused": false}'::jsonb)::text, 'undo'),
         now() + interval '5 minutes');
 
@@ -1277,15 +1287,15 @@ select is(
 
 -- Challenges are single-use and expire.
 select public.console_auth_new_challenge(
-  '11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'sign_in', 'chal-a', null
+  '11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'sign_in', 'sign-in-challenge-0001', null
 );
 select is(
-  public.console_auth_take_challenge('chal-a', '11111111-1111-1111-1111-111111111111', 'sign_in') ->> 'challenge',
-  'chal-a',
+  public.console_auth_take_challenge('sign-in-challenge-0001', '11111111-1111-1111-1111-111111111111', 'sign_in') ->> 'challenge',
+  'sign-in-challenge-0001',
   'a fresh challenge is handed back once'
 );
 select is(
-  public.console_auth_take_challenge('chal-a', '11111111-1111-1111-1111-111111111111', 'sign_in'),
+  public.console_auth_take_challenge('sign-in-challenge-0001', '11111111-1111-1111-1111-111111111111', 'sign_in'),
   null,
   'the same challenge cannot be taken twice'
 );
