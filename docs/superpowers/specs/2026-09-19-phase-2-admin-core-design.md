@@ -45,7 +45,7 @@ Next 16 replaces middleware with `src/proxy.ts`, which runs on Node only (`node_
 - `src/app/(site)/` holds today's root layout and every traveller page, moved as they are.
 - `src/app/console/` has its own root layout (its own `<html>`, fonts, providers, no AppShell) and every console page, plus its route handlers under `src/app/console/api/`.
 - Traveller route handlers (`api/`, `auth/`, `check/`) stay where they are. `global-error`, `manifest`, `robots` and the icons stay at the app root.
-- Each tree has a catch-all (`[...missing]`), with no experimental flag. The traveller catch-all calls `notFound()`, so an unmatched address shows the site's own not-found page. The console's sends unknown addresses to sign in (signed-in members get a not-found state in the modules PR).
+- Unmatched traveller addresses are served by `src/app/global-not-found.tsx` (behind `experimental.globalNotFound`), which renders the site's root layout around the site's own not-found page, on the server, with status 404. The console's catch-all (`src/app/console/[...missing]`) sends unknown addresses to sign in (signed-in members get a not-found state in the modules PR). *Amended during implementation:* a traveller catch-all calling `notFound()` rendered the not-found page only on the client (Next serves a thrown not-found as an empty error shell), which broke the no-JavaScript 404 and its PNR form.
 
 **The proxy.** The host is read from the `Host` header: lower-cased, without the port. `request.nextUrl` reads `localhost` under `next dev`, so it can't be used.
 - **On a console host:**

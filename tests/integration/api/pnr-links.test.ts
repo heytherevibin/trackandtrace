@@ -33,14 +33,14 @@ describe("/check", () => {
 
 describe("legacy /pnr/[pnr]", () => {
   it("redirects permanently to /pnr#<pnr>", async () => {
-    const { GET } = await import("@/app/pnr/[pnr]/route");
+    const { GET } = await import("@/app/(site)/pnr/[pnr]/route");
     const res = await GET(new NextRequest("http://localhost/pnr/2345678901"), { params: Promise.resolve({ pnr: "2345678901" }) });
     expect(res.status).toBe(308);
     expect(res.headers.get("location")).toBe("http://localhost/pnr#2345678901");
   });
 
   it("sends an invalid one to the empty result page", async () => {
-    const { GET } = await import("@/app/pnr/[pnr]/route");
+    const { GET } = await import("@/app/(site)/pnr/[pnr]/route");
     const res = await GET(new NextRequest("http://localhost/pnr/abc"), { params: Promise.resolve({ pnr: "abc" }) });
     expect(res.headers.get("location")).toBe("http://localhost/pnr");
   });

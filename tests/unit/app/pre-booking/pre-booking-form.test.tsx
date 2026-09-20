@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { PreBookingForm } from "@/app/pre-booking/pre-booking-form";
+import { PreBookingForm } from "@/app/(site)/pre-booking/pre-booking-form";
 
 // 06:30 UTC on 17 September 2026 is midday IST, so "today" in IST is 2026-09-17.
 const NOW = new Date("2026-09-17T06:30:00.000Z");

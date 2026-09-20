@@ -95,7 +95,7 @@ const HEX_ALLOWLIST = new Set([
   "src/components/brand/brand-colors.ts",
   "src/styles/theme.css",
   "src/components/theme/theme-boot.ts",
-  "src/app/opengraph-image.tsx",
+  "src/app/(site)/opengraph-image.tsx",
   "src/app/apple-icon.tsx",
 ]);
 // Rhythm Machine vocabulary (rounded caps, signal tones, key and readout tokens, silkscreen, lamps with bloom).

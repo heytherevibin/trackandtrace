@@ -64,3 +64,36 @@ describe("the content security policy", () => {
     expect(withoutDsn.get("content-security-policy")).not.toContain("report-uri");
   });
 });
+
+describe("headers by host", () => {
+  async function headersAt(url: string) {
+    return (await unstable_getResponseFromNextConfig({ url, nextConfig })).headers;
+  }
+
+  it("keeps the traveller policy off the console host, whose own policy comes from the proxy", async () => {
+    for (const url of ["https://admin.trakline.in/login", "http://admin.localhost:4210/login"]) {
+      const headers = await headersAt(url);
+      expect(headers.get("content-security-policy"), url).toBeNull();
+      expect(headers.get("x-robots-tag"), url).toBe("noindex, nofollow, noarchive");
+      expect(headers.get("referrer-policy"), url).toBe("no-referrer");
+      expect(headers.get("cross-origin-opener-policy"), url).toBe("same-origin");
+      expect(headers.get("cross-origin-resource-policy"), url).toBe("same-origin");
+      expect(headers.get("permissions-policy"), url).toBe("camera=(), microphone=(), geolocation=(), publickey-credentials-get=(self), publickey-credentials-create=(self)");
+      expect(headers.get("x-frame-options"), url).toBe("DENY");
+      expect(headers.get("strict-transport-security"), url).toBe("max-age=63072000; includeSubDomains; preload");
+      expect(headers.get("x-content-type-options"), url).toBe("nosniff");
+    }
+  });
+
+  it("keeps the traveller host's headers as they were", async () => {
+    const headers = await headersAt("https://trakline.in/pnr");
+    expect(headers.get("content-security-policy")).toContain("default-src 'self'");
+    expect(headers.get("x-robots-tag")).toBeNull();
+    expect(headers.get("x-frame-options")).toBe("DENY");
+    expect(headers.get("referrer-policy")).toBe("strict-origin-when-cross-origin");
+    expect(headers.get("permissions-policy")).toBe("camera=(), microphone=(), geolocation=()");
+    expect(headers.get("x-dns-prefetch-control")).toBe("on");
+    expect(headers.get("x-content-type-options")).toBe("nosniff");
+    expect(headers.get("strict-transport-security")).toBe("max-age=63072000; includeSubDomains; preload");
+  });
+});

@@ -1,6 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import AccuracyPage from "@/app/accuracy/page";
+import AccuracyPage from "@/app/(site)/accuracy/page";
 
 describe("AccuracyPage", () => {
   it("opens with the drawn title block", () => {

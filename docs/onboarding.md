@@ -7,6 +7,10 @@
 3. `npm run dev:fixture` and open http://localhost:3000. Check `2345678901`.
 4. `npm run check` must be green before any push. GitHub runs the same checks, plus the browser suite, on every pull request.
 
+## Console, locally
+
+`npm run dev:fixture` also serves the team console at http://admin.localhost:3000 (Chrome and Firefox resolve `*.localhost` to this machine). The console refuses to run against the hosted Supabase project, and says so. To see its pages, point both `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` at the local stack (`npm run db:start`) — the env schema requires them together, and the hosted key won't authenticate against a local stack — or start with both Supabase variables blank: `NEXT_PUBLIC_SUPABASE_URL= NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY= npm run dev:fixture`.
+
 ## Supabase
 
 - **Hosted project:** "Trakline", ref `xnykpktqtimadelfjgqf`, ap-south-1. Put `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env.local`; add `SUPABASE_SECRET_KEY` only where account deletion must work.

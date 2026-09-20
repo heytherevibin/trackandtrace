@@ -7,7 +7,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace: 
 vi.mock("@/services/pnr-source", () => ({ fetchPnr: vi.fn() }));
 vi.mock("@/services/watchlist-api", () => ({ saveWatchlist: vi.fn(), deleteWatchlist: vi.fn(), mergeWatchlist: vi.fn(), listWatchlist: vi.fn() }));
 
-const { WatchlistView } = await import("@/app/watchlist/watchlist-view");
+const { WatchlistView } = await import("@/app/(site)/watchlist/watchlist-view");
 const { watchlistStore } = await import("@/services/stores/watchlist-store");
 const { fetchPnr } = await import("@/services/pnr-source");
 const api = await import("@/services/watchlist-api");

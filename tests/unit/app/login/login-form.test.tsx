@@ -5,7 +5,7 @@ const router = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
 vi.mock("@/services/auth-client", () => ({ sendMagicLink: vi.fn(), signInWithGoogle: vi.fn(), signInWithPasskey: vi.fn(), passkeysUsable: vi.fn(() => true) }));
 
-const { LoginForm } = await import("@/app/login/login-form");
+const { LoginForm } = await import("@/app/(site)/login/login-form");
 const auth = await import("@/services/auth-client");
 
 beforeEach(() => {
