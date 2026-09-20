@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(20);
+select plan(23);
 
 select has_schema('console', 'the console schema exists');
 select has_table('console', 'members', 'members exists');
@@ -22,6 +22,13 @@ select is(
   'false',
   'anon cannot read members directly'
 );
+
+-- has_table_privilege on one table proves nothing about the real gate, which
+-- is schema USAGE: without it, no privilege granted on any object inside the
+-- schema is even reachable, for any role, including the one the server holds.
+select is(has_schema_privilege('authenticated', 'console', 'usage')::text, 'false', 'authenticated cannot reach the console schema');
+select is(has_schema_privilege('anon', 'console', 'usage')::text, 'false', 'anon cannot reach the console schema');
+select is(has_schema_privilege('service_role', 'console', 'usage')::text, 'false', 'the server reaches the console only through functions');
 
 -- Roles rank so a guard can ask for "admin or better".
 select is(console.role_rank('owner') > console.role_rank('admin'), true, 'owner outranks admin');
