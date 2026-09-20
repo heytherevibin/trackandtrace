@@ -53,6 +53,10 @@ export type Database = {
         }
         Returns: Json
       }
+      console_auth_activate_member: {
+        Args: { p_member: string }
+        Returns: boolean
+      }
       console_auth_keys_for_member: {
         Args: { p_member: string }
         Returns: Json
@@ -63,12 +67,20 @@ export type Database = {
           p_challenge: string
           p_digest: string
           p_member: string
-          p_purpose: "sign_in" | "add_key" | "action"
+          p_purpose: "sign_in" | "add_key" | "action" | "add_key_tap"
           p_session: string
         }
         Returns: string
       }
       console_auth_owner_addresses: { Args: never; Returns: string[] }
+      console_auth_read_challenge: {
+        Args: {
+          p_challenge: string
+          p_member: string
+          p_purpose: "sign_in" | "add_key" | "action" | "add_key_tap"
+        }
+        Returns: Json
+      }
       console_auth_read_settings: {
         Args: { p_environment: string }
         Returns: Json
@@ -103,6 +115,8 @@ export type Database = {
         Args: { p_session_id: string }
         Returns: undefined
       }
+      console_auth_session: { Args: { p_session_id: string }; Returns: Json }
+      console_auth_setup_link: { Args: { p_token_hash: string }; Returns: Json }
       console_auth_start_session: {
         Args: {
           p_address_hash: string
@@ -116,7 +130,7 @@ export type Database = {
         Args: {
           p_challenge: string
           p_member: string
-          p_purpose: "sign_in" | "add_key" | "action"
+          p_purpose: "sign_in" | "add_key" | "action" | "add_key_tap"
         }
         Returns: Json
       }
@@ -147,6 +161,7 @@ export type Database = {
         }
         Returns: string
       }
+      console_me: { Args: never; Returns: Json }
       console_save_settings: {
         Args: {
           p_changes: Json

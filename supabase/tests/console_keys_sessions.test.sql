@@ -7,7 +7,7 @@ select has_table('console', 'sessions', 'sessions exists');
 select has_table('console', 'challenges', 'challenges exists');
 
 select enum_has_labels('console', 'key_type', array['passkey', 'security_key'], 'every key type the plan names');
-select enum_has_labels('console', 'challenge_purpose', array['sign_in', 'add_key', 'action'], 'every challenge purpose the plan names');
+select enum_has_labels('console', 'challenge_purpose', array['sign_in', 'add_key', 'action', 'add_key_tap'], 'every challenge purpose the plan names');
 
 select has_index('console', 'keys', 'console_keys_member_idx', 'keys has member_idx');
 select has_index('console', 'sessions', 'console_sessions_member_idx', 'sessions has member_idx');
