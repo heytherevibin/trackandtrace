@@ -43,6 +43,12 @@ describe("tapToSignIn", () => {
     await expect(tapToSignIn()).resolves.toEqual({ kind: "cancelled" });
   });
 
+  it("shows the console's own didn't-answer line for any other browser failure, never the browser's own text", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(answer({ ok: true, step: "tap", options: {} })));
+    startAuthentication.mockRejectedValue(Object.assign(new Error("The operation either timed out or was not allowed."), { name: "UnknownError" }));
+    await expect(tapToSignIn()).resolves.toEqual({ kind: "failed", message: "That key didn't answer. Try again." });
+  });
+
   it("passes the server's own message through", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(answer({ ok: false, code: "INVALID_INPUT", message: "This key isn't one of yours." }, 400)));
     await expect(tapToSignIn()).resolves.toEqual({ kind: "failed", message: "This key isn't one of yours." });
@@ -109,5 +115,34 @@ describe("addKey", () => {
       .mockResolvedValueOnce(answer({ ok: false, code: "INVALID_INPUT", message: "That key is already added. Use a different one." }, 409));
     vi.stubGlobal("fetch", fetchSpy);
     await expect(addKey("Blue key")).resolves.toEqual({ kind: "failed", message: "That key is already added. Use a different one." });
+  });
+
+  // excludeCredentials makes the browser itself refuse a duplicate credential before any request
+  // reaches the server, so this is the one browser failure that gets the sheet's own line rather
+  // than "didn't answer" -- @simplewebauthn/browser wraps the DOMException, keeping its name
+  // ("InvalidStateError") and adding a code ("ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED"); either
+  // one surfacing must map the same way.
+  it("maps the browser's own duplicate-credential refusal to the sheet's already-added line, not its own text", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(answer({ ok: true, step: "register", options: {} })));
+    startRegistration.mockRejectedValue(Object.assign(new Error("The authenticator was previously registered"), { name: "InvalidStateError", code: "ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED" }));
+    await expect(addKey("YubiKey 5C again")).resolves.toEqual({ kind: "failed", message: "That key is already added. Use a different one." });
+  });
+
+  it("still recognises a bare InvalidStateError with no wrapper code", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(answer({ ok: true, step: "register", options: {} })));
+    startRegistration.mockRejectedValue(Object.assign(new Error("previously registered"), { name: "InvalidStateError" }));
+    await expect(addKey("YubiKey 5C again")).resolves.toEqual({ kind: "failed", message: "That key is already added. Use a different one." });
+  });
+
+  it("still recognises the wrapper's own code even if its name were ever something else", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(answer({ ok: true, step: "register", options: {} })));
+    startRegistration.mockRejectedValue(Object.assign(new Error("The authenticator was previously registered"), { name: "SomeOtherName", code: "ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED" }));
+    await expect(addKey("YubiKey 5C again")).resolves.toEqual({ kind: "failed", message: "That key is already added. Use a different one." });
+  });
+
+  it("falls back to the console's own didn't-answer line for any other browser failure during registration", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(answer({ ok: true, step: "register", options: {} })));
+    startRegistration.mockRejectedValue(Object.assign(new Error("The authenticator was unable to process the specified options."), { name: "UnknownError" }));
+    await expect(addKey("YubiKey 5C")).resolves.toEqual({ kind: "failed", message: "That key didn't answer. Try again." });
   });
 });

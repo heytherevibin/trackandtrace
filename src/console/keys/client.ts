@@ -52,13 +52,36 @@ function isDismissal(err: unknown): boolean {
   return err instanceof Error && (err.name === "NotAllowedError" || err.name === "AbortError");
 }
 
-/** Runs one WebAuthn call, turning a dismissed or failed prompt into an outcome rather than a throw. */
+/**
+ * `excludeCredentials` makes the browser itself throw before any request reaches our server: Task 9's
+ * `messageFor` only ever sees a real HTTP answer, so it never gets the chance to replace this one's
+ * wording. `@simplewebauthn/browser` wraps the raw DOMException in its own `WebAuthnError`, which
+ * keeps the DOM error's own `name` ("InvalidStateError") and adds a `code` naming why
+ * ("ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED") -- checking both is what survives either the browser
+ * throwing the bare DOMException directly or the wrapped form, whichever a given browser surfaces.
+ */
+function isPreviouslyRegistered(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  if (err.name === "InvalidStateError") return true;
+  const code = (err as { readonly code?: unknown }).code;
+  return code === "ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED";
+}
+
+/**
+ * Runs one WebAuthn call, turning a dismissed or failed prompt into an outcome rather than a throw.
+ * A failure's own `message` is the browser's technical wording (e.g. "The authenticator was
+ * previously registered"), never a line the sheets wrote, so it never reaches the member directly --
+ * matching Ruling 30's rule for a server refusal's *absence*, not just its presence. The one browser
+ * failure with a sheet line of its own (the same key twice) is named; every other one falls back to
+ * the console's own "didn't answer".
+ */
 async function runCeremony<T>(run: () => Promise<T>): Promise<{ readonly kind: "done"; readonly response: T } | FailureOutcome> {
   try {
     return { kind: "done", response: await run() };
   } catch (err) {
     if (isDismissal(err)) return { kind: "cancelled" };
-    return { kind: "failed", message: err instanceof Error && err.message ? err.message : m.didNotAnswer };
+    if (isPreviouslyRegistered(err)) return { kind: "failed", message: m.alreadyAdded };
+    return { kind: "failed", message: m.didNotAnswer };
   }
 }
 

@@ -41,10 +41,11 @@ test("the same key twice is refused", async ({ page, baseURL }) => {
   // Scoped to the plate, not the bare page: Next's route announcer (role="alert", announcing the
   // page title after every navigation) is a second, unrelated match for an unscoped getByRole("alert").
   // Chromium's virtual authenticator refuses this one in the browser itself before any request is
-  // made -- confirmed independent of this app -- so the line the member sees is the browser's own,
-  // not the server's; if that ever changes, the server's own refusal reads just as correctly.
+  // made -- confirmed independent of this app -- so this is client.ts's own InvalidStateError mapping
+  // on trial, not the server's refusal: only the sheet's line is acceptable now that runCeremony maps
+  // the browser's "The authenticator was previously registered" to it rather than passing it through.
   const alert = page.getByRole("region", { name: "Add a second key" }).getByRole("alert");
-  await expect(alert).toContainText(/That key is already added\. Use a different one\.|The authenticator was previously registered/);
+  await expect(alert).toContainText("That key is already added. Use a different one.");
 });
 
 test("a setup link works once", async ({ page, baseURL }) => {
