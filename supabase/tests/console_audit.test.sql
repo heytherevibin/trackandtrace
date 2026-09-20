@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(25);
+select plan(28);
 
 select has_table('console', 'audit_log', 'the audit log exists');
 
@@ -34,6 +34,24 @@ select is(
   console.scrub('reach me at 2001:db8::1 instead'),
   'reach me at [removed] instead',
   'the scrubber removes IPv6 addresses too'
+);
+
+-- Email must be taken before digit runs, or a long-digit local part is
+-- swallowed first and the domain leaks.
+select is(
+  console.scrub('contact 2345678901@example.com for help'),
+  'contact [removed] for help',
+  'an address whose local part is a long digit run goes whole'
+);
+select is(
+  console.scrub('ops@trakline123.in'),
+  '[removed]',
+  'an address with digits in its domain goes whole'
+);
+select is(
+  console.scrub('booked on 2026-09-20'),
+  'booked on 2026-09-20',
+  'a date is not a PNR'
 );
 
 select console.write_audit(

@@ -29,11 +29,18 @@ create index console_audit_category_idx on console.audit_log (category, at desc)
 create index console_audit_actor_idx on console.audit_log (actor_id, at desc);
 
 revoke all on console.audit_log from anon, authenticated;
--- Append-only means append-only for every role, including the one the server holds.
-revoke update, delete on console.audit_log from service_role, authenticator;
+-- Append-only means append-only for every role, including the one the server
+-- holds. ALL, not just UPDATE/DELETE: this line must stand on its own and also
+-- cover TRUNCATE, not rely on Task 1 having already revoked schema USAGE.
+revoke all on console.audit_log from service_role, authenticator;
 
 -- Reasons are free text. The server scrubs them; SQL scrubs them again, because
 -- the audit log is the one place a slip would be permanent.
+-- Order matters: email must be taken first. An address whose local part is
+-- itself a long run of digits (e.g. 2345678901@example.com) would otherwise
+-- have that run swallowed by the digit pass first, leaving a mangled
+-- "[removed]@example.com" that no longer matches the email pattern at all --
+-- the domain, and the fact that an address was ever there, would survive.
 create or replace function console.scrub(p_text text)
 returns text
 language sql
@@ -43,8 +50,8 @@ set search_path = ''
 as $$
   select regexp_replace(
            regexp_replace(
-             regexp_replace(coalesce(p_text, ''), '[0-9]{10,}', '[removed]', 'g'),
-             '[[:alnum:]._%+-]+@[[:alnum:].-]+[.][[:alpha:]]{2,}', '[removed]', 'g'),
+             regexp_replace(coalesce(p_text, ''), '[[:alnum:]._%+-]+@[[:alnum:].-]+[.][[:alpha:]]{2,}', '[removed]', 'g'),
+             '[0-9]{10,}', '[removed]', 'g'),
            '([0-9]{1,3}[.]){3}[0-9]{1,3}|([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}', '[removed]', 'g');
 $$;
 
