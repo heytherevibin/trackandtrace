@@ -61,6 +61,22 @@ Named here so no task invents them, and so the reviewer does not ask for them:
 
 **Reuse the test helpers that exist.** `tests/helpers/fake-supabase.ts` already stands in for the supabase-js builder and its `auth` methods; `tests/unit/app/auth/callback.test.ts` shows the house pattern for testing a route that redirects (a real `NextRequest`, `NextResponse` used as-is). Vitest routes `*.test.ts` to node and `*.test.tsx` to jsdom (`vitest.config.mts`), so a component test must be `.tsx`.
 
+**Three test traps this codebase has already hit. Every task's tests are subject to them, whether or not its own code block shows the workaround:**
+
+1. **Stubbing `VERCEL_ENV=production` alone does not give you a production environment.** `env()`'s `superRefine` refuses a deployed environment without the shared store, and outside `NODE_ENV=production` a failed parse falls back to defaults — silently dropping `VERCEL_ENV`. A test written that way passes while exercising the *non*-production branch. Stub the store too, as `tests/unit/proxy.test.ts:58-66` already does:
+
+   ```ts
+   vi.stubEnv("VERCEL_ENV", "production");
+   vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://example.upstash.io");
+   vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "token");
+   vi.stubEnv("DATA_KEY", `${"A".repeat(43)}=`);
+   resetEnvCache();
+   ```
+
+2. **A `vi.mock` factory is hoisted above the `const`s it closes over.** Declare such mocks with `vi.hoisted(() => …)` — `tests/unit/console/auth/sign-in-link.test.ts` shows the form — or the file throws a ReferenceError before a single test runs.
+
+3. **A mock a test reads arguments from must be typed.** A bare `vi.fn(() => …)` infers a zero-argument signature, so `.mock.calls[0]?.[1]` is an index into a zero-length tuple: vitest runs it, `tsc --noEmit` refuses it (TS2493). Use `vi.fn<Signature>()`, as `tests/unit/console/auth/db.test.ts:5` does.
+
 ## File structure
 
 **Database** (`supabase/`)
