@@ -21,12 +21,15 @@ export default defineConfig({
   projects: [
     {
       name: "desktop",
-      testIgnore: /console\//,
+      // console/ is this file's own fixture-mode console specs; console-auth/ is
+      // playwright.console.config.ts's real-Supabase suite, run separately (npm run test:e2e:console)
+      // -- neither belongs here.
+      testIgnore: /console(-auth)?\//,
       use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 } },
     },
     {
       name: "mobile",
-      testIgnore: /console\//,
+      testIgnore: /console(-auth)?\//,
       use: { ...devices["Pixel 7"], viewport: { width: 390, height: 844 } },
     },
     // The console host, served by the same dev server: Chromium resolves *.localhost to this machine.
