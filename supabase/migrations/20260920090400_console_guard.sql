@@ -1,6 +1,33 @@
 -- The guard every member function runs first, and the tap check every risky
 -- action runs before it changes anything.
 
+-- Every claim read goes through here, so a claims value that is neither
+-- missing nor a valid uuid (an empty string, a malformed subject) fails
+-- closed with the same 'session ended' this guard promises everywhere else,
+-- instead of leaking whatever raw cast error Postgres happens to raise.
+-- The risky expression lives in the BEGIN section, not a DECLARE initializer:
+-- a block's own EXCEPTION clause never catches an error raised while that
+-- same block's declarations are being evaluated, only errors raised once its
+-- BEGIN section is running.
+create or replace function console.claim_uuid(p_key text)
+returns uuid
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_text text;
+begin
+  v_text := nullif(current_setting('request.jwt.claims', true)::jsonb ->> p_key, '');
+  return v_text::uuid;
+exception when invalid_text_representation then
+  raise exception 'session ended' using errcode = '28000';
+end;
+$$;
+
+revoke all on function console.claim_uuid(text) from public, anon, authenticated;
+
 create or replace function console.current_member()
 returns console.members
 language plpgsql
@@ -8,8 +35,8 @@ security definer
 set search_path = ''
 as $$
 declare
-  v_user    uuid := nullif(current_setting('request.jwt.claims', true)::jsonb ->> 'sub', '')::uuid;
-  v_session uuid := nullif(current_setting('request.jwt.claims', true)::jsonb ->> 'session_id', '')::uuid;
+  v_user    uuid := console.claim_uuid('sub');
+  v_session uuid := console.claim_uuid('session_id');
   v_member  console.members;
 begin
   if v_user is null or v_session is null then
@@ -52,9 +79,21 @@ security definer
 set search_path = ''
 as $$
 declare
-  v_member console.members := console.current_member();
+  v_member      console.members := console.current_member();
+  v_member_rank int;
+  v_least_rank  int;
 begin
-  if console.role_rank(v_member.role) < console.role_rank(p_least) then
+  if p_least is null then
+    raise exception 'no access' using errcode = '42501';
+  end if;
+
+  v_member_rank := console.role_rank(v_member.role);
+  v_least_rank  := console.role_rank(p_least);
+
+  -- role_rank has no ELSE, so an unrecognised role ranks null; null < null is
+  -- null, which plpgsql's IF treats as false, so this must be checked
+  -- explicitly rather than trusted to the comparison alone.
+  if v_member_rank is null or v_least_rank is null or v_member_rank < v_least_rank then
     raise exception 'no access' using errcode = '42501';
   end if;
   return v_member;
@@ -63,9 +102,15 @@ $$;
 
 revoke all on function console.require_role(console.member_role) from public, anon, authenticated;
 
--- The four things a tap approves, joined by a unit separator so no field can
--- impersonate another, then hashed. The server stores this digest with the
--- challenge; the database recomputes it from its own arguments.
+-- The four things a tap approves. Each field is hashed on its own, because a
+-- separator can appear inside a field and would otherwise let one field's
+-- text be read as another's -- joining with a separator byte is not
+-- injective: a byte-31 inside target and the same byte inside value can
+-- shift where one field ends and the next begins, and concat_ws silently
+-- drops a null argument, shifting every boundary after it. Fixed-length
+-- (32-byte) sub-hashes make the boundaries unambiguous regardless of what a
+-- field contains. The server stores the final digest with the challenge; the
+-- database recomputes it from its own arguments.
 create or replace function console.action_digest(p_action text, p_target text, p_value text, p_reason text)
 returns bytea
 language sql
@@ -74,7 +119,10 @@ security invoker
 set search_path = ''
 as $$
   select extensions.digest(
-    concat_ws(U&'\001F', p_action, coalesce(p_target, ''), coalesce(p_value, ''), coalesce(p_reason, '')),
+    extensions.digest(coalesce(p_action, ''), 'sha256') ||
+    extensions.digest(coalesce(p_target, ''), 'sha256') ||
+    extensions.digest(coalesce(p_value,  ''), 'sha256') ||
+    extensions.digest(coalesce(p_reason, ''), 'sha256'),
     'sha256'
   );
 $$;
@@ -88,7 +136,7 @@ security definer
 set search_path = ''
 as $$
 declare
-  v_session uuid := nullif(current_setting('request.jwt.claims', true)::jsonb ->> 'session_id', '')::uuid;
+  v_session uuid := console.claim_uuid('session_id');
   v_member  console.members := console.current_member();
   v_id      uuid;
 begin

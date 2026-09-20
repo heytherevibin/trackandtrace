@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(13);
+select plan(18);
 
 insert into auth.users (id, email) values ('11111111-1111-1111-1111-111111111111', 'owner@trakline.in');
 insert into console.members (user_id, email, name, role, status)
@@ -30,6 +30,15 @@ select throws_ok(
 );
 update console.members set role = 'owner' where user_id = '11111111-1111-1111-1111-111111111111';
 
+-- A null rank can never pass: role_rank has no ELSE, so null < null is null,
+-- which plpgsql's IF treats as false unless this is checked explicitly.
+select throws_ok(
+  $$select console.require_role(null)$$,
+  '42501',
+  null,
+  'require_role refuses a null rank'
+);
+
 -- A session that has not tapped a key is not a session yet.
 update console.sessions set key_verified_at = null where session_id = '22222222-2222-2222-2222-222222222222';
 select throws_ok($$select console.current_member()$$, '28000', null, 'a session without a key tap is refused');
@@ -57,6 +66,26 @@ select throws_ok($$select console.current_member()$$, '28000', null, 'an expired
 update console.sessions set expires_at = now() + interval '7 days'
  where session_id = '22222222-2222-2222-2222-222222222222';
 
+-- With no claims at all, the guard fails closed, not open.
+select set_config('request.jwt.claims', '', true);
+select throws_ok($$select console.current_member()$$, '28000', null, 'no claims at all is refused');
+
+-- A malformed claim fails closed too: 28000, never the raw cast error underneath.
+select set_config('request.jwt.claims', json_build_object('sub', 'not-a-uuid')::text, true);
+select throws_ok($$select console.current_member()$$, '28000', null, 'a malformed claims subject is refused, not a raw cast error');
+
+-- Restore the good claims so every assertion from here on speaks as the member again.
+select pg_temp.speak_as('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222');
+
+-- A separator byte inside a field cannot shift where one field ends and the
+-- next begins -- this is the regression the per-field hashing must never let
+-- back in.
+select is(
+  console.action_digest('A', 'B' || chr(31) || 'C', 'D', 'E') = console.action_digest('A', 'B', 'C' || chr(31) || 'D', 'E'),
+  false,
+  'a separator inside a field cannot shift the boundaries'
+);
+
 -- A tap approves exactly one action, once.
 insert into console.challenges (member_id, session_id, purpose, challenge, digest, expires_at)
 values ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'action', 'action-challenge-0001',
@@ -82,6 +111,18 @@ select throws_ok(
   '42501',
   null,
   'a tap cannot approve a different value'
+);
+
+-- A tap made for one action does not approve another, even with the same target, value and reason.
+insert into console.challenges (member_id, session_id, purpose, challenge, digest, expires_at)
+values ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'action', 'action-challenge-0005',
+        console.action_digest('role.change', 'asha@trakline.in', 'support', 'cover'), now() + interval '5 minutes');
+
+select throws_ok(
+  $$select console.use_tap('member.remove', 'asha@trakline.in', 'support', 'cover')$$,
+  '42501',
+  null,
+  'a tap made for one action does not approve another'
 );
 
 -- A tap made in one session cannot approve an action from a different session of the same member.
