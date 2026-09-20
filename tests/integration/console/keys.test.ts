@@ -76,4 +76,19 @@ describe("POST /api/keys/verify", () => {
     const response = await verify(post(VERIFY_URL, { intent: "add_key", step: "register", name: "x".repeat(61), response: { id: "bmV3" } }));
     expect(response.status).toBe(400);
   });
+
+  it("refuses a cross-site post", async () => {
+    const response = await verify(post(VERIFY_URL, { intent: "sign_in", response: { id: "Y3JlZA" } }, { "sec-fetch-site": "cross-site" }));
+    expect(response.status).toBe(403);
+    expect(completeSignIn).not.toHaveBeenCalled();
+  });
+
+  it("refuses an add_key body with no step, or a step it does not know", async () => {
+    const noStep = await verify(post(VERIFY_URL, { intent: "add_key", response: { id: "Y3JlZA" } }));
+    expect(noStep.status).toBe(400);
+    const badStep = await verify(post(VERIFY_URL, { intent: "add_key", step: "finish", response: { id: "Y3JlZA" } }));
+    expect(badStep.status).toBe(400);
+    expect(completeTap).not.toHaveBeenCalled();
+    expect(completeRegistration).not.toHaveBeenCalled();
+  });
 });

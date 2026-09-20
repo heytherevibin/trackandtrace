@@ -1,6 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ConsoleDb } from "@/console/auth/db";
-import { beginCeremony, completeRegistration, completeSignIn, requireLinkSession } from "@/console/keys/ceremony";
+
+// completeTap's "happy path" tests need verifyAuthentication to actually succeed, which the real
+// @simplewebauthn/server cannot do against a fabricated response. Every other export of this
+// module stays real via importOriginal -- beginCeremony's tests below depend on the real
+// generateAuthenticationOptions/generateRegistrationOptions output (registrationOptionsFor and
+// authenticationOptionsFor are never mocked). vi.hoisted, not a plain const: vi.mock's factory is
+// hoisted above this file's own top-level consts. Same note as tests/unit/console/keys/webauthn.test.ts.
+const { verifyAuthentication } = vi.hoisted(() => ({
+  verifyAuthentication: vi.fn<(...args: unknown[]) => Promise<{ credentialId: string; newCounter: number }>>(),
+}));
+vi.mock("@/console/keys/webauthn", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/console/keys/webauthn")>();
+  return { ...actual, verifyAuthentication };
+});
+
+import { beginCeremony, completeRegistration, completeSignIn, completeTap, requireLinkSession } from "@/console/keys/ceremony";
 
 const RP = { id: "admin.localhost", origin: "http://admin.localhost:4210", name: "Trakline Console" };
 const SESSION = {
@@ -19,10 +34,15 @@ const KEY_ROW = { id: "33333333-3333-3333-3333-333333333333", credential_id: "Y3
  * A ceremony response carrying just enough of the real WebAuthn shape for `challengeFrom` to read a
  * challenge back out of `clientDataJSON` -- every completeSignIn/completeTap/completeRegistration
  * test needs this, even the ones whose fake RPC ignores the challenge's actual value, because
- * `challengeFrom` runs before any of them and a bare `{id}` throws "didn't answer" first.
+ * `challengeFrom` runs before any of them and a bare `{id}` throws "didn't answer" first. Defaults
+ * to an assertion's own clientDataJSON type; registration fixtures pass "webauthn.create".
  */
-function responseWithChallenge(id: string, challenge = "c"): { id: string; response: { clientDataJSON: string } } {
-  return { id, response: { clientDataJSON: Buffer.from(JSON.stringify({ type: "webauthn.get", challenge, origin: RP.origin })).toString("base64url") } };
+function responseWithChallenge(
+  id: string,
+  options: { readonly challenge?: string; readonly type?: "webauthn.get" | "webauthn.create" } = {},
+): { id: string; response: { clientDataJSON: string } } {
+  const { challenge = "c", type = "webauthn.get" } = options;
+  return { id, response: { clientDataJSON: Buffer.from(JSON.stringify({ type, challenge, origin: RP.origin })).toString("base64url") } };
 }
 
 function fakes(overrides: Record<string, unknown> = {}) {
@@ -124,8 +144,8 @@ describe("completeSignIn", () => {
     ).rejects.toMatchObject({ status: 401 });
   });
 
-  it("refuses a credential the member does not hold", async () => {
-    const { service, member } = fakes({
+  it("refuses a credential the member does not hold, and logs it as a failed tap", async () => {
+    const { service, member, rpc } = fakes({
       console_auth_session: { ...SESSION, key_count: 1, status: "active" },
       console_auth_keys_for_member: [KEY_ROW],
       console_auth_take_challenge: { challenge: "c", session_id: SESSION.session_id, purpose: "sign_in" },
@@ -133,17 +153,82 @@ describe("completeSignIn", () => {
     await expect(completeSignIn({ req: REQUEST, response: responseWithChallenge("other") as never, db: member, service })).rejects.toMatchObject({
       message: "This key isn't one of yours.",
     });
+    // Spec §5's failure table lists "isn't registered" alongside "doesn't answer" as the same
+    // logged event -- keyFor's throw must land inside the same try/catch as spend() and
+    // verifyAuthentication(), not slip out between them unlogged.
+    expect(rpc).toHaveBeenCalledWith("console_auth_write_audit", expect.objectContaining({ p_action: "Key tap failed", p_result: "failed" }));
   });
 
-  it("logs a failed tap, and does not verify the session", async () => {
+  it("logs a failed tap, and does not verify the session, when there is no live challenge", async () => {
     const { service, member, rpc } = fakes({
       console_auth_session: { ...SESSION, key_count: 1, status: "active" },
       console_auth_keys_for_member: [KEY_ROW],
       console_auth_take_challenge: null,
     });
-    await expect(completeSignIn({ req: REQUEST, response: responseWithChallenge("Y3JlZA") as never, db: member, service })).rejects.toThrow();
+    // Pins the branch: a null console_auth_take_challenge row reads as "not live" (§5's "try
+    // again", 400), not a session gone bad -- without the p_purpose assertion this would still
+    // pass if challengeFrom itself had thrown before spend() ever ran.
+    await expect(completeSignIn({ req: REQUEST, response: responseWithChallenge("Y3JlZA") as never, db: member, service })).rejects.toMatchObject({
+      status: 400,
+    });
+    expect(rpc).toHaveBeenCalledWith("console_auth_take_challenge", expect.objectContaining({ p_purpose: "sign_in" }));
     expect(rpc).toHaveBeenCalledWith("console_auth_write_audit", expect.objectContaining({ p_action: "Key tap failed", p_result: "failed" }));
     expect(rpc).not.toHaveBeenCalledWith("console_auth_verify_session", expect.anything());
+  });
+});
+
+describe("completeTap", () => {
+  it("spends an add_key_tap challenge, never an add_key one", async () => {
+    const { service, member, rpc } = fakes({
+      console_auth_session: { ...SESSION, key_count: 1, status: "active" },
+      console_auth_keys_for_member: [KEY_ROW],
+      console_auth_take_challenge: { challenge: "c", session_id: SESSION.session_id, purpose: "add_key_tap" },
+    });
+    verifyAuthentication.mockResolvedValueOnce({ credentialId: KEY_ROW.credential_id, newCounter: KEY_ROW.counter + 1 });
+    await completeTap({ req: REQUEST, response: responseWithChallenge("Y3JlZA") as never, db: member, service });
+    expect(rpc).toHaveBeenCalledWith("console_auth_take_challenge", expect.objectContaining({ p_purpose: "add_key_tap" }));
+    expect(rpc).not.toHaveBeenCalledWith("console_auth_take_challenge", expect.objectContaining({ p_purpose: "add_key" }));
+  });
+
+  it("mints a registration challenge only once the tap's assertion verified", async () => {
+    const { service, member, rpc } = fakes({
+      console_auth_session: { ...SESSION, key_count: 1, status: "active" },
+      console_auth_keys_for_member: [KEY_ROW],
+      console_auth_take_challenge: { challenge: "c", session_id: SESSION.session_id, purpose: "add_key_tap" },
+    });
+    verifyAuthentication.mockResolvedValueOnce({ credentialId: KEY_ROW.credential_id, newCounter: KEY_ROW.counter + 1 });
+    const begun = await completeTap({ req: REQUEST, response: responseWithChallenge("Y3JlZA") as never, db: member, service });
+    expect(begun.options).toBeTruthy();
+    expect(rpc).toHaveBeenCalledWith("console_auth_new_challenge", expect.objectContaining({ p_purpose: "add_key" }));
+    // The touch is the proof the assertion verified: it must have already happened by the time
+    // the registration challenge is minted.
+    expect(rpc).toHaveBeenCalledWith("console_auth_touch_key", expect.objectContaining({ p_key: KEY_ROW.id }));
+  });
+
+  it("logs a failed tap and mints no add_key challenge when the assertion does not verify", async () => {
+    const { service, member, rpc } = fakes({
+      console_auth_session: { ...SESSION, key_count: 1, status: "active" },
+      console_auth_keys_for_member: [KEY_ROW],
+      console_auth_take_challenge: { challenge: "c", session_id: SESSION.session_id, purpose: "add_key_tap" },
+    });
+    verifyAuthentication.mockRejectedValueOnce(new Error("bad signature"));
+    await expect(completeTap({ req: REQUEST, response: responseWithChallenge("Y3JlZA") as never, db: member, service })).rejects.toThrow();
+    expect(rpc).toHaveBeenCalledWith("console_auth_write_audit", expect.objectContaining({ p_action: "Key tap failed", p_result: "failed" }));
+    expect(rpc).not.toHaveBeenCalledWith("console_auth_new_challenge", expect.objectContaining({ p_purpose: "add_key" }));
+  });
+
+  it("logs a failed tap when the key literally did not answer -- no clientDataJSON at all", async () => {
+    // Pins the fix: challengeFrom(args.response) now runs inside the try, so a garbled or missing
+    // clientDataJSON is the same logged event as any other failed tap, not an uncaught throw that
+    // slips out before console_auth_take_challenge is even reached.
+    const { service, member, rpc } = fakes({
+      console_auth_session: { ...SESSION, key_count: 1, status: "active" },
+      console_auth_keys_for_member: [KEY_ROW],
+      console_auth_take_challenge: { challenge: "c", session_id: SESSION.session_id, purpose: "add_key_tap" },
+    });
+    await expect(completeTap({ req: REQUEST, response: { id: "Y3JlZA" } as never, db: member, service })).rejects.toMatchObject({ status: 400 });
+    expect(rpc).toHaveBeenCalledWith("console_auth_write_audit", expect.objectContaining({ p_action: "Key tap failed", p_result: "failed" }));
+    expect(rpc).not.toHaveBeenCalledWith("console_auth_take_challenge", expect.anything());
   });
 });
 
@@ -155,10 +240,9 @@ describe("completeRegistration", () => {
       console_auth_take_challenge: { challenge: "c", session_id: SESSION.session_id, purpose: "add_key" },
       console_auth_activate_member: true,
     });
-    vi.doMock("@/console/keys/webauthn", () => ({}));
     const out = await completeRegistration({
       req: REQUEST,
-      response: responseWithChallenge("bmV3") as never,
+      response: responseWithChallenge("bmV3", { type: "webauthn.create" }) as never,
       name: "iPhone",
       db: member,
       service,
@@ -177,13 +261,36 @@ describe("completeRegistration", () => {
     });
     const out = await completeRegistration({
       req: REQUEST,
-      response: responseWithChallenge("bmV3") as never,
+      response: responseWithChallenge("bmV3", { type: "webauthn.create" }) as never,
       name: "Blue key",
       db: member,
       service,
       verified: { credentialId: "bmV3", publicKey: "cHVia2V5", counter: 0, transports: [], keyType: "security_key" },
     });
     expect(out).toEqual({ keyCount: 1, activated: false });
+    expect(rpc).not.toHaveBeenCalledWith("console_auth_verify_session", expect.anything());
+  });
+
+  it("does not report activation, or key-verify the session, when an already-active member adds a spare key", async () => {
+    // console_auth_activate_member reports the state ("is active"), not whether this call is what
+    // produced it -- an already-active member adding a third key gets data: true too. Session is
+    // deliberately not key-verified here, the one case that would expose the bug: the old reading
+    // (`activated && !session.keyVerified`) would wrongly key-verify off a spare-key registration.
+    const { service, rpc, member } = fakes({
+      console_auth_session: { ...SESSION, status: "active", key_count: 2, key_verified: false },
+      console_auth_keys_for_member: [KEY_ROW],
+      console_auth_take_challenge: { challenge: "c", session_id: SESSION.session_id, purpose: "add_key" },
+      console_auth_activate_member: true,
+    });
+    const out = await completeRegistration({
+      req: REQUEST,
+      response: responseWithChallenge("bmV3", { type: "webauthn.create" }) as never,
+      name: "Spare key",
+      db: member,
+      service,
+      verified: { credentialId: "bmV3", publicKey: "cHVia2V5", counter: 0, transports: [], keyType: "security_key" },
+    });
+    expect(out).toEqual({ keyCount: 3, activated: false });
     expect(rpc).not.toHaveBeenCalledWith("console_auth_verify_session", expect.anything());
   });
 
@@ -198,7 +305,7 @@ describe("completeRegistration", () => {
     await expect(
       completeRegistration({
         req: REQUEST,
-        response: responseWithChallenge("bmV3") as never,
+        response: responseWithChallenge("bmV3", { type: "webauthn.create" }) as never,
         name: "Blue key",
         db: member,
         service,
