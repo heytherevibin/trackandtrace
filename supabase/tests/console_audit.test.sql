@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(21);
+select plan(25);
 
 select has_table('console', 'audit_log', 'the audit log exists');
 
@@ -78,6 +78,39 @@ select is(
   (select count(*) from console.audit_log where action = 'Recent thing')::int,
   1,
   'a row from last week survives the purge'
+);
+
+-- The age rule lives in the trigger, not just in purge_audit()'s own WHERE
+-- clause: neither the flag nor age is enough alone, only both together.
+insert into console.audit_log (at, environment, actor_name, category, action, result)
+values (now() - interval '3 years', 'development', 'System', 'system', 'Another old thing', 'done');
+
+select set_config('console.purging', 'on', true);
+select throws_ok(
+  $$delete from console.audit_log where action = 'Recent thing'$$,
+  '42501',
+  null,
+  'purging alone does not excuse deleting a row that is not old enough'
+);
+select set_config('console.purging', 'off', true);
+
+select throws_ok(
+  $$delete from console.audit_log where action = 'Another old thing'$$,
+  '42501',
+  null,
+  'age alone does not excuse deleting a row without purging set'
+);
+
+-- The log outlives the member: no foreign key, so deleting the member never
+-- touches the row, and the actor_id it recorded does not change.
+select lives_ok(
+  $$delete from auth.users where id = '11111111-1111-1111-1111-111111111111'$$,
+  'a member with audit history can still be deleted'
+);
+select is(
+  (select actor_id from console.audit_log where action = 'Role changed')::text,
+  '11111111-1111-1111-1111-111111111111',
+  'the recorded actor_id survives the member it once named'
 );
 
 select * from finish();

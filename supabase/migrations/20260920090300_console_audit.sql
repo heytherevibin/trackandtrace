@@ -7,13 +7,12 @@ create table console.audit_log (
   id             uuid primary key default gen_random_uuid(),
   at             timestamptz not null default now(),
   environment    text not null check (char_length(environment) between 1 and 20),
-  -- No ON DELETE action: an append-only row can never be UPDATEd, including by a
-  -- cascading SET NULL, so a member or key cannot be deleted while audit history
-  -- still names it. actor_name is the durable, human-readable record either way.
-  actor_id       uuid references console.members (user_id),
+  -- The log names the actor and key as they were; it holds no foreign key,
+  -- because the record outlives both and must never be rewritten when they go.
+  actor_id       uuid,
   actor_name     text not null check (char_length(actor_name) between 1 and 120),
   actor_role     console.member_role,
-  key_id         uuid references console.keys (id),
+  key_id         uuid,
   session_label  text,
   category       text not null check (char_length(category) between 1 and 40),
   action         text not null check (char_length(action) between 1 and 120),
@@ -49,23 +48,44 @@ as $$
            '([0-9]{1,3}[.]){3}[0-9]{1,3}|([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}', '[removed]', 'g');
 $$;
 
-create or replace function console.audit_is_append_only()
+-- No update ever has a legitimate reason: not a correction, not a cascade.
+create or replace function console.audit_refuse_update()
 returns trigger
 language plpgsql
 security invoker
 set search_path = ''
 as $$
 begin
-  if current_setting('console.purging', true) = 'on' and tg_op = 'DELETE' then
-    return null;
+  raise exception 'the audit log is append-only' using errcode = '42501';
+end;
+$$;
+
+create trigger console_audit_refuse_update
+  before update on console.audit_log
+  for each statement execute function console.audit_refuse_update();
+
+-- The age rule lives here, not just in purge_audit()'s WHERE clause: a row is
+-- only ever removed when the purging flag is set AND that specific row has
+-- passed the two-year mark. Row-level, so it re-checks every row a DELETE
+-- touches, regardless of who issued the statement or how its WHERE clause
+-- was written.
+create or replace function console.audit_only_purge_old()
+returns trigger
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+begin
+  if current_setting('console.purging', true) = 'on' and old.at < now() - interval '2 years' then
+    return old;
   end if;
   raise exception 'the audit log is append-only' using errcode = '42501';
 end;
 $$;
 
-create trigger console_audit_append_only
-  before update or delete on console.audit_log
-  for each statement execute function console.audit_is_append_only();
+create trigger console_audit_only_purge_old
+  before delete on console.audit_log
+  for each row execute function console.audit_only_purge_old();
 
 create or replace function console.write_audit(
   p_environment   text,
