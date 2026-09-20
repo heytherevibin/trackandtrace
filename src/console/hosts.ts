@@ -33,7 +33,10 @@ export function isConsoleHost(header: string | null, vercelEnv: string | undefin
 export function consoleOrigin(hostHeader: string | null, vercelEnv: string | undefined): string {
   if (!isConsoleHost(hostHeader, vercelEnv)) return "";
   if (vercelEnv === "production") return `https://${CONSOLE_HOST_PRODUCTION}`;
-  // Outside production the port matters (the dev server is on 4210, the console e2e on 4211) and
-  // the hostname has already been checked against admin.localhost above.
-  return `http://${(hostHeader ?? "").trim().toLowerCase()}`;
+  // Outside production the port matters (the dev server is on 4210, the console e2e on 4211), so
+  // the header is used -- but the WHOLE authority is checked first, not just the part before the
+  // first colon that `requestHost` looks at. `admin.localhost:4210@evil.com` clears that prefix
+  // check and would otherwise be mailed as an origin whose real host is evil.com.
+  const authority = (hostHeader ?? "").trim().toLowerCase();
+  return /^[a-z0-9.-]+(:\d{1,5})?$/.test(authority) ? `http://${authority}` : "";
 }
