@@ -574,8 +574,12 @@ Create `tests/unit/console/auth/db.test.ts`:
 ```ts
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const createServerClient = vi.fn(() => ({ tag: "server" }));
-const createClient = vi.fn(() => ({ tag: "service" }));
+// Typed, not inferred: a bare `vi.fn(() => …)` infers a zero-argument signature, so
+// `.mock.calls[0]?.[2]` below is an index into a zero-length tuple and `tsc --noEmit` refuses it
+// (TS2493) even though vitest runs it happily. `vi.fn<Signature>()` is this repo's own convention
+// wherever a test reads the arguments a mock was called with.
+const createServerClient = vi.fn<(...args: unknown[]) => { tag: string }>(() => ({ tag: "server" }));
+const createClient = vi.fn<(...args: unknown[]) => { tag: string }>(() => ({ tag: "service" }));
 const cookieStore = { getAll: () => [], set: vi.fn() };
 
 vi.mock("@supabase/ssr", () => ({ createServerClient }));
@@ -1096,12 +1100,16 @@ describe("sendConsoleEmail", () => {
 
   it("posts to Resend with the configured sender", async () => {
     vi.stubEnv("RESEND_API_KEY", "re_aaaaaaaaaaaaaaaaaaaaaaaa");
-    const fetchSpy = vi.fn(() => Promise.resolve(new Response('{"id":"1"}', { status: 200 })));
+    // Typed, not inferred: a bare `vi.fn(() => …)` infers a zero-argument signature, so reading
+    // `.mock.calls[0]` below is an index into a zero-length tuple and `tsc --noEmit` refuses it
+    // (TS2493) even though vitest runs it happily. This is the repo's convention wherever a test
+    // reads the arguments a mock was called with.
+    const fetchSpy = vi.fn<(url: string, init: RequestInit) => Promise<Response>>(() => Promise.resolve(new Response('{"id":"1"}', { status: 200 })));
     vi.stubGlobal("fetch", fetchSpy);
     resetEnvCache();
 
     await expect(sendConsoleEmail(letter)).resolves.toBe("sent");
-    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    const [url, init] = fetchSpy.mock.calls[0];
     expect(url).toBe("https://api.resend.com/emails");
     expect(JSON.parse(String(init.body))).toEqual({
       from: "Trakline Console <console@trakline.in>",
@@ -2100,8 +2108,16 @@ Create `tests/unit/console/keys/webauthn.test.ts`:
 ```ts
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const generateRegistrationOptions = vi.fn(() => Promise.resolve({ challenge: "reg-challenge", rp: { id: "admin.localhost" } }));
-const generateAuthenticationOptions = vi.fn(() => Promise.resolve({ challenge: "auth-challenge", rpId: "admin.localhost" }));
+// Typed, not inferred: a bare `vi.fn(() => …)` infers a zero-argument signature, so
+// `generateRegistrationOptions.mock.calls[0]?.[0]` further down is an index into a zero-length
+// tuple and `tsc --noEmit` refuses it (TS2493) even though vitest runs it happily.
+// `vi.fn<Signature>()` is this repo's convention wherever a test reads a mock's arguments.
+const generateRegistrationOptions = vi.fn<(options: Record<string, unknown>) => Promise<Record<string, unknown>>>(() =>
+  Promise.resolve({ challenge: "reg-challenge", rp: { id: "admin.localhost" } }),
+);
+const generateAuthenticationOptions = vi.fn<(options: Record<string, unknown>) => Promise<Record<string, unknown>>>(() =>
+  Promise.resolve({ challenge: "auth-challenge", rpId: "admin.localhost" }),
+);
 const verifyRegistrationResponse = vi.fn();
 const verifyAuthenticationResponse = vi.fn();
 
