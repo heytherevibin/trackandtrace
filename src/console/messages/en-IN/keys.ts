@@ -2,11 +2,13 @@ import type { MessageTree } from "@/messages/types";
 
 // Word for word from docs/design/sheets/console/ConsoleSetup.dc.html and Main.dc.html.
 export const keys = {
-  // Not on a drawn sheet: the Setup sheet's "One key only" entry ("Console setup" / "Tap your
-  // first key, then add a second.") is a different moment -- registering a first key during setup,
-  // not signing in with one already held. 2d may replace this pairing once the signed-in frame
-  // lands and a real destination for "Your key" exists.
+  // None of title/plate/pageTitle is on a drawn sheet: the Setup sheet's "One key only" entry
+  // ("Console setup" / "Tap your first key, then add a second.") is a different moment --
+  // registering a first key during setup, not signing in with one already held. 2d may replace
+  // all three once the signed-in frame lands and a real destination for this page exists.
   title: "Your key",
+  plate: "Security key",
+  pageTitle: "Your key",
   lead: "Tap your key to finish signing in.",
   form: "Form TC-03",
   waiting: "Waiting for your key…",

@@ -52,7 +52,7 @@ export function KeyStep() {
     <section className="blueprint" aria-labelledby="console-keys-plate">
       <Corners />
       {waiting ? <SweepBar /> : null}
-      <PlateHeader title={m.title} titleId="console-keys-plate" cells="tight" meta={[m.form]} stack={false} />
+      <PlateHeader title={m.plate} titleId="console-keys-plate" cells="tight" meta={[m.form]} stack={false} />
       <div className="flex flex-col gap-4 px-4 py-5 sm:p-6">
         <p className="text-body text-ink-2">{m.status}</p>
         {message ? (

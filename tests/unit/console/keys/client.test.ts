@@ -4,13 +4,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // over a plain `const startAuthentication = vi.fn()` reads it before it is initialized. vi.hoisted
 // gives the mocks a binding that is itself hoisted ahead of the mock registration. Same note as
 // tests/unit/console/keys/ceremony.test.ts and tests/unit/console/keys/webauthn.test.ts.
-const { startAuthentication, startRegistration } = vi.hoisted(() => ({
+const { startAuthentication, startRegistration, browserSupportsWebAuthn } = vi.hoisted(() => ({
   startAuthentication: vi.fn(),
   startRegistration: vi.fn(),
+  browserSupportsWebAuthn: vi.fn(() => true),
 }));
-vi.mock("@simplewebauthn/browser", () => ({ startAuthentication, startRegistration, browserSupportsWebAuthn: () => true }));
+vi.mock("@simplewebauthn/browser", () => ({ startAuthentication, startRegistration, browserSupportsWebAuthn }));
 
-import { addKey, tapToSignIn } from "@/console/keys/client";
+import { addKey, keysUsable, tapToSignIn } from "@/console/keys/client";
 
 function answer(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -19,6 +20,7 @@ function answer(body: unknown, status = 200): Response {
 beforeEach(() => {
   startAuthentication.mockReset().mockResolvedValue({ id: "Y3JlZA" });
   startRegistration.mockReset().mockResolvedValue({ id: "bmV3" });
+  browserSupportsWebAuthn.mockReset().mockReturnValue(true);
 });
 
 afterEach(() => vi.unstubAllGlobals());
@@ -44,6 +46,35 @@ describe("tapToSignIn", () => {
   it("passes the server's own message through", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(answer({ ok: false, code: "INVALID_INPUT", message: "This key isn't one of yours." }, 400)));
     await expect(tapToSignIn()).resolves.toEqual({ kind: "failed", message: "This key isn't one of yours." });
+  });
+
+  it("shows the console's own unreachable line when the network itself fails, not the fetch error's own text", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("Failed to fetch");
+      }),
+    );
+    await expect(tapToSignIn()).resolves.toEqual({ kind: "failed", message: "The console could not be reached. Try again." });
+  });
+
+  it("shows the same unreachable line when the server answers with something that isn't JSON, not a parser's own text", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("<html>502 Bad Gateway</html>", { status: 502, headers: { "content-type": "text/html" } })));
+    await expect(tapToSignIn()).resolves.toEqual({ kind: "failed", message: "The console could not be reached. Try again." });
+  });
+});
+
+describe("keysUsable", () => {
+  it("says the browser can run a ceremony once WebAuthn is supported", () => {
+    vi.stubGlobal("window", {});
+    browserSupportsWebAuthn.mockReturnValue(true);
+    expect(keysUsable()).toBe(true);
+  });
+
+  it("says it cannot when the browser has no WebAuthn support", () => {
+    vi.stubGlobal("window", {});
+    browserSupportsWebAuthn.mockReturnValue(false);
+    expect(keysUsable()).toBe(false);
   });
 });
 

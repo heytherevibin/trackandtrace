@@ -7,8 +7,10 @@ import { requireLinkSession } from "@/console/keys/ceremony";
 import { consoleMessages } from "@/console/messages";
 import { KeyStep } from "./key-step";
 
+const m = consoleMessages.keys;
+
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Your key" };
+export const metadata: Metadata = { title: m.pageTitle };
 
 /**
  * Step 3 of spec §C. Reaching this page means the link was opened and a console session exists;
@@ -25,8 +27,8 @@ export default async function ConsoleKeysPage() {
       <span className="inline-flex">
         <Mark size={40} />
       </span>
-      <h1 className="optical-hang mt-6 text-5xl tracking-display">{consoleMessages.keys.title}</h1>
-      <p className="mt-3.5 text-base text-ink-2">{consoleMessages.keys.lead}</p>
+      <h1 className="optical-hang mt-6 text-5xl tracking-display">{m.title}</h1>
+      <p className="mt-3.5 text-base text-ink-2">{m.lead}</p>
       <div className="mt-8">
         <KeyStep />
       </div>
