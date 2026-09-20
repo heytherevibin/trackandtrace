@@ -42,3 +42,27 @@ next sign-in link takes them to Setup again to add two new keys, because Setup r
 member holds fewer than two keys, not only for a brand-new one. If Setup doesn't hand them straight
 back into the console once both are added, have them ask for a fresh sign-in link and tap in
 normally — their new keys are already on file by then.
+
+## After deploying: confirm a sign-in link actually arrives
+
+Spec §5 makes the sending path fail *silently by design* — sign-in must answer identically whether
+Resend is up or down — so a deploy that touches sign-in, email, or the Supabase redirect allow-list
+gets no automatic signal of its own. The first real production sign-in is also the first test of
+`generateLink`'s `redirectTo` against that allow-list, of Resend and the `console@trakline.in`
+sender, and of `after()` actually running to completion on Vercel. A link that never sends leaves no
+counter, alert or audit row behind — only a log line, if that.
+
+So after every deploy that could affect any of those, request a sign-in link for a real Owner
+address at the console's own `/login` and confirm the email arrives **before anyone depends on the
+console being reachable.** Do not put that address, or anything else from this check, into this
+file, a ticket, or a commit — it is a runbook, not a place for real members' addresses or secrets.
+
+If the email does not arrive, check that deployment's logs for these three lines — the only three
+`sendConsoleEmail` (`src/console/email/send.ts`) ever writes:
+
+- `[console] no RESEND_API_KEY: console email is not configured for this deployment` — the
+  environment variable is missing on this deployment.
+- `[console] resend refused a send` — Resend rejected the request (an unverified sender or domain
+  is the usual cause).
+- `[console] could not send console email` — the request to Resend itself failed or never
+  finished (a network error, or `after()` not outliving the request).
