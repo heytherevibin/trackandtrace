@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(40);
+select plan(42);
 
 -- Every function here is service_role's alone: keys, invites and the Owner
 -- list are steps the Next.js server takes for a member, or logs for
@@ -245,6 +245,32 @@ select is(
   ),
   true,
   'the first member''s own key is still in their list after a second member registers one'
+);
+
+-- Task 1 deferred "whichever task adds an UPDATE path must set the name and
+-- updated_at" to the reinstate paths -- neither did. updated_at is backdated
+-- explicitly here, not left on its now()-at-insert default: this whole suite
+-- runs in one transaction where now() never advances, so a column that was
+-- already now() at insert time would look "fresh" whether or not the upsert
+-- ever touched it.
+insert into auth.users (id, email) values ('c0000000-0000-0000-0000-000000000000', 'stale-name@trakline.in');
+insert into console.members (user_id, email, name, role, status, created_at, updated_at)
+values ('c0000000-0000-0000-0000-000000000000', 'stale-name@trakline.in', 'Old Name', 'viewer', 'removed', '2020-01-01T00:00:00Z', '2020-01-01T00:00:00Z');
+
+insert into console.invites (email, role, invited_by, token_hash, expires_at)
+values ('stale-name@trakline.in', 'admin', '11111111-1111-1111-1111-111111111111', '\xff'::bytea, now() + interval '7 days');
+
+select public.console_auth_accept_invite('\xff'::bytea, 'c0000000-0000-0000-0000-000000000000', 'New Name', 'development');
+
+select is(
+  (select name from console.members where user_id = 'c0000000-0000-0000-0000-000000000000'),
+  'New Name',
+  'reinstatement through accept_invite carries the newly supplied name, not the old one'
+);
+select is(
+  (select updated_at from console.members where user_id = 'c0000000-0000-0000-0000-000000000000') = now(),
+  true,
+  'reinstatement through accept_invite stamps a fresh updated_at'
 );
 
 select * from finish();

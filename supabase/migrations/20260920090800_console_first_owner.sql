@@ -113,7 +113,11 @@ begin
   -- violation against it.
   insert into console.members (user_id, email, name, role, status)
   values (p_user, v_link.email, p_name, 'owner', 'setup')
-  on conflict (user_id) do update set role = excluded.role, status = 'setup'
+  on conflict (user_id) do update
+     set role = excluded.role,
+         status = 'setup',
+         name = excluded.name,
+         updated_at = now()
   returning * into v_member;
 
   perform console.write_audit(

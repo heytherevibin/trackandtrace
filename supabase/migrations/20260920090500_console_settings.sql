@@ -64,7 +64,7 @@ declare
   v_before  jsonb;
   v_after   jsonb;
 begin
-  if jsonb_typeof(p_changes) <> 'object' or p_changes = '{}'::jsonb then
+  if p_changes is null or jsonb_typeof(p_changes) <> 'object' or p_changes = '{}'::jsonb then
     raise exception 'nothing to save' using errcode = '22023';
   end if;
 

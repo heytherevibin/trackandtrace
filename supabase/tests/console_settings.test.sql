@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(26);
+select plan(28);
 
 select has_table('console', 'settings', 'settings exists');
 select col_not_null('console', 'settings', 'version', 'a settings row always has a version');
@@ -102,6 +102,31 @@ select throws_ok(
   '22023',
   null,
   'a save naming a setting that does not exist is refused'
+);
+
+-- Fix round 1: `jsonb_typeof(null) <> 'object' or null = '{}'::jsonb` is SQL
+-- NULL, which plpgsql's `if` treats as false, so a literal SQL null used to
+-- slip past every guard here and still bump the version, move changed_at and
+-- spend the tap -- proven against 'production', never touched by the rest of
+-- this file, so the version assertion below cannot be thrown off by the
+-- 'development' save sequence around it. A real, matching tap is minted first
+-- so this proves the exact silent-success path, not merely a missing-tap
+-- refusal that would raise the unrelated 42501.
+insert into console.challenges (member_id, session_id, purpose, challenge, digest, expires_at)
+values ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'action', 'settings-challenge-nullchange',
+        console.action_digest('settings.save', 'production', null::text, 'null-changeset-attempt'),
+        now() + interval '5 minutes');
+
+select throws_ok(
+  $$select public.console_save_settings('production', 1, null, 'null-changeset-attempt')$$,
+  '22023',
+  null,
+  'a literal SQL null change set is refused, not silently accepted by a valid tap'
+);
+select is(
+  (select version from console.settings where environment = 'production')::int,
+  1,
+  'the null change set attempt left the version unchanged'
 );
 
 -- The tap's value is the change set as jsonb renders it, which is what the
