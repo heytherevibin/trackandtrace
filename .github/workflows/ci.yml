@@ -45,6 +45,10 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Start the local Supabase stack
+        run: npx supabase@2.117.0 start -x realtime,storage-api,imgproxy,studio,edge-runtime,logflare,vector,supavisor,mailpit
+      - name: Database tests
+        run: npx supabase@2.117.0 test db
       - name: Read the Playwright version
         id: playwright
         run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
