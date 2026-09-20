@@ -1687,7 +1687,7 @@ describe("deviceLabel", () => {
 
 describe("consoleAddressHash", () => {
   it("is one-way, stable and short enough for the column", () => {
-    vi.stubEnv("DATA_KEY", "c2VjcmV0LXNlY3JldC1zZWNyZXQtc2VjcmV0LTMyIQ==");
+    vi.stubEnv("DATA_KEY", Buffer.alloc(32, 7).toString("base64")); // 32 bytes, as env.ts's own regex demands
     resetEnvCache();
     const hash = consoleAddressHash("203.0.113.9");
     expect(hash).toBe(consoleAddressHash("203.0.113.9"));
@@ -1697,7 +1697,7 @@ describe("consoleAddressHash", () => {
   });
 
   it("tells two addresses apart", () => {
-    vi.stubEnv("DATA_KEY", "c2VjcmV0LXNlY3JldC1zZWNyZXQtc2VjcmV0LTMyIQ==");
+    vi.stubEnv("DATA_KEY", Buffer.alloc(32, 7).toString("base64")); // 32 bytes, as env.ts's own regex demands
     resetEnvCache();
     expect(consoleAddressHash("203.0.113.9")).not.toBe(consoleAddressHash("203.0.113.10"));
   });
