@@ -1380,6 +1380,11 @@ as $$
   on conflict (session_id) do nothing;
 $$;
 
+-- The key must be this member's own. `sessions.key_id` is a nullable foreign
+-- key, and a nullable one never checks a null, so without the `exists` below a
+-- null key would verify a session with no credential at all, and any existing
+-- key id would verify it with someone else's. A miss falls into the same
+-- "session ended" as a revoked session: the caller never learns it was the key.
 create or replace function public.console_auth_verify_session(p_session_id uuid, p_key_id uuid)
 returns void
 language plpgsql
@@ -1392,7 +1397,13 @@ begin
          key_id = p_key_id,
          expires_at = now() + interval '7 days',
          last_seen_at = now()
-   where session_id = p_session_id and revoked_at is null;
+   where session_id = p_session_id
+     and revoked_at is null
+     and exists (
+       select 1 from console.keys k
+        where k.id = p_key_id
+          and k.member_id = console.sessions.member_id
+     );
 
   if not found then
     raise exception 'session ended' using errcode = '28000';
