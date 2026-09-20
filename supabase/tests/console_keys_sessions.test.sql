@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(19);
+select plan(21);
 
 select has_table('console', 'keys', 'keys exists');
 select has_table('console', 'sessions', 'sessions exists');
@@ -73,6 +73,22 @@ select throws_ok(
   '23514'::char(5),
   null,
   'an action challenge without a digest is refused'
+);
+
+-- §D fixes a challenge's window at five minutes, the same reasoning Task 3
+-- already applied to invites and setup_links: without a CHECK here, a later
+-- function could mint one with an unbounded expiry.
+select throws_ok(
+  $$insert into console.challenges (member_id, session_id, purpose, challenge, expires_at)
+    values ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'sign_in', 'ten-minute-challenge', now() + interval '10 minutes')$$,
+  '23514'::char(5),
+  null,
+  'a challenge more than five minutes out is refused'
+);
+select lives_ok(
+  $$insert into console.challenges (member_id, session_id, purpose, challenge, expires_at)
+    values ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'sign_in', 'five-minute-challenge', now() + interval '5 minutes')$$,
+  'a challenge exactly five minutes out is accepted'
 );
 
 -- A member's rows go when the member goes.

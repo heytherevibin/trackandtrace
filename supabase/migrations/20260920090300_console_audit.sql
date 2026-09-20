@@ -1,6 +1,15 @@
 -- The audit log. Append-only: updates and deletes are refused, and only
 -- console.purge_audit() removes rows, only when they are older than two years.
 
+-- Belt-and-braces: 090400 and 090800 call extensions.digest and
+-- extensions.gen_random_bytes, assuming pgcrypto already lives in the
+-- extensions schema. The pre-existing watchlist migration's own `create
+-- extension if not exists pgcrypto` (no schema clause) already works, because
+-- the Supabase image ships the extension there -- this makes that schema
+-- explicit rather than assumed, as early in this feature's own migrations as
+-- it can be.
+create extension if not exists pgcrypto with schema extensions;
+
 create type console.audit_result as enum ('done', 'refused', 'failed');
 
 create table console.audit_log (
@@ -69,6 +78,14 @@ $$;
 
 create trigger console_audit_refuse_update
   before update on console.audit_log
+  for each statement execute function console.audit_refuse_update();
+
+-- A BEFORE DELETE row trigger never fires on TRUNCATE, and TRUNCATE succeeds
+-- as postgres -- what the Supabase SQL editor runs as. The application roles
+-- are already stopped by the missing schema USAGE, so this is about the
+-- dashboard accident, not an attacker.
+create trigger console_audit_refuse_truncate
+  before truncate on console.audit_log
   for each statement execute function console.audit_refuse_update();
 
 -- The age rule lives here, not just in purge_audit()'s WHERE clause: a row is

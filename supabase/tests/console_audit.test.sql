@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(28);
+select plan(29);
 
 select has_table('console', 'audit_log', 'the audit log exists');
 
@@ -129,6 +129,19 @@ select is(
   (select actor_id from console.audit_log where action = 'Role changed')::text,
   '11111111-1111-1111-1111-111111111111',
   'the recorded actor_id survives the member it once named'
+);
+
+-- A BEFORE DELETE row trigger never fires on TRUNCATE, and TRUNCATE succeeds
+-- as postgres -- exactly the role the Supabase SQL editor runs as -- even
+-- with every application role already shut out by the missing schema USAGE.
+-- Placed last: unlike a row-scoped DELETE, a TRUNCATE that is not refused
+-- empties the whole table, and no earlier assertion above may be left to
+-- depend on rows still being there.
+select throws_ok(
+  $$truncate console.audit_log$$,
+  '42501',
+  null,
+  'the audit log refuses truncate too, not only row-level updates and deletes'
 );
 
 select * from finish();

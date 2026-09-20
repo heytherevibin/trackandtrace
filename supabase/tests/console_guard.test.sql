@@ -141,9 +141,13 @@ select throws_ok(
 );
 
 -- An expired challenge cannot approve anything, even with a matching digest.
-insert into console.challenges (member_id, session_id, purpose, challenge, digest, expires_at)
+-- created_at is backdated along with expires_at, six minutes and one minute
+-- back respectively, so the row still opens within its own five-minute
+-- window (console_challenges_expiry_window) while still reading as expired
+-- against the current instant, which is what use_tap's own check runs on.
+insert into console.challenges (member_id, session_id, purpose, challenge, digest, created_at, expires_at)
 values ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'action', 'action-challenge-0004',
-        console.action_digest('key.remove', 'member@trakline.in', 'remove', 'stale'), now() - interval '1 minute');
+        console.action_digest('key.remove', 'member@trakline.in', 'remove', 'stale'), now() - interval '6 minutes', now() - interval '1 minute');
 
 select throws_ok(
   $$select console.use_tap('key.remove', 'member@trakline.in', 'remove', 'stale')$$,

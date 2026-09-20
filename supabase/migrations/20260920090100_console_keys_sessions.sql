@@ -47,7 +47,12 @@ create table console.challenges (
   used_at     timestamptz,
   constraint console_challenges_challenge_key unique (challenge),
   -- An action tap is always bound to a digest of what it approves.
-  constraint console_challenges_action_digest check (purpose <> 'action' or digest is not null)
+  constraint console_challenges_action_digest check (purpose <> 'action' or digest is not null),
+  -- §D fixes every challenge's window at five minutes. console.sessions gets
+  -- no equivalent CHECK: verify_session moves its expiry to now() + 7 days,
+  -- which may exceed created_at + 7 days.
+  constraint console_challenges_expiry_window
+    check (expires_at > created_at and expires_at <= created_at + interval '5 minutes')
 );
 
 create index console_challenges_open_idx
