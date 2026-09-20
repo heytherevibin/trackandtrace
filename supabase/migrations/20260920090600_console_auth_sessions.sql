@@ -51,17 +51,19 @@ security definer
 set search_path = ''
 as $$
 begin
-  update console.sessions
+  update console.sessions s
      set key_verified_at = now(),
          key_id = p_key_id,
          expires_at = now() + interval '7 days',
          last_seen_at = now()
-   where session_id = p_session_id
-     and revoked_at is null
+   where s.session_id = p_session_id
+     and s.revoked_at is null
+     and s.expires_at > now()
+     and s.last_seen_at > now() - interval '24 hours'
      and exists (
        select 1 from console.keys k
         where k.id = p_key_id
-          and k.member_id = console.sessions.member_id
+          and k.member_id = s.member_id
      );
 
   if not found then

@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(43);
+select plan(47);
 
 -- Every function here is service_role's alone: these are the steps that
 -- happen before a key-verified session exists, so nothing that already holds
@@ -249,6 +249,50 @@ select is(
      from console.sessions where session_id = 'ffffffff-ffff-ffff-ffff-ffffffffffff'),
   true,
   'a member''s own second key still verifies their session, extending it again'
+);
+
+-- Fix round 2: verify_session's own WHERE clause must mirror
+-- current_member()'s expiry and idle checks, not just revoked_at -- otherwise
+-- a key tap on a long-expired or long-idle session revives it indefinitely,
+-- and revocation becomes the only way a session ever ends. Each condition is
+-- proven on its own, the way console_guard.test.sql already proves them for
+-- current_member().
+
+select public.console_auth_start_session(
+  '12121212-1212-1212-1212-121212121212', '11111111-1111-1111-1111-111111111111', 'Long expired', 'hash-expired'
+);
+update console.sessions set expires_at = now() - interval '29 days'
+ where session_id = '12121212-1212-1212-1212-121212121212';
+select throws_ok(
+  $$select public.console_auth_verify_session('12121212-1212-1212-1212-121212121212', '33333333-3333-3333-3333-333333333333')$$,
+  '28000',
+  null,
+  'verifying an expired session raises instead of reviving it'
+);
+select is(
+  (select key_verified_at is null and key_id is null and expires_at < now()
+     from console.sessions where session_id = '12121212-1212-1212-1212-121212121212'),
+  true,
+  'the expired session is left unverified and its expiry is not pushed forward'
+);
+
+select public.console_auth_start_session(
+  '13131313-1313-1313-1313-131313131313', '11111111-1111-1111-1111-111111111111', 'Long idle', 'hash-idle'
+);
+update console.sessions set expires_at = now() + interval '7 days',
+                             last_seen_at = now() - interval '25 hours'
+ where session_id = '13131313-1313-1313-1313-131313131313';
+select throws_ok(
+  $$select public.console_auth_verify_session('13131313-1313-1313-1313-131313131313', '33333333-3333-3333-3333-333333333333')$$,
+  '28000',
+  null,
+  'verifying a session idle beyond 24 hours raises instead of reviving it'
+);
+select is(
+  (select key_verified_at is null and key_id is null and last_seen_at < now() - interval '24 hours'
+     from console.sessions where session_id = '13131313-1313-1313-1313-131313131313'),
+  true,
+  'the idle session is left unverified and its last_seen_at is not refreshed'
 );
 
 select * from finish();
