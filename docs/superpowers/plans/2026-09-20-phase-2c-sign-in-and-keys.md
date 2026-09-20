@@ -932,7 +932,11 @@ export interface ConsoleMember {
 export const ROLE_RANK: Readonly<Record<ConsoleRole, number>> = { owner: 4, admin: 3, support: 2, viewer: 1 } as const;
 
 const shape = z.object({
-  user_id: z.uuid(),
+  // `guid`, not `uuid`: this parses a Postgres `uuid` column, and that type accepts any 32 hex
+  // digits, while zod's `uuid()` also demands RFC 4122's version and variant nibbles. The stricter
+  // check would be stricter than the column it reads, and a member whose id failed it would be
+  // told their session had ended.
+  user_id: z.guid(),
   email: z.string().min(3).max(254),
   name: z.string().min(1).max(120),
   role: z.enum(["owner", "admin", "support", "viewer"]),
