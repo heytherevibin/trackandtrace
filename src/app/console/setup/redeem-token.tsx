@@ -70,9 +70,9 @@ export function RedeemToken({ token }: { readonly token: string }) {
       <p className="mt-3.5 text-base text-ink-2">{m.lead}</p>
       <div className="mt-8 blueprint">
         <Corners />
+        {stage.kind === "working" ? <SweepBar /> : null}
         <PlateHeader meta={[m.form]} cells="tight" stack={false} />
         <div className="flex flex-col gap-4 px-4 py-5 sm:p-6">
-          {stage.kind === "working" ? <SweepBar /> : null}
           {stage.kind === "failed" ? (
             <p role="alert" className="text-label font-medium text-ink-alert">
               {stage.message}

@@ -89,8 +89,8 @@ export function SetupFlow({ keyCount }: { readonly keyCount: number }) {
       <p className="kicker mb-3">{m.stepLegend(step)}</p>
       <section className="blueprint" aria-labelledby="console-setup-plate">
         <Corners />
-        <PlateHeader title={heading} titleId="console-setup-plate" headingLevel={2} cells="tight" meta={[m.form]} stack={false} />
         {adding ? <SweepBar /> : null}
+        <PlateHeader title={heading} titleId="console-setup-plate" headingLevel={2} cells="tight" meta={[m.form]} stack={false} />
         <div className="flex flex-col gap-4 px-4 py-5 sm:p-6">
           {addedKeys.length > 0 ? (
             <ul className="flex flex-col border-b border-line">
