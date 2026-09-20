@@ -93,13 +93,22 @@ describe("Setup", () => {
     expect(screen.getByRole("button", { name: "Add key" })).toBeDisabled();
   });
 
-  it("stays off step 3 on keyCount alone -- only activation means key-verified", async () => {
-    addKey.mockResolvedValue({ kind: "done", keyCount: 2, activated: false });
-    render(<SetupFlow keyCount={1} />);
+  it("reaches step 3 on keyCount alone, even when this call did not itself flip activation", async () => {
+    // The recovery shape from docs/runbooks/console-keys.md: an already-active member whose keys
+    // were cleared starts this flow from zero, and console_auth_activate_member reports `true`
+    // for every one of their calls (they are active before either key is added), so
+    // outcome.activated is false throughout. Settling on stepFor(keyCount) -- the same rule the
+    // initial render uses -- is what lets this member ever reach "You're set up" at all.
+    addKey.mockResolvedValueOnce({ kind: "done", keyCount: 1, activated: false });
+    render(<SetupFlow keyCount={0} />);
+    await userEvent.type(screen.getByLabelText("Name this key"), "YubiKey 5C");
+    await userEvent.click(screen.getByRole("button", { name: "Add key" }));
+    expect(await screen.findByRole("heading", { name: "Add a second key" })).toBeVisible();
+
+    addKey.mockResolvedValueOnce({ kind: "done", keyCount: 2, activated: false });
     await userEvent.type(screen.getByLabelText("Name this key"), "iPhone");
     await userEvent.click(screen.getByRole("button", { name: "Add key" }));
-    expect(await screen.findByText("iPhone")).toBeVisible();
-    expect(screen.getByRole("heading", { name: "Add a second key" })).toBeVisible();
-    expect(screen.queryByRole("heading", { name: "You're set up" })).not.toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "You're set up" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Open the console" })).toBeEnabled();
   });
 });

@@ -62,10 +62,15 @@ export function SetupFlow({ keyCount }: { readonly keyCount: number }) {
       setAddedKeys((current) => [...current, trimmed]);
       setName("");
       setStage({ kind: "idle", error: null });
-      // console_auth_activate_member is what key-verifies the session; keyCount alone can already
-      // read 2 for an already-active member adding a spare key with no tap, so step 3 -- which
-      // leads straight to "Open the console" with no further tap -- waits for activation, not count.
-      setStep(outcome.activated ? 3 : 2);
+      // One rule for step 3, the same stepFor the initial render uses: keyCount alone. An
+      // already-active member recovering from zero keys (docs/runbooks/console-keys.md) never gets
+      // outcome.activated -- console_auth_activate_member only reports *this* call as having crossed
+      // setup -> active, which an already-active member's own call never does -- so gating on
+      // activation left that recovery stuck on step 2 forever. "Open the console" leading straight in
+      // with no further tap is a fresh-member perk (activation key-verifies their session as a
+      // byproduct); a recovering member's session is verified by /keys's own tap instead, which
+      // setup/page.tsx now routes them to.
+      setStep(stepFor(outcome.keyCount));
       return;
     }
     setStage({ kind: "idle", error: outcome.kind === "failed" ? outcome.message : null });

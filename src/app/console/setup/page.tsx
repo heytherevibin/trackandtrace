@@ -29,7 +29,13 @@ export const metadata: Metadata = { title: m.pageTitle };
 export default async function ConsoleSetupPage({ searchParams }: { readonly searchParams: Promise<{ readonly token?: string | readonly string[] }> }) {
   const session = await requireLinkSession().catch(() => null);
   if (session) {
-    if (session.keyCount >= 2) redirect(consoleHref("/"));
+    // The keys-cleared recovery path (docs/runbooks/console-keys.md) leaves an active member's
+    // session not key-verified even once they hold two keys again -- adding a key key-verifies a
+    // session only for the member it activates (ceremony.ts's justActivated), which an already-active
+    // member never is. Sending them to "/" here would just bounce off requireConsoleMember's own
+    // key-verified check with no explanation; /keys is the tap step built for exactly this session
+    // shape (two-plus keys, not yet key-verified).
+    if (session.keyCount >= 2) redirect(consoleHref(session.keyVerified ? "/" : "/keys"));
     return (
       <SignedOutFrame>
         <span className="inline-flex">
