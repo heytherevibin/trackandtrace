@@ -515,7 +515,7 @@ to service_role;
 - [ ] **Step 5: Run the test to verify it passes**
 
 Run: `npm run db:reset && npm run db:test`
-Expected: PASS — the new file's 24 assertions, plus the nine existing files unchanged.
+Expected: PASS — the new file's 43 assertions, plus the nine existing files. One of those nine does change: `supabase/tests/console_keys_sessions.test.sql` asserts `challenge_purpose`'s **complete** label set through `enum_has_labels`, so Step 3's new value forces that array from three labels to four. Widen it in this task's commit; do not weaken the assertion to a subset.
 
 Report the **total** assertion count from the runner's own output. Do not count by hand or by eye: two implementer reports in 2b miscounted.
 
