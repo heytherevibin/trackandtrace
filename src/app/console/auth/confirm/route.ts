@@ -1,16 +1,30 @@
 import { NextResponse } from "next/server";
 import { assertConsoleAvailable } from "@/console/availability";
 import { createConsoleDb, createConsoleServiceDb } from "@/console/auth/db";
+import { consoleOrigin } from "@/console/hosts";
 import { parseAuthMember, sessionIdFromClaims } from "@/console/auth/member";
 import { nextAfterConfirm, startConsoleSession } from "@/console/auth/session";
 import { consoleHref } from "@/console/href";
+import { env } from "@/services/env";
 import { log } from "@/services/log";
 import { clientIp } from "@/services/rate-limit";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * `req.url`'s own origin is not this route's Host header: for a request the proxy rewrote (every
+ * request here, since the console host rewrites everything into /console -- src/proxy.ts), Next
+ * reports `req.url` with the rewrite's own default host, not the one the browser actually sent, even
+ * though `req.headers.get("host")` still carries it correctly. A real end-to-end run against a real
+ * proxy is what surfaces this; a hand-built `Request` in a unit test has no rewrite to diverge from,
+ * which is exactly why tests/integration/console/confirm.test.ts never caught it. `consoleOrigin` is
+ * the one place that already derives this correctly (checked against this environment's console
+ * host, and the production constant rather than a header in production) -- the same function
+ * /api/sign-in uses to build the very link this route confirms.
+ */
 function to(req: Request, path: string): NextResponse {
-  return NextResponse.redirect(new URL(path, new URL(req.url).origin), 303);
+  const origin = consoleOrigin(req.headers.get("host"), env().VERCEL_ENV) || new URL(req.url).origin;
+  return NextResponse.redirect(new URL(path, origin), 303);
 }
 
 /**
