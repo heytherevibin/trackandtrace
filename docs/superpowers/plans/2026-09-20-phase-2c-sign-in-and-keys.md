@@ -1444,7 +1444,7 @@ describe("sendSignInLink", () => {
 });
 ```
 
-Create `tests/integration/console/sign-in.test.ts`:
+**Add to** `tests/integration/console/sign-in.test.ts` — the file already exists and covers the route as it stands today (availability, the rate limits, and the same-origin fallbacks). **Merge these cases into it; do not overwrite it**, or that coverage disappears silently. The mocks at the top go alongside whatever is already there.
 
 ```ts
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
