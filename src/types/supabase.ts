@@ -67,18 +67,14 @@ export type Database = {
           p_challenge: string
           p_digest: string
           p_member: string
-          p_purpose: "sign_in" | "add_key" | "action" | "add_key_tap"
+          p_purpose: string
           p_session: string
         }
         Returns: string
       }
       console_auth_owner_addresses: { Args: never; Returns: string[] }
       console_auth_read_challenge: {
-        Args: {
-          p_challenge: string
-          p_member: string
-          p_purpose: "sign_in" | "add_key" | "action" | "add_key_tap"
-        }
+        Args: { p_challenge: string; p_member: string; p_purpose: string }
         Returns: Json
       }
       console_auth_read_settings: {
@@ -93,7 +89,7 @@ export type Database = {
           p_name: string
           p_public_key: string
           p_transports: string[]
-          p_type: "passkey" | "security_key"
+          p_type: string
         }
         Returns: string
       }
@@ -127,11 +123,7 @@ export type Database = {
         Returns: undefined
       }
       console_auth_take_challenge: {
-        Args: {
-          p_challenge: string
-          p_member: string
-          p_purpose: "sign_in" | "add_key" | "action" | "add_key_tap"
-        }
+        Args: { p_challenge: string; p_member: string; p_purpose: string }
         Returns: Json
       }
       console_auth_touch_key: {
@@ -147,7 +139,7 @@ export type Database = {
           p_action: string
           p_actor: string
           p_actor_name: string
-          p_actor_role: "owner" | "admin" | "support" | "viewer"
+          p_actor_role: string
           p_address_hash: string
           p_after: Json
           p_before: Json
@@ -155,7 +147,7 @@ export type Database = {
           p_environment: string
           p_key_id: string
           p_reason: string
-          p_result: "done" | "refused" | "failed"
+          p_result: string
           p_session_label: string
           p_target: string
         }
