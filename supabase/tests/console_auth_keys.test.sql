@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(34);
+select plan(40);
 
 -- Every function here is service_role's alone: keys, invites and the Owner
 -- list are steps the Next.js server takes for a member, or logs for
@@ -184,6 +184,67 @@ select is(
   (select reason from console.audit_log where action = 'Key tap failed (passthrough test)'),
   'contact [removed] re case [removed]',
   'the passthrough scrubs an address and a ten-digit run just as the member-facing writer does'
+);
+
+-- Fix round 1: possessing the token only proves someone holds the invite,
+-- never that they are the person it names. Without also checking that the
+-- accepting account's own address matches the invite, any live invite could
+-- be redeemed against any existing member row, resetting that row's role.
+-- The order matters too: the invite must only be marked accepted once the
+-- identity check has passed, or a mismatched attempt would silently burn a
+-- live invite even while being refused.
+
+insert into console.invites (email, role, invited_by, token_hash, expires_at)
+values ('mismatch@trakline.in', 'viewer', '11111111-1111-1111-1111-111111111111', '\xdd'::bytea, now() + interval '7 days');
+
+insert into auth.users (id, email) values ('44444444-4444-4444-4444-444444444444', 'unrelated@trakline.in');
+
+select is(
+  public.console_auth_accept_invite('\xdd'::bytea, '44444444-4444-4444-4444-444444444444', 'Someone Else', 'development'),
+  null,
+  'accepting with an account whose address does not match the invite returns null'
+);
+select is(
+  (select accepted_at is null from console.invites where token_hash = '\xdd'::bytea),
+  true,
+  'a mismatched attempt leaves the invite live -- it is not consumed by a failed identity check'
+);
+
+insert into auth.users (id, email) values ('33333333-3333-3333-3333-333333333333', 'mismatch@trakline.in');
+select is(
+  public.console_auth_accept_invite('\xdd'::bytea, '33333333-3333-3333-3333-333333333333', 'Right Person', 'development') ->> 'role',
+  'viewer',
+  'the same invite can still be accepted by the address it was actually sent to'
+);
+
+-- Reinstatement is still meant to work -- just now only for the account the
+-- invite actually names. The removed Owner from the owner_addresses checks
+-- above is re-invited at their own address, under a new role, and comes back
+-- in setup, the same as any other freshly accepted invite.
+insert into console.invites (email, role, invited_by, token_hash, expires_at)
+values ('removed-owner@trakline.in', 'admin', '11111111-1111-1111-1111-111111111111', '\xee'::bytea, now() + interval '7 days');
+
+select is(
+  public.console_auth_accept_invite('\xee'::bytea, '77777777-7777-7777-7777-777777777777', 'Removed Owner', 'development') ->> 'role',
+  'admin',
+  'a removed member re-invited at their own address is reinstated with the invited role'
+);
+select is(
+  (select status from console.members where user_id = '77777777-7777-7777-7777-777777777777')::text,
+  'setup',
+  'reinstatement puts them back in setup, same as any other freshly accepted invite'
+);
+
+-- Strengthens the second-member leak check above: a regression that emptied
+-- every member's key list, rather than merely leaking another member's key
+-- into it, must fail here too.
+select is(
+  exists (
+    select 1 from jsonb_array_elements(public.console_auth_keys_for_member('11111111-1111-1111-1111-111111111111')) e
+    where e ->> 'credential_id' = encode('\x01'::bytea, 'base64')
+  ),
+  true,
+  'the first member''s own key is still in their list after a second member registers one'
 );
 
 select * from finish();
