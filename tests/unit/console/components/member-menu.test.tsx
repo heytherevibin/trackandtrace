@@ -38,6 +38,21 @@ describe("the member menu", () => {
     expect(screen.getByRole("button", { name: "Asha Rao, Owner. Open the member menu" })).toBeInTheDocument();
   });
 
+  // Found rendering the signed-in frame at 390px (task-10-report.md): with the role badge and
+  // chevron always shown, this trigger alone pushed the masthead about 0.78px past a 390px
+  // viewport -- the one thing tests/e2e/console-auth/scans.spec.ts's own layoutBreaks caught,
+  // nothing else in the frame. ShellPhone.dc.html and ConsoleMyKeysPhone.dc.html both draw this
+  // control as a bare `box-icon box-lg` avatar square on a phone (no badge, no chevron) -- the same
+  // 44px collapse ThemeToggle already gets from ConsoleMasthead (`max-sm:size-11`). The role never
+  // goes missing for a screen reader: it stays in the trigger's own accessible name (asserted
+  // above) whether or not the badge is visually shown.
+  it("collapses to a 44px icon-only control on a phone, hiding the role badge and chevron a screen reader still has from the trigger's own name", () => {
+    render(<MemberMenu member={MEMBER} />);
+    const trigger = screen.getByRole("button", { name: "Asha Rao, Owner. Open the member menu" });
+    expect(trigger).toHaveClass("max-sm:size-11");
+    expect(screen.getByText("Owner")).toHaveClass("max-sm:hidden");
+  });
+
   it("opens on exactly two items: My keys, a link to /keys, and Sign out, not a link", async () => {
     render(<MemberMenu member={MEMBER} />);
     await openMenu();

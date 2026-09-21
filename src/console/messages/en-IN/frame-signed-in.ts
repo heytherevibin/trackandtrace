@@ -13,6 +13,11 @@ export const frameSignedIn = {
   },
   nav: {
     landmark: "Console",
+    // The phone rail's trigger (ShellPhone.dc.html and ConsoleMyKeysPhone.dc.html's own hamburger
+    // button, both `aria-label="Open menu"` word for word). Kept in this tree rather than reusing
+    // messages.shell.nav.openMenu (the site's own, identical string for its own nav sheet): the
+    // console never imports the traveller message tree (see this file's own top-of-file note).
+    openMenu: "Open menu",
     groupLabel: {
       operate: "Operate",
       people: "People",

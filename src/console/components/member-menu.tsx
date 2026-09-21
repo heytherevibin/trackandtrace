@@ -57,13 +57,20 @@ export function MemberMenu({ member }: { readonly member: ConsoleMember }) {
       <MenuRoot>
         <MenuTrigger
           aria-label={fs.member.openMenu(member.name, roleLabel)}
-          className="inline-flex h-9 shrink-0 items-center gap-2.5 border border-line py-0 pl-1 pr-2.5 hover:border-line-strong"
+          className="inline-flex h-9 shrink-0 items-center gap-2.5 border border-line py-0 pl-1 pr-2.5 hover:border-line-strong max-sm:size-11 max-sm:justify-center max-sm:gap-0 max-sm:border-0 max-sm:p-0"
         >
           <Avatar name={member.name} size="sm" />
-          <Badge variant="steel" caps>
+          {/* ShellPhone.dc.html and ConsoleMyKeysPhone.dc.html both draw this control as a bare
+              avatar square on a phone -- no badge, no chevron, the same box-icon box-lg collapse
+              ThemeToggle already gets (ConsoleMasthead's own `max-sm:size-11`). The role stays on
+              the trigger's own aria-label regardless, so hiding these two loses nothing a screen
+              reader had. Found as a real ~1px overflow at 390px (task-10-report.md), not a style
+              preference: with both always shown, this trigger alone was the one thing that pushed
+              the signed-in masthead past a 390px viewport. */}
+          <Badge variant="steel" caps className="max-sm:hidden">
             {roleLabel}
           </Badge>
-          <ChevronDownRegular className="size-3 text-ink-3" aria-hidden="true" />
+          <ChevronDownRegular className="size-3 text-ink-3 max-sm:hidden" aria-hidden="true" />
         </MenuTrigger>
         <MenuContent>
           <div className="flex flex-col gap-2 px-3 py-2">
