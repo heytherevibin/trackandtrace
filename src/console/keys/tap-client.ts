@@ -1,0 +1,67 @@
+"use client";
+
+import { startAuthentication } from "@simplewebauthn/browser";
+import { z } from "zod";
+import { consoleMessages } from "@/console/messages";
+import { apiRequest } from "@/services/api-client";
+import type { ApiErrorBody } from "@/services/errors";
+import type { TapRequest } from "./tap";
+
+// The browser half of a per-action tap (spec §D step 2): ask /api/tap/options to mint a challenge
+// bound to these four fields, run the WebAuthn ceremony, then post what it returns to
+// /api/tap/verify. Mirrors src/console/keys/client.ts's own ceremony shape -- see that file for
+// why apiRequest (not a bare fetch) carries the request, why a dismissed prompt is not a failure,
+// and why SOURCE_UNAVAILABLE/INTERNAL get the console's own line instead of apiRequest's technical
+// wording. Nothing here hashes, trims or otherwise reshapes the four fields: the database's digest
+// must be computed over the very same bytes the action later recomputes it from (tap.ts's own
+// note), so they go out exactly as given. The challenge this mints is never spent here either --
+// verify only proves a real key answered, and the action the tap approves spends it later.
+
+export type TapOutcome = { readonly kind: "done" } | { readonly kind: "cancelled" } | { readonly kind: "failed"; readonly message: string };
+
+const s = consoleMessages.session;
+
+const optionsSchema = z.object({ ok: z.literal(true), options: z.unknown() });
+const verifiedSchema = z.object({ ok: z.literal(true) });
+
+function jsonPost(body: unknown): RequestInit {
+  return { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) };
+}
+
+/**
+ * Same substitution as client.ts's own messageFor: a real refusal (a genuine HTTP answer) already
+ * carries sheet copy, so it passes through unchanged. SOURCE_UNAVAILABLE (the fetch itself failed
+ * or timed out) and INTERNAL (the body wasn't the JSON it should have been) are apiRequest's own
+ * technical wording, never a line the sheets wrote, so both get the console's one line instead.
+ */
+function messageFor(error: ApiErrorBody): string {
+  return error.code === "SOURCE_UNAVAILABLE" || error.code === "INTERNAL" ? s.unavailable : error.message;
+}
+
+/**
+ * A prompt the member dismissed is not a failure (decision #2, carried from the previous plan):
+ * client.ts's own isDismissal checks the same two names. It is not imported from there because
+ * client.ts does not export it, and that file's other exports reach no further than this one does
+ * -- duplicating this one small, stable check (the two DOMException names WebAuthn dismissal
+ * always uses) is safer than adding a new export to an already-shipped module for it.
+ */
+function isDismissal(err: unknown): boolean {
+  return err instanceof Error && (err.name === "NotAllowedError" || err.name === "AbortError");
+}
+
+/** Runs the tap ceremony for one risky action (spec §D), turning every outcome into a TapOutcome rather than a throw. */
+export async function runTap(tap: TapRequest): Promise<TapOutcome> {
+  const begun = await apiRequest("/api/tap/options", jsonPost(tap), optionsSchema);
+  if (!begun.ok) return { kind: "failed", message: messageFor(begun.error) };
+
+  let response: Awaited<ReturnType<typeof startAuthentication>>;
+  try {
+    response = await startAuthentication({ optionsJSON: begun.data.options as never });
+  } catch (err) {
+    if (isDismissal(err)) return { kind: "cancelled" };
+    return { kind: "failed", message: consoleMessages.keys.didNotAnswer };
+  }
+
+  const verified = await apiRequest("/api/tap/verify", jsonPost({ response }), verifiedSchema);
+  return verified.ok ? { kind: "done" } : { kind: "failed", message: messageFor(verified.error) };
+}
