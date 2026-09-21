@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(37);
+select plan(39);
 
 -- Grants: every one of these is the member's own call, so `authenticated` alone.
 select is(has_function_privilege('authenticated', 'public.console_my_keys()', 'execute')::text, 'true', 'a member can list their own keys');
@@ -27,6 +27,14 @@ insert into console.sessions (session_id, member_id, key_id, key_verified_at, de
 values
   ('22222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111', 'aaaaaaaa-0000-0000-0000-000000000001', now(), 'Chrome on macOS', 'hash', now() + interval '7 days'),
   ('33333333-3333-3333-3333-333333333333', '11111111-1111-1111-1111-111111111111', 'aaaaaaaa-0000-0000-0000-000000000002', now(), 'Safari on iPhone', 'hash', now() + interval '7 days');
+
+-- A second member, so "not yours" can be tested against a key that really
+-- exists and really belongs to someone else.
+insert into auth.users (id, email) values ('44444444-4444-4444-4444-444444444444', 'devi@trakline.in');
+insert into console.members (user_id, email, name, role, status)
+values ('44444444-4444-4444-4444-444444444444', 'devi@trakline.in', 'Devi Menon', 'support', 'active');
+insert into console.keys (id, member_id, credential_id, public_key, counter, name, type)
+values ('bbbbbbbb-0000-0000-0000-000000000001', '44444444-4444-4444-4444-444444444444', '\x04'::bytea, '\x0d'::bytea, 0, 'Devi''s YubiKey', 'security_key');
 
 -- Act as that member, in that session -- through the claim alone, the same
 -- idiom console_guard.test.sql and console_settings.test.sql use. The
@@ -74,6 +82,18 @@ select throws_ok(
   '42501',
   null,
   'a key that is not yours cannot be renamed'
+);
+select throws_ok(
+  $$ select public.console_rename_key('bbbbbbbb-0000-0000-0000-000000000001', 'Mine now', 'development') $$,
+  '42501',
+  null,
+  'nor can another member''s key, which does exist'
+);
+select throws_ok(
+  $$ select public.console_remove_key('bbbbbbbb-0000-0000-0000-000000000001', 'Not mine to remove.', 'development') $$,
+  '42501',
+  null,
+  'and another member''s key cannot be removed either'
 );
 
 -- Removal without a tap is refused, whatever else is true.

@@ -56,7 +56,7 @@ begin
     raise exception 'no access' using errcode = '42501';
   end if;
 
-  update console.keys set name = p_name where id = p_key;
+  update console.keys set name = p_name where id = p_key and member_id = v_member.user_id;
 
   perform console.write_audit(
     p_environment, v_member.user_id, v_member.name, v_member.role,
@@ -89,6 +89,20 @@ begin
     raise exception 'no access' using errcode = '42501';
   end if;
 
+  -- Nothing but this check holds the floor up, and a bare read of the count
+  -- does not hold it against a second caller: two removals of two different
+  -- keys would each read the same pre-delete count, each pass, and together
+  -- leave the member below two keys and locked out of a console whose only
+  -- second factor is a key. Locking the member's key rows makes the second
+  -- caller wait for the first to commit or roll back, and the count below --
+  -- a new statement, so a new snapshot -- then reads the settled number.
+  -- `order by k.id` has both callers take the locks in the same order, so
+  -- they queue instead of deadlocking.
+  perform 1 from console.keys k
+   where k.member_id = v_member.user_id
+   order by k.id
+     for update;
+
   select count(*) - 1 into v_remaining
     from console.keys k where k.member_id = v_member.user_id;
 
@@ -101,7 +115,7 @@ begin
   -- recomputes to a different digest and is not found.
   perform console.use_tap('Removed a key', v_name, v_remaining::text, p_reason);
 
-  delete from console.keys where id = p_key;
+  delete from console.keys where id = p_key and member_id = v_member.user_id;
 
   perform console.write_audit(
     p_environment, v_member.user_id, v_member.name, v_member.role,
