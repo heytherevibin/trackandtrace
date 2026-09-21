@@ -28,16 +28,11 @@ export interface TapRequest {
   readonly reason: string;
 }
 
-/**
- * The reason, validated once. `.trim()` is a transform, so this schema decides
- * the exact string that gets digested -- and the later action that spends the
- * tap must digest the very same one. Every route that carries a reason into a
- * tap imports this; a second schema that merely looks the same would make a
- * reason with a trailing space mint one digest and spend against another, and
- * every such action would fail with "no tap for this action" and nothing would
- * say why.
- */
-export const tapReason = z.string().trim().min(10, consoleMessages.tap.reasonShort).max(200);
+// The reason schema lives in ./tap-schema, a file with nothing behind it but zod and the copy, so
+// a "use client" module (confirm-its-you.tsx) can import the very same schema without dragging
+// this file's next/headers-reaching imports into the client bundle. Re-exported here so every
+// existing importer of tapReason from this module keeps working untouched.
+export { tapReason } from "./tap-schema";
 
 interface Deps {
   readonly db?: ConsoleDb;

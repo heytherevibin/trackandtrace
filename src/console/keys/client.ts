@@ -47,8 +47,8 @@ function messageFor(error: ApiErrorBody): string {
   return error.code === "SOURCE_UNAVAILABLE" || error.code === "INTERNAL" ? s.unavailable : error.message;
 }
 
-/** A prompt the member dismissed is not a failure: it gets no line of its own (decision #2). */
-function isDismissal(err: unknown): boolean {
+/** A prompt the member dismissed is not a failure: it gets no line of its own (decision #2). Exported so tap-client.ts's runTap shares this exact check rather than keeping a second copy. */
+export function isDismissal(err: unknown): boolean {
   return err instanceof Error && (err.name === "NotAllowedError" || err.name === "AbortError");
 }
 

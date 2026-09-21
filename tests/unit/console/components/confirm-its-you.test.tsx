@@ -11,10 +11,19 @@ vi.mock("@/console/keys/tap-client", () => ({ runTap }));
 
 import { ConfirmItsYou } from "@/console/components/confirm-its-you";
 
-const ACTION = "Pause PNR checks";
-const TARGET = "PNR checks";
-const VALUE = "On → Paused";
-const VALID_REASON = "Provider maintenance window, 14:00 to 15:00 IST.";
+// The digest fields (TapRequest) and the display props are deliberately different strings
+// throughout this file, matching fix-1's own example (docs/superpowers/plans/...:821-827): a real
+// caller's `action`/`target`/`value` bind the tap ("Removed a key" / "YubiKey 5 NFC" / "2"), while
+// `summary`/`change` are what the sheet draws ("Remove YubiKey 5 NFC" / "Keys: 3 → 2"). If a test
+// only ever used matching values, a bug that derived the display text from the digest fields (or
+// vice versa) could pass unnoticed.
+const ACTION = "Removed a key";
+const TARGET = "YubiKey 5 NFC";
+const VALUE = "2";
+const SUMMARY = "Remove YubiKey 5 NFC";
+const CHANGE = { label: "Keys", before: "3", after: "2" };
+const CHANGE_TEXT = `${CHANGE.label}: ${CHANGE.before} → ${CHANGE.after}`;
+const VALID_REASON = "Left at the old office; replaced.";
 
 // A realistic controlled harness: reason and open both live here, exactly as a real caller would
 // own them, so "leaves the dialog open" and "starts nothing" are assertions about ConfirmItsYou's
@@ -29,6 +38,8 @@ function Harness({ onCancel, onConfirmed }: { readonly onCancel: () => void; rea
       target={TARGET}
       value={VALUE}
       reason={reason}
+      summary={SUMMARY}
+      change={CHANGE}
       onReasonChange={setReason}
       onCancel={() => {
         setOpen(false);
@@ -47,13 +58,27 @@ beforeEach(() => {
 });
 
 describe("ConfirmItsYou", () => {
-  it("shows the action summary and the before-after line", () => {
+  it("shows the display summary and change line, never the digest fields", () => {
     render(<Harness onCancel={vi.fn()} onConfirmed={vi.fn()} />);
     expect(screen.getByRole("heading", { name: "Confirm it's you" })).toBeVisible();
     expect(screen.getByText("Form TC-01")).toBeVisible();
-    expect(screen.getByText(ACTION)).toBeVisible();
+    expect(screen.getByText(SUMMARY)).toBeVisible();
     expect(screen.getByText("Change")).toBeVisible();
-    expect(screen.getByText(`${TARGET}: ${VALUE}`)).toBeVisible();
+    expect(screen.getByText(CHANGE_TEXT)).toBeVisible();
+    // ACTION ("Removed a key") never appears as its own text node -- only SUMMARY does.
+    expect(screen.queryByText(ACTION)).toBeNull();
+  });
+
+  it("renders the display props and still taps with the digest fields, even though they do not match", async () => {
+    runTap.mockResolvedValue({ kind: "done" });
+    const onConfirmed = vi.fn();
+    render(<Harness onCancel={vi.fn()} onConfirmed={onConfirmed} />);
+    expect(screen.getByText(SUMMARY)).toBeVisible();
+    expect(screen.getByText(CHANGE_TEXT)).toBeVisible();
+    await userEvent.type(screen.getByLabelText("Reason"), VALID_REASON);
+    await userEvent.click(screen.getByRole("button", { name: "Tap your key" }));
+    await waitFor(() => expect(onConfirmed).toHaveBeenCalledTimes(1));
+    expect(runTap).toHaveBeenCalledWith({ action: ACTION, target: TARGET, value: VALUE, reason: VALID_REASON });
   });
 
   it("refuses a reason under 10 characters, without starting a ceremony", async () => {
@@ -64,7 +89,7 @@ describe("ConfirmItsYou", () => {
     expect(runTap).not.toHaveBeenCalled();
   });
 
-  it("calls onConfirmed exactly once when the tap succeeds, posting the four fields verbatim", async () => {
+  it("calls onConfirmed exactly once when the tap succeeds", async () => {
     runTap.mockResolvedValue({ kind: "done" });
     const onConfirmed = vi.fn();
     render(<Harness onCancel={vi.fn()} onConfirmed={onConfirmed} />);
@@ -72,7 +97,6 @@ describe("ConfirmItsYou", () => {
     await userEvent.click(screen.getByRole("button", { name: "Tap your key" }));
     await waitFor(() => expect(onConfirmed).toHaveBeenCalledTimes(1));
     expect(runTap).toHaveBeenCalledOnce();
-    expect(runTap).toHaveBeenCalledWith({ action: ACTION, target: TARGET, value: VALUE, reason: VALID_REASON });
   });
 
   it("shows the console's own didn't-answer line on a failed tap, and leaves the dialog open", async () => {

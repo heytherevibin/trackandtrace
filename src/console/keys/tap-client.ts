@@ -5,6 +5,7 @@ import { z } from "zod";
 import { consoleMessages } from "@/console/messages";
 import { apiRequest } from "@/services/api-client";
 import type { ApiErrorBody } from "@/services/errors";
+import { isDismissal } from "./client";
 import type { TapRequest } from "./tap";
 
 // The browser half of a per-action tap (spec §D step 2): ask /api/tap/options to mint a challenge
@@ -36,17 +37,6 @@ function jsonPost(body: unknown): RequestInit {
  */
 function messageFor(error: ApiErrorBody): string {
   return error.code === "SOURCE_UNAVAILABLE" || error.code === "INTERNAL" ? s.unavailable : error.message;
-}
-
-/**
- * A prompt the member dismissed is not a failure (decision #2, carried from the previous plan):
- * client.ts's own isDismissal checks the same two names. It is not imported from there because
- * client.ts does not export it, and that file's other exports reach no further than this one does
- * -- duplicating this one small, stable check (the two DOMException names WebAuthn dismissal
- * always uses) is safer than adding a new export to an already-shipped module for it.
- */
-function isDismissal(err: unknown): boolean {
-  return err instanceof Error && (err.name === "NotAllowedError" || err.name === "AbortError");
 }
 
 /** Runs the tap ceremony for one risky action (spec §D), turning every outcome into a TapOutcome rather than a throw. */

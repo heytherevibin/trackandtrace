@@ -6,6 +6,7 @@ import { DialogClose, DialogContent, DialogRoot } from "@/components/ui/dialog";
 import { Led } from "@/components/ui/led";
 import type { TapRequest } from "@/console/keys/tap";
 import { runTap } from "@/console/keys/tap-client";
+import { tapReason } from "@/console/keys/tap-schema";
 import { consoleMessages } from "@/console/messages";
 
 // Form TC-01 (docs/design/sheets/console/Main.dc.html): the dialog every risky action opens
@@ -14,36 +15,38 @@ import { consoleMessages } from "@/console/messages";
 // itself is never performed here: the tap stays unspent (tap.ts's own note), and the caller
 // performs the actual mutation only after onConfirmed fires.
 //
-// The sheet's own composition for the two summary lines (actionSummary: 'Pause PNR checks on
-// production'; fig: 'PNR checks: On → Paused', built from a target of 'PNR checks' and a value of
-// 'On → Paused') is what this component transcribes: the bold line is `action`, verbatim, and the
-// Change line is `${target}: ${value}`, verbatim. Nothing here composes a sentence of its own from
-// the four fields -- a caller that wants different words passes different strings.
+// Two roles, and neither is computed from the other. `action`/`target`/`value`/`reason`
+// (TapRequest) are what console.action_digest binds a tap to, and what console.use_tap later
+// re-digests when the action itself runs -- they are never rendered. `summary`/`change` are what
+// the sheet actually draws (Main.dc.html:216-217, composed at :356): a full sentence ("Pause PNR
+// checks on production", "Remove YubiKey 5 NFC") and a label/before/after triple ("PNR checks:
+// On → Paused", "Keys: 3 → 2") that the caller writes in its own words -- sometimes from data the
+// digest fields don't even carry, like a key count from before the removal. Deriving one pair
+// from the other would mean the words on screen could only ever change by changing what the tap
+// is bound to, which the digest fields were never meant to carry.
 
 const m = consoleMessages.tap;
 
 type Stage = { readonly kind: "idle" } | { readonly kind: "waiting" } | { readonly kind: "failed"; readonly message: string };
 
-// Mirrors tap.ts's own tapReason (trim, then 10-200 characters) rather than importing it: that
-// module's other top-level exports reach next/headers through @/console/auth/db, which a "use
-// client" bundle must never carry. This check only ever gates the button -- it does not trim,
-// reshape or otherwise decide what runTap sends, so it can never cause the drift ruling 3 (task-3
-// addendum) warns about: `reason` reaches runTap exactly as typed, and the server's own tapReason
-// import is what actually decides, and digests, the trimmed string.
-function reasonIsLongEnough(reason: string): boolean {
-  const length = reason.trim().length;
-  return length >= 10 && length <= 200;
-}
-
 export interface ConfirmItsYouProps extends TapRequest {
   readonly open: boolean;
+  /**
+   * The sheet's {{actionSummary}} -- the bold line. The caller composes it, because the drawn copy
+   * is a sentence ("Pause PNR checks on production", "Remove YubiKey 5 NFC") and not one of the
+   * four fields above: those are what the database digests and re-digests, and they are never
+   * rendered.
+   */
+  readonly summary: string;
+  /** The sheet's Change line, drawn as `${label}: ${before} → ${after}` (e.g. "Keys: 3 → 2"). */
+  readonly change: { readonly label: string; readonly before: string; readonly after: string };
   readonly onReasonChange: (reason: string) => void;
   readonly onCancel: () => void;
   readonly onConfirmed: () => void;
 }
 
 /** Form TC-01: confirms it's the member, with a typed reason and one tap, before a risky action runs. */
-export function ConfirmItsYou({ open, action, target, value, reason, onReasonChange, onCancel, onConfirmed }: ConfirmItsYouProps) {
+export function ConfirmItsYou({ open, action, target, value, reason, summary, change, onReasonChange, onCancel, onConfirmed }: ConfirmItsYouProps) {
   const [stage, setStage] = useState<Stage>({ kind: "idle" });
   // The reason a confirm attempt refused, or null once none has (or the member has since edited
   // it away). reasonAlert below is derived from comparing this to the live `reason` prop rather
@@ -84,7 +87,10 @@ export function ConfirmItsYou({ open, action, target, value, reason, onReasonCha
   }, [stage]);
 
   async function confirm(): Promise<void> {
-    if (!reasonIsLongEnough(reason)) {
+    // tapReason only gates the button here -- it does not trim, reshape or otherwise decide what
+    // gets sent. `reason` reaches runTap exactly as typed; only the server's own tapReason import
+    // (in route.ts) ever decides, and digests, the trimmed string.
+    if (!tapReason.safeParse(reason).success) {
       setRejectedReason(reason);
       return;
     }
@@ -123,10 +129,10 @@ export function ConfirmItsYou({ open, action, target, value, reason, onReasonCha
       >
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
-            <span className="text-lg font-medium text-ink-1">{action}</span>
+            <span className="text-lg font-medium text-ink-1">{summary}</span>
             <span className="flex items-baseline gap-2.5">
               <span className="legend">{m.changeLabel}</span>
-              <span className="text-sm text-ink-1">{`${target}: ${value}`}</span>
+              <span className="text-sm text-ink-1">{`${change.label}: ${change.before} → ${change.after}`}</span>
             </span>
           </div>
           <div className="flex flex-col gap-1.5">
