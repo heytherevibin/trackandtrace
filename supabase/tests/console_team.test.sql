@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(71);
+select plan(72);
 
 -- What an Owner may do to the team: list it, invite someone, change a role,
 -- reset a member's keys, remove a member, and resend or revoke an invite.
@@ -121,9 +121,22 @@ select throws_ok(
   $$ select public.console_invite_member('nadia@trakline.in', 'admin', 'Building out support coverage.', 'development') $$,
   '42501', null, 'inviting with no tap is refused'
 );
+
+-- These three name the message they expect, not merely the errcode. Every refusal in this file
+-- raises 42501, including "no tap for this action" -- so a bare `'42501', null` here would pass
+-- whether the call was refused for the reason under test or simply for want of a tap. Proven, not
+-- assumed: with the membership check narrowed back to `= 'active'`, the null-message version of the
+-- setup-member assertion still passed.
 select throws_ok(
   $$ select public.console_invite_member('devi@trakline.in', 'admin', 'Trying to re-invite an active member.', 'development') $$,
-  '42501', null, 'an address that already belongs to an active member is refused'
+  '42501', 'that address already belongs to a member', 'an address that already belongs to an active member is refused'
+);
+-- Meera is 'setup': she accepted an invite and has not finished adding her two keys. She is a
+-- member, so inviting her again would mint a second live invite against a member row that already
+-- exists. An Owner helping someone stuck there resets their keys instead.
+select throws_ok(
+  $$ select public.console_invite_member('meera@trakline.in', 'support', 'Trying to re-invite a half-set-up member.', 'development') $$,
+  '42501', 'that address already belongs to a member', 'nor one who is still finishing setup -- they are a member already'
 );
 
 select pg_temp.tap(
@@ -158,7 +171,7 @@ select is(
 );
 select throws_ok(
   $$ select public.console_invite_member('nadia@trakline.in', 'viewer', 'Trying to invite twice.', 'development') $$,
-  '42501', null, 'an address with an invite already open is refused, even for a different role'
+  '42501', 'an invite is already open for that address', 'an address with an invite already open is refused, even for a different role'
 );
 
 select is(jsonb_array_length(public.console_team() -> 'invites'), 2, 'both invites appear');

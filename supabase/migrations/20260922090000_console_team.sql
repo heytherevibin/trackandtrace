@@ -126,7 +126,12 @@ declare
   v_token  text;
   v_id     uuid;
 begin
-  if exists (select 1 from console.members where email = v_email and status = 'active') then
+  -- `<> 'removed'`, not `= 'active'`: a member who accepted an invite but has not finished adding
+  -- their two keys sits in 'setup', and they are already a member -- inviting them a second time
+  -- would mint a second live invite against a member row that exists. An Owner helping someone
+  -- stuck there resets their keys; they do not re-invite them. The two functions below already
+  -- read membership this way, so this is the file agreeing with itself.
+  if exists (select 1 from console.members where email = v_email and status <> 'removed') then
     raise exception 'that address already belongs to a member' using errcode = '42501';
   end if;
 
@@ -317,7 +322,10 @@ begin
     null, null, 'team', 'Resent an invite', v_invite.email, null, 'done', null, null, null
   );
 
-  return jsonb_build_object('invite_id', v_invite.id, 'token', v_token);
+  -- email and role travel with the token: the caller's next act is to send the letter, and a second
+  -- round trip to read back a row this function already has in hand would be one more place for the
+  -- two to disagree.
+  return jsonb_build_object('invite_id', v_invite.id, 'token', v_token, 'email', v_invite.email, 'role', v_invite.role);
 end;
 $$;
 
