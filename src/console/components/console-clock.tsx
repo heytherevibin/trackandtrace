@@ -25,8 +25,23 @@ export function ConsoleClock() {
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), MINUTE_MS);
-    return () => clearInterval(id);
+    // Tick on the wall-clock minute, not 60s from whenever the page was opened. A plain interval
+    // from mount lands wherever mount happened to fall -- open the console at 14:32:45 and it goes
+    // on saying 14:32 until 14:33:45, a minute behind for three quarters of every minute, for as
+    // long as the tab is open. So: wait out the current minute, then tick each minute after it.
+    // Minute boundaries are the same in IST as in UTC -- the offset is a whole number of minutes.
+    let interval: ReturnType<typeof setInterval> | undefined;
+    const timeout = setTimeout(
+      () => {
+        setNow(new Date());
+        interval = setInterval(() => setNow(new Date()), MINUTE_MS);
+      },
+      MINUTE_MS - (Date.now() % MINUTE_MS),
+    );
+    return () => {
+      clearTimeout(timeout);
+      if (interval) clearInterval(interval);
+    };
   }, []);
 
   return (
