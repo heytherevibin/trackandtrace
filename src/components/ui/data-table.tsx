@@ -3,7 +3,8 @@ import { cn } from "@/utils/cn";
 
 export interface Column<Row> {
   readonly key: string;
-  readonly header: string;
+  /** Usually plain text; a ReactNode so a column can carry a visually-hidden heading (e.g. VisuallyHidden), as some sheets draw. */
+  readonly header: ReactNode;
   readonly cell: (row: Row) => ReactNode;
   readonly align?: "start" | "end";
   readonly numeric?: boolean;
