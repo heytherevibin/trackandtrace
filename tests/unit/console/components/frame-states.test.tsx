@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import ConsoleError from "@/app/console/error";
+import { buttonClassName } from "@/components/ui/button";
 import { NoAccessState, SessionEndedState } from "@/console/components/frame-states";
 
 // The three states Main.dc.html's `page` prop draws besides Ready/Loading (task-5-brief.md's
@@ -42,6 +43,17 @@ describe("the frame's error state (src/app/console/error.tsx)", () => {
   it("shows no reference line when the error carries no digest -- a code in no log is worse than none", () => {
     render(<ConsoleError error={new Error("boom")} retry={vi.fn()} />);
     expect(screen.queryByText(/Reference/)).not.toBeInTheDocument();
+  });
+
+  // Every console sheet that draws Retry draws it outline, never filled -- Main.dc.html:177,
+  // AuditLog.dc.html:206, ConsoleMyKeys.dc.html:146, ConsoleTeam.dc.html:176 and their phone
+  // sheets, eight in all. ErrorState defaults to the filled button the *traveller* sheets draw
+  // (traveller/Errors.dc.html), so the console has to ask for its own. Compared against
+  // buttonClassName rather than a literal class string: this pins which variant, not how that
+  // variant happens to be styled today.
+  it("draws Retry outline, as the console sheets draw it -- not the traveller's filled button", () => {
+    render(<ConsoleError error={new Error("boom")} retry={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "Retry" }).className).toBe(buttonClassName({ variant: "secondary" }));
   });
 
   it("retries through the button Next hands the boundary", async () => {
