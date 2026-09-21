@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { KEY_NAME_MAX } from "@/console/account/key-name";
 import { getMyKeys, removeMyKey, renameMyKey } from "@/console/account/my-keys";
 import { assertConsoleAvailable } from "@/console/availability";
 import { requireConsoleMember } from "@/console/auth/guard";
@@ -28,9 +29,9 @@ export async function GET(): Promise<Response> {
   }
 }
 
-// console.keys checks 1..60 characters; refusing here keeps the database's own refusal for the
+// console.keys checks 1..KEY_NAME_MAX characters; refusing here keeps the database's own refusal for the
 // cases only it can see (the same rule verify/route.ts's own registration schema already follows).
-const patchBody = z.object({ keyId: z.guid(), name: z.string().trim().min(1).max(60) }).strict();
+const patchBody = z.object({ keyId: z.guid(), name: z.string().trim().min(1).max(KEY_NAME_MAX) }).strict();
 
 /**
  * PATCH /api/keys/mine -- rename a key (task-7). No tap: console_rename_key takes none,

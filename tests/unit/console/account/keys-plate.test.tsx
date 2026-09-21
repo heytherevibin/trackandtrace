@@ -178,7 +178,7 @@ describe("KeysPlate", () => {
   // Remove -> the real ConfirmItsYou -> a mocked runTap -> a mocked removeKey -- the same order
   // spec §D fixes (Main.dc.html, task-8-brief.md).
   describe("Remove", () => {
-    it("opens Confirm it's you with the row's name as the target and the drawn summary/change line", async () => {
+    it("opens Confirm it's you with the drawn summary and change line", async () => {
       render(<KeysPlate keys={THREE_KEYS} />);
       const removeButtons = screen.getAllByRole("button", { name: "Remove" });
       await userEvent.click(removeButtons[2]!); // YubiKey 5 NFC
@@ -209,6 +209,18 @@ describe("KeysPlate", () => {
       await userEvent.type(screen.getByLabelText("Reason"), VALID_REASON);
       await userEvent.click(screen.getByRole("button", { name: "Tap your key" }));
       await waitFor(() => expect(removeKey).toHaveBeenCalledExactlyOnceWith("aaaaaaaa-0000-0000-0000-000000000005", VALID_REASON));
+      // The tap's `target` is the key's id, not its name. console.keys has no uniqueness on
+      // (member_id, name), so a tap over "YubiKey 5 NFC" approved any key that happened to be
+      // called that -- and the digest is what console_remove_key re-computes, from `p_key::text`
+      // (supabase/migrations/20260921100300_console_remove_key_binds_id.sql). `value` is the count
+      // after this removal, the client's half of the agreement proved for real in
+      // tests/e2e/console-auth/my-keys.spec.ts.
+      expect(runTap).toHaveBeenCalledExactlyOnceWith({
+        action: "Removed a key",
+        target: "aaaaaaaa-0000-0000-0000-000000000005",
+        value: "2",
+        reason: VALID_REASON,
+      });
       expect(await screen.findByText("2 keys")).toBeInTheDocument();
       expect(screen.queryByText("YubiKey 5 NFC")).not.toBeInTheDocument();
       // ConsoleMyKeys.dc.html's own state script: st === 'Removed' -> 'Key removed · logged'.
@@ -237,12 +249,18 @@ describe("KeysPlate", () => {
       expect(screen.getByText("YubiKey 5 NFC")).toBeInTheDocument();
     });
 
-    it("a DELETE refusal leaves the key in the table and shows the console's own message", async () => {
+    it("a DELETE refusal leaves the key in the table, shows the console's own message and re-reads the list", async () => {
       // A message that appears nowhere else on the page (unlike the two-key line, which the plate's
       // footer always shows -- task-2-addendum.md's own "a test that passes for the wrong reason"
       // rule: reusing that string here would pass even if this banner were never wired up).
       runTap.mockResolvedValue({ kind: "done" });
       removeKey.mockResolvedValue({ kind: "failed", message: "This key isn't one of yours." });
+      // The re-read answers with the same three keys: nothing was removed, so this is what the
+      // server really holds, and the table must be left showing it rather than a guess.
+      fetchMyKeys.mockResolvedValue({
+        keys: THREE_KEYS,
+        member: { name: "Asha Rao", email: "asha@trakline.in", role: "owner", createdAt: "2026-09-02T09:00:00Z" },
+      });
       render(<KeysPlate keys={THREE_KEYS} />);
       await userEvent.click(screen.getAllByRole("button", { name: "Remove" })[2]!);
       await userEvent.type(screen.getByLabelText("Reason"), VALID_REASON);
@@ -250,8 +268,25 @@ describe("KeysPlate", () => {
       await waitFor(() => expect(removeKey).toHaveBeenCalledOnce());
       expect(await screen.findByText("This key isn't one of yours.")).toBeVisible();
       expect(screen.getByText("YubiKey 5 NFC")).toBeInTheDocument();
-      expect(fetchMyKeys).not.toHaveBeenCalled();
+      // Every refusal Remove can meet is the server saying this table is out of date; leaving it
+      // stale would have the next attempt mint a tap over the same wrong count and fail identically.
+      await waitFor(() => expect(fetchMyKeys).toHaveBeenCalledOnce());
       expect(notifySuccess).not.toHaveBeenCalled();
+    });
+
+    it("keeps the refusal on screen even when the re-read that follows it cannot complete", async () => {
+      // The message is set before the re-read, so a refresh that fails does not replace the one
+      // sentence telling the member what actually happened with a second, vaguer one.
+      runTap.mockResolvedValue({ kind: "done" });
+      removeKey.mockResolvedValue({ kind: "failed", message: "This key isn't one of yours." });
+      fetchMyKeys.mockResolvedValue(null);
+      render(<KeysPlate keys={THREE_KEYS} />);
+      await userEvent.click(screen.getAllByRole("button", { name: "Remove" })[2]!);
+      await userEvent.type(screen.getByLabelText("Reason"), VALID_REASON);
+      await userEvent.click(screen.getByRole("button", { name: "Tap your key" }));
+      await waitFor(() => expect(fetchMyKeys).toHaveBeenCalledOnce());
+      expect(await screen.findByText("This key isn't one of yours.")).toBeVisible();
+      expect(screen.getByText("YubiKey 5 NFC")).toBeInTheDocument();
     });
   });
 });

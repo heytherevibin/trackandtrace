@@ -39,6 +39,14 @@ export const myKeys = {
     addStarts: "Adding a key starts with a tap of a key you already have.",
   },
   twoKeyLine: "You need at least two keys. Add another before removing one.",
+  // Authored, not transcribed: no sheet draws this state. console.use_tap raises 'no tap for this
+  // action' whenever the four fields it re-digests differ from the ones the tap was minted over --
+  // in practice a key count that moved under the member (another device removed a key, or added
+  // one) between opening the dialog and confirming it. That used to fall through to "The console
+  // could not be reached", which was untrue about a console that had just answered, so this says
+  // the true thing instead: the confirmation no longer describes this removal, and a fresh one
+  // will. The plate re-reads the list on this refusal, so the retry it invites can actually work.
+  tapMismatch: "That confirmation no longer matches this key. Try removing it again.",
 
   // ConsoleMyKeys.dc.html:117 (the plate's own trigger) and :166 (the dialog's h2, the same three
   // words) -- one string for both, not two that could drift apart.

@@ -25,17 +25,16 @@ export const metadata: Metadata = { title: m.pageTitle };
  * A Server Component, like every other console page: it calls the guard once and passes the member
  * down to ConsoleFrame, which does not call it itself (task-6-addendum.md §6).
  *
- * requireConsoleMember() is caught and sent to /login on any failure -- the same pattern
- * src/app/console/[...missing]/page.tsx already uses -- rather than left to throw: a member with no
+ * An UNAUTHENTICATED requireConsoleMember() is caught and sent to /login -- the same narrowing
+ * src/app/console/[...missing]/page.tsx now carries -- rather than left to throw: a member with no
  * session (or one that has genuinely ended) reaching /keys is the ordinary "not signed in" case every
  * console page handles this way, not a fault. This matters here specifically because this page is now
- * what a signed-out visit to `/` (which redirects to `/keys`) reaches; a throw here would have shown
- * the generic error boundary, or worse, to a request with no `authenticated` role at all (PostgREST's
- * own "permission denied for function console_me", which src/console/auth/guard.ts's fromDatabase
- * does not recognise as a session problem -- a pre-existing gap this page is the first to reach
- * uncaught, since every existing caller either already redirects on any failure the way this one now
- * does, or is only ever reached by an already-signed-in browser in practice; flagged in
- * task-6-report.md rather than fixed here, since guard.ts is not this task's file).
+ * what a signed-out visit to `/` (which redirects to `/keys`) reaches; a throw there would have shown
+ * the generic error boundary. Anything else still throws, including a request with no `authenticated`
+ * role at all (PostgREST's own "permission denied for function console_me", which
+ * src/console/auth/guard.ts's fromDatabase does not recognise as a session problem -- a pre-existing
+ * gap flagged in task-6-report.md rather than fixed here, since guard.ts is not that task's file;
+ * reaching the error boundary is the right answer for it either way).
  *
  * getMyKeys() and getMySessions(), by contrast, only ever run once requireConsoleMember() has
  * already succeeded, so a failure in either is left to propagate to the console's own error

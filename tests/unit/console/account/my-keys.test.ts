@@ -150,15 +150,17 @@ describe("removeMyKey", () => {
     });
   });
 
-  // "no tap for this action" (console.use_tap's own refusal, task-8-addendum.md §2) falls through
-  // to the same shared line rather than a bespoke translation: it is not one of the two refusals
-  // the sheet drew copy for, so it gets the fallback every other unmapped database fault gets.
-  it("refuses a spent or mismatched tap with the shared unavailable line, not the database's raw text", async () => {
+  // "no tap for this action" (console.use_tap's own refusal) used to fall through to the shared
+  // unavailable line -- "The console could not be reached", said by a console that had just been
+  // reached in order to refuse. It is a digest mismatch, in practice a key count that moved under
+  // the member between opening the dialog and confirming it, and it now gets its own authored line
+  // (the sheet draws no state for it; see the copy file's note on tapMismatch).
+  it("refuses a spent or mismatched tap with its own line, not the network's and not the database's raw text", async () => {
     const db = dbAnswering({ error: { message: "no tap for this action" } });
     await expect(removeMyKey("aaaaaaaa-0000-0000-0000-000000000003", "Left at the old office; replaced.", "production", db)).rejects.toMatchObject({
-      code: "SOURCE_UNAVAILABLE",
-      status: 503,
-      message: "The console could not be reached. Try again.",
+      code: "INVALID_INPUT",
+      status: 403,
+      message: "That confirmation no longer matches this key. Try removing it again.",
     });
   });
 });

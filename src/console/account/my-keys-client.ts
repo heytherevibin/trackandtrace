@@ -1,6 +1,7 @@
 "use client";
 
 import { z } from "zod";
+import { KEY_NAME_MAX } from "@/console/account/key-name";
 import type { MyKeys } from "@/console/account/my-keys";
 import type { MySessionRow } from "@/console/account/my-sessions";
 import { consoleApiMessage } from "@/console/api-message";
@@ -17,7 +18,7 @@ const myKeysResponseSchema = z.object({
   keys: z.array(
     z.object({
       id: z.guid(),
-      name: z.string().min(1).max(60),
+      name: z.string().min(1).max(KEY_NAME_MAX),
       type: z.enum(["passkey", "security_key"]),
       createdAt: z.string(),
       lastUsedAt: z.string().nullable(),

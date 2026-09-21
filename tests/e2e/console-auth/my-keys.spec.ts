@@ -7,10 +7,11 @@ test.beforeEach(() => resetConsole());
 
 /**
  * My keys, end to end (task-11, spec §D): the one place every half of the tap's own agreement meets
- * for real. `console_remove_key` re-digests `('Removed a key', <name>, count(*) - 1, <reason>)` from
- * the database's own count; ConfirmItsYou mints a tap over the very same four fields, with `value`
- * computed by KeysPlate as `String(keys.length - 1)` -- the client's own count, from whatever the
- * last GET /api/keys/mine returned. supabase/tests/console_my_keys.test.sql proves the SQL side
+ * for real. `console_remove_key` re-digests `('Removed a key', p_key::text, count(*) - 1, <reason>)`
+ * from the database's own count; ConfirmItsYou mints a tap over the very same four fields, with
+ * `target` the row's id (never its name -- two keys may share one) and `value` computed by KeysPlate
+ * as `String(keys.length - 1)`, the client's own count from whatever the last GET /api/keys/mine
+ * returned. supabase/tests/console_my_keys.test.sql proves the SQL side
  * alone, against a hand-computed digest; tests/unit/console/account/keys-plate.test.tsx proves the
  * client's arithmetic alone, against a mocked runTap and removeKey. Neither can prove the two sides
  * agree -- the mock is exactly where they are cut apart. Removing the third key below drives a real

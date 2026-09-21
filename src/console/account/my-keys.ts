@@ -103,18 +103,24 @@ export async function renameMyKey(keyId: string, name: string, environment: stri
 }
 
 /**
- * `console_remove_key` raises two developer strings a member must never read as sent
- * (task-8-addendum.md §4.3): 'a member must keep at least two keys' (the floor spec §D sets) and
+ * `console_remove_key` raises three developer strings a member must never read as sent
+ * (task-8-addendum.md §4.3): 'a member must keep at least two keys' (the floor spec §D sets),
  * 'no access' (the same "not this member's key" case fromRenameError above already tells apart, but
  * shown with keys.notYours here -- tap.ts's own keyFor() uses the identical line for a key that
  * answered a tap but isn't one of the member's, so Remove's failure reads the same way whether the
- * tap or the delete is what notices). Anything else, including console.use_tap's own 'no tap for
- * this action' on a digest mismatch, falls through to the shared unavailable line -- consoleApiMessage's
- * job, as everywhere else, rather than a bespoke translation for a case the sheet drew no copy for.
+ * tap or the delete is what notices), and console.use_tap's own 'no tap for this action'.
+ *
+ * That third one used to fall through to SOURCE_UNAVAILABLE -- "The console could not be reached",
+ * about a console that had just answered in order to refuse. It is not an outage: the four fields
+ * the database re-digests differ from the ones the tap was minted over, in practice because the key
+ * count moved under the member between opening the dialog and confirming it. It gets its own line,
+ * authored rather than drawn (the sheet has no state for it; see the copy file's own note), and the
+ * plate re-reads its list on this refusal so the retry that line invites can succeed.
  */
 function fromRemoveError(message: string): AppError {
   if (message.includes("a member must keep at least two keys")) return new AppError("INVALID_INPUT", consoleMessages.myKeys.twoKeyLine, { status: 403 });
   if (message.includes("no access")) return new AppError("INVALID_INPUT", consoleMessages.keys.notYours, { status: 403 });
+  if (message.includes("no tap for this action")) return new AppError("INVALID_INPUT", consoleMessages.myKeys.tapMismatch, { status: 403 });
   return unavailable();
 }
 

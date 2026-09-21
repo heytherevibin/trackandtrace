@@ -6,7 +6,7 @@ import { DialogClose, DialogContent, DialogRoot } from "@/components/ui/dialog";
 import { Led } from "@/components/ui/led";
 import type { TapRequest } from "@/console/keys/tap";
 import { runTap } from "@/console/keys/tap-client";
-import { tapReason } from "@/console/keys/tap-schema";
+import { TAP_REASON_MAX, tapReason } from "@/console/keys/tap-schema";
 import { consoleMessages } from "@/console/messages";
 
 // Form TC-01 (docs/design/sheets/console/Main.dc.html): the dialog every risky action opens
@@ -174,6 +174,11 @@ export function ConfirmItsYou({ open, action, target, value, reason, summary, ch
               rows={3}
               className="well w-full resize-none"
               placeholder={m.reasonPlaceholder}
+              // Stops where tapReason stops. The alert below renders `reasonShort` for every
+              // schema failure, so an over-long reason used to be told to write more; capping the
+              // field makes that case unreachable by typing, the same fix both key-name fields
+              // already carry.
+              maxLength={TAP_REASON_MAX}
               value={reason}
               onChange={(event) => onReasonChange(event.currentTarget.value)}
               // Locked once the ceremony starts: the tap is minted over this exact string, and the

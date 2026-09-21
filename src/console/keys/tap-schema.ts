@@ -12,4 +12,12 @@ import { consoleMessages } from "@/console/messages";
  * merely looks the same is how a reason with a trailing space mints one digest and spends against
  * another, and every such action then fails with "no tap for this action" and nothing says why.
  */
-export const tapReason = z.string().trim().min(10, consoleMessages.tap.reasonShort).max(200);
+/**
+ * Spec §E's upper bound, exported rather than left inline so the dialog's textarea can stop where
+ * the schema stops. ConfirmItsYou renders `reasonShort` for *every* tapReason failure, so without a
+ * `maxLength` a member who typed past 200 characters was told to write more -- the same trap both
+ * key-name fields avoid by capping the input at KEY_NAME_MAX (`@/console/account/key-name`).
+ */
+export const TAP_REASON_MAX = 200;
+
+export const tapReason = z.string().trim().min(10, consoleMessages.tap.reasonShort).max(TAP_REASON_MAX);

@@ -14,10 +14,10 @@ const f = consoleMessages.frame;
  * split further (task-6-addendum.md §2 invites this for the Profile plate; the lost-keys note is
  * small enough, and grouped with Profile in the sheet's own left-hand column, to travel with it).
  *
- * Sessions -- the sheet's right-hand column beside these two -- is a later task
- * (task-6-addendum.md's scope line). Rendering an empty second grid column for it to land in later
- * would draw a half-finished layout no sheet shows, so this stacks in one column instead: the same
- * call Ruling 4 made for the module rail ("a rail of fourteen dead links is worse than none").
+ * These two are the sheet's left-hand column. Sessions -- the right-hand one beside them -- was a
+ * later task when this file was written and is now built (src/console/account/sessions-plate.tsx);
+ * the two-column grid the sheet draws lives in the page (src/app/console/keys/page.tsx), so this
+ * component still renders one stacked column of its own and lets the page place it.
  */
 export function ProfilePlate({ member }: { readonly member: MyKeysProfile }) {
   const roleLabel = f.roleLabel[member.role];

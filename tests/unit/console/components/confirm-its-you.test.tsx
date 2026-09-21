@@ -10,6 +10,7 @@ const { runTap } = vi.hoisted(() => ({ runTap: vi.fn() }));
 vi.mock("@/console/keys/tap-client", () => ({ runTap }));
 
 import { ConfirmItsYou } from "@/console/components/confirm-its-you";
+import { TAP_REASON_MAX, tapReason } from "@/console/keys/tap-schema";
 
 // The digest fields (TapRequest) and the display props are deliberately different strings
 // throughout this file, matching fix-1's own example (docs/superpowers/plans/...:821-827): a real
@@ -88,6 +89,19 @@ describe("ConfirmItsYou", () => {
     await userEvent.click(screen.getByRole("button", { name: "Tap your key" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Add a reason of at least 10 characters.");
     expect(runTap).not.toHaveBeenCalled();
+  });
+
+  // The alert above is the *only* one this dialog draws, so it would have been shown for an
+  // over-long reason too -- telling a member who wrote 201 characters to write more. The field
+  // stops where tapReason stops (TAP_REASON_MAX), which makes that state unreachable by typing,
+  // the same fix both key-name fields already carry.
+  it("stops the reason field at the same length the schema does", () => {
+    render(<Harness onCancel={vi.fn()} onConfirmed={vi.fn()} />);
+    expect(screen.getByLabelText("Reason")).toHaveAttribute("maxlength", String(TAP_REASON_MAX));
+    expect(TAP_REASON_MAX).toBe(200);
+    // And the schema really does refuse one character past it, so the cap is not merely cosmetic.
+    expect(tapReason.safeParse("x".repeat(TAP_REASON_MAX)).success).toBe(true);
+    expect(tapReason.safeParse("x".repeat(TAP_REASON_MAX + 1)).success).toBe(false);
   });
 
   it("calls onConfirmed exactly once when the tap succeeds", async () => {

@@ -59,6 +59,15 @@ test("the link alone opens nothing: without a tap the console stays shut", async
   // The link session exists but is not key-verified, so the console's home sends it back.
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1, name: "Console sign in" })).toBeVisible();
+
+  // And an address the console does not have sends it back the same way, rather than showing the
+  // not-found state inside a frame this visitor has not earned. This is the half of
+  // src/app/console/[...missing]/page.tsx that only a real database can prove: it now redirects on
+  // UNAUTHENTICATED alone and lets every other fault through to the error boundary, so a console
+  // whose grants are wrong stops looking like an ordinary sign-out. The fixture-mode suite
+  // (tests/e2e/console/host.spec.ts) has no database and so cannot reach this path at all.
+  await page.goto("/pnr");
+  await expect(page.getByRole("heading", { level: 1, name: "Console sign in" })).toBeVisible();
 });
 
 test("a stranger's address gets the same answer and no letter", async ({ page }) => {

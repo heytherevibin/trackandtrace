@@ -15,9 +15,10 @@ import { formatDate } from "@/utils/datetime";
 
 const m = consoleMessages.myKeys;
 
-// The literal console.use_tap('Removed a key', …) binds (supabase/migrations/20260921100000_console_my_keys.sql)
-// -- a digest field, never rendered, so it lives beside the dialog it feeds rather than in the copy
-// file with the drawn strings (task-8-addendum.md §1-2).
+// The literal console.use_tap('Removed a key', …) binds
+// (supabase/migrations/20260921100300_console_remove_key_binds_id.sql) -- a digest field, never
+// rendered, so it lives beside the dialog it feeds rather than in the copy file with the drawn
+// strings (task-8-addendum.md §1-2).
 const REMOVE_ACTION = "Removed a key";
 
 type DialogState = { readonly kind: "none" } | { readonly kind: "add" } | { readonly kind: "rename"; readonly row: MyKeysRow } | { readonly kind: "remove"; readonly row: MyKeysRow };
@@ -41,9 +42,10 @@ export function KeysPlate({ keys: initialKeys }: { readonly keys: readonly MyKey
   const [removeReason, setRemoveReason] = useState("");
   // What the last DELETE refused, if anything -- ConfirmItsYou has already closed by the time a
   // refusal comes back (ConfirmItsYou's own onConfirmed fires once the tap is verified, before the
-  // delete this file performs afterward even starts), so there is no dialog left open to show it in,
-  // and this console has no toast wired up yet to hand it to instead. Cleared whenever a new Remove
-  // attempt opens.
+  // delete this file performs afterward even starts), so there is no dialog left open to show it in.
+  // It goes here rather than to the toaster task-9 mounted for `notify.success` below: a toast is a
+  // notice that goes away, and a refusal a member has to act on should stay on the screen next to
+  // the thing that refused. Cleared whenever a new Remove attempt opens.
   const [plateError, setPlateError] = useState<string | null>(null);
 
   // A write that lands and a re-read that does not is the worst of both: the server has the new
@@ -102,9 +104,14 @@ export function KeysPlate({ keys: initialKeys }: { readonly keys: readonly MyKey
       return;
     }
     // A refusal -- the two-key floor, a stale key that is no longer this member's, or a stale count
-    // that no longer matches the tap's own digest (task-8-addendum.md §2) -- leaves `keys` untouched:
-    // no optimistic removal ever happened, so "the key stays in the table" needs no undo.
+    // that no longer matches the tap's own digest (task-8-addendum.md §2) -- removes nothing, so
+    // there is no optimistic change to undo. The list is re-read all the same: every one of those
+    // refusals is the server saying this table is out of date, and leaving it stale would have the
+    // member's next attempt mint a tap over the same wrong count and fail in exactly the same way.
+    // The message is set first, so it is still on screen if the re-read itself cannot complete.
     setPlateError(outcome.message);
+    const fresh = await fetchMyKeys();
+    if (fresh) setKeys(fresh.keys);
   }
 
   const removing = dialog.kind === "remove" ? dialog.row : null;
@@ -168,7 +175,11 @@ export function KeysPlate({ keys: initialKeys }: { readonly keys: readonly MyKey
       <ConfirmItsYou
         open={dialog.kind === "remove"}
         action={REMOVE_ACTION}
-        target={removing?.name ?? ""}
+        // The key's id, not its name: console.keys has no uniqueness on (member_id, name), so a
+        // tap over the name approved any key that happened to share it. `target` is a digest field
+        // and is never drawn -- the words on screen come from `summary` and `change` below, which
+        // is the whole reason those two props exist.
+        target={removing?.id ?? ""}
         value={String(keys.length - 1)}
         reason={removeReason}
         summary={removing ? m.removeSummary(removing.name) : ""}
