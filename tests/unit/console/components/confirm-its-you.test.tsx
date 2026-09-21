@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { useState } from "react";
+import { StrictMode, useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // vi.mock's factory is hoisted above a plain top-level const, and this one reads runTap directly
@@ -181,5 +181,33 @@ describe("ConfirmItsYou", () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
     expect(onConfirmed).not.toHaveBeenCalled();
+  });
+});
+
+// The bug this guards was invisible to every other test in this file and to production alike, and
+// only turned up when someone drove the dialog in a real browser (task-11-report.md).
+//
+// mountedRef was cleared to false on cleanup but never set back to true in the mount effect. React
+// Strict Mode's development-only double-invoke -- mount, simulate an unmount, mount again, on the
+// same fiber with the same refs -- therefore ran that cleanup once before any real interaction, and
+// useRef's initial value is not revisited on the second mount. So the ref read false for the rest
+// of the instance's life and confirm() discarded every outcome it ever received: the member tapped
+// their key, the tap verified, and the dialog sat there.
+//
+// Every other test here renders without Strict Mode, which is why none of them saw it. This one
+// renders with it, so a regression fails in milliseconds instead of surfacing as a four-second
+// end-to-end ceremony timing out for no stated reason.
+describe("ConfirmItsYou under Strict Mode", () => {
+  it("still reports a completed tap after the double-invoke has run its simulated unmount", async () => {
+    runTap.mockResolvedValue({ kind: "done" });
+    const onConfirmed = vi.fn();
+    render(
+      <StrictMode>
+        <Harness onCancel={vi.fn()} onConfirmed={onConfirmed} />
+      </StrictMode>,
+    );
+    await userEvent.type(screen.getByLabelText("Reason"), VALID_REASON);
+    await userEvent.click(screen.getByRole("button", { name: "Tap your key" }));
+    await waitFor(() => expect(onConfirmed).toHaveBeenCalledTimes(1));
   });
 });

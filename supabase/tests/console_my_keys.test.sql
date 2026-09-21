@@ -72,8 +72,12 @@ select is(
   'MacBook Air',
   'a rename lands'
 );
+-- Scoped to this file's own member. console.audit_log is append-only and deliberately survives
+-- resetConsole() (it holds no foreign keys, which is what 2b built it for), so a bare count on
+-- `action` alone sees every row any real run has written since the last `db:reset` -- an end-to-end
+-- run of My keys renames a key too, and this then reads 2 where it wants 1.
 select is(
-  (select count(*)::int from console.audit_log where action = 'Renamed a key'),
+  (select count(*)::int from console.audit_log where action = 'Renamed a key' and actor_id = '11111111-1111-1111-1111-111111111111'),
   1,
   'and is written to the audit log'
 );
@@ -150,8 +154,9 @@ select is(
   true,
   'the other one does not'
 );
+-- Scoped to this file's own member, for the same reason as the rename count above.
 select is(
-  (select count(*)::int from console.audit_log where action = 'Signed out other sessions'),
+  (select count(*)::int from console.audit_log where action = 'Signed out other sessions' and actor_id = '11111111-1111-1111-1111-111111111111'),
   1,
   'and it is in the audit log'
 );
