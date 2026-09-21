@@ -1,9 +1,16 @@
 import type { MessageTree } from "@/messages/types";
 
-// The signed-in frame's own new copy (Main.dc.html): the rail's landmark and group legends, the
-// member menu's one item that isn't already in ./frame.ts (Sign out, roleLabel), and the rail
-// footer's build line. Group keys match ConsoleGroupKey (src/console/nav.ts).
+// The signed-in frame's own new copy (Main.dc.html): the masthead clock's legend, the rail's
+// landmark and group legends, the member menu's one item that isn't already in ./frame.ts (Sign
+// out, roleLabel), and the rail footer's build line. Group keys match ConsoleGroupKey
+// (src/console/nav.ts). "IST" is kept here rather than reused from @/messages' own common.ist:
+// the console never imports the traveller message tree (tests/unit/console/boundary.contract.test.ts
+// checks the other direction, but every other piece of console copy already lives under this tree
+// too -- one console-owned home for it, not two trees for the same three letters).
 export const frameSignedIn = {
+  clock: {
+    ist: "IST",
+  },
   nav: {
     landmark: "Console",
     groupLabel: {
