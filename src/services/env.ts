@@ -60,6 +60,8 @@ const envSchema = z
       .optional(),
     /** Set by Vercel on every build and function. Absent in CI and local runs. */
     VERCEL_ENV: z.enum(["production", "preview", "development"]).optional(),
+    /** Set by Vercel on every deployment: the full commit sha. The console rail's footer shows its first seven characters. */
+    VERCEL_GIT_COMMIT_SHA: z.string().min(7).optional(),
     NEXT_PUBLIC_SUPABASE_URL: z.url().optional(),
     /** Supabase publishable key (sb_publishable_…): safe in the browser, RLS applies. */
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: keyLike.optional(),

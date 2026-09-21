@@ -51,6 +51,10 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   // Several root layouts ((site) and console), so unmatched addresses need global-not-found.
   experimental: { globalNotFound: true },
+  // The console rail's build line (task-4-addendum.md §2): baked in at build time, so it is the
+  // build's own date rather than whatever date a later request happens to be served on. Next
+  // inlines process.env.BUILD_DATE wherever that literal expression appears in compiled output.
+  env: { BUILD_DATE: new Date().toISOString().slice(0, 10) },
   images: {
     remotePatterns: [{ protocol: "https", hostname: "*.googleusercontent.com" }],
   },
