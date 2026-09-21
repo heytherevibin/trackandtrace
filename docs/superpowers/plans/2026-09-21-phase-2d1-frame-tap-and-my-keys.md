@@ -121,7 +121,7 @@ Create `supabase/tests/console_my_keys.test.sql`. Model it on `supabase/tests/co
 ```sql
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(31);
+select plan(37);
 
 -- Grants: every one of these is the member's own call, so `authenticated` alone.
 select is(has_function_privilege('authenticated', 'public.console_my_keys()', 'execute')::text, 'true', 'a member can list their own keys');
