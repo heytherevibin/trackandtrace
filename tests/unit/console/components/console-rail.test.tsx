@@ -4,7 +4,7 @@ import type { ConsoleRole } from "@/console/auth/member";
 import { consoleHref } from "@/console/href";
 import { CONSOLE_MODULES, railFor, type ConsoleNavGroup } from "@/console/nav";
 import { resetEnvCache } from "@/services/env";
-import { buildLine, ConsoleRail, ConsoleRailSheet } from "@/console/components/console-rail";
+import { buildLine, ConsoleRail, ConsoleRailDrawer } from "@/console/components/console-rail";
 
 const ROLES = ["owner", "admin", "support", "viewer"] as const satisfies readonly ConsoleRole[];
 
@@ -69,23 +69,32 @@ describe("the console rail", () => {
 
 // The brief's own first test ("at 390px the rail is not rendered and the bottom-sheet trigger is")
 // cannot be written as stated: railFor(role) is [] for every role against the real CONSOLE_MODULES
-// today (nav.ts's own ruling -- no module is built yet), and console-frame.tsx:31 already gates the
+// today (nav.ts's own ruling -- no module is built yet), and console-frame.tsx already gates the
 // rail behind `groups.length > 0`, so an assertion against real data would pass against an empty
-// page and prove nothing (task-10-addendum.md §1). ConsoleRailSheet goes behind the same gate as
-// ConsoleRail -- both are children of the one `groups.length > 0 ? <>...</> : null` in
-// console-frame.tsx -- so this fixture (built: true throughout, the same shape nav.test.ts and this
-// file's own GROUPS already use) is what lets "opening it lists the same modules railFor gives" mean
-// anything, and "today's reality" below is asserted separately, against the real data, the way
-// nav.test.ts's own "today's reality" block already does for railFor itself.
-describe("ConsoleRailSheet: the phone trigger and its sheet", () => {
-  it("is a trigger button; opening it lists the same groups and modules railFor gives, under the sheet's own Console landmark", async () => {
-    render(<ConsoleRailSheet groups={GROUPS} />);
+// page and prove nothing (task-10-addendum.md §1). ConsoleRailDrawer goes behind the same gate as
+// ConsoleRail -- both are driven by the one `groups.length > 0` in console-frame.tsx -- so this
+// fixture (built: true throughout, the same shape nav.test.ts and this file's own GROUPS already
+// use) is what lets "opening it lists the same modules railFor gives" mean anything, and "today's
+// reality" below is asserted separately, against the real data, the way nav.test.ts's own "today's
+// reality" block already does for railFor itself.
+//
+// task-10-fix-1.md: this was first built over src/components/ui/sheet.tsx's bottom tray, on the
+// brief and addendum's own repeated "bottom sheet" instruction -- both wrong, per ShellPhone.dc.html's
+// own drawer panel (left-anchored, border-right, no drag handle) and its `drawer`/`drawerOpen` prop
+// name. These tests exercise the corrected drawer; the accessible shape (a "dialog" named "Console",
+// a "navigation" of the same name inside it) is unchanged from the retired sheet version, since
+// Base UI's Drawer and the generic Sheet wrapper both render that way -- only the drawer's own
+// header content (Trakline, the Console tag, a "Close menu" button) and the drawer/sheet distinction
+// itself are new.
+describe("ConsoleRailDrawer: the phone trigger and its drawer", () => {
+  it("is a trigger button; opening it lists the same groups and modules railFor gives, under the drawer's own Console landmark", async () => {
+    render(<ConsoleRailDrawer groups={GROUPS} />);
     const trigger = screen.getByRole("button", { name: "Open menu" });
     expect(screen.queryByRole("dialog")).toBeNull();
 
     fireEvent.click(trigger);
-    const sheet = await screen.findByRole("dialog", { name: "Console" });
-    const nav = within(sheet).getByRole("navigation", { name: "Console" });
+    const drawer = await screen.findByRole("dialog", { name: "Console" });
+    const nav = within(drawer).getByRole("navigation", { name: "Console" });
 
     expect(within(nav).getByText("Operate")).toBeVisible();
     expect(within(nav).getByText("Configure")).toBeVisible();
@@ -95,30 +104,46 @@ describe("ConsoleRailSheet: the phone trigger and its sheet", () => {
     expect(within(nav).getByRole("link", { name: /Provider keys/ })).toHaveAttribute("href", "/provider-keys");
   });
 
-  it("draws a trigger but an empty sheet -- not even a legend -- for a group with no groups at all", async () => {
-    render(<ConsoleRailSheet groups={[]} />);
+  // ShellPhone.dc.html's own drawer header (Trakline, the Console tag, Close menu) -- distinct from
+  // ConsoleMasthead's own header above the backdrop, not a re-render of it.
+  it("draws its own header -- Trakline, the Console tag, and a Close menu button -- not ConsoleMasthead's", async () => {
+    render(<ConsoleRailDrawer groups={GROUPS} />);
     fireEvent.click(screen.getByRole("button", { name: "Open menu" }));
-    const sheet = await screen.findByRole("dialog", { name: "Console" });
-    expect(within(sheet).queryByText("Operate")).not.toBeInTheDocument();
+    const drawer = await screen.findByRole("dialog", { name: "Console" });
+    expect(within(drawer).getByText("Trakline")).toBeVisible();
+    // Two matches for "Console": the sr-only Drawer.Title (the dialog's own accessible name,
+    // already asserted by findByRole above) and the visible Console tag beside the wordmark.
+    expect(within(drawer).getAllByText("Console")).toHaveLength(2);
+    const close = within(drawer).getByRole("button", { name: "Close menu" });
+    expect(close).toBeVisible();
+    fireEvent.click(close);
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("shows the same build line ConsoleRail draws, once the sheet is open", async () => {
+  it("draws a trigger but an empty drawer -- not even a legend -- for a group with no groups at all", async () => {
+    render(<ConsoleRailDrawer groups={[]} />);
+    fireEvent.click(screen.getByRole("button", { name: "Open menu" }));
+    const drawer = await screen.findByRole("dialog", { name: "Console" });
+    expect(within(drawer).queryByText("Operate")).not.toBeInTheDocument();
+  });
+
+  it("shows the same build line ConsoleRail draws, once the drawer is open", async () => {
     vi.stubEnv("VERCEL_GIT_COMMIT_SHA", "42c5317aabbccddeeff00112233445566778899");
     vi.stubEnv("BUILD_DATE", "2026-09-19");
     resetEnvCache();
-    render(<ConsoleRailSheet groups={GROUPS} />);
+    render(<ConsoleRailDrawer groups={GROUPS} />);
     fireEvent.click(screen.getByRole("button", { name: "Open menu" }));
     expect(await screen.findByText("Build 42c5317 · 19 Sept 2026")).toBeVisible();
   });
 });
 
-// console-frame.tsx:31's own gate -- `groups.length > 0 ? <><ConsoleRail .../><ConsoleRailSheet
-// .../></> : null` -- wraps both siblings in the one condition, so a role that gets nothing from
-// railFor gets neither the desktop rail nor the phone trigger. This is the same ternary
-// nav.test.ts's own "railFor against today's real CONSOLE_MODULES" block already pins at the
-// railFor level ("shows nothing for any role, yet"); this test pins the boolean console-frame.tsx
-// itself branches on, using the real (non-fixture) railFor and CONSOLE_MODULES, so it fails the day
-// 2d-2 flips Team or the Audit log to built: true -- exactly as it should.
+// console-frame.tsx's own gate -- `groups.length > 0` drives both `<ConsoleRail>` and the `leading`
+// slot's `<ConsoleRailDrawer>` together -- so a role that gets nothing from railFor gets neither the
+// desktop rail nor the phone trigger. This is the same ternary nav.test.ts's own "railFor against
+// today's real CONSOLE_MODULES" block already pins at the railFor level ("shows nothing for any
+// role, yet"); this test pins the boolean console-frame.tsx itself branches on, using the real
+// (non-fixture) railFor and CONSOLE_MODULES, so it fails the day 2d-2 flips Team or the Audit log to
+// built: true -- exactly as it should.
 describe("today's reality: the rail and its phone trigger render for no role, yet", () => {
   it("groups.length > 0 is false for every role against the real CONSOLE_MODULES", () => {
     for (const role of ROLES) {

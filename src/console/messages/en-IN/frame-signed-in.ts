@@ -18,6 +18,10 @@ export const frameSignedIn = {
     // messages.shell.nav.openMenu (the site's own, identical string for its own nav sheet): the
     // console never imports the traveller message tree (see this file's own top-of-file note).
     openMenu: "Open menu",
+    // The drawer's own close button (ShellPhone.dc.html:172, `aria-label="Close menu"` -- the same
+    // phrase messages.shell.nav.closeMenu uses for the site's own nav-menu.tsx, in this tree for the
+    // same reason openMenu is).
+    closeMenu: "Close menu",
     groupLabel: {
       operate: "Operate",
       people: "People",
