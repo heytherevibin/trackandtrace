@@ -154,6 +154,16 @@ export type Database = {
         Returns: string
       }
       console_me: { Args: never; Returns: Json }
+      console_my_keys: { Args: never; Returns: Json }
+      console_my_sessions: { Args: never; Returns: Json }
+      console_remove_key: {
+        Args: { p_environment: string; p_key: string; p_reason: string }
+        Returns: number
+      }
+      console_rename_key: {
+        Args: { p_environment: string; p_key: string; p_name: string }
+        Returns: undefined
+      }
       console_save_settings: {
         Args: {
           p_changes: Json
@@ -161,6 +171,10 @@ export type Database = {
           p_reason: string
           p_version: number
         }
+        Returns: number
+      }
+      console_sign_out_others: {
+        Args: { p_environment: string }
         Returns: number
       }
     }
