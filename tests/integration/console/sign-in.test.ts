@@ -1,7 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// The console's sign-in route answers the same for every address and never says whether it belongs to a member.
-// Plan 2c adds sending, for members only, behind this same answer.
+const sendSignInLink = vi.fn(() => Promise.resolve());
+vi.mock("@/console/auth/sign-in-link", () => ({ sendSignInLink, confirmUrl: () => "" }));
+// `after` runs its callback inline here, so a test can assert what the route scheduled.
+vi.mock("next/server", () => ({ after: (fn: () => unknown) => void fn() }));
+
+// The console's sign-in route answers the same for every address and never says whether it belongs
+// to a member. The lookup, the mint and the send all run in `after()`, once the response is already
+// on its way, so nothing a caller can measure -- in content or in timing -- says which address is a
+// member's (spec §C, §3A).
 
 let route: typeof import("@/app/console/api/sign-in/route");
 
@@ -10,6 +17,9 @@ function post(body: unknown, headers: Record<string, string | null> = {}): Reque
     "content-type": "application/json",
     "sec-fetch-site": "same-origin",
     "x-forwarded-for": "198.51.100.7",
+    // consoleOrigin reads this directly -- it is never inferred from the request URL -- so a test
+    // that wants the route to recognise this connection as the console must set it explicitly.
+    host: "admin.localhost:4210",
   };
   for (const [key, value] of Object.entries(headers)) {
     if (value === null) {
@@ -26,6 +36,7 @@ function post(body: unknown, headers: Record<string, string | null> = {}): Reque
 }
 
 beforeEach(async () => {
+  sendSignInLink.mockClear();
   vi.resetModules();
   route = await import("@/app/console/api/sign-in/route");
 });
@@ -46,6 +57,7 @@ describe("POST /api/sign-in where the console must not run", () => {
       expect(response.status).toBe(503);
       expect(await response.json()).toMatchObject({ code: "CONSOLE_UNAVAILABLE", message: "Point the app at a local Supabase to use the console." });
     }
+    expect(sendSignInLink).not.toHaveBeenCalled();
   });
 });
 
@@ -62,12 +74,14 @@ describe("POST /api/sign-in on the console", () => {
     const response = await route.POST(post({ email: "asha@example" }));
     expect(response.status).toBe(400);
     expect(await response.json()).toMatchObject({ code: "INVALID_INPUT", message: "Enter an email address like name@example.com." });
+    expect(sendSignInLink).not.toHaveBeenCalled();
   });
 
   it("refuses requests from another site, with the console's own wording", async () => {
     const response = await route.POST(post({ email: "asha@example.com" }, { "sec-fetch-site": "same-site" }));
     expect(response.status).toBe(403);
     expect(await response.json()).toMatchObject({ code: "INVALID_INPUT", message: "Cross-site requests are refused." });
+    expect(sendSignInLink).not.toHaveBeenCalled();
   });
 
   it("limits one address to 5 requests in 10 minutes", async () => {
@@ -110,6 +124,27 @@ describe("POST /api/sign-in on the console", () => {
         post({ email: "fallback4@example.com" }, { "sec-fetch-site": null, origin: null })
       );
       expect(response.status).toBe(403);
+    });
+  });
+
+  describe("sending the link (scheduled in after(), so the answer says nothing)", () => {
+    it("answers identically in content for a member and a stranger", async () => {
+      const one = await route.POST(post({ email: "asha@trakline.in" }));
+      const two = await route.POST(post({ email: "stranger@example.com" }));
+      expect(one.status).toBe(200);
+      expect(two.status).toBe(200);
+      expect(await one.json()).toEqual(await two.json());
+    });
+
+    it("lower-cases the address before it reaches the lookup", async () => {
+      await route.POST(post({ email: "Asha@Trakline.IN" }));
+      expect(sendSignInLink).toHaveBeenCalledWith("asha@trakline.in", "http://admin.localhost:4210");
+    });
+
+    it("sends through after(), not before the answer", async () => {
+      const response = await route.POST(post({ email: "asha@trakline.in" }));
+      expect(response.headers.get("Cache-Control")).toBe("no-store");
+      expect(sendSignInLink).toHaveBeenCalledOnce();
     });
   });
 });

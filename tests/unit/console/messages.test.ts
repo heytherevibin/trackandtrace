@@ -25,4 +25,9 @@ describe("console messages", () => {
     expect(consoleMessages.availability.productionOnly).toBe("The console runs only in production.");
     expect(consoleMessages.availability.localDatabase).toBe("Point the app at a local Supabase to use the console.");
   });
+
+  it("says the same thing about an ended session everywhere", () => {
+    expect(consoleMessages.session.ended).toBe("Your session ended. Sign in again.");
+    expect(consoleMessages.session.noAccess).toBe("You don't have access to this.");
+  });
 });

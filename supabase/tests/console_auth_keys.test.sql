@@ -13,9 +13,9 @@ select is(has_function_privilege('service_role', 'public.console_auth_keys_for_m
 select is(has_function_privilege('authenticated', 'public.console_auth_keys_for_member(uuid)', 'execute')::text, 'false', 'authenticated cannot list a member''s keys directly');
 select is(has_function_privilege('anon', 'public.console_auth_keys_for_member(uuid)', 'execute')::text, 'false', 'anon cannot list a member''s keys directly');
 
-select is(has_function_privilege('service_role', 'public.console_auth_record_key(uuid, bytea, bytea, bigint, text[], text, console.key_type)', 'execute')::text, 'true', 'service_role can record a key');
-select is(has_function_privilege('authenticated', 'public.console_auth_record_key(uuid, bytea, bytea, bigint, text[], text, console.key_type)', 'execute')::text, 'false', 'authenticated cannot record a key directly');
-select is(has_function_privilege('anon', 'public.console_auth_record_key(uuid, bytea, bytea, bigint, text[], text, console.key_type)', 'execute')::text, 'false', 'anon cannot record a key directly');
+select is(has_function_privilege('service_role', 'public.console_auth_record_key(uuid, bytea, bytea, bigint, text[], text, text)', 'execute')::text, 'true', 'service_role can record a key');
+select is(has_function_privilege('authenticated', 'public.console_auth_record_key(uuid, bytea, bytea, bigint, text[], text, text)', 'execute')::text, 'false', 'authenticated cannot record a key directly');
+select is(has_function_privilege('anon', 'public.console_auth_record_key(uuid, bytea, bytea, bigint, text[], text, text)', 'execute')::text, 'false', 'anon cannot record a key directly');
 
 select is(has_function_privilege('service_role', 'public.console_auth_touch_key(uuid, bigint)', 'execute')::text, 'true', 'service_role can touch a key');
 select is(has_function_privilege('authenticated', 'public.console_auth_touch_key(uuid, bigint)', 'execute')::text, 'false', 'authenticated cannot touch a key directly');
@@ -29,9 +29,9 @@ select is(has_function_privilege('service_role', 'public.console_auth_owner_addr
 select is(has_function_privilege('authenticated', 'public.console_auth_owner_addresses()', 'execute')::text, 'false', 'authenticated cannot list Owner addresses directly');
 select is(has_function_privilege('anon', 'public.console_auth_owner_addresses()', 'execute')::text, 'false', 'anon cannot list Owner addresses directly');
 
-select is(has_function_privilege('service_role', 'public.console_auth_write_audit(text, uuid, text, console.member_role, uuid, text, text, text, text, text, console.audit_result, text, jsonb, jsonb)', 'execute')::text, 'true', 'service_role can write an audit row directly');
-select is(has_function_privilege('authenticated', 'public.console_auth_write_audit(text, uuid, text, console.member_role, uuid, text, text, text, text, text, console.audit_result, text, jsonb, jsonb)', 'execute')::text, 'false', 'authenticated cannot write an audit row directly');
-select is(has_function_privilege('anon', 'public.console_auth_write_audit(text, uuid, text, console.member_role, uuid, text, text, text, text, text, console.audit_result, text, jsonb, jsonb)', 'execute')::text, 'false', 'anon cannot write an audit row directly');
+select is(has_function_privilege('service_role', 'public.console_auth_write_audit(text, uuid, text, text, uuid, text, text, text, text, text, text, text, jsonb, jsonb)', 'execute')::text, 'true', 'service_role can write an audit row directly');
+select is(has_function_privilege('authenticated', 'public.console_auth_write_audit(text, uuid, text, text, uuid, text, text, text, text, text, text, text, jsonb, jsonb)', 'execute')::text, 'false', 'authenticated cannot write an audit row directly');
+select is(has_function_privilege('anon', 'public.console_auth_write_audit(text, uuid, text, text, uuid, text, text, text, text, text, text, text, jsonb, jsonb)', 'execute')::text, 'false', 'anon cannot write an audit row directly');
 
 insert into auth.users (id, email) values
   ('11111111-1111-1111-1111-111111111111', 'owner@trakline.in'),

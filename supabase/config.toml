@@ -168,6 +168,8 @@ additional_redirect_urls = [
   "http://127.0.0.1:3200/**",
   "http://localhost:4210/**",
   "http://127.0.0.1:4210/**",
+  "http://admin.localhost:4210/**",
+  "http://admin.localhost:4211/**",
 ]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
@@ -473,6 +475,7 @@ additional_redirect_urls = [
   "http://127.0.0.1:3200/**",
   "http://localhost:4210/**",
   "http://127.0.0.1:4210/**",
+  "https://admin.trakline.in/**",
 ]
 
 [remotes.production.auth.email]

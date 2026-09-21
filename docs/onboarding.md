@@ -13,6 +13,8 @@
 
 The console's tables live in the private `console` schema. `npm run db:reset` applies its migrations to the local stack, and `npm run db:test` runs the pgTAP tests (CI runs the same). Nothing reads those tables directly: every caller goes through a `public.console_*` function.
 
+**Console end-to-end** (`npm run test:e2e:console`) drives the whole sign-in and setup journey in a real browser against the local stack: a virtual security key over Chromium's WebAuthn CDP API, real email capture (`E2E=1` writes to an in-memory outbox instead of sending), and `psql` resetting the console between tests. It needs the local stack running (`npm run db:start`) and starts its own dev server on port 4211 — the traveller suite's port 4210 stays free for its own server, since Next only runs one dev server per project at a time, so run the two suites one after another, never at once. `scripts/console-e2e.mjs` reads the stack's URL and keys from `npx supabase status -o env` itself; nothing needs to be pasted into `.env.local` for it.
+
 ## Supabase
 
 - **Hosted project:** "Trakline", ref `xnykpktqtimadelfjgqf`, ap-south-1. Put `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env.local`; add `SUPABASE_SECRET_KEY` only where account deletion must work.
