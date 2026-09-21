@@ -33,9 +33,9 @@ export default async function ConsoleSetupPage({ searchParams }: { readonly sear
     // session not key-verified even once they hold two keys again -- adding a key key-verifies a
     // session only for the member it activates (ceremony.ts's justActivated), which an already-active
     // member never is. Sending them to "/" here would just bounce off requireConsoleMember's own
-    // key-verified check with no explanation; /keys is the tap step built for exactly this session
-    // shape (two-plus keys, not yet key-verified).
-    if (session.keyCount >= 2) redirect(consoleHref(session.keyVerified ? "/" : "/keys"));
+    // key-verified check with no explanation; /sign-in-key is the tap step built for exactly this
+    // session shape (two-plus keys, not yet key-verified).
+    if (session.keyCount >= 2) redirect(consoleHref(session.keyVerified ? "/" : "/sign-in-key"));
     return (
       <SignedOutFrame>
         <span className="inline-flex">

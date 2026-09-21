@@ -8,9 +8,16 @@ import { consoleHref } from "@/console/href";
  * When 2f gives "/" a real Overview page, remove this redirect -- NoAccessState's link
  * (src/console/components/frame-states.tsx) keeps working unchanged, no rename needed.
  *
- * Until then (task-5-addendum.md §4): /keys is still the sign-in key step, not My keys (task 6
- * moves it), so a signed-in member landing on "/" sees that page rather than Overview. That is a
- * known, accepted window inside an unmerged branch, not a bug this redirect should route around.
+ * Until then: /keys has no page of its own (task 6 puts My keys there), so a signed-in member
+ * landing on "/" falls through to src/app/console/[...missing]/page.tsx's signed-in not-found
+ * state rather than Overview -- worse-looking than a redirect loop, but terminal, honest (the page
+ * genuinely does not exist yet), and not a placeholder built to cover the gap (task-5-fix-1.md).
+ *
+ * This used to loop: /keys was also the sign-in key step, which redirected a key-verified session
+ * straight back to "/" (src/app/console/setup/page.tsx has the same shape and was the third leg).
+ * task-5-fix-1.md moves that step to /sign-in-key instead of deferring the fix to task 6, so a
+ * signed-in member hitting "/" -- including by the masthead's own logo link, always visible --
+ * settles instead of bouncing forever.
  */
 export default function ConsoleHome(): never {
   redirect(consoleHref("/keys"));
