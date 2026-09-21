@@ -51,8 +51,14 @@ export const passengerSeatSchema = z.object({
   quota: quotaSchema,
 });
 
+// Datetimes accept an offset, not only "Z". Postgres serialises a timestamptz as
+// "2026-09-21T19:10:34.256374+00:00", and z.iso.datetime()'s default rejects that -- which turned
+// every watchlist save into "The service returned a malformed response", because addedAt is
+// row.created_at straight from the database. Every fixture in the suite wrote the "Z" form, so
+// nothing caught it. Both forms are valid ISO 8601; refusing one the database actually emits was
+// the bug, not the timestamp.
 export const historyPointSchema = z.object({
-  at: z.iso.datetime(),
+  at: z.iso.datetime({ offset: true }),
   status: ticketStatusSchema,
   position: z.number().int().nullable(),
   probability: z.number().optional(),
@@ -88,7 +94,7 @@ export const pnrSnapshotSchema = z.object({
   journeyDate: z.iso.date(),
   journeyDateLabel: z.string(),
   chartTime: z.string().optional(),
-  chartAt: z.iso.datetime().optional(),
+  chartAt: z.iso.datetime({ offset: true }).optional(),
   chartPrepared: z.boolean().optional(),
   passengerCount: z.number().int().positive(),
   pax: z.array(passengerSeatSchema).min(1),
@@ -109,7 +115,7 @@ export const pnrResultSchema = z.object({
   lead: pnrLeadSchema,
   trend: z.array(trendDaySchema).optional(),
   hoursToChart: z.number().optional(),
-  checkedAt: z.iso.datetime(),
+  checkedAt: z.iso.datetime({ offset: true }),
 });
 
 export const errorCodeSchema = z.enum([
@@ -142,7 +148,7 @@ export const pnrApiResponseSchema = z.discriminatedUnion("ok", [pnrApiOkSchema, 
 export const watchlistEntrySchema = z.object({
   pnr: z.string().regex(PNR_PATTERN),
   label: z.string().min(1).max(200),
-  addedAt: z.iso.datetime(),
+  addedAt: z.iso.datetime({ offset: true }),
   checks: z.array(historyPointSchema).max(40),
 });
 
