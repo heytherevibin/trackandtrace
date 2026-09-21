@@ -19,6 +19,9 @@ export const tap = {
   tap: "Tap your key",
   waiting: "Waiting for your key…",
   status: "Touch your security key or approve on your device",
+  // TC-01's fallback when a tap comes back with nothing to show, referenced from the sign-in
+  // step's copy rather than restated. There is no `notYours` here: the browser reports a wrong
+  // key and a dismissed prompt as the same NotAllowedError, so the client can never raise that
+  // state on its own -- the server does, and its message is shown as sent.
   didNotAnswer: keys.didNotAnswer,
-  notYours: keys.notYours,
 } as const satisfies MessageTree;

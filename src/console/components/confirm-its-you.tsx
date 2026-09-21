@@ -29,20 +29,12 @@ const m = consoleMessages.tap;
 
 type Stage = { readonly kind: "idle" } | { readonly kind: "waiting" } | { readonly kind: "failed"; readonly message: string };
 
-/**
- * The verify step's refusal text arrives from the server, sourced from consoleMessages.keys.* --
- * the same copy the sign-in step reads (src/console/keys/tap.ts, the server file, is left alone).
- * When it matches one of the two states TC-01's own sheet names (Main.dc.html's statusText map),
- * this dialog shows TC-01's own copy instead of relaying the server's raw string verbatim -- so if
- * tap.ts (the copy file) ever needs TC-01's wording to diverge from the sign-in step's, editing
- * that one file is enough; no call site needs hunting down. Any other refusal (not one of these
- * two known strings) passes through unchanged, exactly as before.
- */
-function knownMessage(message: string): string {
-  if (message === consoleMessages.keys.didNotAnswer) return m.didNotAnswer;
-  if (message === consoleMessages.keys.notYours) return m.notYours;
-  return message;
-}
+// A refused verify shows the message the server sent, as it sent it. An earlier draft matched that
+// string against the two refusals TC-01's sheet names and swapped in this file's own wording, so
+// the copy could diverge later -- but deciding what a message *means* by comparing its text is a
+// thing that breaks silently the first time either string is edited, which is the very moment it
+// was supposed to help. If TC-01's wording ever needs to differ, the server picks the message and
+// is where that belongs.
 
 export interface ConfirmItsYouProps extends TapRequest {
   readonly open: boolean;
@@ -124,7 +116,7 @@ export function ConfirmItsYou({ open, action, target, value, reason, summary, ch
       onConfirmed();
       return;
     }
-    setStage(outcome.kind === "cancelled" ? { kind: "idle" } : { kind: "failed", message: knownMessage(outcome.message) });
+    setStage(outcome.kind === "cancelled" ? { kind: "idle" } : { kind: "failed", message: outcome.message });
   }
 
   const waiting = stage.kind === "waiting";
