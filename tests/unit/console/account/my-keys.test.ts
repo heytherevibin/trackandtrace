@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { getMyKeys } from "@/console/account/my-keys";
+import { getMyKeys, renameMyKey } from "@/console/account/my-keys";
 import type { ConsoleDb } from "@/console/auth/db";
 
 // console_my_keys() itself (20260921100000_console_my_keys.sql): both halves, one call.
@@ -63,5 +63,38 @@ describe("getMyKeys", () => {
 
   it("refuses a response with no member half at all", async () => {
     await expect(getMyKeys(dbAnswering({ data: { keys: [] } }))).rejects.toMatchObject({ code: "SOURCE_UNAVAILABLE" });
+  });
+});
+
+// console_rename_key(p_key uuid, p_name text, p_environment text) itself
+// (supabase/migrations/20260921100000_console_my_keys.sql): three arguments, no tap
+// (task-7-addendum.md §2).
+describe("renameMyKey", () => {
+  it("calls console_rename_key with the key, the name and the caller's environment", async () => {
+    const db = dbAnswering({ data: null });
+    await renameMyKey("aaaaaaaa-0000-0000-0000-000000000003", "MacBook Air", "production", db);
+    expect(db.rpc).toHaveBeenCalledExactlyOnceWith("console_rename_key", {
+      p_key: "aaaaaaaa-0000-0000-0000-000000000003",
+      p_name: "MacBook Air",
+      p_environment: "production",
+    });
+  });
+
+  it("answers a key that is not the caller's with the console's own access line, not a fault", async () => {
+    const db = dbAnswering({ error: { message: "no access" } });
+    await expect(renameMyKey("99999999-9999-9999-9999-999999999999", "Not mine", "production", db)).rejects.toMatchObject({
+      code: "INVALID_INPUT",
+      status: 403,
+      message: "You don't have access to this.",
+    });
+  });
+
+  it("refuses with the shared unavailable line for any other database fault", async () => {
+    const db = dbAnswering({ error: { message: "connection refused" } });
+    await expect(renameMyKey("aaaaaaaa-0000-0000-0000-000000000003", "MacBook Air", "production", db)).rejects.toMatchObject({
+      code: "SOURCE_UNAVAILABLE",
+      status: 503,
+      message: "The console could not be reached. Try again.",
+    });
   });
 });

@@ -7,15 +7,28 @@ import { AppError } from "@/services/errors";
 // file, so the mocks it returns must be declared with vi.hoisted (same note as
 // tests/integration/console/keys.test.ts and tests/integration/console/home.test.ts). Both mocks are
 // typed explicitly -- vi.fn(() => …) infers a zero-argument signature (task-6-addendum.md §9).
-const { requireConsoleMember, getMyKeys } = vi.hoisted(() => ({
+const { requireConsoleMember, getMyKeys, renameMyKey, consoleEnvironment } = vi.hoisted(() => ({
   requireConsoleMember: vi.fn<() => Promise<ConsoleMember>>(),
   getMyKeys: vi.fn<() => Promise<MyKeys>>(),
+  renameMyKey: vi.fn<(keyId: string, name: string, environment: string) => Promise<void>>(),
+  consoleEnvironment: vi.fn<() => string>(() => "production"),
 }));
 
 vi.mock("@/console/auth/guard", () => ({ requireConsoleMember }));
-vi.mock("@/console/account/my-keys", () => ({ getMyKeys }));
+vi.mock("@/console/account/my-keys", () => ({ getMyKeys, renameMyKey }));
+vi.mock("@/console/auth/session", () => ({ consoleEnvironment }));
 
-import { GET } from "@/app/console/api/keys/mine/route";
+import { GET, PATCH } from "@/app/console/api/keys/mine/route";
+
+function patch(url: string, body: unknown, headers: Record<string, string> = {}): Request {
+  return new Request(url, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+    headers: { "content-type": "application/json", "sec-fetch-site": "same-origin", host: "admin.localhost:4210", ...headers },
+  });
+}
+
+const MINE_URL = "http://admin.localhost:4210/console/api/keys/mine";
 
 const MEMBER: ConsoleMember = {
   userId: "11111111-1111-1111-1111-111111111111",
@@ -33,6 +46,8 @@ const DATA: MyKeys = {
 beforeEach(() => {
   requireConsoleMember.mockReset();
   getMyKeys.mockReset();
+  renameMyKey.mockReset();
+  consoleEnvironment.mockReset().mockReturnValue("production");
 });
 
 describe("GET /api/keys/mine", () => {
@@ -58,5 +73,61 @@ describe("GET /api/keys/mine", () => {
     const response = await GET();
     expect(response.status).toBe(503);
     expect(await response.json()).toMatchObject({ ok: false, code: "SOURCE_UNAVAILABLE" });
+  });
+});
+
+const KEY_ID = "aaaaaaaa-0000-0000-0000-000000000003";
+
+describe("PATCH /api/keys/mine", () => {
+  it("renames the key through the caller's own environment and reports ok", async () => {
+    requireConsoleMember.mockResolvedValue(MEMBER);
+    renameMyKey.mockResolvedValue(undefined);
+    const response = await PATCH(patch(MINE_URL, { keyId: KEY_ID, name: "MacBook Air" }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true });
+    expect(renameMyKey).toHaveBeenCalledExactlyOnceWith(KEY_ID, "MacBook Air", "production");
+  });
+
+  it("refuses a cross-site request before ever renaming anything", async () => {
+    requireConsoleMember.mockResolvedValue(MEMBER);
+    const response = await PATCH(patch(MINE_URL, { keyId: KEY_ID, name: "MacBook Air" }, { "sec-fetch-site": "cross-site" }));
+    expect(response.status).toBe(403);
+    expect(renameMyKey).not.toHaveBeenCalled();
+  });
+
+  it("never reaches console_rename_key when there is no session", async () => {
+    requireConsoleMember.mockRejectedValue(new AppError("UNAUTHENTICATED", "Your session ended. Sign in again.", { status: 401 }));
+    const response = await PATCH(patch(MINE_URL, { keyId: KEY_ID, name: "MacBook Air" }));
+    expect(response.status).toBe(401);
+    expect(renameMyKey).not.toHaveBeenCalled();
+  });
+
+  it("refuses an empty name without ever asking the database", async () => {
+    requireConsoleMember.mockResolvedValue(MEMBER);
+    const response = await PATCH(patch(MINE_URL, { keyId: KEY_ID, name: "   " }));
+    expect(response.status).toBe(400);
+    expect(renameMyKey).not.toHaveBeenCalled();
+  });
+
+  it("refuses a name longer than console.keys' own 60-character check, the same way verify's route does", async () => {
+    requireConsoleMember.mockResolvedValue(MEMBER);
+    const response = await PATCH(patch(MINE_URL, { keyId: KEY_ID, name: "x".repeat(61) }));
+    expect(response.status).toBe(400);
+    expect(renameMyKey).not.toHaveBeenCalled();
+  });
+
+  it("refuses a key id that is not a uuid", async () => {
+    requireConsoleMember.mockResolvedValue(MEMBER);
+    const response = await PATCH(patch(MINE_URL, { keyId: "not-a-guid", name: "MacBook Air" }));
+    expect(response.status).toBe(400);
+    expect(renameMyKey).not.toHaveBeenCalled();
+  });
+
+  it("answers a key that is not the caller's with the shared access refusal, not a 500", async () => {
+    requireConsoleMember.mockResolvedValue(MEMBER);
+    renameMyKey.mockRejectedValue(new AppError("INVALID_INPUT", "You don't have access to this.", { status: 403 }));
+    const response = await PATCH(patch(MINE_URL, { keyId: "99999999-9999-9999-9999-999999999999", name: "Not mine" }));
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ ok: false, code: "INVALID_INPUT", message: "You don't have access to this." });
   });
 });
