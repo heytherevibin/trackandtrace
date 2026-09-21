@@ -20,7 +20,7 @@ const m = consoleMessages.frame.states.error;
 export default function ConsoleError({ error, retry }: { error: Error & { digest?: string }; retry: () => void }) {
   return (
     <div className="flex min-h-dvh items-center justify-center px-4 py-8">
-      <ErrorState title={m.title} detail={m.detail} digest={error.digest} onRetry={retry} className="w-full max-w-[720px]" />
+      <ErrorState title={m.title} detail={m.detail} digest={error.digest} onRetry={retry} retryVariant="secondary" className="w-full max-w-[720px]" />
     </div>
   );
 }

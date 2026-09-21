@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// Same hoisting trap as tests/unit/console/signed-in.test.tsx: vi.mock's factory is hoisted above
+// Same hoisting trap as the signed-in placeholder test this replaced: vi.mock's factory is hoisted above
 // a plain top-level const, so the mocks it closes over come from vi.hoisted instead.
 const { apiRequest } = vi.hoisted(() => ({ apiRequest: vi.fn() }));
 vi.mock("@/services/api-client", () => ({ apiRequest }));

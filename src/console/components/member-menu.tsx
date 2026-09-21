@@ -19,8 +19,9 @@ const fs = consoleMessages.frameSignedIn;
 
 const okSchema = z.object({ ok: z.literal(true) });
 
-// Same rule as src/app/console/signed-in.tsx and src/console/keys/client.ts: SOURCE_UNAVAILABLE/INTERNAL
-// are apiRequest's own technical wording, not sheet copy, so a member never sees them raw.
+// The refusal a member reads comes from consoleApiMessage (@/console/api-message), the one place
+// that decides it: SOURCE_UNAVAILABLE and INTERNAL are apiRequest's own technical wording, not
+// sheet copy, so a member never sees them raw.
 interface State {
   readonly pending: boolean;
   readonly error: string | null;
@@ -28,9 +29,9 @@ interface State {
 
 /**
  * The member menu (Main.dc.html): the trigger in the masthead, and its two items -- My keys and
- * Sign out. Sign out carries src/app/console/signed-in.tsx's own logic (same endpoint, same
- * `{ scope: "local" }` guarantee -- made by the route it posts to, not by this call -- same error
- * mapping); Task 5 deletes that placeholder once nothing renders it.
+ * Sign out. Sign out posts to the console's own sign-out route, which is where the
+ * `{ scope: "local" }` guarantee is made -- not by this call. Local scope matters: a global sign
+ * out would revoke the person's traveller sessions along with their console one.
  *
  * The error alert lives outside MenuContent on purpose: Base UI closes the popup on an item's
  * click, and a refusal must still be legible once that happens.
