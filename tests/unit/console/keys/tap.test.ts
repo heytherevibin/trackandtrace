@@ -120,14 +120,25 @@ describe("verifyTap", () => {
     expect(rpc).not.toHaveBeenCalledWith("console_auth_touch_key", expect.anything());
   });
 
-  it("refuses a challenge minted for a different session of the same member", async () => {
-    const { service, db } = fakes({
+  it("refuses a challenge minted for a different session of the same member, and logs it", async () => {
+    const { service, db, rpc } = fakes({
       service: {
         console_auth_keys_for_member: [KEY_ROW],
         console_auth_read_challenge: { session_id: "99999999-9999-9999-9999-999999999999", purpose: "action" },
       },
     });
-    await expect(verifyTap({ req: REQUEST, response: responseWithChallenge("Y3JlZA") as never, db, service })).rejects.toMatchObject({ status: 401 });
+    // A tap answered from a session other than the one that minted it is the only refusal here
+    // that reads as "your session has gone bad" rather than "try again" -- so it must be the
+    // session message and a 401, not didNotAnswer and a 400. Asserting the status alone would
+    // pass just as well if this became a generic failure.
+    await expect(verifyTap({ req: REQUEST, response: responseWithChallenge("Y3JlZA") as never, db, service })).rejects.toMatchObject({
+      status: 401,
+      message: "Your session ended. Sign in again.",
+    });
+    // It is also the most suspicious of the three refusals, so it is the one most worth having in
+    // the audit log; it reaches the same catch block as its siblings and must log like them.
+    expect(rpc).toHaveBeenCalledWith("console_auth_write_audit", expect.objectContaining({ p_action: "Key tap failed", p_result: "failed" }));
+    expect(rpc).not.toHaveBeenCalledWith("console_auth_touch_key", expect.anything());
   });
 
   it("refuses a credential this member does not hold, and logs it as a failed tap", async () => {
