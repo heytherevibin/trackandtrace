@@ -114,6 +114,16 @@ function sql(statement: string): string {
 }
 
 /**
+ * A direct read against the local database, for the handful of things this console has no UI or API
+ * for yet -- the audit log (module 14, `built: false`) chief among them. `resetConsole` and
+ * `firstOwnerLink` already reach the database this way for setup; this is the same `psql` call,
+ * exported for a spec's own assertions rather than kept private to this file.
+ */
+export function consoleSql(statement: string): string {
+  return sql(statement);
+}
+
+/**
  * A console with no Owner. `console.create_first_owner_link` refuses to issue a link once one
  * exists, so every test that sets an Owner up needs the console emptied first. Deleting members
  * cascades to their keys, sessions and challenges; the audit log is untouched, because it holds no
@@ -132,6 +142,13 @@ export interface SignedInOwner {
   readonly email: string;
   readonly name: string;
   readonly role: string;
+  /**
+   * The second key's own authenticator, still attached and present (setUpFirstOwner never turns it
+   * back off). A spec that adds a third key while this owner is signed in needs a handle to whichever
+   * authenticator is currently present, to swap it out before the third key's own registration --
+   * the same hazard swapAuthenticatorAfterTap's own doc comment describes, one key later.
+   */
+  readonly secondKey: VirtualKey;
 }
 
 /**
@@ -175,11 +192,15 @@ export async function setUpFirstOwner(page: Page, baseUrl: string): Promise<Sign
   await page.getByRole("button", { name: "Add key" }).click();
   await page.getByRole("heading", { name: "Add a second key" }).waitFor();
   // A second, genuinely different key: swapped in for the first right after its tap is spent.
-  await swapAuthenticatorAfterTap(page, firstKey, "internal");
+  let secondKey: VirtualKey | undefined;
+  await swapAuthenticatorAfterTap(page, firstKey, "internal", (next) => {
+    secondKey = next;
+  });
   await page.getByLabel("Name this key").fill("iPhone");
   await page.getByRole("button", { name: "Add key" }).click();
   await page.getByRole("button", { name: "Open the console" }).click();
-  return { email, ...ownerIdentity(email) };
+  if (!secondKey) throw new Error("swapAuthenticatorAfterTap never swapped in the second key");
+  return { email, ...ownerIdentity(email), secondKey };
 }
 
 export const test = base;

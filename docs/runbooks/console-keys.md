@@ -25,6 +25,15 @@ through adding two security keys.
 one, so losing one before it's opened costs nothing — only redeeming a link (or the console already
 having an Owner) stops a later one from working.
 
+## The two-key floor
+
+A member can never remove their way down to one key from My keys: once exactly two remain, every
+row's Remove button is disabled and the plate says why — "You need at least two keys. Add another
+before removing one." The database enforces the same floor independently (`console_remove_key`
+refuses once its own count would drop below two, whatever the client sent), so this is not only a
+disabled button — a member is never actually one key away from the recovery step below by mistake.
+To go below two keys at all, use the recovery statement, not the console.
+
 ## Recovery: the last Owner has lost both keys
 
 Normally one Owner resets another's keys from inside the console. The **last** Owner has nobody to

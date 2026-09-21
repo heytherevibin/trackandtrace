@@ -74,12 +74,21 @@ export function ConfirmItsYou({ open, action, target, value, reason, summary, ch
   // waiting, as the sheet draws it, so this is the only place to hold that line.
   const attemptRef = useRef(0);
 
-  useEffect(
-    () => () => {
+  // Strict Mode's development-only double-invoke (mount, simulate an unmount, mount again -- the
+  // same fiber and the same refs throughout, unlike a genuine remount) runs this cleanup once
+  // before any real caller ever gets a chance to. `useRef(true)`'s own initial value is never
+  // revisited on that second, simulated mount, so without this line `mountedRef.current` reads
+  // false forever after -- not just under Strict Mode's own synthetic cycle, but for the rest of
+  // this instance's real life, silently discarding every tap that resolves after it, however long
+  // that takes. Setting it back to true here, in the effect body a real mount always runs, is what
+  // makes the ref track this component's actual mounted state rather than merely "has an unmount
+  // simulation run since the ref was created."
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
       mountedRef.current = false;
-    },
-    [],
-  );
+    };
+  }, []);
 
   // Adjusting state when a prop changes, during render rather than in an effect -- react.dev's own
   // recommended shape for this, since an effect-based reset would commit one extra stale frame
