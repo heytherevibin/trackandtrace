@@ -16,9 +16,12 @@ export const dynamic = "force-dynamic";
 const body = z.object({ token: z.string().regex(/^[0-9a-f]{64}$/, "Invalid request.") }).strict();
 
 /**
- * The first Owner's setup link, redeemed server to server: the token out of the Supabase SQL
- * editor is the whole credential, and opening it proves possession. Nothing here may say whether
- * an address exists -- this endpoint is reachable only with a token the database is holding.
+ * A setup token, redeemed (Task 2b: of either kind). A first-Owner link is server to server: the
+ * token out of the Supabase SQL editor is the whole credential, and opening it proves possession.
+ * An invite instead sends a sign-in link to the address it was made for -- `redeemSetupToken`
+ * tells the two apart and reports which one this call turned out to be. Nothing here may say
+ * whether an address exists -- this endpoint is reachable only with a token the database is
+ * holding, and an invite's two refusals (expired, withdrawn) both require that same possession.
  */
 export async function POST(req: Request): Promise<Response> {
   try {
@@ -26,15 +29,18 @@ export async function POST(req: Request): Promise<Response> {
     assertSameOrigin(req);
     const { token } = await readBody(req, body);
     const outcome = await redeemSetupToken({ token, req });
-    // A "no live link" refusal is an ordinary answer, not an anomaly, so it returns here rather
-    // than throwing into the catch below -- the same reason confirm/route.ts's early returns for
-    // a bad link never reach its own log.warn.
-    if (!outcome.ok) return jsonError(new AppError("INVALID_INPUT", consoleMessages.setup.expired, { status: 400 }));
-    return jsonOk({ ok: true });
+    // A refusal is an ordinary answer, not an anomaly, so it returns here rather than throwing
+    // into the catch below -- the same reason confirm/route.ts's early returns for a bad link
+    // never reach its own log.warn.
+    if (!outcome.ok) {
+      const message = outcome.reason === "withdrawn" ? consoleMessages.setup.withdrawn : consoleMessages.setup.expired;
+      return jsonError(new AppError("INVALID_INPUT", message, { status: 400 }));
+    }
+    return jsonOk({ ok: true, kind: outcome.kind });
   } catch (err) {
     // Unlike the refusal above, anything that reaches here is unexpected -- this is the console's
-    // one-shot bootstrap, so a 503 or a 403 should leave a trace.
-    log.warn("[console] the first Owner's setup link could not be redeemed", err);
+    // bootstrap and its invite intake alike, so a 503 or a 403 should leave a trace.
+    log.warn("[console] a setup token could not be redeemed", err);
     return jsonError(err);
   }
 }

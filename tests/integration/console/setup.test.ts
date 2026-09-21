@@ -24,6 +24,12 @@ vi.mock("@/console/auth/session", async (importOriginal) => ({
   startConsoleSession,
 }));
 
+// An accepted invite's letter is sendSignInLink, not a second copy of the mint-and-mail logic --
+// mocked at the module boundary so the accept path can be asserted without also re-testing that
+// function's own contract (tests/unit/console/auth/sign-in-link.test.ts already does).
+const { sendSignInLink } = vi.hoisted(() => ({ sendSignInLink: vi.fn(() => Promise.resolve()) }));
+vi.mock("@/console/auth/sign-in-link", () => ({ sendSignInLink }));
+
 import { POST } from "@/app/console/api/setup/route";
 
 const OWNER = "11111111-1111-1111-1111-111111111111";
@@ -126,5 +132,80 @@ describe("POST /api/setup", () => {
     const response = await POST(post({ token: "deadbeef" }));
     expect(response.status).toBe(400);
     expect(serviceRpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/setup — accepting an invite", () => {
+  const MEMBER = "33333333-3333-3333-3333-333333333333";
+
+  function mockInvite(overrides: Partial<{ readonly expired: boolean; readonly withdrawn: boolean }> = {}) {
+    serviceRpc.mockImplementation((name: string) => {
+      if (name === "console_auth_invite") {
+        return Promise.resolve({
+          data: { email: "kiran.das@trakline.in", role: "support", expired: false, withdrawn: false, ...overrides },
+          error: null,
+        });
+      }
+      if (name === "console_auth_accept_invite") {
+        return Promise.resolve({ data: { user_id: MEMBER, role: "support", status: "setup" }, error: null });
+      }
+      return Promise.resolve({ data: null, error: null });
+    });
+    createUser.mockResolvedValue({ data: { user: { id: MEMBER } }, error: null });
+    generateLink.mockResolvedValue({ data: { user: { id: MEMBER }, properties: { hashed_token: "hashed" } }, error: null });
+  }
+
+  it("is told apart from a first-Owner link: it creates the address's account, accepts, and only then sends a sign-in link", async () => {
+    mockInvite();
+    const response = await POST(post({ token: TOKEN }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ ok: true, kind: "invite" });
+
+    expect(createUser).toHaveBeenCalledWith(expect.objectContaining({ email: "kiran.das@trakline.in", email_confirm: true }));
+    expect(serviceRpc).toHaveBeenCalledWith("console_auth_accept_invite", expect.objectContaining({ p_user: MEMBER, p_name: "Kiran Das" }));
+    expect(sendSignInLink).toHaveBeenCalledWith("kiran.das@trakline.in", expect.any(String), expect.anything());
+
+    // Order matters (the brief's own words: "accepting calls console_auth_accept_invite and then
+    // sends a sign-in link") -- the letter is a consequence of acceptance, not a parallel step.
+    const acceptCallIndex = serviceRpc.mock.calls.findIndex(([name]) => name === "console_auth_accept_invite");
+    const acceptOrder = serviceRpc.mock.invocationCallOrder[acceptCallIndex];
+    const sendOrder = sendSignInLink.mock.invocationCallOrder[0];
+    expect(sendOrder).toBeGreaterThan(acceptOrder);
+
+    // Not the first-Owner shape: no cookie-writing session is started on this browser. The member
+    // signs in later, on whatever device opens the mailed link.
+    expect(verifyOtp).not.toHaveBeenCalled();
+    expect(startConsoleSession).not.toHaveBeenCalled();
+  });
+
+  it("refuses an expired invite with the sheet's own line, never touching auth or sending anything", async () => {
+    mockInvite({ expired: true });
+    const response = await POST(post({ token: TOKEN }));
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ message: "This invite has expired. Ask an Owner to send a new one." });
+    expect(createUser).not.toHaveBeenCalled();
+    expect(sendSignInLink).not.toHaveBeenCalled();
+  });
+
+  it("refuses a withdrawn invite with its own line, distinct from expired", async () => {
+    mockInvite({ withdrawn: true });
+    const response = await POST(post({ token: TOKEN }));
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ message: "This invite was withdrawn." });
+    expect(createUser).not.toHaveBeenCalled();
+  });
+
+  it("prefers withdrawn over expired when an invite is somehow both", async () => {
+    mockInvite({ expired: true, withdrawn: true });
+    const response = await POST(post({ token: TOKEN }));
+    expect(await response.json()).toMatchObject({ message: "This invite was withdrawn." });
+  });
+
+  it("answers the very same refusal for a token nobody issued as for a dead invite -- never hinting one exists", async () => {
+    serviceRpc.mockImplementation(() => Promise.resolve({ data: null, error: null }));
+    const response = await POST(post({ token: TOKEN }));
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ message: "This invite has expired. Ask an Owner to send a new one." });
+    expect(createUser).not.toHaveBeenCalled();
   });
 });

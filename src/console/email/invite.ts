@@ -7,14 +7,12 @@ import { log } from "@/services/log";
  * Where the invite link goes, given this request's console origin (built by `consoleOrigin`,
  * never `req.url` -- see src/console/hosts.ts). It lands on `/setup?token=…`, the same page the
  * first Owner's setup link already uses: src/app/console/setup/page.tsx reads a `token` query
- * param and, finding no link session, hands off to `RedeemToken` -- its own comment already
- * reserves this shape for an invite's entry ("Team's Invite states are drawn but unreachable
- * until the next PR"), and ConsoleSetup.dc.html draws "First Owner" and "Invite" as two entries
- * into one flow, not two pages.
+ * param and hands off to `RedeemToken`, and ConsoleSetup.dc.html draws "First Owner" and "Invite"
+ * as two entries into one flow, not two pages.
  *
- * This task does not wire that redemption path -- `redeemSetupToken` still only understands a
- * first-Owner link, so an invite token opened today reads as an expired link rather than an
- * accepted one -- only the letter that carries it. Flagged in task-2-report.md.
+ * Task 2 (this file) only ever built the letter; redemption itself -- `lookupInviteToken` telling
+ * an invite token apart from a first-Owner one, and `redeemSetupToken` accepting a live one -- is
+ * Task 2b (src/console/setup/redeem.ts), flagged as missing in task-2-report.md and closed there.
  */
 export function acceptInviteUrl(origin: string, token: string): string {
   return `${origin}/setup?token=${encodeURIComponent(token)}`;

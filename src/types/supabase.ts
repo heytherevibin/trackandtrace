@@ -57,6 +57,7 @@ export type Database = {
         Args: { p_member: string }
         Returns: boolean
       }
+      console_auth_invite: { Args: { p_token_hash: string }; Returns: Json }
       console_auth_keys_for_member: {
         Args: { p_member: string }
         Returns: Json
