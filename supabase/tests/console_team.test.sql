@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(72);
+select plan(75);
 
 -- What an Owner may do to the team: list it, invite someone, change a role,
 -- reset a member's keys, remove a member, and resend or revoke an invite.
@@ -212,9 +212,16 @@ select ok(
 update console.invites
    set created_at = now() - interval '8 days', expires_at = now() - interval '1 day'
  where email = 'nadia2@trakline.in';
-select throws_ok(
+-- Resending an expired invite is the recovery path, not a refusal: the live-email index holds the
+-- address until an invite is accepted or revoked, and expiry does not release it, so refusing here
+-- would leave an Owner unable to resend and unable to re-invite.
+select lives_ok(
   $$ select public.console_resend_invite((select id from console.invites where email = 'nadia2@trakline.in'), 'development') $$,
-  '42501', null, 'an expired invite cannot be resent'
+  'an expired invite can be resent -- that is how an Owner recovers one'
+);
+select ok(
+  (select expires_at from console.invites where email = 'nadia2@trakline.in') > now(),
+  'and resending pushes its expiry back out'
 );
 
 -- Revoke: takes a tap, because it withdraws access that was granted.
@@ -259,11 +266,24 @@ select throws_ok(
   '42501', null, 'a tap minted for one member does not spend against a different one'
 );
 
--- An Owner cannot demote themselves, even with a spare Owner on hand -- and
--- this is refused before a tap is ever sought, so none is minted here.
+-- An Owner cannot demote themselves, even with a spare Owner on hand. A matching tap is minted
+-- first, deliberately: the self-check raises the same text as the floor guard, and every refusal
+-- in this file raises 42501 -- including use_tap's own "no tap for this action". So without a tap
+-- in hand, deleting the self-check entirely would let the call fall through to use_tap and keep
+-- this test green. With one, a broken self-check lets the demotion *succeed*, and the assertion
+-- below catches it.
+select pg_temp.tap(
+  'a1111111-1111-1111-1111-111111111111', 'a2222222-2222-2222-2222-222222222222', 'self-demote-challenge',
+  'Changed a role', 'a1111111-1111-1111-1111-111111111111', 'admin', 'Stepping back.'
+);
 select throws_ok(
   $$ select public.console_change_role('a1111111-1111-1111-1111-111111111111', 'admin', 'Stepping back.', 'development') $$,
   '42501', null, 'an Owner cannot demote themselves while another Owner exists'
+);
+select is(
+  (select role::text from console.members where user_id = 'a1111111-1111-1111-1111-111111111111'),
+  'owner',
+  'and they are still an Owner afterwards -- the refusal was the self-check, not a missing tap'
 );
 
 select pg_temp.tap(
@@ -336,9 +356,20 @@ select throws_ok(
   $$ select public.console_remove_member('c1111111-1111-1111-1111-111111111111', 'No tap yet.', 'development') $$,
   '42501', null, 'removing a member with no tap is refused'
 );
+-- With a matching tap in hand, for the same reason as the self-demotion test above: without one,
+-- deleting the self-check would let this fall through to use_tap and still raise 42501.
+select pg_temp.tap(
+  'a1111111-1111-1111-1111-111111111111', 'a2222222-2222-2222-2222-222222222222', 'self-remove-challenge',
+  'Removed a member', 'a1111111-1111-1111-1111-111111111111', 'owner', 'Stepping back.'
+);
 select throws_ok(
   $$ select public.console_remove_member('a1111111-1111-1111-1111-111111111111', 'Stepping back.', 'development') $$,
   '42501', null, 'an Owner cannot remove themselves while another Owner exists'
+);
+select is(
+  (select status::text from console.members where user_id = 'a1111111-1111-1111-1111-111111111111'),
+  'active',
+  'and they are still active afterwards -- the refusal was the self-check, not a missing tap'
 );
 
 select pg_temp.tap(

@@ -178,6 +178,14 @@ begin
     raise exception 'a console needs at least one owner' using errcode = '42501';
   end if;
 
+  -- Every active Owner is locked here, in user_id order, before the target row below.
+  -- require_another_active_owner() further down takes exactly this lock; taking the *target's* row
+  -- first instead let two Owners each holding the other's row wait on each other, which Postgres
+  -- breaks by aborting one with 40P01 rather than the orderly queue this file claimed. Harmless
+  -- when the target is not an Owner: a handful of rows, held for one console action. Not needed in
+  -- console_reset_keys, which takes no owner-set lock and so can close no cycle.
+  perform 1 from console.members where role = 'owner' and status = 'active' order by user_id for update;
+
   select * into v_target from console.members where user_id = p_member and status <> 'removed' for update;
   if not found then
     raise exception 'no access' using errcode = '42501';
@@ -262,6 +270,14 @@ begin
     raise exception 'a console needs at least one owner' using errcode = '42501';
   end if;
 
+  -- Every active Owner is locked here, in user_id order, before the target row below.
+  -- require_another_active_owner() further down takes exactly this lock; taking the *target's* row
+  -- first instead let two Owners each holding the other's row wait on each other, which Postgres
+  -- breaks by aborting one with 40P01 rather than the orderly queue this file claimed. Harmless
+  -- when the target is not an Owner: a handful of rows, held for one console action. Not needed in
+  -- console_reset_keys, which takes no owner-set lock and so can close no cycle.
+  perform 1 from console.members where role = 'owner' and status = 'active' order by user_id for update;
+
   select * into v_target from console.members where user_id = p_member and status <> 'removed' for update;
   if not found then
     raise exception 'no access' using errcode = '42501';
@@ -305,15 +321,22 @@ begin
     raise exception 'no access' using errcode = '42501';
   end if;
 
-  if v_invite.expires_at <= now() then
-    raise exception 'that invite has expired' using errcode = '42501';
-  end if;
+  -- An expired invite is resendable on purpose. console_invites_live_email_idx holds the address
+  -- while an invite is neither accepted nor revoked, and expiry does not release it -- so refusing
+  -- here would leave an Owner unable to resend *and* unable to invite that address again, with
+  -- revoking first as the only way out and nothing saying so. Resending mints a fresh token and
+  -- pushes expiry out, which is what an Owner pressing Resend beside an expired row means.
 
   v_token := encode(extensions.gen_random_bytes(32), 'hex');
 
+  -- created_at moves with expires_at. console_invites_expiry_window checks
+  -- `expires_at <= created_at + interval '7 days'`, so pushing expiry out while leaving created_at
+  -- where it was made resending *any* invite older than a moment fail with a raw 23514 -- not only
+  -- expired ones. A resent invite is a new invite in every way that matters: new token, new clock.
   update console.invites
      set token_hash = extensions.digest(v_token, 'sha256'),
          sent_at = now(),
+         created_at = now(),
          expires_at = now() + interval '7 days'
    where id = p_invite;
 
