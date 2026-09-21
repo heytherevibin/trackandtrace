@@ -1,10 +1,18 @@
 import type { ReactNode } from "react";
 import { cn } from "@/utils/cn";
+import { VisuallyHidden } from "./visually-hidden";
 
 export interface Column<Row> {
   readonly key: string;
-  /** Usually plain text; a ReactNode so a column can carry a visually-hidden heading (e.g. VisuallyHidden), as some sheets draw. */
-  readonly header: ReactNode;
+  /**
+   * Plain text, deliberately. It is also the row label the stacked phone layout prints through
+   * `content: attr(data-label)` (src/styles/utilities.css), and a DOM attribute can only hold a
+   * string -- a ReactNode here stringifies to "[object Object]" with no React warning, and shows
+   * up as "[OBJECT OBJECT]" under 768px. To hide a header visually, use `hideHeader`.
+   */
+  readonly header: string;
+  /** Renders the header for screen readers only, as ConsoleMyKeys.dc.html:111 draws its Actions column. */
+  readonly hideHeader?: boolean;
   readonly cell: (row: Row) => ReactNode;
   readonly align?: "start" | "end";
   readonly numeric?: boolean;
@@ -35,7 +43,7 @@ export function DataTable<Row>({ columns, rows, rowKey, caption, showCaption = f
           <tr>
             {columns.map((c) => (
               <th key={c.key} scope="col" className={cn("legend-md border-b border-line", dense ? "px-3.5 py-2" : "px-5 py-2.5", c.align === "end" ? "text-right" : "text-left")}>
-                {c.header}
+                {c.hideHeader ? <VisuallyHidden>{c.header}</VisuallyHidden> : c.header}
               </th>
             ))}
           </tr>

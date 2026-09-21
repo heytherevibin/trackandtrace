@@ -8,6 +8,7 @@ import { requireConsoleMember } from "@/console/auth/guard";
 import { ConsoleFrame } from "@/console/components/console-frame";
 import { consoleHref } from "@/console/href";
 import { consoleMessages } from "@/console/messages";
+import { AppError } from "@/services/errors";
 
 const m = consoleMessages.myKeys;
 
@@ -44,7 +45,15 @@ export const metadata: Metadata = { title: m.pageTitle };
  * path and the table only (task-6-addendum.md's scope line).
  */
 export default async function MyKeysPage() {
-  const member = await requireConsoleMember().catch(() => null);
+  // Only a missing or ended session sends anyone to sign in. Anything else -- a console whose
+  // grants are wrong, a database that is down -- is a fault, and swallowing it here would send a
+  // member to /login looking like an ordinary sign-out while the real cause went unreported. That
+  // is the same thing guard.ts's own mapping refuses to do, and this page is where all traffic
+  // lands via /, so it is the worst place to undo it. A rethrow reaches src/app/console/error.tsx.
+  const member = await requireConsoleMember().catch((err: unknown) => {
+    if (err instanceof AppError && err.code === "UNAUTHENTICATED") return null;
+    throw err;
+  });
   if (!member) redirect(consoleHref("/login"));
   const { keys, member: profile } = await getMyKeys();
 

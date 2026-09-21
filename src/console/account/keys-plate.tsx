@@ -4,7 +4,6 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Plate } from "@/components/ui/plate";
-import { VisuallyHidden } from "@/components/ui/visually-hidden";
 import { AddKeyDialog } from "@/console/account/add-key-dialog";
 import type { MyKeysRow } from "@/console/account/my-keys";
 import { fetchMyKeys } from "@/console/account/my-keys-client";
@@ -53,10 +52,13 @@ export function KeysPlate({ keys: initialKeys }: { readonly keys: readonly MyKey
     { key: "added", header: m.columns.added, cell: (k) => formatDate(k.createdAt), numeric: true },
     { key: "lastUsed", header: m.columns.lastUsed, cell: (k) => (k.lastUsedAt ? formatDate(k.lastUsedAt) : m.neverUsed), numeric: true },
     // Visually hidden, matching ConsoleMyKeys.dc.html:111's own <span style="position: absolute; ...">
-    // for this header.
+    // for this header. Through `hideHeader` rather than a wrapped element, so the header stays a
+    // plain string: DataTable also prints it as the stacked phone layout's row label, and a DOM
+    // attribute can only carry a string.
     {
       key: "actions",
-      header: <VisuallyHidden>{m.columns.actions}</VisuallyHidden>,
+      header: m.columns.actions,
+      hideHeader: true,
       cell: (k) => (
         <Button variant="ghost" size="sm" onClick={() => setDialog({ kind: "rename", row: k })}>
           {m.rename}
