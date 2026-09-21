@@ -53,29 +53,47 @@ export async function addVirtualKey(page: Page, transport: "usb" | "internal" = 
  * reproduced the original failure anyway, consistently -- every isolated success above intervenes at
  * the JS call boundary instead (between an assertion and the following `create()`, in one continuous
  * chain), never at the network layer, and swapping there is what actually works against this app's
- * own click too. `navigator.credentials.create` is wrapped once, before the ceremony that needs it:
- * the wrapped version performs the swap only the first time it sees a call whose own
+ * own click too. `navigator.credentials.create` is wrapped once per call, before the ceremony that
+ * needs it: the wrapped version performs the swap only the first time it sees a call whose own
  * `excludeCredentials` is non-empty (the tap's assertion doesn't call `create` at all, and the first
- * key's own registration has nothing to exclude), then defers to the real implementation.
+ * key's own registration has nothing to exclude), then defers to whatever was there before it (the
+ * real implementation, or an earlier call's own wrapper).
+ *
+ * Callable more than once on the same page -- a member adding a third key while signed in needs a
+ * second swap, on top of the one `setUpFirstOwner` already spends getting the member to two -- so the
+ * exposed bridge function is named uniquely per call (`page.exposeFunction` throws "has been already
+ * registered" on a second call with the same name, and nothing resets that registry short of a fresh
+ * page). `onSwapped`, if given, is told the freshly attached authenticator once the swap actually
+ * fires -- not when this function returns, which only arms the hook -- so a caller that needs to swap
+ * again later (see setUpFirstOwner's own `secondKey`) has a handle to what is now the present one.
  */
-export async function swapAuthenticatorAfterTap(page: Page, spent: VirtualKey, transport: "usb" | "internal"): Promise<void> {
+let swapBindingCounter = 0;
+
+export async function swapAuthenticatorAfterTap(
+  page: Page,
+  spent: VirtualKey,
+  transport: "usb" | "internal",
+  onSwapped?: (next: VirtualKey) => void,
+): Promise<void> {
+  const bindingName = `__ttSwapBeforeExclude${swapBindingCounter++}`;
   let swapped = false;
-  await page.exposeFunction("__ttSwapBeforeExclude", async () => {
+  await page.exposeFunction(bindingName, async () => {
     if (swapped) return;
     swapped = true;
     await spent.setPresent(false);
-    await addVirtualKey(page, transport);
+    const next = await addVirtualKey(page, transport);
+    onSwapped?.(next);
   });
-  await page.evaluate(() => {
+  await page.evaluate((name) => {
     const real = navigator.credentials.create.bind(navigator.credentials);
     navigator.credentials.create = (async (options?: CredentialCreationOptions) => {
       const excludeCredentials = options?.publicKey?.excludeCredentials;
       if (excludeCredentials && excludeCredentials.length > 0) {
-        await (window as unknown as { __ttSwapBeforeExclude: () => Promise<void> }).__ttSwapBeforeExclude();
+        await (window as unknown as Record<string, () => Promise<void>>)[name]();
       }
       return real(options);
     }) as typeof navigator.credentials.create;
-  });
+  }, bindingName);
 }
 
 /** The letters the console captured since the last read (src/app/console/api/test-outbox). */

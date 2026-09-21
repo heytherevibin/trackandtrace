@@ -6,12 +6,18 @@ import { ConsoleMasthead } from "@/console/components/console-masthead";
 // unlike most of the signed-in frame it renders directly under @testing-library/react.
 //
 // `leading` (task-10-fix-1.md's third slot, added after `clock`/`member`) is additive and optional,
-// the same shape those two already have -- task-4-fix-1-report.md verified that pair by confirming
-// every page that renders ConsoleMasthead with neither filled still passes unmodified
-// (tests/unit/console/setup/setup-flow.test.tsx, tests/unit/console/sign-in-form.test.tsx,
-// tests/unit/console/unavailable.test.tsx -- all exercise SignedOutFrame, which passes none of the
-// three), rather than a dedicated test, since there wasn't one to update. This file adds the direct
-// coverage neither addition had.
+// the same shape those two already have.
+//
+// A correction, because a review caught the earlier claim being false and it had already been
+// repeated once: task-4-fix-1-report.md said setup-flow.test.tsx, sign-in-form.test.tsx and
+// unavailable.test.tsx all exercise SignedOutFrame. None of them do. The first two render their own
+// client components, which never import ConsoleMasthead at all; the third mocks SignedOutFrame to a
+// passthrough on purpose, and says so in its own comment. SignedOutFrame is only assembled by
+// setup/page.tsx and login/page.tsx, both async server components reading next/headers, which
+// vitest cannot render -- so only Playwright reaches them.
+//
+// The tests below are therefore the *only* automated proof that omitting a slot changes nothing.
+// That is what they are for; do not read them as covering the pages themselves.
 describe("ConsoleMasthead", () => {
   it("renders nothing extra when leading is omitted -- SignedOutFrame's own call shape", () => {
     render(<ConsoleMasthead />);

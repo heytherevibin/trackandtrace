@@ -51,6 +51,12 @@ describe("the member menu", () => {
     const trigger = screen.getByRole("button", { name: "Asha Rao, Owner. Open the member menu" });
     expect(trigger).toHaveClass("max-sm:size-11");
     expect(screen.getByText("Owner")).toHaveClass("max-sm:hidden");
+    // The chevron is aria-hidden, so no role or text query reaches it and the assertion above
+    // would pass with it still on screen -- which is how the 390px overflow got here in the first
+    // place. Query the element itself.
+    const chevron = trigger.querySelector("svg:not([data-avatar])");
+    expect(chevron).not.toBeNull();
+    expect(chevron).toHaveClass("max-sm:hidden");
   });
 
   it("opens on exactly two items: My keys, a link to /keys, and Sign out, not a link", async () => {
