@@ -46,6 +46,10 @@ function fakes(overrides: { readonly member?: unknown; readonly service?: Record
     console_auth_new_action_challenge: "44444444-4444-4444-4444-444444444444",
     console_auth_read_challenge: null,
     console_auth_touch_key: null,
+    // The database's own answer to "a key answered this challenge": true unless a test says
+    // otherwise. Defaulting it to true keeps every pre-existing verifyTap test about the thing it
+    // was written to test; the two tests that override it are the ones about this step itself.
+    console_auth_verify_challenge: true,
     console_auth_write_audit: "55555555-5555-5555-5555-555555555555",
     ...overrides.service,
   };
@@ -158,6 +162,43 @@ describe("verifyTap", () => {
     verifyAuthentication.mockResolvedValueOnce({ credentialId: KEY_ROW.credential_id, newCounter: 999 });
     await verifyTap({ req: REQUEST, response: { ...responseWithChallenge("Y3JlZA"), counter: 1 } as never, db, service });
     expect(rpc).toHaveBeenCalledWith("console_auth_touch_key", { p_key: KEY_ROW.id, p_counter: 999 });
+  });
+
+  it("records on the challenge that a key answered, for this member's own session", async () => {
+    const { service, db, rpc } = fakes({
+      service: { console_auth_keys_for_member: [KEY_ROW], console_auth_read_challenge: { session_id: SESSION_ID, purpose: "action" } },
+    });
+    verifyAuthentication.mockResolvedValueOnce({ credentialId: KEY_ROW.credential_id, newCounter: KEY_ROW.counter + 1 });
+    await verifyTap({ req: REQUEST, response: responseWithChallenge("Y3JlZA", "the-challenge") as never, db, service });
+    // The one write that makes the tap real. Without it console.use_tap has no fact to check, and
+    // a caller who skipped the ceremony entirely satisfied every condition it did check -- proven
+    // end to end in tests/e2e/console-auth/my-keys.spec.ts. The challenge goes out as the browser's
+    // own clientDataJSON reported it, never as the caller named it.
+    expect(rpc).toHaveBeenCalledWith("console_auth_verify_challenge", {
+      p_challenge: "the-challenge",
+      p_member: MEMBER.user_id,
+      p_session: SESSION_ID,
+    });
+  });
+
+  it("refuses, and logs a failed tap, when the challenge cannot be marked answered", async () => {
+    const { service, db, rpc } = fakes({
+      service: {
+        console_auth_keys_for_member: [KEY_ROW],
+        console_auth_read_challenge: { session_id: SESSION_ID, purpose: "action" },
+        console_auth_verify_challenge: false,
+      },
+    });
+    verifyAuthentication.mockResolvedValueOnce({ credentialId: KEY_ROW.credential_id, newCounter: KEY_ROW.counter + 1 });
+    // A verify that cannot mark its own challenge has proven nothing the action can rely on, so it
+    // must throw rather than answer `{ ok: true }` and hand the caller a tap the database will
+    // refuse anyway. The refusal is the console's existing one for a challenge that is gone, spent
+    // or expired -- the same causes this covers -- not a new code.
+    await expect(verifyTap({ req: REQUEST, response: responseWithChallenge("Y3JlZA") as never, db, service })).rejects.toMatchObject({
+      status: 400,
+      message: "That key didn't answer. Try again.",
+    });
+    expect(rpc).toHaveBeenCalledWith("console_auth_write_audit", expect.objectContaining({ p_action: "Key tap failed", p_result: "failed" }));
   });
 
   it("logs a failed tap and never touches the key when the assertion does not verify", async () => {

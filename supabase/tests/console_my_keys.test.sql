@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(39);
+select plan(42);
 
 -- Grants: every one of these is the member's own call, so `authenticated` alone.
 select is(has_function_privilege('authenticated', 'public.console_my_keys()', 'execute')::text, 'true', 'a member can list their own keys');
@@ -109,11 +109,31 @@ select throws_ok(
 );
 select is((select count(*)::int from console.keys where member_id = '11111111-1111-1111-1111-111111111111'), 3, 'and removes nothing');
 
--- A tap bound to this exact removal.
+-- A tap bound to this exact removal. Minting it is not enough on its own: a
+-- challenge no key ever answered is exactly the state two plain fetches could
+-- reach with no WebAuthn ceremony at all, which is the bypass a branch review
+-- found, so the refusal comes first and the server's own mark after it.
 select public.console_auth_new_challenge(
   '11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222',
   'action', 'remove-key-challenge-value',
   console.action_digest('Removed a key', 'MacBook Air', '2', 'Left at the old office; replaced.')
+);
+select throws_ok(
+  $$ select public.console_remove_key('aaaaaaaa-0000-0000-0000-000000000003', 'Left at the old office; replaced.', 'development') $$,
+  '42501',
+  null,
+  'a tap no key answered removes nothing, however exactly its digest matches'
+);
+select is((select count(*)::int from console.keys where member_id = '11111111-1111-1111-1111-111111111111'), 3, 'and all three keys remain');
+
+-- The mark itself, made by the very function verifyTap calls once
+-- @simplewebauthn has verified the assertion (src/console/keys/tap.ts).
+select is(
+  public.console_auth_verify_challenge(
+    'remove-key-challenge-value', '11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222'
+  ),
+  true,
+  'the server records that a key answered the tap'
 );
 select public.console_remove_key('aaaaaaaa-0000-0000-0000-000000000003', 'Left at the old office; replaced.', 'development');
 select is((select count(*)::int from console.keys where member_id = '11111111-1111-1111-1111-111111111111'), 2, 'the key is gone');
@@ -128,11 +148,15 @@ select is(
   'the tap is spent'
 );
 
--- The two-key rule bites even with a valid tap.
+-- The two-key rule bites even with a valid tap -- valid meaning answered, not
+-- merely minted, or this would prove only that an unanswered tap is refused.
 select public.console_auth_new_challenge(
   '11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222',
   'action', 'remove-second-key-challenge',
   console.action_digest('Removed a key', 'YubiKey 5 NFC', '1', 'Down to two, trying anyway.')
+);
+select public.console_auth_verify_challenge(
+  'remove-second-key-challenge', '11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222'
 );
 select throws_ok(
   $$ select public.console_remove_key('aaaaaaaa-0000-0000-0000-000000000002', 'Down to two, trying anyway.', 'development') $$,

@@ -142,6 +142,10 @@ export type Database = {
         Args: { p_counter: number; p_key: string }
         Returns: undefined
       }
+      console_auth_verify_challenge: {
+        Args: { p_challenge: string; p_member: string; p_session: string }
+        Returns: boolean
+      }
       console_auth_verify_session: {
         Args: { p_key_id: string; p_session_id: string }
         Returns: undefined

@@ -128,6 +128,102 @@ test.describe("My keys", () => {
   });
 
   /**
+   * The tap, proven the way it was broken (final-fix.md §1). Every unit test in this repository
+   * mocks either the ceremony or the database, and 1149 of them saw nothing: `verifyTap` verified a
+   * real assertion and then recorded nothing about it, so `console.use_tap` had no fact to check and
+   * two plain fetches -- mint a challenge, call the action -- removed a key with no WebAuthn
+   * ceremony at all, logging it as a genuine tap. This spec is that exact sequence, run against the
+   * real routes and the real database with every virtual authenticator detached, so nothing in the
+   * browser *could* have answered even if something had asked it to.
+   *
+   * Two challenges are minted, one over the key's id and one over its name, because the digest's
+   * `target` changed from the name to the id in the same round of fixes (final-fix.md §2). Whichever
+   * of the two `console_remove_key` re-digests, a digest-matching tap is waiting for it -- so the
+   * refusal below can only ever be about the missing ceremony, never about a digest that happened
+   * not to line up. That is what makes this spec fail against the unfixed code rather than pass for
+   * the wrong reason.
+   */
+  test("a tap no key ever answered cannot remove a key", async ({ page, baseURL }) => {
+    const base = baseURL ?? BASE;
+    const owner = await setUpFirstOwner(page, base);
+    await expectSignedInAs(page, owner.name, owner.role);
+
+    // A third key, so the two-key floor is not what refuses the removal below and the refusal can
+    // only be the missing tap. Added through the drawn dialog, the same way the test above does it.
+    let thirdKey: VirtualKey | undefined;
+    await page.getByRole("button", { name: "Add a key" }).click();
+    const addDialog = page.getByRole("dialog", { name: "Add a key" });
+    await expect(addDialog).toBeVisible();
+    await addDialog.getByLabel("Name this key").fill("YubiKey 5 NFC");
+    await swapAuthenticatorAfterTap(page, owner.secondKey, "usb", (next) => {
+      thirdKey = next;
+    });
+    await addDialog.getByRole("button", { name: "Add a key" }).click();
+    await expect(addDialog).not.toBeVisible();
+    await expect(page.getByText("3 keys")).toBeVisible();
+    expect(thirdKey, "the exclude-credentials swap never fired for the third key").toBeDefined();
+
+    // Every authenticator gone -- not merely switched off. From here the browser has no key to tap,
+    // so anything this member manages to do is something done without one.
+    await owner.firstKey.remove();
+    await owner.secondKey.remove();
+    await thirdKey?.remove();
+
+    const memberId = consoleSql(`select user_id from console.members where email = '${owner.email}'`);
+    const keyId = consoleSql(`select id from console.keys where member_id = '${memberId}' and name = 'YubiKey 5 NFC'`);
+    expect(keyId, "the third key's own row").toBeTruthy();
+    const reason = "Proving a removal cannot skip its tap.";
+
+    // Fetch 1 (twice, once per candidate digest target). Same origin, same session cookie, same
+    // route the dialog itself calls -- the only thing missing is the ceremony between the two.
+    const minted = await page.evaluate(
+      async ({ targets, value, reason: why }) => {
+        const statuses: number[] = [];
+        for (const target of targets) {
+          const response = await fetch("/api/tap/options", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ action: "Removed a key", target, value, reason: why }),
+          });
+          statuses.push(response.status);
+        }
+        return statuses;
+      },
+      { targets: [keyId, "YubiKey 5 NFC"], value: "2", reason },
+    );
+    expect(minted, "both taps were minted -- the bypass gets as far as a real challenge").toEqual([200, 200]);
+
+    // Fetch 2: the action itself, with no /api/tap/verify in between.
+    const removal = await page.evaluate(
+      async ({ id, reason: why }) => {
+        const response = await fetch("/api/keys/mine", {
+          method: "DELETE",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ keyId: id, reason: why }),
+        });
+        return { status: response.status, body: await response.text() };
+      },
+      { id: keyId, reason },
+    );
+
+    expect(removal.status, `DELETE /api/keys/mine answered ${removal.status}: ${removal.body}`).not.toBe(200);
+    expect(consoleSql(`select count(*) from console.keys where id = '${keyId}'`), "the key is still there").toBe("1");
+    expect(consoleSql(`select count(*) from console.keys where member_id = '${memberId}'`), "and the member still holds all three").toBe("3");
+    // The audit log is where this was worst: the unfixed console wrote `result = 'done'` for a
+    // removal no key ever approved. Scoped to this run's own actor, for the same reason the counts
+    // in the test above are -- console.audit_log survives resetConsole().
+    expect(
+      consoleSql(`select count(*) from console.audit_log where actor_id = '${memberId}' and action = 'Removed a key'`),
+      "and nothing was written to the audit log",
+    ).toBe("0");
+
+    // Re-read from the server, not just the database: the page a member would actually see still
+    // shows three keys.
+    await gotoReady(page, "/");
+    await expect(page.getByText("3 keys")).toBeVisible();
+  });
+
+  /**
    * A second, genuinely separate `console.sessions` row: opening a real sign-in link in a second
    * browser context, exactly as far as `src/app/console/auth/confirm/route.ts`'s own comment says a
    * link alone ever gets ("the session is not key-verified yet") -- no second WebAuthn ceremony is

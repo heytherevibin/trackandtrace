@@ -112,10 +112,10 @@ select throws_ok(
 -- 'development' save sequence around it. A real, matching tap is minted first
 -- so this proves the exact silent-success path, not merely a missing-tap
 -- refusal that would raise the unrelated 42501.
-insert into console.challenges (member_id, session_id, purpose, challenge, digest, expires_at)
+insert into console.challenges (member_id, session_id, purpose, challenge, digest, expires_at, verified_at)
 values ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'action', 'settings-challenge-nullchange',
         console.action_digest('settings.save', 'production', null::text, 'null-changeset-attempt'),
-        now() + interval '5 minutes');
+        now() + interval '5 minutes', now());
 
 select throws_ok(
   $$select public.console_save_settings('production', 1, null, 'null-changeset-attempt')$$,
@@ -132,10 +132,10 @@ select is(
 -- The tap's value is the change set as jsonb renders it, which is what the
 -- function hashes (`p_changes::text`). Cast in the test too, so the two agree
 -- whatever jsonb does with spacing.
-insert into console.challenges (member_id, session_id, purpose, challenge, digest, expires_at)
+insert into console.challenges (member_id, session_id, purpose, challenge, digest, expires_at, verified_at)
 values ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'action', 'settings-challenge-0001',
         console.action_digest('settings.save', 'development', ('{"checks_paused": true}'::jsonb)::text, 'maintenance'),
-        now() + interval '5 minutes');
+        now() + interval '5 minutes', now());
 
 select is(
   public.console_save_settings('development', 1, '{"checks_paused": true}'::jsonb, 'maintenance'),
@@ -164,10 +164,10 @@ select is(
 );
 
 -- Two saves cannot clash: the second one carries a stale version.
-insert into console.challenges (member_id, session_id, purpose, challenge, digest, expires_at)
+insert into console.challenges (member_id, session_id, purpose, challenge, digest, expires_at, verified_at)
 values ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'action', 'settings-challenge-0002',
         console.action_digest('settings.save', 'development', ('{"checks_paused": false}'::jsonb)::text, 'undo'),
-        now() + interval '5 minutes');
+        now() + interval '5 minutes', now());
 
 select throws_ok(
   $$select public.console_save_settings('development', 1, '{"checks_paused": false}'::jsonb, 'undo')$$,
@@ -179,10 +179,10 @@ select throws_ok(
 -- A member below admin cannot save, even holding a valid tap -- the role gate
 -- must run before the tap is spent, not after.
 update console.members set role = 'viewer' where user_id = '11111111-1111-1111-1111-111111111111';
-insert into console.challenges (member_id, session_id, purpose, challenge, digest, expires_at)
+insert into console.challenges (member_id, session_id, purpose, challenge, digest, expires_at, verified_at)
 values ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'action', 'settings-challenge-0003',
         console.action_digest('settings.save', 'development', ('{"checks_paused": false}'::jsonb)::text, 'viewer-attempt'),
-        now() + interval '5 minutes');
+        now() + interval '5 minutes', now());
 
 select throws_ok(
   $$select public.console_save_settings('development', 2, '{"checks_paused": false}'::jsonb, 'viewer-attempt')$$,

@@ -124,6 +124,31 @@ async function readChallenge(service: ConsoleDb, memberId: string, sessionId: st
   if (!parsed.success || parsed.data.session_id !== sessionId) throw ended();
 }
 
+/**
+ * Records on the challenge that a key answered it -- the one fact `console.use_tap` had no way to
+ * check, and without which a caller who never ran a ceremony at all satisfied every condition it
+ * did check. `console_auth_verify_challenge` re-checks member, session, purpose, expiry and
+ * unspent-ness itself and pins `purpose = 'action'` inside its own body, so a sign-in or add-key
+ * challenge can never be marked through here.
+ *
+ * A false answer throws rather than continuing, and deliberately so: a verify that cannot mark its
+ * own challenge has proven nothing the action could rely on, and letting it return `{ ok: true }`
+ * would hand the caller a tap the database will refuse anyway -- or worse, one it would not.
+ * `didNotAnswer` is the refusal the console already gives for a challenge that is gone, spent,
+ * expired or never existed, which is the same set of causes this covers; it is raised inside
+ * verifyTap's try, so it logs a failed tap like its siblings.
+ */
+async function markVerified(service: ConsoleDb, memberId: string, sessionId: string, challenge: string): Promise<void> {
+  const { data, error } = await service.rpc("console_auth_verify_challenge", {
+    p_challenge: challenge,
+    p_member: memberId,
+    p_session: sessionId,
+  });
+  // Anything but a literal `true` -- false, null, an error -- is a refusal. Narrowed rather than
+  // trusted: a drifted return shape must fail closed here, never read as "marked".
+  if (error || data !== true) throw new AppError("INVALID_INPUT", m.didNotAnswer, { status: 400 });
+}
+
 async function logFailedTap(service: ConsoleDb, member: ConsoleMember, req: Request): Promise<void> {
   await writeConsoleAudit(service, {
     actor: member.userId,
@@ -167,10 +192,17 @@ export async function beginTap(args: { readonly req: Request; readonly tap: TapR
 }
 
 /**
- * Verifies the tap's assertion and touches the key -- and, unlike every other ceremony in this
- * console, spends nothing. The action the tap approves spends it, inside the database, by calling
- * `console.use_tap()` with the very same four fields; this function's whole job is proving a real
- * key answered, not deciding the tap is used up.
+ * Verifies the tap's assertion, touches the key and records on the challenge itself that a key
+ * answered -- and, unlike every other ceremony in this console, spends nothing. The action the tap
+ * approves spends it, inside the database, by calling `console.use_tap()` with the very same four
+ * fields; this function's whole job is proving a real key answered, not deciding the tap is used up.
+ *
+ * That last step is not bookkeeping. Leaving the challenge unspent is what lets the action spend it
+ * later, but it also means the challenge alone says nothing about whether a ceremony ever happened
+ * -- and `console.use_tap` can only check facts the database holds. Until `verified_at` existed,
+ * two plain fetches (mint a challenge, then call the action) removed a key with no WebAuthn at all
+ * and the audit row read `result = 'done'`. `console_auth_verify_challenge` is the write that makes
+ * the tap real, and `use_tap`'s own `verified_at is not null` is what now reads it.
  */
 export async function verifyTap(args: { readonly req: Request; readonly response: AuthenticationResponseJSON } & Deps): Promise<void> {
   const db = args.db ?? (await createConsoleDb());
@@ -191,6 +223,7 @@ export async function verifyTap(args: { readonly req: Request; readonly response
     const verified = await verifyAuthentication({ rp, response: args.response, expectedChallenge: challenge, key });
     const { error: touchError } = await service.rpc("console_auth_touch_key", { p_key: key.id, p_counter: verified.newCounter });
     if (touchError) log.warn("[console] a key's counter could not be updated", { keyId: key.id, message: touchError.message });
+    await markVerified(service, member.userId, sessionId, challenge);
   } catch (err) {
     await logFailedTap(service, member, args.req);
     throw err;

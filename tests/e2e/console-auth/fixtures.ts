@@ -143,6 +143,13 @@ export interface SignedInOwner {
   readonly name: string;
   readonly role: string;
   /**
+   * The first key's own authenticator: still attached, but with presence simulation switched off by
+   * the swap that let the second key register. Handed back so a spec that must leave this browser
+   * with *no* authenticator at all can detach it too -- switched-off is not the same as gone, and a
+   * spec proving an action cannot happen without a ceremony has to be able to say the stronger thing.
+   */
+  readonly firstKey: VirtualKey;
+  /**
    * The second key's own authenticator, still attached and present (setUpFirstOwner never turns it
    * back off). A spec that adds a third key while this owner is signed in needs a handle to whichever
    * authenticator is currently present, to swap it out before the third key's own registration --
@@ -200,7 +207,7 @@ export async function setUpFirstOwner(page: Page, baseUrl: string): Promise<Sign
   await page.getByRole("button", { name: "Add key" }).click();
   await page.getByRole("button", { name: "Open the console" }).click();
   if (!secondKey) throw new Error("swapAuthenticatorAfterTap never swapped in the second key");
-  return { email, ...ownerIdentity(email), secondKey };
+  return { email, ...ownerIdentity(email), firstKey, secondKey };
 }
 
 export const test = base;
