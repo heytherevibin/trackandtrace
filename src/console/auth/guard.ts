@@ -13,6 +13,15 @@ const m = consoleMessages.session;
 function fromDatabase(message: string): AppError {
   if (message.includes("session ended")) return new AppError("UNAUTHENTICATED", m.ended, { status: 401 });
   if (message.includes("no access")) return new AppError("INVALID_INPUT", m.noAccess, { status: 403 });
+  // A request carrying no session reaches PostgREST as `anon`, and console_me is granted to
+  // `authenticated` alone -- so the database turns it away by permission rather than by saying the
+  // session ended. That is still "you are not signed in", and answering it as an internal fault
+  // would show a signed-out visitor an error page instead of the sign-in link they need.
+  //
+  // Narrowly on *function*: "permission denied for schema console" is the console's own
+  // misconfiguration -- the shape the enum-argument bug took in 2c -- and must stay a fault rather
+  // than quietly logging members out while the cause goes unreported.
+  if (message.includes("permission denied for function")) return new AppError("UNAUTHENTICATED", m.ended, { status: 401 });
   return new AppError("INTERNAL", m.unavailable);
 }
 

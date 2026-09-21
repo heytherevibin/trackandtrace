@@ -61,8 +61,8 @@ describe("nextAfterConfirm", () => {
     expect(nextAfterConfirm(1)).toBe("/setup");
   });
 
-  it("sends a member with two keys to the key step", () => {
-    expect(nextAfterConfirm(2)).toBe("/keys");
+  it("sends a member with two keys to the sign-in key step", () => {
+    expect(nextAfterConfirm(2)).toBe("/sign-in-key");
   });
 });
 

@@ -30,4 +30,22 @@ describe("console messages", () => {
     expect(consoleMessages.session.ended).toBe("Your session ended. Sign in again.");
     expect(consoleMessages.session.noAccess).toBe("You don't have access to this.");
   });
+
+  // ConsoleMyKeys.dc.html's own state script, transcribed word for word (task-9-addendum.md §1):
+  // `st === 'Removed' ? 'Key removed · logged' : st === 'Others signed out' ? 'Other sessions
+  // signed out · logged' : ''`.
+  it("carries the sheet's own two toasts, byte for byte", () => {
+    expect(consoleMessages.myKeys.removedToast).toBe("Key removed · logged");
+    expect(consoleMessages.myKeys.sessions.signedOutToast).toBe("Other sessions signed out · logged");
+  });
+
+  // task-9-brief.md's own quoted copy: the confirm dialog's title, and its body naming the one
+  // other session drawn on the sheet (Safari on iPhone) -- built from the list, never hardcoded.
+  it("names the sessions plate's confirm dialog word for word", () => {
+    expect(consoleMessages.myKeys.sessionsTitle).toBe("Sessions");
+    expect(consoleMessages.myKeys.sessions.signOutOthers).toBe("Sign out other sessions");
+    expect(consoleMessages.myKeys.sessions.confirmTitle).toBe("Sign out other sessions?");
+    expect(consoleMessages.myKeys.sessions.confirmConfirm).toBe("Sign out others");
+    expect(consoleMessages.myKeys.sessions.confirmBody(["Safari on iPhone"])).toBe("Safari on iPhone is signed out at once. This device stays signed in.");
+  });
 });

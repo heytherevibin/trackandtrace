@@ -37,6 +37,25 @@ describe("requireConsoleMember", () => {
     await expect(requireConsoleMember(undefined, dbAnswering({ error: { message: "no access" } }))).rejects.toMatchObject({ status: 403 });
   });
 
+  // A request with no session at all is `anon` to PostgREST, and console_me is granted to
+  // `authenticated` alone -- so the database refuses it by permission rather than by saying the
+  // session ended. Reading that as an internal fault would answer a signed-out visitor with an
+  // error page instead of the sign-in link they actually need.
+  it("reads a function-level permission refusal as having no session, not as a fault", async () => {
+    await expect(
+      requireConsoleMember(undefined, dbAnswering({ error: { message: "permission denied for function console_me" } })),
+    ).rejects.toMatchObject({ status: 401, message: "Your session ended. Sign in again." });
+  });
+
+  // But a permission refusal on the schema is the console's own misconfiguration -- the shape the
+  // enum-argument bug took in the previous phase -- and must stay a fault rather than quietly
+  // logging members out.
+  it("still treats a schema-level permission refusal as a fault", async () => {
+    await expect(
+      requireConsoleMember(undefined, dbAnswering({ error: { message: "permission denied for schema console" } })),
+    ).rejects.toMatchObject({ status: 500 });
+  });
+
   it("refuses a role below the one the module needs", async () => {
     await expect(requireConsoleMember("admin", dbAnswering({ data: MEMBER }))).rejects.toMatchObject({ status: 403 });
   });

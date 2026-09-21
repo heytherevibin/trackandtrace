@@ -68,8 +68,8 @@ export function SetupFlow({ keyCount }: { readonly keyCount: number }) {
       // setup -> active, which an already-active member's own call never does -- so gating on
       // activation left that recovery stuck on step 2 forever. "Open the console" leading straight in
       // with no further tap is a fresh-member perk (activation key-verifies their session as a
-      // byproduct); a recovering member's session is verified by /keys's own tap instead, which
-      // setup/page.tsx now routes them to.
+      // byproduct); a recovering member's session is verified by /sign-in-key's own tap instead,
+      // which setup/page.tsx now routes them to.
       setStep(stepFor(outcome.keyCount));
       return;
     }

@@ -7,12 +7,12 @@ import { Mark } from "@/components/brand/mark";
 import { Corners } from "@/components/ui/corners";
 import { PlateHeader } from "@/components/ui/plate";
 import { SweepBar } from "@/components/ui/sweep-bar";
+import { consoleApiMessage } from "@/console/api-message";
 import { consoleHref } from "@/console/href";
 import { consoleMessages } from "@/console/messages";
 import { apiRequest } from "@/services/api-client";
 
 const m = consoleMessages.setup;
-const s = consoleMessages.session;
 const REDEEMED = z.object({ ok: z.literal(true) });
 
 type Stage = { readonly kind: "working" } | { readonly kind: "failed"; readonly message: string };
@@ -54,8 +54,7 @@ export function RedeemToken({ token }: { readonly token: string }) {
         router.replace(consoleHref("/setup"));
         return;
       }
-      const { code } = result.error;
-      setStage({ kind: "failed", message: code === "SOURCE_UNAVAILABLE" || code === "INTERNAL" ? s.unavailable : result.error.message });
+      setStage({ kind: "failed", message: consoleApiMessage(result.error) });
     })();
   }, [token, router]);
 

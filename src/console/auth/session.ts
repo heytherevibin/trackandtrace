@@ -55,9 +55,9 @@ export function consoleEnvironment(): string {
   return env().VERCEL_ENV ?? env().NODE_ENV;
 }
 
-/** Setup until two keys exist (spec §C step 2), the key step afterwards. */
-export function nextAfterConfirm(keyCount: number): "/setup" | "/keys" {
-  return keyCount < 2 ? "/setup" : "/keys";
+/** Setup until two keys exist (spec §C step 2), the sign-in key step afterwards. */
+export function nextAfterConfirm(keyCount: number): "/setup" | "/sign-in-key" {
+  return keyCount < 2 ? "/setup" : "/sign-in-key";
 }
 
 export async function startConsoleSession(args: {

@@ -42,12 +42,12 @@ describe("GET /auth/confirm", () => {
     expect(signOut).not.toHaveBeenCalled();
   });
 
-  it("sends a member who already holds two keys to the key step", async () => {
+  it("sends a member who already holds two keys to the sign-in key step", async () => {
     serviceRpc.mockImplementation((name: string) =>
       Promise.resolve({ data: name === "console_auth_member_by_email" ? { ...MEMBER, status: "active", key_count: 2 } : null, error: null }),
     );
     const response = await GET(request("?token_hash=abc&type=magiclink"));
-    expect(response.headers.get("location")).toContain("/keys");
+    expect(response.headers.get("location")).toContain("/sign-in-key");
     expect(signOut).not.toHaveBeenCalled();
   });
 

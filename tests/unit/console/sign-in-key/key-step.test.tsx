@@ -13,7 +13,7 @@ vi.mock("@/console/keys/client", () => ({ tapToSignIn, keysUsable, addKey: vi.fn
 const { replace } = vi.hoisted(() => ({ replace: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace, refresh: vi.fn() }) }));
 
-import { KeyStep } from "@/app/console/keys/key-step";
+import { KeyStep } from "@/app/console/sign-in-key/key-step";
 
 beforeEach(() => {
   tapToSignIn.mockReset().mockResolvedValue({ kind: "done" });
