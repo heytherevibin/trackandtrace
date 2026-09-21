@@ -10,15 +10,27 @@ import { fetchMySessions, signOutOthers } from "@/console/account/my-keys-client
 import type { MySessionRow } from "@/console/account/my-sessions";
 import { consoleMessages } from "@/console/messages";
 import { cn } from "@/utils/cn";
-import { formatTime } from "@/utils/datetime";
+import { formatRelative, formatTime } from "@/utils/datetime";
 
 const m = consoleMessages.myKeys;
 const s = m.sessions;
 const clock = consoleMessages.frameSignedIn.clock;
 
 /** "09:12 IST" -- formatTime plus the console clock's own IST legend (task-9-addendum.md §2: reuse it, don't invent a second one). */
-function signedInAt(createdAt: string): string {
-  return `${formatTime(createdAt)} ${clock.ist}`;
+function atTime(when: string): string {
+  return `${formatTime(when)} ${clock.ist}`;
+}
+
+/**
+ * "yesterday, 22:40 IST" -- ConsoleMyKeys.dc.html:142's own shape for a session that is not this
+ * one. The day comes from the shared formatRelative, which already says "yesterday", "3 hr ago" and
+ * the like, so this adds no second vocabulary of its own; the time is the same atTime the current
+ * row uses. A session the database has never marked as seen falls back to when it was created --
+ * the row still has to say something, and when it started is the honest answer.
+ */
+function lastSeenAt(lastSeenAt: string | null, createdAt: string): string {
+  const when = lastSeenAt ?? createdAt;
+  return `${formatRelative(when)}, ${atTime(when)}`;
 }
 
 /**
@@ -69,7 +81,11 @@ export function SessionsPlate({ sessions: initialSessions }: { readonly sessions
       <ul className="flex flex-col">
         {sessions.map((session, index) => (
           <li key={session.id} className={cn("flex items-center gap-3 px-5 py-3.5", index > 0 && "border-t border-line")}>
-            <span className="flex-1 text-sm">{s.row(session.deviceLabel, signedInAt(session.createdAt))}</span>
+            <span className="flex-1 text-sm">
+              {session.isCurrent
+                ? s.row(session.deviceLabel, atTime(session.createdAt))
+                : s.otherRow(session.deviceLabel, lastSeenAt(session.lastSeenAt, session.createdAt))}
+            </span>
             {session.isCurrent ? <Badge variant="accent">{s.thisDevice}</Badge> : null}
           </li>
         ))}

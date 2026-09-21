@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MySessionRow } from "@/console/account/my-sessions";
 
 // Same layering as tests/unit/console/account/keys-plate.test.tsx: the network calls
@@ -25,7 +25,7 @@ const CURRENT: MySessionRow = {
 const OTHER: MySessionRow = {
   id: "cccccccc-0000-0000-0000-000000000002",
   deviceLabel: "Safari on iPhone",
-  lastSeenAt: "2026-09-20T17:15:00Z",
+  lastSeenAt: "2026-09-20T17:10:00Z", // 22:40 IST, the day before NOW below
   createdAt: "2026-09-18T17:10:00Z", // 22:40 IST
   isCurrent: false,
 };
@@ -37,10 +37,21 @@ const OTHER_2: MySessionRow = {
   isCurrent: false,
 };
 
+// The other row says how long ago the session was last seen, and formatRelative measures that
+// against "now" -- so without pinning the clock this file would read "yesterday" today and
+// something else tomorrow.
+const NOW = new Date("2026-09-21T18:00:00Z");
+
 beforeEach(() => {
+  vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ["Date"] });
+  vi.setSystemTime(NOW);
   fetchMySessions.mockReset();
   signOutOthers.mockReset();
   notifySuccess.mockReset();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("SessionsPlate", () => {
@@ -54,10 +65,10 @@ describe("SessionsPlate", () => {
     expect(screen.getAllByText("This device")).toHaveLength(1);
   });
 
-  it("draws each row as the device label, then when it signed in, in IST", () => {
+  it("draws this device by when it signed in, and another by when it was last seen -- as the sheet does", () => {
     render(<SessionsPlate sessions={[CURRENT, OTHER]} />);
     expect(screen.getByText("Chrome on macOS · signed in 09:12 IST")).toBeInTheDocument();
-    expect(screen.getByText("Safari on iPhone · signed in 22:40 IST")).toBeInTheDocument();
+    expect(screen.getByText("Safari on iPhone · last seen yesterday, 22:40 IST")).toBeInTheDocument();
   });
 
   it("hides Sign out other sessions and any other row when there is nothing but the current device", () => {
@@ -100,7 +111,7 @@ describe("SessionsPlate", () => {
     await userEvent.click(screen.getByRole("button", { name: "Sign out others" }));
     await waitFor(() => expect(signOutOthers).toHaveBeenCalledOnce());
     expect(await screen.findByText("Chrome on macOS · signed in 09:12 IST")).toBeInTheDocument();
-    expect(screen.queryByText("Safari on iPhone · signed in 22:40 IST")).not.toBeInTheDocument();
+    expect(screen.queryByText("Safari on iPhone · last seen yesterday, 22:40 IST")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Sign out other sessions" })).not.toBeInTheDocument();
     expect(notifySuccess).toHaveBeenCalledExactlyOnceWith("Other sessions signed out · logged");
   });
@@ -123,6 +134,6 @@ describe("SessionsPlate", () => {
     await userEvent.click(screen.getByRole("button", { name: "Sign out others" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("The console could not be reached. Try again.");
     expect(fetchMySessions).not.toHaveBeenCalled();
-    expect(screen.getByText("Safari on iPhone · signed in 22:40 IST")).toBeInTheDocument();
+    expect(screen.getByText("Safari on iPhone · last seen yesterday, 22:40 IST")).toBeInTheDocument();
   });
 });

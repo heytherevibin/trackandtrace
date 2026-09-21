@@ -94,16 +94,18 @@ export const myKeys = {
   sessions: {
     // ConsoleMyKeys.dc.html:140's own tag text.
     thisDevice: "This device",
-    // ConsoleMyKeys.dc.html:140,142: "Chrome on macOS · signed in 09:12 IST". The brief draws this
-    // template for *every* row, current or not (task-9-brief.md: "each row as `<device label> ·
-    // signed in <time>` with `This device` on the current one") -- not the sheet's own second
-    // example row ("Safari on iPhone · last seen yesterday, 22:40 IST"), which reads "last seen"
-    // and a relative day the addendum explicitly steers away from inventing (task-9-addendum.md
-    // §2: "Reuse the console clock's own IST legend handling rather than inventing a second way to
-    // say it"). `time` arrives pre-formatted ("09:12 IST") from formatTime plus the shared IST
-    // legend (consoleMessages.frameSignedIn.clock.ist) -- see sessions-plate.tsx -- so this file
-    // does not duplicate that formatting or the word "IST" a second time.
-    row: (device: string, time: string) => `${device} · signed in ${time}`,
+    // The sheet draws the two rows differently, and the difference is the point:
+    // ConsoleMyKeys.dc.html:140 "Chrome on macOS · signed in 09:12 IST" for the device you are on,
+    // :142 "Safari on iPhone · last seen yesterday, 22:40 IST" for one you are not. For this device
+    // you already know you are here, so when the session started is what there is to say; for
+    // another, how recently it was used is the thing that decides whether to sign it out.
+    //
+    // task-9-brief.md gave one template for both rows and task-9 followed it, flagging the
+    // conflict rather than silently choosing -- correctly, since the sheet is the authority and
+    // the brief was mine. `when` arrives pre-formatted ("09:12 IST", "yesterday, 22:40 IST") from
+    // sessions-plate.tsx, so this file does not duplicate that formatting or the word "IST".
+    row: (device: string, when: string) => `${device} · signed in ${when}`,
+    otherRow: (device: string, when: string) => `${device} · last seen ${when}`,
     // ConsoleMyKeys.dc.html:143's trigger.
     signOutOthers: "Sign out other sessions",
     // ConsoleMyKeys.dc.html:208, the confirm dialog's own h2.
