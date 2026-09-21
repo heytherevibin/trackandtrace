@@ -10,22 +10,17 @@ import { Badge } from "@/components/ui/badge";
 import { MenuContent, MenuItem, MenuLinkItem, MenuRoot, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
 import type { ConsoleMember } from "@/console/auth/member";
 import { consoleHref } from "@/console/href";
+import { consoleApiMessage } from "@/console/api-message";
 import { consoleMessages } from "@/console/messages";
 import { apiRequest } from "@/services/api-client";
-import type { ApiErrorBody } from "@/services/errors";
 
 const f = consoleMessages.frame;
 const fs = consoleMessages.frameSignedIn;
-const s = consoleMessages.session;
 
 const okSchema = z.object({ ok: z.literal(true) });
 
 // Same rule as src/app/console/signed-in.tsx and src/console/keys/client.ts: SOURCE_UNAVAILABLE/INTERNAL
 // are apiRequest's own technical wording, not sheet copy, so a member never sees them raw.
-function messageFor(error: ApiErrorBody): string {
-  return error.code === "SOURCE_UNAVAILABLE" || error.code === "INTERNAL" ? s.unavailable : error.message;
-}
-
 interface State {
   readonly pending: boolean;
   readonly error: string | null;
@@ -48,7 +43,7 @@ export function MemberMenu({ member }: { readonly member: ConsoleMember }) {
     setState({ pending: true, error: null });
     const outcome = await apiRequest("/api/sign-out", { method: "POST" }, okSchema);
     if (!outcome.ok) {
-      setState({ pending: false, error: messageFor(outcome.error) });
+      setState({ pending: false, error: consoleApiMessage(outcome.error) });
       return;
     }
     router.replace(consoleHref("/login"));

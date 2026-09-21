@@ -2,9 +2,9 @@
 
 import { browserSupportsWebAuthn, startAuthentication, startRegistration } from "@simplewebauthn/browser";
 import { z } from "zod";
+import { consoleApiMessage } from "@/console/api-message";
 import { consoleMessages } from "@/console/messages";
 import { apiRequest } from "@/services/api-client";
-import type { ApiErrorBody } from "@/services/errors";
 
 // The browser half of every ceremony (spec §D): ask the server for options, run the
 // @simplewebauthn/browser ceremony, then post what it returns. Every outcome becomes one of three
@@ -13,7 +13,6 @@ import type { ApiErrorBody } from "@/services/errors";
 // malformed body as an error rather than data, validates the shape of a real one, and times out.
 
 const m = consoleMessages.keys;
-const s = consoleMessages.session;
 
 /** What every ceremony shares once it stops short of "done": dismissed, or failed with a line to show. */
 type FailureOutcome = { readonly kind: "cancelled" } | { readonly kind: "failed"; readonly message: string };
@@ -43,10 +42,6 @@ function jsonPost(body: unknown): RequestInit {
  * JSON it should have been), that message is apiRequest's own technical wording, not a line the
  * sheets wrote, so it's replaced with the console's one line for "couldn't reach it."
  */
-function messageFor(error: ApiErrorBody): string {
-  return error.code === "SOURCE_UNAVAILABLE" || error.code === "INTERNAL" ? s.unavailable : error.message;
-}
-
 /** A prompt the member dismissed is not a failure: it gets no line of its own (decision #2). Exported so tap-client.ts's runTap shares this exact check rather than keeping a second copy. */
 export function isDismissal(err: unknown): boolean {
   return err instanceof Error && (err.name === "NotAllowedError" || err.name === "AbortError");
@@ -54,7 +49,7 @@ export function isDismissal(err: unknown): boolean {
 
 /**
  * `excludeCredentials` makes the browser itself throw before any request reaches our server: Task 9's
- * `messageFor` only ever sees a real HTTP answer, so it never gets the chance to replace this one's
+ * `consoleApiMessage` only ever sees a real HTTP answer, so it never gets the chance to replace this one's
  * wording. `@simplewebauthn/browser` wraps the raw DOMException in its own `WebAuthnError`, which
  * keeps the DOM error's own `name` ("InvalidStateError") and adds a `code` naming why
  * ("ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED") -- checking both is what survives either the browser
@@ -87,13 +82,13 @@ async function runCeremony<T>(run: () => Promise<T>): Promise<{ readonly kind: "
 
 export async function tapToSignIn(): Promise<CeremonyOutcome> {
   const begun = await apiRequest("/api/keys/options", jsonPost({ intent: "sign_in" }), optionsSchema);
-  if (!begun.ok) return { kind: "failed", message: messageFor(begun.error) };
+  if (!begun.ok) return { kind: "failed", message: consoleApiMessage(begun.error) };
 
   const tapped = await runCeremony(() => startAuthentication({ optionsJSON: begun.data.options as never }));
   if (tapped.kind !== "done") return tapped;
 
   const verified = await apiRequest("/api/keys/verify", jsonPost({ intent: "sign_in", response: tapped.response }), signInVerifiedSchema);
-  return verified.ok ? { kind: "done" } : { kind: "failed", message: messageFor(verified.error) };
+  return verified.ok ? { kind: "done" } : { kind: "failed", message: consoleApiMessage(verified.error) };
 }
 
 /** The server alone decides whether a tap comes first: it knows how many keys this member holds. */
@@ -107,13 +102,13 @@ async function resolveRegistrationOptions(begun: {
   if (tapped.kind !== "done") return tapped;
 
   const unlocked = await apiRequest("/api/keys/verify", jsonPost({ intent: "add_key", step: "tap", response: tapped.response }), tapVerifiedSchema);
-  if (!unlocked.ok) return { kind: "failed", message: messageFor(unlocked.error) };
+  if (!unlocked.ok) return { kind: "failed", message: consoleApiMessage(unlocked.error) };
   return { kind: "done", options: unlocked.data.options };
 }
 
 export async function addKey(name: string): Promise<AddKeyOutcome> {
   const begun = await apiRequest("/api/keys/options", jsonPost({ intent: "add_key" }), optionsSchema);
-  if (!begun.ok) return { kind: "failed", message: messageFor(begun.error) };
+  if (!begun.ok) return { kind: "failed", message: consoleApiMessage(begun.error) };
 
   const resolved = await resolveRegistrationOptions(begun.data);
   if (resolved.kind !== "done") return resolved;
@@ -126,6 +121,6 @@ export async function addKey(name: string): Promise<AddKeyOutcome> {
     jsonPost({ intent: "add_key", step: "register", name, response: registered.response }),
     registeredSchema,
   );
-  if (!done.ok) return { kind: "failed", message: messageFor(done.error) };
+  if (!done.ok) return { kind: "failed", message: consoleApiMessage(done.error) };
   return { kind: "done", keyCount: done.data.keyCount, activated: done.data.activated };
 }

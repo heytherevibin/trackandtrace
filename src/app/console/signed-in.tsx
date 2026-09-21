@@ -11,21 +11,16 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { ConsoleRole } from "@/console/auth/member";
 import { consoleHref } from "@/console/href";
+import { consoleApiMessage } from "@/console/api-message";
 import { consoleMessages } from "@/console/messages";
 import { apiRequest } from "@/services/api-client";
-import type { ApiErrorBody } from "@/services/errors";
 
 const f = consoleMessages.frame;
-const s = consoleMessages.session;
 
 const okSchema = z.object({ ok: z.literal(true) });
 
 // Same rule as src/console/keys/client.ts: SOURCE_UNAVAILABLE/INTERNAL are apiRequest's own
 // technical wording, not sheet copy, so they're replaced; every other refusal already reads right.
-function messageFor(error: ApiErrorBody): string {
-  return error.code === "SOURCE_UNAVAILABLE" || error.code === "INTERNAL" ? s.unavailable : error.message;
-}
-
 export interface SignedInProps {
   readonly name: string;
   readonly role: ConsoleRole;
@@ -45,7 +40,7 @@ export function SignedIn({ name, role }: SignedInProps) {
     setState({ pending: true, error: null });
     const outcome = await apiRequest("/api/sign-out", { method: "POST" }, okSchema);
     if (!outcome.ok) {
-      setState({ pending: false, error: messageFor(outcome.error) });
+      setState({ pending: false, error: consoleApiMessage(outcome.error) });
       return;
     }
     router.replace(consoleHref("/login"));

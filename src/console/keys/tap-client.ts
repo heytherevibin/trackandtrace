@@ -2,9 +2,9 @@
 
 import { startAuthentication } from "@simplewebauthn/browser";
 import { z } from "zod";
+import { consoleApiMessage } from "@/console/api-message";
 import { consoleMessages } from "@/console/messages";
 import { apiRequest } from "@/services/api-client";
-import type { ApiErrorBody } from "@/services/errors";
 import { isDismissal } from "./client";
 import type { TapRequest } from "./tap";
 
@@ -20,7 +20,6 @@ import type { TapRequest } from "./tap";
 
 export type TapOutcome = { readonly kind: "done" } | { readonly kind: "cancelled" } | { readonly kind: "failed"; readonly message: string };
 
-const s = consoleMessages.session;
 
 const optionsSchema = z.object({ ok: z.literal(true), options: z.unknown() });
 const verifiedSchema = z.object({ ok: z.literal(true) });
@@ -30,19 +29,15 @@ function jsonPost(body: unknown): RequestInit {
 }
 
 /**
- * Same substitution as client.ts's own messageFor: a real refusal (a genuine HTTP answer) already
+ * Same substitution as every other console client's: a real refusal (a genuine HTTP answer) already
  * carries sheet copy, so it passes through unchanged. SOURCE_UNAVAILABLE (the fetch itself failed
  * or timed out) and INTERNAL (the body wasn't the JSON it should have been) are apiRequest's own
  * technical wording, never a line the sheets wrote, so both get the console's one line instead.
  */
-function messageFor(error: ApiErrorBody): string {
-  return error.code === "SOURCE_UNAVAILABLE" || error.code === "INTERNAL" ? s.unavailable : error.message;
-}
-
 /** Runs the tap ceremony for one risky action (spec §D), turning every outcome into a TapOutcome rather than a throw. */
 export async function runTap(tap: TapRequest): Promise<TapOutcome> {
   const begun = await apiRequest("/api/tap/options", jsonPost(tap), optionsSchema);
-  if (!begun.ok) return { kind: "failed", message: messageFor(begun.error) };
+  if (!begun.ok) return { kind: "failed", message: consoleApiMessage(begun.error) };
 
   let response: Awaited<ReturnType<typeof startAuthentication>>;
   try {
@@ -56,5 +51,5 @@ export async function runTap(tap: TapRequest): Promise<TapOutcome> {
   }
 
   const verified = await apiRequest("/api/tap/verify", jsonPost({ response }), verifiedSchema);
-  return verified.ok ? { kind: "done" } : { kind: "failed", message: messageFor(verified.error) };
+  return verified.ok ? { kind: "done" } : { kind: "failed", message: consoleApiMessage(verified.error) };
 }
