@@ -1,8 +1,9 @@
 import { z } from "zod";
-import { getMyKeys, renameMyKey } from "@/console/account/my-keys";
+import { getMyKeys, removeMyKey, renameMyKey } from "@/console/account/my-keys";
 import { assertConsoleAvailable } from "@/console/availability";
 import { requireConsoleMember } from "@/console/auth/guard";
 import { consoleEnvironment } from "@/console/auth/session";
+import { tapReason } from "@/console/keys/tap";
 import { assertSameOrigin } from "@/console/same-origin";
 import { jsonError, jsonOk } from "@/services/api-response";
 import { readBody } from "@/services/request-body";
@@ -43,6 +44,33 @@ export async function PATCH(req: Request): Promise<Response> {
     await requireConsoleMember();
     const { keyId, name } = await readBody(req, patchBody);
     await renameMyKey(keyId, name, consoleEnvironment());
+    return jsonOk({ ok: true });
+  } catch (err) {
+    return jsonError(err);
+  }
+}
+
+// tapReason, imported rather than restated: it is the same schema /api/tap/options validated the
+// reason with at mint, and its trim transform decided the exact string console.action_digest hashed
+// (task-8-addendum.md §3). Importing @/console/keys/tap rather than ./tap-schema is deliberate too --
+// this route already runs server-side, so it takes the export that re-shares one schema object with
+// every other reason-carrying route instead of a second import path to the same file.
+const deleteBody = z.object({ keyId: z.guid(), reason: tapReason }).strict();
+
+/**
+ * DELETE /api/keys/mine -- remove a key (task-8, spec §D step 3). The one call in this console that
+ * follows a tap: ConfirmItsYou verifies the member first (spec §D steps 1-2, the challenge stays
+ * unspent), and only a completed tap ever reaches this route. `console_remove_key` re-verifies
+ * everything itself -- the two-key floor, ownership, and the tap's own digest -- so this handler adds
+ * no check of its own beyond the same same-origin and shape validation every mutating route has.
+ */
+export async function DELETE(req: Request): Promise<Response> {
+  try {
+    assertConsoleAvailable();
+    assertSameOrigin(req);
+    await requireConsoleMember();
+    const { keyId, reason } = await readBody(req, deleteBody);
+    await removeMyKey(keyId, reason, consoleEnvironment());
     return jsonOk({ ok: true });
   } catch (err) {
     return jsonError(err);

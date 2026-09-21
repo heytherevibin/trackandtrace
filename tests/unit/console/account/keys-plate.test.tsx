@@ -1,16 +1,23 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { MyKeysRow } from "@/console/account/my-keys";
 
-// KeysPlate now orchestrates two dialogs and a re-fetch; its own test stays about orchestration
+// KeysPlate now orchestrates three dialogs and a re-fetch; its own test stays about orchestration
 // (which button opens which dialog, and that a success re-renders the table), not the ceremony or
 // network logic underneath -- that is each dialog's own file
 // (tests/unit/console/account/add-key-dialog.test.tsx, .../rename-key-dialog.test.tsx) and
-// fetchMyKeys' own (tests/unit/console/account/my-keys-client.test.ts). The mocked dialogs below
-// expose just enough of their real props (open, keyRow, onAdded/onRenamed) to drive that.
-const { fetchMyKeys } = vi.hoisted(() => ({ fetchMyKeys: vi.fn() }));
-vi.mock("@/console/account/my-keys-client", () => ({ fetchMyKeys }));
+// fetchMyKeys'/removeKey's own (tests/unit/console/account/my-keys-client.test.ts). The mocked Add
+// and Rename dialogs below expose just enough of their real props (open, keyRow, onAdded/onRenamed)
+// to drive that.
+//
+// ConfirmItsYou is deliberately NOT mocked here: this plate is its first real caller (task-8), so
+// the wiring under test is specifically KeysPlate -> the real ConfirmItsYou -> a mocked runTap ->
+// a mocked removeKey, the same layering confirm-its-you.test.tsx itself uses one level down.
+const { fetchMyKeys, removeKey } = vi.hoisted(() => ({ fetchMyKeys: vi.fn(), removeKey: vi.fn() }));
+const { runTap } = vi.hoisted(() => ({ runTap: vi.fn() }));
+vi.mock("@/console/account/my-keys-client", () => ({ fetchMyKeys, removeKey }));
+vi.mock("@/console/keys/tap-client", () => ({ runTap }));
 vi.mock("@/console/account/add-key-dialog", () => ({
   AddKeyDialog: ({ open, onAdded }: { readonly open: boolean; readonly onAdded: () => void }) =>
     open ? (
@@ -33,8 +40,19 @@ const KEYS: readonly MyKeysRow[] = [
   { id: "aaaaaaaa-0000-0000-0000-000000000003", name: "MacBook Pro", type: "passkey", createdAt: "2026-09-05T10:00:00Z", lastUsedAt: null },
 ];
 
+// A third key: Remove is refused below two keys (spec §D), so most Remove-flow tests need enough
+// keys that removing one is even allowed.
+const THREE_KEYS: readonly MyKeysRow[] = [
+  ...KEYS,
+  { id: "aaaaaaaa-0000-0000-0000-000000000005", name: "YubiKey 5 NFC", type: "security_key", createdAt: "2026-09-11T10:00:00Z", lastUsedAt: null },
+];
+
+const VALID_REASON = "Left at the old office; replaced.";
+
 beforeEach(() => {
   fetchMyKeys.mockReset();
+  removeKey.mockReset();
+  runTap.mockReset();
 });
 
 describe("KeysPlate", () => {
@@ -83,11 +101,21 @@ describe("KeysPlate", () => {
     expect(screen.getByText("You need at least two keys. Add another before removing one.")).toBeInTheDocument();
   });
 
-  it("draws Add a key and a Rename per row, but no Remove control -- removal is still the next task", () => {
+  it("draws Add a key, a Rename and a Remove per row", () => {
     render(<KeysPlate keys={KEYS} />);
     expect(screen.getByRole("button", { name: "Add a key" })).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Rename" })).toHaveLength(KEYS.length);
-    expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Remove" })).toHaveLength(KEYS.length);
+  });
+
+  it("disables every Remove button at the two-key floor", () => {
+    render(<KeysPlate keys={KEYS} />);
+    for (const button of screen.getAllByRole("button", { name: "Remove" })) expect(button).toBeDisabled();
+  });
+
+  it("enables Remove once a third key exists", () => {
+    render(<KeysPlate keys={THREE_KEYS} />);
+    for (const button of screen.getAllByRole("button", { name: "Remove" })) expect(button).toBeEnabled();
   });
 
   it("opens the Add dialog from the Add a key button", async () => {
@@ -127,5 +155,83 @@ describe("KeysPlate", () => {
     await userEvent.click(screen.getByText("mock add succeeded"));
     expect(await screen.findByText("iPhone")).toBeInTheDocument();
     expect(screen.queryByText("mock add succeeded")).not.toBeInTheDocument();
+  });
+
+  // KeysPlate is ConfirmItsYou's first real caller (task-8): these exercise the whole chain --
+  // Remove -> the real ConfirmItsYou -> a mocked runTap -> a mocked removeKey -- the same order
+  // spec §D fixes (Main.dc.html, task-8-brief.md).
+  describe("Remove", () => {
+    it("opens Confirm it's you with the row's name as the target and the drawn summary/change line", async () => {
+      render(<KeysPlate keys={THREE_KEYS} />);
+      const removeButtons = screen.getAllByRole("button", { name: "Remove" });
+      await userEvent.click(removeButtons[2]!); // YubiKey 5 NFC
+      expect(screen.getByRole("heading", { name: "Confirm it's you" })).toBeVisible();
+      expect(screen.getByText("Remove YubiKey 5 NFC")).toBeVisible();
+      expect(screen.getByText("Keys: 3 → 2")).toBeVisible();
+    });
+
+    it("refuses a reason under 10 characters without starting a ceremony", async () => {
+      render(<KeysPlate keys={THREE_KEYS} />);
+      await userEvent.click(screen.getAllByRole("button", { name: "Remove" })[0]!);
+      await userEvent.type(screen.getByLabelText("Reason"), "short");
+      await userEvent.click(screen.getByRole("button", { name: "Tap your key" }));
+      expect(await screen.findByRole("alert")).toHaveTextContent("Add a reason of at least 10 characters.");
+      expect(runTap).not.toHaveBeenCalled();
+      expect(removeKey).not.toHaveBeenCalled();
+    });
+
+    it("a completed tap calls DELETE with the key and the typed reason, and the table reflects the removal", async () => {
+      runTap.mockResolvedValue({ kind: "done" });
+      removeKey.mockResolvedValue({ kind: "done" });
+      fetchMyKeys.mockResolvedValue({
+        keys: KEYS,
+        member: { name: "Asha Rao", email: "asha@trakline.in", role: "owner", createdAt: "2026-09-02T09:00:00Z" },
+      });
+      render(<KeysPlate keys={THREE_KEYS} />);
+      await userEvent.click(screen.getAllByRole("button", { name: "Remove" })[2]!); // YubiKey 5 NFC
+      await userEvent.type(screen.getByLabelText("Reason"), VALID_REASON);
+      await userEvent.click(screen.getByRole("button", { name: "Tap your key" }));
+      await waitFor(() => expect(removeKey).toHaveBeenCalledExactlyOnceWith("aaaaaaaa-0000-0000-0000-000000000005", VALID_REASON));
+      expect(await screen.findByText("2 keys")).toBeInTheDocument();
+      expect(screen.queryByText("YubiKey 5 NFC")).not.toBeInTheDocument();
+    });
+
+    it("a cancelled tap sends no DELETE and leaves the key in the table", async () => {
+      runTap.mockResolvedValue({ kind: "cancelled" });
+      render(<KeysPlate keys={THREE_KEYS} />);
+      await userEvent.click(screen.getAllByRole("button", { name: "Remove" })[2]!);
+      await userEvent.type(screen.getByLabelText("Reason"), VALID_REASON);
+      await userEvent.click(screen.getByRole("button", { name: "Tap your key" }));
+      await waitFor(() => expect(runTap).toHaveBeenCalledOnce());
+      expect(removeKey).not.toHaveBeenCalled();
+      expect(screen.getByText("YubiKey 5 NFC")).toBeInTheDocument();
+    });
+
+    it("a failed tap sends no DELETE and leaves the key in the table", async () => {
+      runTap.mockResolvedValue({ kind: "failed", message: "That key didn't answer. Try again." });
+      render(<KeysPlate keys={THREE_KEYS} />);
+      await userEvent.click(screen.getAllByRole("button", { name: "Remove" })[2]!);
+      await userEvent.type(screen.getByLabelText("Reason"), VALID_REASON);
+      await userEvent.click(screen.getByRole("button", { name: "Tap your key" }));
+      await waitFor(() => expect(runTap).toHaveBeenCalledOnce());
+      expect(removeKey).not.toHaveBeenCalled();
+      expect(screen.getByText("YubiKey 5 NFC")).toBeInTheDocument();
+    });
+
+    it("a DELETE refusal leaves the key in the table and shows the console's own message", async () => {
+      // A message that appears nowhere else on the page (unlike the two-key line, which the plate's
+      // footer always shows -- task-2-addendum.md's own "a test that passes for the wrong reason"
+      // rule: reusing that string here would pass even if this banner were never wired up).
+      runTap.mockResolvedValue({ kind: "done" });
+      removeKey.mockResolvedValue({ kind: "failed", message: "This key isn't one of yours." });
+      render(<KeysPlate keys={THREE_KEYS} />);
+      await userEvent.click(screen.getAllByRole("button", { name: "Remove" })[2]!);
+      await userEvent.type(screen.getByLabelText("Reason"), VALID_REASON);
+      await userEvent.click(screen.getByRole("button", { name: "Tap your key" }));
+      await waitFor(() => expect(removeKey).toHaveBeenCalledOnce());
+      expect(await screen.findByText("This key isn't one of yours.")).toBeVisible();
+      expect(screen.getByText("YubiKey 5 NFC")).toBeInTheDocument();
+      expect(fetchMyKeys).not.toHaveBeenCalled();
+    });
   });
 });

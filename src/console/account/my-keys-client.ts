@@ -54,3 +54,22 @@ export async function renameKey(keyId: string, name: string): Promise<RenameOutc
   );
   return result.ok ? { kind: "done" } : { kind: "failed", message: consoleApiMessage(result.error) };
 }
+
+export type RemoveOutcome = { readonly kind: "done" } | { readonly kind: "failed"; readonly message: string };
+
+const removedSchema = z.object({ ok: z.literal(true) });
+
+/**
+ * The delete half of Remove (task-8, spec §D step 3) -- called only after ConfirmItsYou's
+ * `onConfirmed` fires (a completed tap), never before. `reason` goes out exactly as the member
+ * typed it, the same as `runTap` sends it to the mint: only the route's own `tapReason` import ever
+ * trims and digests it (task-8-addendum.md §3), so a second trim here would risk the two disagreeing.
+ */
+export async function removeKey(keyId: string, reason: string): Promise<RemoveOutcome> {
+  const result = await apiRequest(
+    "/api/keys/mine",
+    { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ keyId, reason }) },
+    removedSchema,
+  );
+  return result.ok ? { kind: "done" } : { kind: "failed", message: consoleApiMessage(result.error) };
+}

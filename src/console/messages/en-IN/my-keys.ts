@@ -1,8 +1,8 @@
 import type { MessageTree } from "@/messages/types";
 
-// Word for word from docs/design/sheets/console/ConsoleMyKeys.dc.html. Removing a key and the
-// Sessions plate are still later tasks, so this file does not carry "Remove" -- but task-7 adds the
-// Add and Rename copy the previous task's own comment (now rewritten below) deliberately left out.
+// Word for word from docs/design/sheets/console/ConsoleMyKeys.dc.html. The Sessions plate is still a
+// later task, so this file does not yet carry its copy -- but task-8 adds Remove, the tap's first
+// real caller, on top of the Add and Rename copy task-7 added before it.
 export const myKeys = {
   title: "My keys",
   pageTitle: "My keys",
@@ -53,6 +53,21 @@ export const myKeys = {
   // for the dialog's title and its submit button rather than inventing copy the sheet never wrote
   // (task-7-report.md).
   rename: "Rename",
+  // ConsoleMyKeys.dc.html:112-114, the row action task-8 wires. The dialog it opens is the shared
+  // TC-01 (src/console/components/confirm-its-you.tsx), not a My-keys-specific one -- only its own
+  // drawn copy lives here.
+  remove: "Remove",
+  // ConsoleMyKeys.dc.html:186 -- the Remove dialog's summary sentence, a function of the key's name
+  // so it reads "Remove YubiKey 5 NFC" rather than a fixed string. Composed here, not in the
+  // component and not from console.action_digest's four fields (task-8-addendum.md §1): those bind
+  // the tap and are never rendered, so deriving the drawn copy from them would tie the words on
+  // screen to what the database hashes.
+  removeSummary: (name: string) => `Remove ${name}`,
+  // ConsoleMyKeys.dc.html:187 -- the Change line's label ("Keys: 3 → 2"). Only the label is copy;
+  // before/after stay plain `String(n)` at the call site, because MessageTree's Leaf type
+  // (@/messages/types) is `string | ((...args) => string)` and so cannot carry a function that
+  // returns ConfirmItsYou's `{label, before, after}` object.
+  removeChangeLabel: "Keys",
 
   profileTitle: "Profile",
   profile: {
