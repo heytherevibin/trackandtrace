@@ -3,6 +3,7 @@ import {
   historyPointSchema,
   pnrApiResponseSchema,
   pnrResultSchema,
+  watchlistEntrySchema,
   watchlistUpsertSchema,
 } from "@/types/schemas";
 import { buildFixtureResult } from "@/services/sources/fixture";
@@ -70,5 +71,32 @@ describe("watchlistUpsertSchema", () => {
     expect(watchlistUpsertSchema.safeParse(tooMany).success).toBe(false);
     expect(watchlistUpsertSchema.safeParse({ pnr: "2345678901", label: " ", checks: [] }).success).toBe(false);
     expect(watchlistUpsertSchema.safeParse({ pnr: "2345678901", label: "12951 · BCT→NDLS" }).success).toBe(true);
+  });
+});
+
+// The format the database actually sends, not the one fixtures are written in. Postgres serialises
+// a timestamptz with an offset -- `select to_jsonb(now())` gives
+// "2026-09-21T19:10:34.256374+00:00" -- and `watchlist_entries.created_at` reaches the client as
+// `addedAt` unchanged. z.iso.datetime()'s default accepts only "Z", so every save answered "The
+// service returned a malformed response" while all 1155 tests passed, because every fixture in the
+// suite writes the "Z" form by hand.
+describe("datetimes the database really produces", () => {
+  const entry = (addedAt: string) => ({ pnr: "2345678901", label: "12951 · BCT→NDLS", addedAt, checks: [] });
+
+  it("accepts a Postgres timestamptz, offset and microseconds and all", () => {
+    expect(watchlistEntrySchema.safeParse(entry("2026-09-21T19:10:34.256374+00:00")).success).toBe(true);
+  });
+
+  it("accepts a non-UTC offset too -- the column is timestamptz, not a promise about the zone", () => {
+    expect(watchlistEntrySchema.safeParse(entry("2026-09-22T00:40:34.256374+05:30")).success).toBe(true);
+  });
+
+  it("still accepts the Z form every fixture uses, so nothing that worked stops working", () => {
+    expect(watchlistEntrySchema.safeParse(entry("2026-09-10T00:00:00.000Z")).success).toBe(true);
+  });
+
+  it("still refuses something that is not a datetime at all", () => {
+    expect(watchlistEntrySchema.safeParse(entry("2026-09-21 19:10:34+00")).success).toBe(false);
+    expect(watchlistEntrySchema.safeParse(entry("yesterday")).success).toBe(false);
   });
 });
