@@ -31,10 +31,19 @@ export const metadata: Metadata = { title: m.pageTitle };
  * console page handles this way, not a fault. This matters here specifically because this page is now
  * what a signed-out visit to `/` (which redirects to `/keys`) reaches; a throw there would have shown
  * the generic error boundary. Anything else still throws, including a request with no `authenticated`
- * role at all (PostgREST's own "permission denied for function console_me", which
- * src/console/auth/guard.ts's fromDatabase does not recognise as a session problem -- a pre-existing
- * gap flagged in task-6-report.md rather than fixed here, since guard.ts is not that task's file;
- * reaching the error boundary is the right answer for it either way).
+ * role at all -- with one deliberate exception, stated plainly because an earlier draft of this
+ * comment claimed the opposite and a reviewer proved it false by revoking the grant and watching
+ * /keys redirect to /login.
+ *
+ * The exception: guard.ts's fromDatabase maps PostgREST's "permission denied for function" to
+ * UNAUTHENTICATED, so it is caught here and redirects. That is on purpose -- a request carrying no
+ * session reaches PostgREST as `anon`, and console_me is granted to `authenticated` alone, so this
+ * is the ordinary signed-out case and a signed-out visitor needs the sign-in link, not an error
+ * page. The cost is real: if console_me's own grant were ever revoked in production, every member
+ * would see a sign-out rather than a fault, and nothing would report it. That is judged the better
+ * trade -- signed-out requests are constant, a missing grant is a deploy-time mistake CI catches --
+ * but it is a trade, not a property. "permission denied for schema console" (the shape 2c's enum
+ * bug took) is deliberately NOT mapped and still reaches the error boundary.
  *
  * getMyKeys() and getMySessions(), by contrast, only ever run once requireConsoleMember() has
  * already succeeded, so a failure in either is left to propagate to the console's own error

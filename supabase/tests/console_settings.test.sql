@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(28);
+select plan(29);
 
 select has_table('console', 'settings', 'settings exists');
 select col_not_null('console', 'settings', 'version', 'a settings row always has a version');
@@ -112,6 +112,23 @@ select throws_ok(
 -- 'development' save sequence around it. A real, matching tap is minted first
 -- so this proves the exact silent-success path, not merely a missing-tap
 -- refusal that would raise the unrelated 42501.
+-- A tap nobody ever answered. console_save_settings is the second caller of console.use_tap, and
+-- the binding that makes an unanswered tap worthless lives inside use_tap itself -- so this path
+-- inherits it rather than asserting it, and nothing here would notice if that predicate were
+-- removed. The equivalent assertion exists for key removal; this is its sibling, so a revert is
+-- caught at both callers rather than one. `verified_at` is null and everything else matches.
+insert into console.challenges (member_id, session_id, purpose, challenge, digest, expires_at)
+values ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'action', 'settings-challenge-unanswered',
+        console.action_digest('settings.save', 'production', '{"checks_paused": true}'::jsonb::text, 'never-tapped'),
+        now() + interval '5 minutes');
+
+select throws_ok(
+  $$select public.console_save_settings('production', 1, '{"checks_paused": true}'::jsonb, 'never-tapped')$$,
+  '42501',
+  null,
+  'a tap no key ever answered cannot save a setting either'
+);
+
 insert into console.challenges (member_id, session_id, purpose, challenge, digest, expires_at, verified_at)
 values ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'action', 'settings-challenge-nullchange',
         console.action_digest('settings.save', 'production', null::text, 'null-changeset-attempt'),

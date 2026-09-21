@@ -58,9 +58,14 @@ describe("the console catch-all", () => {
     expect(redirect).not.toHaveBeenCalled();
   });
 
+  // Deliberately not "permission denied for function console_me": guard.ts maps that one to
+  // UNAUTHENTICATED on purpose, so it redirects rather than throwing, and a test using it here
+  // would read as covering the grants path while asserting the opposite of what that path does.
+  // A plain Error is what this test is actually about -- anything that is not an AppError at all
+  // must still reach the error boundary rather than being mistaken for a sign-out.
   it("and lets a plain Error through too, not only an AppError", async () => {
-    requireConsoleMember.mockRejectedValue(new Error("permission denied for function console_me"));
-    await expect(ConsoleMissing()).rejects.toThrow("permission denied for function console_me");
+    requireConsoleMember.mockRejectedValue(new Error("the database went away mid-query"));
+    await expect(ConsoleMissing()).rejects.toThrow("the database went away mid-query");
     expect(redirect).not.toHaveBeenCalled();
   });
 
