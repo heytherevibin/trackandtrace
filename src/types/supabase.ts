@@ -62,6 +62,18 @@ export type Database = {
         Returns: Json
       }
       console_auth_member_by_email: { Args: { p_email: string }; Returns: Json }
+      console_auth_new_action_challenge: {
+        Args: {
+          p_action: string
+          p_challenge: string
+          p_member: string
+          p_reason: string
+          p_session: string
+          p_target: string
+          p_value: string
+        }
+        Returns: string
+      }
       console_auth_new_challenge: {
         Args: {
           p_challenge: string

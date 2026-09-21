@@ -5,6 +5,7 @@ import { keys } from "./en-IN/keys";
 import { session } from "./en-IN/session";
 import { setup } from "./en-IN/setup";
 import { signIn } from "./en-IN/sign-in";
+import { tap } from "./en-IN/tap";
 
 /** Console copy. It may name providers; traveller code never imports it (tests/unit/console/boundary.contract.test.ts). */
-export const consoleMessages = { frame, signIn, availability, session, email, keys, setup } as const;
+export const consoleMessages = { frame, signIn, availability, session, email, keys, setup, tap } as const;
