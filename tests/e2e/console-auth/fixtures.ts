@@ -1,5 +1,7 @@
 import { execFileSync } from "node:child_process";
-import { test as base, type Page } from "@playwright/test";
+import { expect, test as base, type Page } from "@playwright/test";
+import { consoleMessages } from "@/console/messages";
+import { nameFromAddress } from "@/console/setup/redeem";
 
 export interface VirtualKey {
   readonly id: string;
@@ -108,8 +110,46 @@ export function firstOwnerLink(email: string, baseUrl: string): string {
   return sql(`select console.create_first_owner_link('${email}', '${baseUrl}')`);
 }
 
-/** The whole first-Owner journey through the UI, for a fresh address. Returns that address. */
-export async function setUpFirstOwner(page: Page, baseUrl: string): Promise<string> {
+export interface SignedInOwner {
+  readonly email: string;
+  readonly name: string;
+  readonly role: string;
+}
+
+/**
+ * The name and role label a first Owner's own address resolves to -- the same derivation
+ * `src/console/setup/redeem.ts`'s `nameFromAddress` and `consoleMessages.frame.roleLabel.owner`
+ * give the app itself, reused rather than duplicated so a spec that builds its own email (not
+ * through `setUpFirstOwner`) can still name its member and role in one place, not two.
+ */
+export function ownerIdentity(email: string): { readonly name: string; readonly role: string } {
+  return { name: nameFromAddress(email), role: consoleMessages.frame.roleLabel.owner };
+}
+
+/**
+ * The signed-in frame, proven by the one thing that stays true as "/" changes hands (My keys next
+ * task, Overview in 2f): the member menu trigger, which names the member and their role
+ * (consoleMessages.frameSignedIn.member.openMenu, member-menu.tsx:58). Not "a Sign out button
+ * exists" -- that stopped being a top-level button when Task 4 put it in the menu, and would break
+ * again next task regardless, since it was only ever a proxy for this.
+ */
+export async function expectSignedInAs(page: Page, name: string, role: string): Promise<void> {
+  await expect(page.getByRole("button", { name: `${name}, ${role}. Open the member menu` })).toBeVisible();
+}
+
+/**
+ * Sign out is inside the member menu (Main.dc.html's own drawing), so open it first. The item's
+ * role is `menuitem`, confirmed against @base-ui/react's own source
+ * (menu/item/useMenuItemCommonProps.js hardcodes `role: 'menuitem'`) and against the rendered DOM,
+ * not assumed.
+ */
+export async function signOut(page: Page): Promise<void> {
+  await page.getByRole("button", { name: /Open the member menu/ }).click();
+  await page.getByRole("menuitem", { name: "Sign out" }).click();
+}
+
+/** The whole first-Owner journey through the UI, for a fresh address. */
+export async function setUpFirstOwner(page: Page, baseUrl: string): Promise<SignedInOwner> {
   const email = `owner-${Date.now()}-${Math.floor(Math.random() * 1e6)}@trakline.in`;
   const firstKey = await addVirtualKey(page, "usb");
   await page.goto(firstOwnerLink(email, baseUrl));
@@ -121,8 +161,8 @@ export async function setUpFirstOwner(page: Page, baseUrl: string): Promise<stri
   await page.getByLabel("Name this key").fill("iPhone");
   await page.getByRole("button", { name: "Add key" }).click();
   await page.getByRole("button", { name: "Open the console" }).click();
-  return email;
+  return { email, ...ownerIdentity(email) };
 }
 
 export const test = base;
-export { expect } from "@playwright/test";
+export { expect };

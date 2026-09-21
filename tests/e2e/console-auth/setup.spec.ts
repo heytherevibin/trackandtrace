@@ -1,4 +1,4 @@
-import { addVirtualKey, expect, firstOwnerLink, resetConsole, swapAuthenticatorAfterTap, test } from "./fixtures";
+import { addVirtualKey, expect, expectSignedInAs, firstOwnerLink, ownerIdentity, resetConsole, swapAuthenticatorAfterTap, test } from "./fixtures";
 
 const BASE = "http://admin.localhost:4211";
 
@@ -24,7 +24,11 @@ test("the first Owner sets up with two keys and lands in the console", async ({ 
 
   await expect(page.getByRole("heading", { name: "You're set up" })).toBeVisible();
   await page.getByRole("button", { name: "Open the console" }).click();
-  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+  // Not a top-level Sign out button (that moved into the member menu in Task 4) and not an
+  // assertion about "/"'s own interim page (about to be replaced next task) -- the frame itself,
+  // which stays true either way.
+  const { name, role } = ownerIdentity(email);
+  await expectSignedInAs(page, name, role);
 });
 
 test("the same key twice is refused", async ({ page, baseURL }) => {
