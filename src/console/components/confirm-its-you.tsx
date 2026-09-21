@@ -29,6 +29,21 @@ const m = consoleMessages.tap;
 
 type Stage = { readonly kind: "idle" } | { readonly kind: "waiting" } | { readonly kind: "failed"; readonly message: string };
 
+/**
+ * The verify step's refusal text arrives from the server, sourced from consoleMessages.keys.* --
+ * the same copy the sign-in step reads (src/console/keys/tap.ts, the server file, is left alone).
+ * When it matches one of the two states TC-01's own sheet names (Main.dc.html's statusText map),
+ * this dialog shows TC-01's own copy instead of relaying the server's raw string verbatim -- so if
+ * tap.ts (the copy file) ever needs TC-01's wording to diverge from the sign-in step's, editing
+ * that one file is enough; no call site needs hunting down. Any other refusal (not one of these
+ * two known strings) passes through unchanged, exactly as before.
+ */
+function knownMessage(message: string): string {
+  if (message === consoleMessages.keys.didNotAnswer) return m.didNotAnswer;
+  if (message === consoleMessages.keys.notYours) return m.notYours;
+  return message;
+}
+
 export interface ConfirmItsYouProps extends TapRequest {
   readonly open: boolean;
   /**
@@ -59,6 +74,13 @@ export function ConfirmItsYou({ open, action, target, value, reason, summary, ch
   const previousStageKindRef = useRef<Stage["kind"]>(stage.kind);
   // A tap started before this component goes away must never resolve into a gone instance's state.
   const mountedRef = useRef(true);
+  // Each confirm attempt takes a token. Closing the dialog -- Cancel, Escape, the close button, all
+  // of which come through onOpenChange -- bumps it, so an attempt still in flight is abandoned
+  // rather than allowed to land. Without this, a member who cancels during the verify round trip
+  // still has the action run, which is the one thing a confirmation gate must never do (closing a
+  // dialog does not unmount it, so mountedRef alone never caught this). Cancel stays enabled while
+  // waiting, as the sheet draws it, so this is the only place to hold that line.
+  const attemptRef = useRef(0);
 
   useEffect(
     () => () => {
@@ -94,14 +116,15 @@ export function ConfirmItsYou({ open, action, target, value, reason, summary, ch
       setRejectedReason(reason);
       return;
     }
+    const attempt = ++attemptRef.current;
     setStage({ kind: "waiting" });
     const outcome = await runTap({ action, target, value, reason });
-    if (!mountedRef.current) return;
+    if (!mountedRef.current || attempt !== attemptRef.current) return;
     if (outcome.kind === "done") {
       onConfirmed();
       return;
     }
-    setStage(outcome.kind === "cancelled" ? { kind: "idle" } : { kind: "failed", message: outcome.message });
+    setStage(outcome.kind === "cancelled" ? { kind: "idle" } : { kind: "failed", message: knownMessage(outcome.message) });
   }
 
   const waiting = stage.kind === "waiting";
@@ -112,7 +135,13 @@ export function ConfirmItsYou({ open, action, target, value, reason, summary, ch
     <DialogRoot
       open={open}
       onOpenChange={(next) => {
-        if (!next) onCancel();
+        if (!next) {
+          // Bumped before onCancel, so a confirm() already in flight -- awaiting runTap -- finds
+          // its token stale when it resumes and abandons the attempt instead of calling onConfirmed.
+          attemptRef.current += 1;
+          setStage({ kind: "idle" });
+          onCancel();
+        }
       }}
     >
       <DialogContent
@@ -143,6 +172,7 @@ export function ConfirmItsYou({ open, action, target, value, reason, summary, ch
               id="confirm-reason"
               rows={3}
               className="well w-full resize-none"
+              placeholder={m.reasonPlaceholder}
               value={reason}
               onChange={(event) => onReasonChange(event.currentTarget.value)}
               aria-invalid={reasonAlert || undefined}

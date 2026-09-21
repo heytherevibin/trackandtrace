@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -67,6 +67,7 @@ describe("ConfirmItsYou", () => {
     expect(screen.getByText(CHANGE_TEXT)).toBeVisible();
     // ACTION ("Removed a key") never appears as its own text node -- only SUMMARY does.
     expect(screen.queryByText(ACTION)).toBeNull();
+    expect(screen.getByPlaceholderText("Why? This goes in the audit log.")).toBeVisible();
   });
 
   it("renders the display props and still taps with the digest fields, even though they do not match", async () => {
@@ -155,5 +156,30 @@ describe("ConfirmItsYou", () => {
     expect(await screen.findByRole("button", { name: "Waiting for your key…" })).toBeDisabled();
     expect(screen.getByRole("status")).toHaveTextContent("Touch your security key or approve on your device");
     resolveTap?.({ kind: "done" });
+  });
+
+  // fix-2: closing a dialog does not unmount it, so mountedRef alone was never enough -- a member
+  // who cancels while runTap's verify round trip is still in flight must not have the action run
+  // once that promise resolves. This is the one failure a confirmation gate must never have.
+  it("does not confirm the action when Cancel is pressed while a tap is waiting", async () => {
+    let resolveTap: ((outcome: { kind: "done" }) => void) | undefined;
+    runTap.mockImplementation(() => new Promise((resolve) => (resolveTap = resolve)));
+    const onCancel = vi.fn();
+    const onConfirmed = vi.fn();
+    render(<Harness onCancel={onCancel} onConfirmed={onConfirmed} />);
+    await userEvent.type(screen.getByLabelText("Reason"), VALID_REASON);
+    await userEvent.click(screen.getByRole("button", { name: "Tap your key" }));
+    expect(await screen.findByRole("button", { name: "Waiting for your key…" })).toBeDisabled();
+
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(onCancel).toHaveBeenCalledOnce();
+
+    // The ceremony/verify round trip was already in flight and settles after Cancel was pressed --
+    // exactly the ordinary window the bug lives in, not an exotic race.
+    await act(async () => {
+      resolveTap?.({ kind: "done" });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(onConfirmed).not.toHaveBeenCalled();
   });
 });

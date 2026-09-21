@@ -49,7 +49,10 @@ export async function runTap(tap: TapRequest): Promise<TapOutcome> {
     response = await startAuthentication({ optionsJSON: begun.data.options as never });
   } catch (err) {
     if (isDismissal(err)) return { kind: "cancelled" };
-    return { kind: "failed", message: consoleMessages.keys.didNotAnswer };
+    // consoleMessages.tap.didNotAnswer, not .keys.didNotAnswer: this is TC-01's own fallback for a
+    // browser-side ceremony failure, read from TC-01's own copy file so it can diverge from the
+    // sign-in step's without hunting down call sites.
+    return { kind: "failed", message: consoleMessages.tap.didNotAnswer };
   }
 
   const verified = await apiRequest("/api/tap/verify", jsonPost({ response }), verifiedSchema);

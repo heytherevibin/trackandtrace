@@ -12,6 +12,7 @@ export const tap = {
   form: "Form TC-01",
   changeLabel: "Change",
   reasonLabel: "Reason",
+  reasonPlaceholder: "Why? This goes in the audit log.",
   reasonHint: "Don't include PNRs, emails or IP addresses; they're removed. 10–200 characters.",
   reasonShort: "Add a reason of at least 10 characters.",
   cancel: "Cancel",
