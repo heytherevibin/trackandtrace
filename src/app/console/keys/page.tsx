@@ -3,7 +3,9 @@ import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { KeysPlate } from "@/console/account/keys-plate";
 import { getMyKeys } from "@/console/account/my-keys";
+import { getMySessions } from "@/console/account/my-sessions";
 import { ProfilePlate } from "@/console/account/profile-plate";
+import { SessionsPlate } from "@/console/account/sessions-plate";
 import { requireConsoleMember } from "@/console/auth/guard";
 import { ConsoleFrame } from "@/console/components/console-frame";
 import { consoleHref } from "@/console/href";
@@ -35,14 +37,16 @@ export const metadata: Metadata = { title: m.pageTitle };
  * does, or is only ever reached by an already-signed-in browser in practice; flagged in
  * task-6-report.md rather than fixed here, since guard.ts is not this task's file).
  *
- * getMyKeys(), by contrast, only ever runs once requireConsoleMember() has already succeeded, so its
- * failure is left to propagate to the console's own error boundary (src/app/console/error.tsx, task
- * 5) rather than a bespoke in-page error state -- the sheet's isError copy ("Your keys didn't load" /
- * "The console couldn't reach its database.") is not in the brief's quoted-copy list, so it is not
- * transcribed here.
+ * getMyKeys() and getMySessions(), by contrast, only ever run once requireConsoleMember() has
+ * already succeeded, so a failure in either is left to propagate to the console's own error
+ * boundary (src/app/console/error.tsx, task 5) rather than a bespoke in-page error state -- the
+ * sheet's isError copy ("Your keys didn't load" / "The console couldn't reach its database.") is
+ * not in the brief's quoted-copy list, so it is not transcribed here.
  *
- * Adding, renaming, removing a key and the Sessions plate are later tasks; this page is the read
- * path and the table only (task-6-addendum.md's scope line).
+ * The two-column layout below (ConsoleMyKeys.dc.html:122-145) was left a single column until now
+ * (task-6-addendum.md's own note on profile-plate.tsx: "a rail of fourteen dead links is worse than
+ * none" -- the same call, applied to a grid whose second column had nothing to hold yet). Task 9
+ * fills it with the Sessions plate.
  */
 export default async function MyKeysPage() {
   // Only a missing or ended session sends anyone to sign in. Anything else -- a console whose
@@ -55,14 +59,24 @@ export default async function MyKeysPage() {
     throw err;
   });
   if (!member) redirect(consoleHref("/login"));
-  const { keys, member: profile } = await getMyKeys();
+  // One round trip each, run together: getMyKeys's own comment notes it already combines the Keys
+  // and Profile plates into one call, and getMySessions is a second, independent read -- there is
+  // no data dependency between the two, so they run concurrently rather than one after the other.
+  const [{ keys, member: profile }, sessions] = await Promise.all([getMyKeys(), getMySessions()]);
 
   return (
     <ConsoleFrame member={member}>
       <div className="flex flex-col gap-8">
         <PageHeader kicker={m.kicker} title={m.title} lead={m.lead} />
         <KeysPlate keys={keys} />
-        <ProfilePlate member={profile} />
+        <div className="grid items-start gap-8 lg:grid-cols-2">
+          <div className="flex flex-col gap-8">
+            <ProfilePlate member={profile} />
+          </div>
+          <div className="flex flex-col gap-8">
+            <SessionsPlate sessions={sessions} />
+          </div>
+        </div>
       </div>
     </ConsoleFrame>
   );

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Plate } from "@/components/ui/plate";
+import { notify } from "@/components/ui/toast";
 import { AddKeyDialog } from "@/console/account/add-key-dialog";
 import type { MyKeysRow } from "@/console/account/my-keys";
 import { fetchMyKeys, removeKey } from "@/console/account/my-keys-client";
@@ -92,6 +93,11 @@ export function KeysPlate({ keys: initialKeys }: { readonly keys: readonly MyKey
     closeRemove();
     const outcome = await removeKey(row.id, reason);
     if (outcome.kind === "done") {
+      // ConsoleMyKeys.dc.html's own state script: st === 'Removed' -> 'Key removed · logged'. The
+      // previous task left this undrawn since nothing mounted a toaster yet (task-8-report.md);
+      // task-9 mounts one (src/console/components/console-providers.tsx) and this is the one line
+      // that was waiting on it (task-9-addendum.md §1).
+      notify.success(m.removedToast);
       await refresh();
       return;
     }

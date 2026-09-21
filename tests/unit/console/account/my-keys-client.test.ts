@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 // Browser-side fetch wrappers: stub global fetch and assert on the spy directly, the same way
 // tests/unit/console/keys/client.test.ts exercises addKey/tapToSignIn -- apiRequest itself already
 // has its own tests, so these only cover what fetchMyKeys/renameKey add on top of it.
-import { fetchMyKeys, removeKey, renameKey } from "@/console/account/my-keys-client";
+import { fetchMyKeys, fetchMySessions, removeKey, renameKey, signOutOthers } from "@/console/account/my-keys-client";
 
 function answer(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -103,6 +103,68 @@ describe("removeKey", () => {
       }),
     );
     await expect(removeKey("aaaaaaaa-0000-0000-0000-000000000001", "Left at the old office; replaced.")).resolves.toEqual({
+      kind: "failed",
+      message: "The console could not be reached. Try again.",
+    });
+  });
+});
+
+const SESSIONS_BODY = {
+  ok: true,
+  sessions: [
+    { id: "cccccccc-0000-0000-0000-000000000001", deviceLabel: "Chrome on macOS", lastSeenAt: "2026-09-21T03:50:00Z", createdAt: "2026-09-21T03:42:00Z", isCurrent: true },
+    { id: "cccccccc-0000-0000-0000-000000000002", deviceLabel: "Safari on iPhone", lastSeenAt: "2026-09-20T17:15:00Z", createdAt: "2026-09-18T17:10:00Z", isCurrent: false },
+  ],
+};
+
+describe("fetchMySessions", () => {
+  it("returns the sessions the route reports", async () => {
+    const fetchSpy = vi.fn().mockResolvedValue(answer(SESSIONS_BODY));
+    vi.stubGlobal("fetch", fetchSpy);
+    await expect(fetchMySessions()).resolves.toEqual(SESSIONS_BODY.sessions);
+    expect(fetchSpy).toHaveBeenCalledWith("/api/sessions", expect.objectContaining({ method: "GET" }));
+  });
+
+  it("returns null rather than throw when the route refuses", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(answer({ ok: false, code: "UNAUTHENTICATED", message: "Your session ended. Sign in again." }, 401)));
+    await expect(fetchMySessions()).resolves.toBeNull();
+  });
+
+  it("returns null when the network itself fails, rather than throw", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("Failed to fetch");
+      }),
+    );
+    await expect(fetchMySessions()).resolves.toBeNull();
+  });
+});
+
+describe("signOutOthers", () => {
+  it("sends a same-origin DELETE with no body and reports the count revoked", async () => {
+    const fetchSpy = vi.fn().mockResolvedValue(answer({ ok: true, count: 1 }));
+    vi.stubGlobal("fetch", fetchSpy);
+    await expect(signOutOthers()).resolves.toEqual({ kind: "done", count: 1 });
+    expect(fetchSpy).toHaveBeenCalledOnce();
+    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/sessions");
+    expect(init).toMatchObject({ method: "DELETE" });
+  });
+
+  it("passes the server's own refusal message through", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(answer({ ok: false, code: "INVALID_INPUT", message: "You don't have access to this." }, 403)));
+    await expect(signOutOthers()).resolves.toEqual({ kind: "failed", message: "You don't have access to this." });
+  });
+
+  it("replaces an unreachable-source refusal with the console's own line, via the shared mapper", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("Failed to fetch");
+      }),
+    );
+    await expect(signOutOthers()).resolves.toEqual({
       kind: "failed",
       message: "The console could not be reached. Try again.",
     });

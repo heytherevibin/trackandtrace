@@ -16,8 +16,14 @@ import type { MyKeysRow } from "@/console/account/my-keys";
 // a mocked removeKey, the same layering confirm-its-you.test.tsx itself uses one level down.
 const { fetchMyKeys, removeKey } = vi.hoisted(() => ({ fetchMyKeys: vi.fn(), removeKey: vi.fn() }));
 const { runTap } = vi.hoisted(() => ({ runTap: vi.fn() }));
+// task-9-addendum.md §1: the removal toast was the previous task's gap ("nothing in the console
+// mounts a toaster yet"); this task mounts ToastHost and wires this one line. Mocked here the same
+// way tests/unit/console/account/sessions-plate.test.tsx mocks it, so this test asserts the exact
+// string reaches notify.success without depending on sonner's own internals.
+const { notifySuccess } = vi.hoisted(() => ({ notifySuccess: vi.fn() }));
 vi.mock("@/console/account/my-keys-client", () => ({ fetchMyKeys, removeKey }));
 vi.mock("@/console/keys/tap-client", () => ({ runTap }));
+vi.mock("@/components/ui/toast", () => ({ notify: { success: notifySuccess, error: vi.fn() } }));
 vi.mock("@/console/account/add-key-dialog", () => ({
   AddKeyDialog: ({ open, onAdded }: { readonly open: boolean; readonly onAdded: () => void }) =>
     open ? (
@@ -53,6 +59,7 @@ beforeEach(() => {
   fetchMyKeys.mockReset();
   removeKey.mockReset();
   runTap.mockReset();
+  notifySuccess.mockReset();
 });
 
 describe("KeysPlate", () => {
@@ -204,6 +211,8 @@ describe("KeysPlate", () => {
       await waitFor(() => expect(removeKey).toHaveBeenCalledExactlyOnceWith("aaaaaaaa-0000-0000-0000-000000000005", VALID_REASON));
       expect(await screen.findByText("2 keys")).toBeInTheDocument();
       expect(screen.queryByText("YubiKey 5 NFC")).not.toBeInTheDocument();
+      // ConsoleMyKeys.dc.html's own state script: st === 'Removed' -> 'Key removed · logged'.
+      expect(notifySuccess).toHaveBeenCalledExactlyOnceWith("Key removed · logged");
     });
 
     it("a cancelled tap sends no DELETE and leaves the key in the table", async () => {
@@ -242,6 +251,7 @@ describe("KeysPlate", () => {
       expect(await screen.findByText("This key isn't one of yours.")).toBeVisible();
       expect(screen.getByText("YubiKey 5 NFC")).toBeInTheDocument();
       expect(fetchMyKeys).not.toHaveBeenCalled();
+      expect(notifySuccess).not.toHaveBeenCalled();
     });
   });
 });

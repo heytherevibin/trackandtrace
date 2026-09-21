@@ -1,8 +1,11 @@
 import type { MessageTree } from "@/messages/types";
 
-// Word for word from docs/design/sheets/console/ConsoleMyKeys.dc.html. The Sessions plate is still a
-// later task, so this file does not yet carry its copy -- but task-8 adds Remove, the tap's first
-// real caller, on top of the Add and Rename copy task-7 added before it.
+// Word for word from docs/design/sheets/console/ConsoleMyKeys.dc.html. task-8 added Remove, the
+// tap's first real caller, on top of the Add and Rename copy task-7 added before it; task-9 adds
+// the Sessions plate and the two toasts the sheet's own state script draws
+// (`st === 'Removed' ? 'Key removed · logged' : st === 'Others signed out' ? 'Other sessions
+// signed out · logged' : ''`) -- the second half of each ternary was undrawn in code until this
+// task mounted a toaster (task-9-addendum.md §1).
 export const myKeys = {
   title: "My keys",
   pageTitle: "My keys",
@@ -68,6 +71,10 @@ export const myKeys = {
   // (@/messages/types) is `string | ((...args) => string)` and so cannot carry a function that
   // returns ConfirmItsYou's `{label, before, after}` object.
   removeChangeLabel: "Keys",
+  // The sheet's own state script, state=Removed: `'Key removed · logged'`. The previous task left
+  // this undrawn since nothing mounted a toaster yet (task-8-report.md); task-9 mounts one
+  // (task-9-addendum.md §1) and this is the one line that was waiting on it.
+  removedToast: "Key removed · logged",
 
   profileTitle: "Profile",
   profile: {
@@ -79,4 +86,50 @@ export const myKeys = {
 
   lostTitle: "If you lose your keys",
   lostNote: "Another Owner can reset them. If you're the only Owner, they're reset in the Supabase dashboard, so keep your keys in different places.",
+
+  // ConsoleMyKeys.dc.html:137-144, the sheet's right-hand column (task-9). sessionsTitle sits
+  // beside keysTitle/profileTitle above rather than inside the nested object below, the same split
+  // that block already draws between a plate's own title and its field labels.
+  sessionsTitle: "Sessions",
+  sessions: {
+    // ConsoleMyKeys.dc.html:140's own tag text.
+    thisDevice: "This device",
+    // ConsoleMyKeys.dc.html:140,142: "Chrome on macOS · signed in 09:12 IST". The brief draws this
+    // template for *every* row, current or not (task-9-brief.md: "each row as `<device label> ·
+    // signed in <time>` with `This device` on the current one") -- not the sheet's own second
+    // example row ("Safari on iPhone · last seen yesterday, 22:40 IST"), which reads "last seen"
+    // and a relative day the addendum explicitly steers away from inventing (task-9-addendum.md
+    // §2: "Reuse the console clock's own IST legend handling rather than inventing a second way to
+    // say it"). `time` arrives pre-formatted ("09:12 IST") from formatTime plus the shared IST
+    // legend (consoleMessages.frameSignedIn.clock.ist) -- see sessions-plate.tsx -- so this file
+    // does not duplicate that formatting or the word "IST" a second time.
+    row: (device: string, time: string) => `${device} · signed in ${time}`,
+    // ConsoleMyKeys.dc.html:143's trigger.
+    signOutOthers: "Sign out other sessions",
+    // ConsoleMyKeys.dc.html:208, the confirm dialog's own h2.
+    confirmTitle: "Sign out other sessions?",
+    // ConsoleMyKeys.dc.html:209: "Safari on iPhone is signed out at once. This device stays signed
+    // in." -- built from the list rather than hardcoded (task-9-brief.md), so a member with more
+    // than one other session reads exactly which ones are about to go: this is not a state the
+    // sheet draws, so the plural join and subject-verb agreement below are new, undrawn copy this
+    // task adds rather than transcribes.
+    confirmBody: (devices: readonly string[]) => {
+      const named = devices.length <= 2 ? devices.join(" and ") : `${devices.slice(0, -1).join(", ")}, and ${devices[devices.length - 1]}`;
+      const verb = devices.length === 1 ? "is" : "are";
+      return `${named} ${verb} signed out at once. This device stays signed in.`;
+    },
+    // ConsoleMyKeys.dc.html:212. Cancel is ConfirmDialog's own default (messages.common.cancel,
+    // "Cancel") everywhere else it's used, but the console keeps its own copy of every string it
+    // shows rather than reaching into the traveller tree for one (the same call frame-signed-in.ts
+    // makes for "IST", and the boundary this file's own header note assumes:
+    // tests/unit/console/boundary.contract.test.ts checks the other direction, but nothing here
+    // relies on that -- this string is passed explicitly rather than left to ConfirmDialog's
+    // default).
+    cancel: "Cancel",
+    // ConsoleMyKeys.dc.html:212.
+    confirmConfirm: "Sign out others",
+    // The sheet's own state script, state='Others signed out': `'Other sessions signed out ·
+    // logged'` -- the toast's other half, same story as removedToast above.
+    signedOutToast: "Other sessions signed out · logged",
+  },
 } as const satisfies MessageTree;

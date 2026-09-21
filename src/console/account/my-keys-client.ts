@@ -2,13 +2,15 @@
 
 import { z } from "zod";
 import type { MyKeys } from "@/console/account/my-keys";
+import type { MySessionRow } from "@/console/account/my-sessions";
 import { consoleApiMessage } from "@/console/api-message";
 import { apiRequest } from "@/services/api-client";
 
-// The browser-side calls the My keys page's client component needs beyond its first, server-
-// rendered paint: re-reading the list after a mutation, and sending a rename. Kept separate from
-// src/console/keys/client.ts, which is specifically "the browser half of every ceremony" (its own
-// comment) -- neither of these two calls runs a WebAuthn ceremony.
+// The browser-side calls the My keys page's client components need beyond their first, server-
+// rendered paint: re-reading the keys or the sessions after a mutation, sending a rename, and
+// signing the other sessions out. Kept separate from src/console/keys/client.ts, which is
+// specifically "the browser half of every ceremony" (its own comment) -- none of these calls runs a
+// WebAuthn ceremony, sign-out-others included (task-9: no tap).
 
 const myKeysResponseSchema = z.object({
   ok: z.literal(true),
@@ -72,4 +74,42 @@ export async function removeKey(keyId: string, reason: string): Promise<RemoveOu
     removedSchema,
   );
   return result.ok ? { kind: "done" } : { kind: "failed", message: consoleApiMessage(result.error) };
+}
+
+const mySessionsResponseSchema = z.object({
+  ok: z.literal(true),
+  sessions: z.array(
+    z.object({
+      id: z.guid(),
+      deviceLabel: z.string().min(1).max(120),
+      lastSeenAt: z.string(),
+      createdAt: z.string(),
+      isCurrent: z.boolean(),
+    }),
+  ),
+});
+
+/**
+ * Re-reads GET /api/sessions -- the Sessions plate's own source of truth after a sign-out-others
+ * lands, the same "refresh from the server rather than patch local state by hand" rule KeysPlate's
+ * own fetchMyKeys follows. `null` on any refusal, for the same reason: the mutation already
+ * succeeded or failed on its own terms by the time this runs.
+ */
+export async function fetchMySessions(): Promise<readonly MySessionRow[] | null> {
+  const result = await apiRequest("/api/sessions", { method: "GET" }, mySessionsResponseSchema);
+  return result.ok ? result.data.sessions : null;
+}
+
+export type SignOutOthersOutcome = { readonly kind: "done"; readonly count: number } | { readonly kind: "failed"; readonly message: string };
+
+const signOutOthersResponseSchema = z.object({ ok: z.literal(true), count: z.number().int().nonnegative() });
+
+/**
+ * The delete half of Sessions (task-9): no body, no tap -- console_sign_out_others takes only the
+ * caller's own environment, decided server-side. `count` is what the sheet's own toast does not
+ * show (task-9-addendum.md §4); the caller decides what, if anything, to do with it.
+ */
+export async function signOutOthers(): Promise<SignOutOthersOutcome> {
+  const result = await apiRequest("/api/sessions", { method: "DELETE" }, signOutOthersResponseSchema);
+  return result.ok ? { kind: "done", count: result.data.count } : { kind: "failed", message: consoleApiMessage(result.error) };
 }
