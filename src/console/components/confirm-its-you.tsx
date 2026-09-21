@@ -167,6 +167,11 @@ export function ConfirmItsYou({ open, action, target, value, reason, summary, ch
               placeholder={m.reasonPlaceholder}
               value={reason}
               onChange={(event) => onReasonChange(event.currentTarget.value)}
+              // Locked once the ceremony starts: the tap is minted over this exact string, and the
+              // action that spends it re-digests what the caller then sends. Editing in between
+              // would spend against a reason the tap was never taken for, and the member would get
+              // "no tap for this action" for something they did to themselves.
+              disabled={waiting}
               aria-invalid={reasonAlert || undefined}
               aria-describedby={reasonAlert ? "confirm-reason-alert" : undefined}
             />

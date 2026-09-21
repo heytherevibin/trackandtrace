@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { KEY_NAME_MAX } from "@/console/account/key-name";
 import { createConsoleDb, type ConsoleDb } from "@/console/auth/db";
 import type { ConsoleRole } from "@/console/auth/member";
 import type { ConsoleKeyType } from "@/console/keys/webauthn";
@@ -33,7 +34,7 @@ export interface MyKeys {
 // not accept them even if a future drift on the database side put them back.
 const keyShape = z.object({
   id: z.guid(),
-  name: z.string().min(1).max(60),
+  name: z.string().min(1).max(KEY_NAME_MAX),
   type: z.enum(["passkey", "security_key"]),
   created_at: z.string(),
   last_used_at: z.string().nullable(),

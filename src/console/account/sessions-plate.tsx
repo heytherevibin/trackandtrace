@@ -25,11 +25,10 @@ function atTime(when: string): string {
  * "yesterday, 22:40 IST" -- ConsoleMyKeys.dc.html:142's own shape for a session that is not this
  * one. The day comes from the shared formatRelative, which already says "yesterday", "3 hr ago" and
  * the like, so this adds no second vocabulary of its own; the time is the same atTime the current
- * row uses. A session the database has never marked as seen falls back to when it was created --
- * the row still has to say something, and when it started is the honest answer.
+ * row uses. A session too new to have been seen again still reads sensibly: console.sessions gives
+ * last_seen_at a `not null default now()`, so at insert it already equals created_at.
  */
-function lastSeenAt(lastSeenAt: string | null, createdAt: string): string {
-  const when = lastSeenAt ?? createdAt;
+function lastSeenAt(when: string): string {
   return `${formatRelative(when)}, ${atTime(when)}`;
 }
 
@@ -84,7 +83,7 @@ export function SessionsPlate({ sessions: initialSessions }: { readonly sessions
             <span className="flex-1 text-sm">
               {session.isCurrent
                 ? s.row(session.deviceLabel, atTime(session.createdAt))
-                : s.otherRow(session.deviceLabel, lastSeenAt(session.lastSeenAt, session.createdAt))}
+                : s.otherRow(session.deviceLabel, lastSeenAt(session.lastSeenAt))}
             </span>
             {session.isCurrent ? <Badge variant="accent">{s.thisDevice}</Badge> : null}
           </li>

@@ -234,8 +234,8 @@ describe("DELETE /api/keys/mine", () => {
 // /api/tap/options (the mint) and DELETE /api/keys/mine (the spend) through their own real route
 // handlers, against fakes, so a one-off disagreement between the two fails here rather than as
 // "no tap for this action" in a browser (task-8-brief.md, task-8-addendum.md §2).
-describe("the tap's four fields agree between the mint and the spend", () => {
-  it("mints the tap with the action, target and value console_remove_key's own spend will use", async () => {
+describe("the route carries the tap's four fields through without mangling them", () => {
+  it("passes action, target and value to beginTap exactly as received -- the agreement with console_remove_key's own formula is proved in supabase/tests/console_my_keys.test.sql and keys-plate.test.tsx, not here", async () => {
     requireConsoleMember.mockResolvedValue(MEMBER);
     beginTap.mockResolvedValue({ options: { challenge: "action-challenge" } });
     // KEYS_BEFORE_REMOVAL keys exist; console_remove_key computes v_remaining as count(*) - 1, so a

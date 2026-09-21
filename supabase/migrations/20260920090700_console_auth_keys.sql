@@ -14,7 +14,7 @@ as $$
       'public_key', encode(k.public_key, 'base64'),
       'counter', k.counter,
       'transports', k.transports
-    ) order by k.created_at),
+    ) order by k.created_at, k.id),
     '[]'::jsonb
   )
   from console.keys k
