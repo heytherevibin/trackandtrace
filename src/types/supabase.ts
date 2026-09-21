@@ -169,6 +169,24 @@ export type Database = {
         }
         Returns: string
       }
+      console_change_role: {
+        Args: {
+          p_environment: string
+          p_member: string
+          p_reason: string
+          p_role: string
+        }
+        Returns: undefined
+      }
+      console_invite_member: {
+        Args: {
+          p_email: string
+          p_environment: string
+          p_reason: string
+          p_role: string
+        }
+        Returns: Json
+      }
       console_me: { Args: never; Returns: Json }
       console_my_keys: { Args: never; Returns: Json }
       console_my_sessions: { Args: never; Returns: Json }
@@ -176,8 +194,24 @@ export type Database = {
         Args: { p_environment: string; p_key: string; p_reason: string }
         Returns: number
       }
+      console_remove_member: {
+        Args: { p_environment: string; p_member: string; p_reason: string }
+        Returns: undefined
+      }
       console_rename_key: {
         Args: { p_environment: string; p_key: string; p_name: string }
+        Returns: undefined
+      }
+      console_resend_invite: {
+        Args: { p_environment: string; p_invite: string }
+        Returns: Json
+      }
+      console_reset_keys: {
+        Args: { p_environment: string; p_member: string; p_reason: string }
+        Returns: number
+      }
+      console_revoke_invite: {
+        Args: { p_environment: string; p_invite: string; p_reason: string }
         Returns: undefined
       }
       console_save_settings: {
@@ -193,6 +227,7 @@ export type Database = {
         Args: { p_environment: string }
         Returns: number
       }
+      console_team: { Args: never; Returns: Json }
     }
     Enums: {
       [_ in never]: never
