@@ -1,5 +1,5 @@
 /* Trakline — world tokens for Industry, the wireframe system.
-   Day face = light technical ground. Night face = steel-blue ground.
+   Day face = light technical ground. Night face = neutral near-black ground (Geist neutrals).
    One accent: steel. Literal colours only (the contract test computes contrast from them). */
 
 :root,
@@ -57,45 +57,50 @@
 [data-theme="dark"] {
   color-scheme: dark;
 
-  --surface-0: #1d2d3d;
-  --surface-1: #2c455d;
-  --surface-2: #243a50;
-  --surface-3: #243a50;
+  /* True black page, as Vercel draws it. Wells sit a hair above it; raised objects — menus,
+     dialogs, sheets — lift to gray-100 so they read off the page on fill alone, not on a shadow
+     the black would swallow. Steel is still the one accent, now drawn against neutral ground. */
+  --surface-0: #000000;
+  --surface-1: #0a0a0a;
+  --surface-2: #1a1a1a;
+  --surface-3: #1a1a1a;
 
-  --ink-1: #f5f5f8;
-  --ink-2: #c6c9cf;
-  --ink-3: #b4b9c0;
-  --ink-inverse: #1d2d3d;
+  --ink-1: #ededed;
+  --ink-2: #a1a1a1;
+  --ink-3: #8f8f8f;
+  --ink-inverse: #000000;
   --ink-alert: #d6ebff;
 
+  /* The old night ground (#1d2d3d) keeps one job: the soft steel chip. */
   --accent: #5980a6;
   --accent-text: #b5d9fd;
   --accent-strong: #5980a6;
   --accent-strong-hover: #597ea3;
   --accent-strong-active: #b5d9fd;
-  --accent-ink: #1d2d3d;
-  --accent-soft: #2c455d;
+  --accent-ink: #000000;
+  --accent-soft: #1d2d3d;
   --accent-soft-ink: #d6ebff;
-  --accent-wash: rgba(89, 128, 166, 0.08);
+  --accent-wash: rgba(89, 128, 166, 0.16);
   --accent-busy: #94bce3;
 
-  --line: rgba(245, 245, 248, 0.24);
-  --line-strong: rgba(245, 245, 248, 0.45);
-  --mark: rgba(245, 245, 248, 0.55);
+  --line: rgba(237, 237, 237, 0.2);
+  --line-strong: rgba(237, 237, 237, 0.45);
+  --mark: rgba(237, 237, 237, 0.55);
 
   --focus-ring: #5980a6;
-  --backdrop: rgba(0, 0, 0, 0.6);
-  --skeleton-base: #2c455d;
-  --skeleton-sheen: rgba(255, 255, 255, 0.06);
+  --backdrop: rgba(0, 0, 0, 0.7);
+  --skeleton-base: #292929;
+  --skeleton-sheen: rgba(255, 255, 255, 0.08);
   --selection-bg: rgba(89, 128, 166, 0.3);
-  --selection-fg: #f5f5f8;
-  --scrollbar-thumb: rgba(245, 245, 248, 0.3);
+  --selection-fg: #ededed;
+  --scrollbar-thumb: rgba(237, 237, 237, 0.3);
   --scrollbar-track: transparent;
 
-  /* A hairline edge plus ambient darkness on the dark ground */
-  --elevation-1: 0 1px 2px rgba(0, 0, 0, 0.5);
-  --elevation-2: 0 3px 10px rgba(0, 0, 0, 0.5);
-  --elevation-3: 0 12px 32px rgba(0, 0, 0, 0.6);
+  /* Ambient darkness only: every raised object carries its own hairline, and the fill ladder
+     does the lifting on the black ground. */
+  --elevation-1: 0 1px 2px rgba(0, 0, 0, 0.6);
+  --elevation-2: 0 3px 10px rgba(0, 0, 0, 0.6);
+  --elevation-3: 0 12px 32px rgba(0, 0, 0, 0.7);
 }
 
 /* Surfaces rendered outside the app tree (global-error, not-found) still get the face */

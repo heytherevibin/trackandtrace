@@ -13,13 +13,13 @@ export const LIGHT = {
 } as const;
 
 export const DARK = {
-  surface0: "#1d2d3d",
-  surface1: "#2c455d",
-  ink1: "#f5f5f8",
-  ink3: "#b4b9c0",
+  surface0: "#000000",
+  surface1: "#0a0a0a",
+  ink1: "#ededed",
+  ink3: "#8f8f8f",
   accent: "#5980a6",
   accentText: "#b5d9fd",
-  line: "#4a5764",
+  line: "#2f2f2f",
 } as const;
 
 // The mark keeps its own plate on both faces: three keys and a lit lamp.
