@@ -80,12 +80,15 @@ describe("renameMyKey", () => {
     });
   });
 
-  it("answers a key that is not the caller's with the console's own access line, not a fault", async () => {
+  // The same line removal shows for the same database refusal. Renaming and removing both act on
+  // a key, so both name the key rather than the page: "This key isn't one of yours" tells the
+  // member the thing they need to know, where the generic access line does not.
+  it("answers a key that is not the caller's with the console's own not-yours line, not a fault", async () => {
     const db = dbAnswering({ error: { message: "no access" } });
     await expect(renameMyKey("99999999-9999-9999-9999-999999999999", "Not mine", "production", db)).rejects.toMatchObject({
       code: "INVALID_INPUT",
       status: 403,
-      message: "You don't have access to this.",
+      message: "This key isn't one of yours.",
     });
   });
 

@@ -7,6 +7,7 @@ import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import type { MyKeysRow } from "@/console/account/my-keys";
 import { renameKey } from "@/console/account/my-keys-client";
+import { KEY_NAME_MAX } from "@/console/account/key-name";
 import { consoleMessages } from "@/console/messages";
 
 const m = consoleMessages.myKeys;
@@ -94,7 +95,7 @@ export function RenameKeyDialog({ open, keyRow, onClose, onRenamed }: RenameKeyD
         <form id="rename-key-form" noValidate onSubmit={(event) => void submit(event)} className="flex flex-col gap-4">
           <Field invalid={error !== null}>
             <FieldLabel>{k.nameLabel}</FieldLabel>
-            <Input value={name} disabled={renaming} onChange={(event) => setName(event.currentTarget.value)} />
+            <Input value={name} maxLength={KEY_NAME_MAX} disabled={renaming} onChange={(event) => setName(event.currentTarget.value)} />
             {error !== null ? (
               <FieldError match role="alert">
                 {error}

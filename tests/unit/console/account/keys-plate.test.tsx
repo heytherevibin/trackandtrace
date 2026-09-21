@@ -144,6 +144,16 @@ describe("KeysPlate", () => {
     expect(screen.queryByText("MacBook Pro")).not.toBeInTheDocument();
   });
 
+  // The write landed and the re-read did not. Showing the old name with nothing said is the worst
+  // outcome available: the member has no way to tell a failed rename from a stale table.
+  it("says so when a rename lands but the re-read fails, rather than showing the old name in silence", async () => {
+    fetchMyKeys.mockResolvedValue(null);
+    render(<KeysPlate keys={KEYS} />);
+    await userEvent.click(screen.getAllByRole("button", { name: "Rename" })[1]!);
+    await userEvent.click(screen.getByText("mock rename succeeded for MacBook Pro"));
+    expect(await screen.findByRole("alert")).toHaveTextContent("The console could not be reached. Try again.");
+  });
+
   it("re-fetches and shows the new key once an add lands, and closes the dialog", async () => {
     const added: MyKeysRow = { id: "aaaaaaaa-0000-0000-0000-000000000009", name: "iPhone", type: "passkey", createdAt: "2026-09-20T10:00:00Z", lastUsedAt: null };
     fetchMyKeys.mockResolvedValue({

@@ -23,7 +23,11 @@ begin
         'type', k.type,
         'created_at', k.created_at,
         'last_used_at', k.last_used_at
-      ) order by k.created_at)
+      -- `k.id` breaks the tie. created_at defaults to now(), which is transaction time, so keys
+      -- written in one transaction share a timestamp exactly -- and without a tiebreaker the order
+      -- is whatever the plan happens to produce, so the table could reorder itself between two
+      -- refreshes. It surfaced as a pgTAP test that failed about one run in six.
+      ) order by k.created_at, k.id)
       from console.keys k where k.member_id = v_member.user_id
     ), '[]'::jsonb),
     'member', jsonb_build_object(
@@ -144,7 +148,9 @@ begin
       'last_seen_at', s.last_seen_at,
       'created_at', s.created_at,
       'is_current', s.session_id = v_current
-    ) order by s.created_at desc)
+    -- Same tiebreaker as console_my_keys, for the same reason: two sessions can share a
+    -- created_at, and a list that reorders itself between refreshes is its own small bug.
+    ) order by s.created_at desc, s.session_id)
     from console.sessions s
     where s.member_id = v_member.user_id
       and s.revoked_at is null

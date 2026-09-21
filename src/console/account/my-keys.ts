@@ -64,7 +64,10 @@ function unavailable(): AppError {
  * refusal belongs").
  */
 function fromRenameError(message: string): AppError {
-  if (message.includes("no access")) return new AppError("INVALID_INPUT", consoleMessages.session.noAccess, { status: 403 });
+  // keys.notYours, the same line removal shows and the same one tap.ts's keyFor() shows: one
+  // refusal, one sentence. The generic session.noAccess was vaguer about the very thing the member
+  // needs to know -- it is the key that is not theirs, not the page.
+  if (message.includes("no access")) return new AppError("INVALID_INPUT", consoleMessages.keys.notYours, { status: 403 });
   return unavailable();
 }
 

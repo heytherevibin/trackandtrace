@@ -43,26 +43,33 @@ export function KeysPlate({ keys: initialKeys }: { readonly keys: readonly MyKey
   // delete this file performs afterward even starts), so there is no dialog left open to show it in,
   // and this console has no toast wired up yet to hand it to instead. Cleared whenever a new Remove
   // attempt opens.
-  const [removeError, setRemoveError] = useState<string | null>(null);
+  const [plateError, setPlateError] = useState<string | null>(null);
 
+  // A write that lands and a re-read that does not is the worst of both: the server has the new
+  // name, the table still shows the old one, and saying nothing would let the member believe their
+  // change was lost -- or, if they look away and back, that it never happened. So a failed re-read
+  // says so, in the same place a refused action does.
   async function refresh(): Promise<void> {
     const fresh = await fetchMyKeys();
     if (fresh) setKeys(fresh.keys);
+    else setPlateError(consoleMessages.session.unavailable);
   }
 
   async function handleAdded(): Promise<void> {
     setDialog({ kind: "none" });
+    setPlateError(null);
     await refresh();
   }
 
   async function handleRenamed(): Promise<void> {
     setDialog({ kind: "none" });
+    setPlateError(null);
     await refresh();
   }
 
   function openRemove(row: MyKeysRow): void {
     setRemoveReason("");
-    setRemoveError(null);
+    setPlateError(null);
     setDialog({ kind: "remove", row });
   }
 
@@ -91,7 +98,7 @@ export function KeysPlate({ keys: initialKeys }: { readonly keys: readonly MyKey
     // A refusal -- the two-key floor, a stale key that is no longer this member's, or a stale count
     // that no longer matches the tap's own digest (task-8-addendum.md §2) -- leaves `keys` untouched:
     // no optimistic removal ever happened, so "the key stays in the table" needs no undo.
-    setRemoveError(outcome.message);
+    setPlateError(outcome.message);
   }
 
   const removing = dialog.kind === "remove" ? dialog.row : null;
@@ -139,9 +146,9 @@ export function KeysPlate({ keys: initialKeys }: { readonly keys: readonly MyKey
         <p className="text-label text-ink-3">{m.twoKeyLine}</p>
         <p className="text-label text-ink-3">{m.legends.onlyHere}</p>
         <p className="text-label text-ink-3">{m.legends.addStarts}</p>
-        {removeError ? (
+        {plateError ? (
           <p role="alert" className="text-label font-medium text-ink-alert">
-            {removeError}
+            {plateError}
           </p>
         ) : null}
       </div>
