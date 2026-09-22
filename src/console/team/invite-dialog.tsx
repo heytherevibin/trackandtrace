@@ -119,11 +119,18 @@ export function InviteDialog({ variant = "primary" }: { readonly variant?: Butto
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<ConsoleRole>(DEFAULT_ROLE);
   const [reason, setReason] = useState("");
-  // What was refused, and for which address. Derived against the live field below rather than
-  // tracked as its own boolean, so editing the address clears the alert for free -- the same shape
-  // ConfirmItsYou's own `reasonAlert` uses one level down. It carries both refusals a member can
-  // see here: this dialog's own "that is not an address", and whatever the database refused.
+  // A refusal about the address itself, and which address it was about. Derived against the live
+  // field below rather than tracked as its own boolean, so editing the address clears the latch for
+  // free -- the same shape ConfirmItsYou's own `reasonAlert` uses one level down. This is the state
+  // dlg_refused draws: aria-invalid, an alert under the field, and Continue disabled. It carries
+  // this dialog's own "that is not an address" alongside the three the database raises.
   const [refusal, setRefusal] = useState<{ readonly email: string; readonly message: string } | null>(null);
+  // A refusal that has nothing to do with the address: a tap that no longer matches, or a console
+  // that could not be reached. Both invite a retry with this very address, in as many words, so
+  // neither may latch the field or disable Continue -- and neither belongs on the Email field at
+  // all, which is why it is not one state with `refusal` above. Cleared by the next attempt rather
+  // than by an edit, because an edit is not what would fix it.
+  const [attemptError, setAttemptError] = useState<string | null>(null);
   const roleLabelId = useId();
 
   function open(): void {
@@ -131,6 +138,7 @@ export function InviteDialog({ variant = "primary" }: { readonly variant?: Butto
     setRole(DEFAULT_ROLE);
     setReason("");
     setRefusal(null);
+    setAttemptError(null);
     setStage({ kind: "form" });
   }
 
@@ -139,6 +147,7 @@ export function InviteDialog({ variant = "primary" }: { readonly variant?: Butto
    * an address that is not an address is not something the console needs to be asked about.
    */
   function onContinue(): void {
+    setAttemptError(null);
     if (!EMAIL.safeParse(email.trim().toLowerCase()).success) {
       setRefusal({ email, message: m.invalidEmail });
       return;
@@ -166,11 +175,17 @@ export function InviteDialog({ variant = "primary" }: { readonly variant?: Butto
       setReason("");
       return;
     }
-    // Back to TC-04 with the refusal under the field it is about, as dlg_refused draws it -- not to
-    // a toast. A toast goes away; a refusal a member has to act on stays next to the thing that
-    // refused. Continue is disabled until the address changes, because nothing else about this
-    // attempt could make the same address succeed.
-    setRefusal({ email: typed, message: outcome.message });
+    // Back to TC-04 with the refusal on screen, not to a toast: a toast goes away, and a refusal a
+    // member has to act on stays next to the thing that refused.
+    //
+    // Where it goes depends on whether this address could ever succeed. The three the database
+    // raises about the address go under the Email field, as dlg_refused draws them, with Continue
+    // disabled until the address changes -- nothing else about the attempt could change the answer.
+    // A stale tap or an unreachable console is the opposite case: both say "try again" in their own
+    // copy, so both leave the field alone and Continue enabled, and the member's next Continue
+    // takes a fresh tap over the same address.
+    if (outcome.boundToAddress) setRefusal({ email: typed, message: outcome.message });
+    else setAttemptError(outcome.message);
     setStage({ kind: "form" });
   }
 
@@ -220,6 +235,14 @@ export function InviteDialog({ variant = "primary" }: { readonly variant?: Butto
               <RolePicker value={role} labelId={roleLabelId} onChange={setRole} />
             </div>
             <p className="text-label text-ink-3">{m.hint}</p>
+            {/* Deliberately outside <Field>: role="alert" is announced when it appears, and
+                pointing the Email input's aria-describedby at it would tell a screen reader the
+                address is the problem when it is not. */}
+            {attemptError !== null ? (
+              <p role="alert" className="text-label font-medium text-ink-alert">
+                {attemptError}
+              </p>
+            ) : null}
           </div>
         </DialogContent>
       </DialogRoot>

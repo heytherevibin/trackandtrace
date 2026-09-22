@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { consoleApiMessage } from "@/console/api-message";
 import type { ConsoleRole } from "@/console/auth/member";
+import { consoleMessages } from "@/console/messages";
 import { apiRequest } from "@/services/api-client";
 
 // The browser-side call the Team page's one client component needs: sending an invite. Modelled on
@@ -20,7 +21,40 @@ import { apiRequest } from "@/services/api-client";
 // quietly hand it to a caller that might log it.
 const invitedSchema = z.object({ ok: z.literal(true) }).strict();
 
-export type InviteOutcome = { readonly kind: "done" } | { readonly kind: "failed"; readonly message: string };
+/**
+ * The refusals that are about the address itself and so cannot succeed until it changes -- as
+ * opposed to a stale tap or a console that could not be reached, both of which the very same
+ * address can retry, and both of whose copy says so in as many words.
+ *
+ * This compares the message the server sent against the very objects the server's own mapper built
+ * its AppError from: `fromInviteError` (src/console/team/team.ts) reads
+ * `consoleMessages.team.invite.alreadyMember` and this file reads the same property of the same
+ * object. That is not the pattern ConfirmItsYou's own note rejects -- that one matched a server
+ * message against a *second, locally restated* wording, which could drift the moment either was
+ * edited. There is one copy here, and editing it moves both halves at once.
+ *
+ * A message this set has never seen falls through as `false`, deliberately: an unclassified refusal
+ * should leave a member able to try again, not lock a field over a sentence nobody wrote a rule for.
+ */
+const ADDRESS_BOUND: ReadonlySet<string> = new Set([
+  consoleMessages.team.invite.alreadyMember,
+  consoleMessages.team.invite.alreadyInvited,
+  consoleMessages.team.invite.travellerAccount,
+]);
+
+export type InviteOutcome =
+  | { readonly kind: "done" }
+  | {
+      readonly kind: "failed";
+      readonly message: string;
+      /**
+       * Whether retrying with this same address could ever succeed. The dialog latches its Email
+       * field -- `aria-invalid`, the alert beneath it, Continue disabled -- only when this is true,
+       * so that the two refusals whose copy invites a retry do not disable the one control that
+       * retries.
+       */
+      readonly boundToAddress: boolean;
+    };
 
 /**
  * Sends one invite (task-4, Form TC-04). Called only after ConfirmItsYou's `onConfirmed` fires --
@@ -42,5 +76,7 @@ export async function inviteMember(email: string, role: ConsoleRole, reason: str
     { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, role, reason }) },
     invitedSchema,
   );
-  return result.ok ? { kind: "done" } : { kind: "failed", message: consoleApiMessage(result.error) };
+  if (result.ok) return { kind: "done" };
+  const message = consoleApiMessage(result.error);
+  return { kind: "failed", message, boundToAddress: ADDRESS_BOUND.has(message) };
 }

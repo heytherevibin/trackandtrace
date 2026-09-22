@@ -32,6 +32,7 @@ describe("inviteMember", () => {
     await expect(inviteMember("priya@example.com", "support", "Covering weekend leads.")).resolves.toEqual({
       kind: "failed",
       message: "The console could not be reached. Try again.",
+      boundToAddress: false,
     });
   });
 
@@ -45,6 +46,7 @@ describe("inviteMember", () => {
     await expect(inviteMember("priya.shah@example.com", "support", "Covering weekend leads.")).resolves.toEqual({
       kind: "failed",
       message: "This address already has a Trakline account. Invite a dedicated console address.",
+      boundToAddress: true,
     });
   });
 
@@ -58,6 +60,47 @@ describe("inviteMember", () => {
     await expect(inviteMember("priya@example.com", "support", "Covering weekend leads.")).resolves.toEqual({
       kind: "failed",
       message: "The console could not be reached. Try again.",
+      boundToAddress: false,
     });
+  });
+});
+
+// Which refusals the same address can never fix, and which it can. The dialog latches its Email
+// field -- aria-invalid, an alert beneath it, Continue disabled -- only on the first kind, so
+// getting this wrong is what would have a console tell a member to try again while disabling the
+// one control that tries.
+describe("inviteMember's boundToAddress", () => {
+  function refusing(message: string, code = "INVALID_INPUT"): void {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(answer({ ok: false, code, message }, 403)));
+  }
+
+  const send = () => inviteMember("priya@example.com", "support", "Covering weekend leads.");
+
+  it("is true for the three refusals about the address itself", async () => {
+    for (const message of [
+      "This address already belongs to a console member.",
+      "This address already has an invite open. Resend or revoke that one instead.",
+      "This address already has a Trakline account. Invite a dedicated console address.",
+    ]) {
+      refusing(message);
+      await expect(send()).resolves.toMatchObject({ boundToAddress: true });
+    }
+  });
+
+  it("is false for a stale tap, which the very same address can retry", async () => {
+    refusing("That confirmation no longer matches this invite. Try inviting them again.");
+    await expect(send()).resolves.toMatchObject({ boundToAddress: false });
+  });
+
+  it("is false for a console that could not be reached, which the very same address can retry", async () => {
+    refusing("The console could not be reached. Try again.", "SOURCE_UNAVAILABLE");
+    await expect(send()).resolves.toMatchObject({ boundToAddress: false });
+  });
+
+  // Fails open on purpose: a refusal nobody has classified yet leaves the member able to retry,
+  // rather than locking a field over a sentence this file has never seen.
+  it("is false for a refusal it does not recognise", async () => {
+    refusing("Something nobody has written a rule for yet.");
+    await expect(send()).resolves.toMatchObject({ boundToAddress: false });
   });
 });

@@ -121,7 +121,7 @@ describe("InviteDialog", () => {
   // what it was sent -- never the raw text.
   it("shows the database's translated refusal for an address that is already a member, not its raw text", async () => {
     runTap.mockResolvedValue({ kind: "done" });
-    inviteMember.mockResolvedValue({ kind: "failed", message: "This address already belongs to a console member." });
+    inviteMember.mockResolvedValue({ kind: "failed", message: "This address already belongs to a console member.", boundToAddress: true });
     render(<InviteDialog variant="primary" />);
     const user = await openWith("devi@trakline.in");
     await confirm(user);
@@ -137,16 +137,60 @@ describe("InviteDialog", () => {
 
   it("draws the sheet's own alert for an address that already has a Trakline account", async () => {
     runTap.mockResolvedValue({ kind: "done" });
-    inviteMember.mockResolvedValue({ kind: "failed", message: "This address already has a Trakline account. Invite a dedicated console address." });
+    inviteMember.mockResolvedValue({
+      kind: "failed",
+      message: "This address already has a Trakline account. Invite a dedicated console address.",
+      boundToAddress: true,
+    });
     render(<InviteDialog variant="primary" />);
     const user = await openWith("priya.shah@example.com");
     await confirm(user);
     expect(await screen.findByRole("alert")).toHaveTextContent("This address already has a Trakline account. Invite a dedicated console address.");
   });
 
+  // A stale tap and an unreachable console both invite a retry with the very same address, so
+  // neither may latch the field or disable the only control that retries -- and neither has
+  // anything to say about the address, so neither may mark it invalid.
+  it("leaves Continue enabled and the address unmarked when the refusal is not about the address", async () => {
+    runTap.mockResolvedValue({ kind: "done" });
+    inviteMember.mockResolvedValue({
+      kind: "failed",
+      message: "That confirmation no longer matches this invite. Try inviting them again.",
+      boundToAddress: false,
+    });
+    render(<InviteDialog variant="primary" />);
+    const user = await openWith("priya@example.com");
+    await confirm(user);
+    expect(await screen.findByRole("alert")).toHaveTextContent("That confirmation no longer matches this invite. Try inviting them again.");
+    expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled();
+    expect(screen.getByLabelText("Email")).not.toHaveAttribute("aria-invalid");
+    expect(screen.getByLabelText("Email")).toHaveValue("priya@example.com");
+  });
+
+  it("lets that retry actually run, on the same address, without an edit", async () => {
+    runTap.mockResolvedValue({ kind: "done" });
+    inviteMember.mockResolvedValueOnce({
+      kind: "failed",
+      message: "That confirmation no longer matches this invite. Try inviting them again.",
+      boundToAddress: false,
+    });
+    inviteMember.mockResolvedValue({ kind: "done" });
+    render(<InviteDialog variant="primary" />);
+    const user = await openWith("priya@example.com");
+    await confirm(user);
+    await screen.findByRole("alert");
+    await confirm(user);
+    await waitFor(() => expect(notifySuccess).toHaveBeenCalledWith("Invite sent · logged"));
+    expect(inviteMember).toHaveBeenCalledTimes(2);
+  });
+
   it("lets a refused address be edited, which re-enables Continue", async () => {
     runTap.mockResolvedValue({ kind: "done" });
-    inviteMember.mockResolvedValue({ kind: "failed", message: "This address already has a Trakline account. Invite a dedicated console address." });
+    inviteMember.mockResolvedValue({
+      kind: "failed",
+      message: "This address already has a Trakline account. Invite a dedicated console address.",
+      boundToAddress: true,
+    });
     render(<InviteDialog variant="primary" />);
     const user = await openWith("priya.shah@example.com");
     await confirm(user);

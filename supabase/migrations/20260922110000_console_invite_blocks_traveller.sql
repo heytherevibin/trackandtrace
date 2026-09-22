@@ -17,11 +17,11 @@
 -- in auth.users too, so either one going wrong is a failed test, not a subtle
 -- change of wording.
 --
--- A consequence worth stating rather than designing around: a REMOVED member
--- keeps their auth.users row, so under this rule they can no longer be
--- re-invited. That is the spec's own sentence applied literally. Inventing an
--- exemption is a policy decision, and not one this migration gets to make --
--- it is recorded in task-4-report.md instead.
+-- One exemption, ruled on by the owner rather than invented here: a REMOVED
+-- member keeps their auth.users row, so the rule read literally would refuse
+-- them for good. Removal must not be permanent, so the check below lets an
+-- address through when its only console.members row is 'removed'. See the
+-- check itself for why that is narrow.
 --
 -- Everything else about this function is unchanged, and its original comments
 -- are carried over verbatim (20260922090000_console_team.sql).
@@ -51,13 +51,35 @@ begin
     raise exception 'an invite is already open for that address' using errcode = '42501';
   end if;
 
-  -- Spec §E line 103. `lower(u.email)`, not `u.email`: v_email is already
-  -- lower-cased above, and an Owner who typed a capital must not be able to
-  -- walk straight past this rule. It costs the partial index on auth.users
-  -- (email), which is the right trade for a check that runs once per invite.
-  -- This function is `security definer` with `set search_path = ''`, so it may
-  -- read auth.users by its fully-qualified name; its caller may not.
-  if exists (select 1 from auth.users u where lower(u.email) = v_email) then
+  -- Spec §E line 103, with one exemption the owner ruled on. `lower(u.email)`,
+  -- not `u.email`: v_email is already lower-cased above, and an Owner who typed
+  -- a capital must not be able to walk straight past this rule. It costs the
+  -- partial index on auth.users (email), which is the right trade for a check
+  -- that runs once per invite. This function is `security definer` with
+  -- `set search_path = ''`, so it may read auth.users by its fully-qualified
+  -- name; its caller may not.
+  --
+  -- The exemption: removal never touches auth.users, so read literally this
+  -- rule would lock a removed member out for good -- there is no "unremove",
+  -- and this function is the only way back in. So an address is let through
+  -- when console.members still holds a row for it, which by this point can
+  -- only be a 'removed' one: the first check above already refused every other
+  -- status. `status = 'removed'` is written out rather than left implicit,
+  -- because the two checks being read together is the only thing that makes
+  -- the shorter form correct, and a later edit to either one should not be
+  -- able to widen this silently.
+  --
+  -- An address with a traveller account and no member row at all is still
+  -- refused, which is the case the sheet draws.
+  --
+  -- console_auth_accept_invite already lands a re-invite correctly: its insert
+  -- is `on conflict (user_id) do update set role, status = 'setup', name`, and
+  -- a removed member keeps both their user_id and their email, so accepting
+  -- reactivates the row they already have rather than colliding with
+  -- console_members_email_key.
+  if exists (select 1 from auth.users u where lower(u.email) = v_email)
+     and not exists (select 1 from console.members where email = v_email and status = 'removed')
+  then
     raise exception 'that address already has a Trakline account' using errcode = '42501';
   end if;
 

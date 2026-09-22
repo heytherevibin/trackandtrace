@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(78);
+select plan(79);
 
 -- What an Owner may do to the team: list it, invite someone, change a role,
 -- reset a member's keys, remove a member, and resend or revoke an invite.
@@ -110,7 +110,16 @@ select is(
 -- role gate runs first and refuses before any of them could matter.
 select pg_temp.speak_as('d1111111-1111-1111-1111-111111111111', 'd2222222-2222-2222-2222-222222222222');
 select throws_ok($$ select public.console_team() $$, '42501', null, 'a Support member cannot list the team');
-select throws_ok($$ select public.console_invite_member('new@trakline.in', 'viewer', 'Trying anyway.', 'development') $$, '42501', null, 'nor invite someone');
+-- This one names its message where its six siblings do not, and it has to.
+-- console_invite_member now carries a third refusal of its own (the traveller
+-- check, 20260922110000_console_invite_blocks_traveller.sql), and a bare
+-- '42501', null here would pass whether the Owner floor refused or that check
+-- did -- so the assertion would stop being about the role gate it was written
+-- for. 'no access' is console.require_role's own text.
+select throws_ok(
+  $$ select public.console_invite_member('new@trakline.in', 'viewer', 'Trying anyway.', 'development') $$,
+  '42501', 'no access', 'nor invite someone'
+);
 select throws_ok($$ select public.console_change_role('a1111111-1111-1111-1111-111111111111', 'admin', 'Trying anyway.', 'development') $$, '42501', null, 'nor change a role');
 select throws_ok($$ select public.console_reset_keys('a1111111-1111-1111-1111-111111111111', 'Trying anyway.', 'development') $$, '42501', null, 'nor reset a member''s keys');
 select throws_ok($$ select public.console_remove_member('a1111111-1111-1111-1111-111111111111', 'Trying anyway.', 'development') $$, '42501', null, 'nor remove a member');
@@ -423,14 +432,24 @@ select throws_ok(
 );
 select is(jsonb_array_length(public.console_team() -> 'members'), 4, 'a removed member no longer appears in the roster');
 
--- ...and cannot be invited back. Removal clears the console.members check (status = 'removed' is
--- not a member any more) but never touches auth.users, so the traveller check catches them on the
--- way past. That is spec §E line 103 applied literally, and it is a real consequence rather than an
--- oversight: task-4-report.md states it plainly instead of quietly carving out an exemption that
--- this task has no authority to invent.
-select throws_ok(
+-- ...and can be invited back. Removal never touches auth.users, so the literal reading of spec
+-- §E:103 would have refused a removed member for good -- there is no "unremove", and this function
+-- is the only way in. The owner ruled that removal must not be permanent (task-4 fix round 1), so
+-- the traveller check exempts an address whose only console.members row is 'removed'. The
+-- exemption is narrow, and tests 36-37 above are what keep it narrow: priya.shah@example.com has
+-- an auth.users row and no member row at all, and is still refused.
+select pg_temp.tap(
+  'a1111111-1111-1111-1111-111111111111', 'a2222222-2222-2222-2222-222222222222', 'reinvite-priya-challenge',
+  'Invited a member', 'priya@trakline.in', 'support', 'Priya is coming back.'
+);
+select lives_ok(
   $$ select public.console_invite_member('priya@trakline.in', 'support', 'Priya is coming back.', 'development') $$,
-  '42501', 'that address already has a Trakline account', 'a removed member keeps their auth.users row, so they cannot be re-invited'
+  'a removed member can be invited back -- removal is not permanent'
+);
+select is(
+  (select count(*)::int from console.invites where email = 'priya@trakline.in' and accepted_at is null and revoked_at is null),
+  1,
+  'and the re-invite is live, so the letter it sends can actually be redeemed'
 );
 
 select * from finish();
