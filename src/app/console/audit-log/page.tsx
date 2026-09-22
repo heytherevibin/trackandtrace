@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { PageHeader } from "@/components/ui/page-header";
 import { getAuditLog, type AuditPage } from "@/console/audit/audit";
 import { EntriesPlate } from "@/console/audit/entries-plate";
 import { auditQueryFor, parseAuditFilters, type AuditSearchParams } from "@/console/audit/filters";
@@ -153,12 +152,13 @@ export default async function AuditLogPage({ searchParams }: { readonly searchPa
   // re-reads from the GET route, which is a real recovery -- a reload would only re-run this.
   const page: AuditPage | null = await getAuditLog(auditQueryFor(filters, new Date())).catch(() => null);
 
+  // The page header is drawn by EntriesPlate rather than here, and that moved with Task 4: the
+  // sheet puts `Export CSV` in the header's own actions (:90) while the export's status rows belong
+  // down beside the table (:136-147), and both need the live filters and the live total -- which
+  // only the client component holds. A header rendered here could reach neither.
   return (
     <ConsoleFrame member={member}>
-      <div className="flex flex-col gap-8">
-        <PageHeader kicker={m.kicker} title={m.title} lead={m.lead} />
-        <EntriesPlate initial={page} filters={filters} environment={environment} />
-      </div>
+      <EntriesPlate initial={page} filters={filters} environment={environment} />
     </ConsoleFrame>
   );
 }

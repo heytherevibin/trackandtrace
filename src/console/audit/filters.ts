@@ -225,6 +225,103 @@ export function auditRangeBounds(filters: AuditFilters, now: Date): { readonly f
 }
 
 /**
+ * The most rows one export will carry.
+ *
+ * Mirrored as the literal in `console.audit_export_max()`
+ * (20260922200000_console_audit_export.sql), which is the boundary; this copy is a courtesy, so the
+ * dialog does not ask a member for a ceremony the database is going to refuse. The two are pinned
+ * by a test each, and each comment names the other.
+ *
+ * It is not a performance number. An export too large for the route to hold would still have spent
+ * its tap and still have written an audit row saying it happened, in a table with no update and no
+ * delete -- a permanent record of an export nobody received.
+ */
+export const AUDIT_EXPORT_MAX = 10_000;
+
+/**
+ * The action the export's tap is digested under, and the action its audit row is written as.
+ *
+ * A literal here and a literal in `console_audit_export`; they are the one pair that must agree by
+ * hand, exactly as `'Invited a member'` already does across `console_invite_member` and the dialog
+ * that requests its tap. A constant, so a tap taken for a role change can never be spent on an
+ * export.
+ */
+export const AUDIT_EXPORT_ACTION = "Exported the audit log";
+
+const RANGE_SEPARATOR = "/";
+
+/**
+ * The export's `target` digest field: the half-open interval it will read, as one string.
+ *
+ * This and `auditExportFilters` below are **the only** implementation of the export's canonical
+ * form. `console.action_digest` hashes the four strings the browser sends when the tap is minted,
+ * and `console.use_tap` re-hashes whatever `console_audit_export` passes it -- so the database
+ * receives these two strings verbatim, hands them to `use_tap` verbatim, and only ever *parses*
+ * them. A database that had to render them back from typed parameters would be a second
+ * implementation of this function, and the day the two drifted every export would fail with "no tap
+ * for this action" and nothing would say why (src/console/keys/tap.ts's own note).
+ *
+ * Either side may be empty: one day picked and not the other is a real Custom range. Both empty is
+ * not, and the database refuses it.
+ */
+export function auditExportRange(filters: AuditFilters, now: Date): string {
+  const { from, to } = auditRangeBounds(filters, now);
+  return `${from ?? ""}${RANGE_SEPARATOR}${to ?? ""}`;
+}
+
+/**
+ * The export's `value` digest field: every filter the range does not already carry, as one object.
+ *
+ * Always the same five keys in always the same order, and explicit `null` for each absent one --
+ * two exports that ask for the same rows must produce byte-identical strings, or a tap minted on
+ * one page could not be spent from another. `search` is normalised to `null` for the same reason
+ * `auditQueryFor` does it: `p_category`, `p_result` and `p_environment` are plain equalities in
+ * SQL, so `""` means *match nothing*.
+ */
+export function auditExportFilters(filters: AuditFilters): string {
+  return JSON.stringify({
+    category: filters.category,
+    environment: filters.environment,
+    member: filters.member,
+    result: filters.result,
+    search: filters.search || null,
+  });
+}
+
+/** The IST calendar day an instant falls on, or null when the string is not one. */
+function dayAt(iso: string, offsetMs = 0): string | null {
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return null;
+  return dayKey.format(at.getTime() + offsetMs);
+}
+
+/**
+ * `audit-2026-09-19.csv` -- AuditLog.dc.html:144's own file name, and a function of the range
+ * rather than a constant.
+ *
+ * Derived from the canonical range string and nothing else, so the name can never describe a
+ * different set than the tap approved. The range's end is **exclusive**, so the last day it covers
+ * is the one before it: a Today range at 00:00 the next morning must not be named for a day it
+ * carries no rows from.
+ *
+ * Only the single-day form is drawn. The other three are **Not drawn** -- the sheet only ever draws
+ * Today -- and a range spanning a week would otherwise be named for one of its days, which is worse
+ * than a longer name.
+ */
+export function auditExportFileName(range: string): string {
+  const [rawFrom = "", rawTo = ""] = range.split(RANGE_SEPARATOR);
+  const from = rawFrom ? dayAt(rawFrom) : null;
+  const to = rawTo ? dayAt(rawTo, -1) : null;
+  if (from && to) return from === to ? `audit-${from}.csv` : `audit-${from}-to-${to}.csv`;
+  if (from) return `audit-from-${from}.csv`;
+  if (to) return `audit-to-${to}.csv`;
+  // Unreachable through this module: a range with neither side is refused before a file exists to
+  // name. A name is still returned rather than thrown, because naming a file is not where an
+  // unbounded export should be discovered.
+  return "audit.csv";
+}
+
+/**
  * The filters as `console_audit`'s own nine arguments. `null` for everything absent and never `""`:
  * `p_category`, `p_result` and `p_environment` are plain equalities, so an empty string matches
  * nothing and shows an empty log with no explanation (task-2-addendum.md §3).

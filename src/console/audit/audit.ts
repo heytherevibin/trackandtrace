@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AUDIT_RESULTS, type AuditQuery, type AuditResult } from "@/console/audit/filters";
+import { AUDIT_EXPORT_MAX, AUDIT_RESULTS, auditExportFileName, type AuditQuery, type AuditResult } from "@/console/audit/filters";
 import { createConsoleDb, type ConsoleDb } from "@/console/auth/db";
 import type { ConsoleRole } from "@/console/auth/member";
 import { consoleMessages } from "@/console/messages";
@@ -215,4 +215,156 @@ export async function getAuditEntry(id: string, db?: ConsoleDb): Promise<AuditEn
   const { data, error } = await client.rpc("console_audit_entry", { p_id: id });
   if (error) throw fromAuditError(error);
   return parseAuditEntry(data);
+}
+
+// ---------------------------------------------------------------------------
+// The export (Task 4). Everything above only reads; this is the one action.
+// ---------------------------------------------------------------------------
+
+const m = consoleMessages.audit;
+
+/**
+ * The CSV's columns, in `console.audit_log`'s own order.
+ *
+ * The header names are the table's own column names and are deliberately **not** in the messages
+ * tree. They are not copy: the file is a record of a table, opened in a spreadsheet beside the
+ * console rather than read as prose, and a translated header would make the same export a
+ * different artefact in each locale -- and a different one again the day the copy was edited.
+ * Sixteen columns, the same sixteen `console.audit_row` serialises, so the CSV and the table can
+ * never describe a row differently.
+ */
+const CSV_COLUMNS: readonly (readonly [string, (row: AuditEntry) => string | null])[] = [
+  ["id", (row) => row.id],
+  // Exactly as the database serialised it, offset and all. A second date implementation here would
+  // be one more thing to keep in step with the table and the drawer, and the offset form is
+  // unambiguous wherever the file is opened.
+  ["at", (row) => row.at],
+  ["environment", (row) => row.environment],
+  ["actor_id", (row) => row.actorId],
+  ["actor_name", (row) => row.actorName],
+  ["actor_role", (row) => row.actorRole],
+  ["key_id", (row) => row.keyId],
+  ["session_label", (row) => row.sessionLabel],
+  ["category", (row) => row.category],
+  ["action", (row) => row.action],
+  ["target", (row) => row.target],
+  ["reason", (row) => row.reason],
+  ["result", (row) => row.result],
+  ["address_hash", (row) => row.addressHash],
+  // Stringified even when the column holds a bare JSON string, so the column has one shape
+  // throughout; every other column is rendered as itself.
+  ["before", (row) => (row.before === null ? null : JSON.stringify(row.before))],
+  ["after", (row) => (row.after === null ? null : JSON.stringify(row.after))],
+];
+
+/**
+ * The characters a spreadsheet reads as the start of a formula rather than as text.
+ *
+ * This file is opened in Excel or Sheets by the person doing the access review, and the audit log
+ * holds text members typed and text the console stored on their behalf -- a reason, a target, a
+ * session label. A cell beginning `=`, `+`, `-` or `@` is evaluated on open; a leading tab or
+ * carriage return can smuggle one past a naive check. Quoting is not a defence here: a spreadsheet
+ * strips the quotes and evaluates what is inside.
+ */
+const FORMULA_LEAD = /^[=+\-@\t\r]/;
+
+/**
+ * One field, RFC 4180: quoted when it carries a quote, a comma or a line break, with the quotes
+ * inside it doubled.
+ *
+ * A field that would be read as a formula gets a leading apostrophe first. That is a real
+ * alteration of the record and it is the deliberate trade: the apostrophe is visible in the file,
+ * and a record that is slightly annotated is better than one that runs. Only the leading character
+ * is touched; nothing else in the value is changed.
+ */
+function csvField(value: string | null): string {
+  if (value === null || value === "") return "";
+  const guarded = FORMULA_LEAD.test(value) ? `'${value}` : value;
+  return /["\r\n,]/.test(guarded) ? `"${guarded.replaceAll('"', '""')}"` : guarded;
+}
+
+/**
+ * The filtered set as a CSV file, header first, in the order the database returned it.
+ *
+ * CRLF line endings and a leading byte-order mark, both for the program that will actually open
+ * this: without the BOM, Excel reads UTF-8 as the local code page, and the console's curly quotes,
+ * ellipses and Indian names arrive as mojibake in a document someone is about to sign off on.
+ */
+export function auditCsv(rows: readonly AuditEntry[]): string {
+  const header = CSV_COLUMNS.map(([name]) => name).join(",");
+  const body = rows.map((row) => CSV_COLUMNS.map(([, read]) => csvField(read(row))).join(","));
+  return `﻿${[header, ...body].join("\r\n")}`;
+}
+
+/** `console_audit_export`'s own answer: the whole filtered set, and its size. */
+const exportShape = z.object({ rows: z.array(rowShape), count: z.number().int().nonnegative() });
+
+/**
+ * The three refusals `console_audit_export` raises that a member can act on differently, and
+ * nothing else.
+ *
+ * Read by message and not by code, the same way `src/console/team/team.ts` reads its own: every
+ * console refusal is a 42501, so the code alone cannot tell a stale confirmation from a role that
+ * changed under the page. Anything that is not one of ours is a driver string, a missing relation,
+ * a provider's wording -- none of it written for a member to read.
+ */
+function fromExportError(error: { readonly message: string; readonly code?: string }): AppError {
+  if (error.message.includes("no tap for this action")) return new AppError("INVALID_INPUT", m.export.tapMismatch, { status: 403 });
+  if (error.message.includes("too many entries to export")) return new AppError("INVALID_INPUT", m.export.tooMany(AUDIT_EXPORT_MAX), { status: 403 });
+  if (error.code === "42501") return new AppError("INVALID_INPUT", m.export.refused, { status: 403 });
+  return unavailable();
+}
+
+export interface AuditExportRequest {
+  /** The canonical half-open range, exactly as the tap was minted over it. */
+  readonly range: string;
+  /** The canonical filter object, exactly as the tap was minted over it. */
+  readonly filters: string;
+  /** The reason the member typed, exactly as the tap was minted over it. */
+  readonly reason: string;
+  /** The deployment the audit row is written against. The route's own, never a caller's. */
+  readonly environment: string;
+}
+
+export interface AuditExport {
+  readonly csv: string;
+  readonly count: number;
+  readonly fileName: string;
+}
+
+/**
+ * One export: spend the tap, write the audit row, take the rows, serialise them.
+ *
+ * The first three happen inside `console_audit_export`, in one transaction, and that is the whole
+ * design (task-4-addendum.md §2): `console.use_tap` re-digests the four fields from its own
+ * arguments, so a route that spent a tap and then separately assembled a CSV would have spent it
+ * on something nobody approved.
+ *
+ * `range` and `filters` are passed through **verbatim** and are never rebuilt here. They are the
+ * two strings the browser had digested when the tap was minted; recomputing them server-side would
+ * let a Today range cross midnight between the two computations and leave a tap that cannot be
+ * spent, with nothing to say why.
+ *
+ * Makes no access check of its own, exactly as `getAuditLog` makes none: the route above guards,
+ * and `console.require_role('admin')` inside the function is the boundary -- a floor, so an Owner
+ * and an Admin both pass and Support and Viewer are refused.
+ */
+export async function exportAuditLog(ask: AuditExportRequest, db?: ConsoleDb): Promise<AuditExport> {
+  const client = db ?? (await createConsoleDb());
+  const { data, error } = await client.rpc("console_audit_export", {
+    p_range: ask.range,
+    p_filters: ask.filters,
+    p_reason: ask.reason,
+    p_environment: ask.environment,
+  });
+  if (error) throw fromExportError(error);
+  const parsed = exportShape.safeParse(data);
+  if (!parsed.success) throw unavailable();
+  return {
+    csv: auditCsv(parsed.data.rows.map(toEntry)),
+    count: parsed.data.count,
+    // From the same string the tap was taken over, so the name on screen can never describe a
+    // different set than the one the member approved.
+    fileName: auditExportFileName(ask.range),
+  };
 }

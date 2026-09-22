@@ -203,6 +203,62 @@ export const audit = {
     system: "System",
   },
 
+  // Export (AuditLog.dc.html:90 for the control, :232-251 for the confirm step, :136-147 for the
+  // two status rows). The confirm step is **Form TC-01** as drawn -- "Confirm it's you", a Reason
+  // field, the standard hint, "Tap your key" -- so its copy is `consoleMessages.tap`'s and is not
+  // restated here. What is here is only what this module draws around it.
+  //
+  // The sheet draws Preparing and Ready as rows on the board, between the chip row and the Entries
+  // plate, and not inside the dialog: the dialog closes when the key answers.
+  export: {
+    // :94, beside the icon.
+    action: "Export CSV",
+
+    // :237's bold line -- "Export 14 audit entries from today" -- a function of the count and the
+    // range, as the addendum says and as the sheet's own composition shows. The singular is **Not
+    // drawn**: the sheet only ever draws 14, and "Export 1 audit entries" is not a sentence.
+    summary: (count: number, range: string) => `Export ${count} ${count === 1 ? "audit entry" : "audit entries"} from ${range}`,
+
+    // :139, word for word, ellipsis and full stop included. Singular Not drawn, as above.
+    preparing: (count: number, range: string) => `Preparing export… ${count} ${count === 1 ? "entry" : "entries"} from ${range}.`,
+
+    // The range, in the words the summary and the preparing line put after "from". Only `today` is
+    // drawn (:237, :139); the other three are **Not drawn** and are the same vocabulary the
+    // table's own caption already uses for them ("for the last 7 days", "for the chosen dates"), so
+    // the two halves of this page describe a range the same way.
+    ranges: {
+      today: "today",
+      "7d": "the last 7 days",
+      "30d": "the last 30 days",
+      custom: "the chosen dates",
+    },
+
+    // :145 and :146, word for word. The line is the specification, not decoration: the prepared
+    // export is single-use, lives in the browser that asked for it, and is let go after ten
+    // minutes.
+    works: "Works once, in this browser, for 10 minutes",
+    download: "Download",
+
+    // **Not drawn.** The sheet draws the export succeeding and never failing, and a refusal that
+    // showed nothing would leave a member pressing a button that had already stopped working. A
+    // database refusal is a developer string and must never reach them, so each of these is the
+    // console's own sentence for one thing that can really happen.
+
+    // console.use_tap refused: the four fields it re-digests differ from the ones the tap was
+    // minted over -- the filters moved under the dialog, or five minutes passed. Same shape as
+    // team.invite.tapMismatch and for the same reason: it is not an outage, so it must not read
+    // like one.
+    tapMismatch: "That confirmation no longer matches this export. Try exporting again.",
+
+    // console.audit_export_max(). The number comes from AUDIT_EXPORT_MAX so the line cannot claim a
+    // limit the database does not hold.
+    tooMany: (max: number) => `That's more than ${max.toLocaleString("en-IN")} entries. Narrow the range or the filters and try again.`,
+
+    // Every other 42501: a role that changed in another tab, or a request that never went through
+    // the filter bar. Both are answered by reloading, which is also what re-reads the role.
+    refused: "The console wouldn't export that. Reload the page and try again.",
+  },
+
   empty: {
     title: "No actions in this range",
     detail: "Nothing was done in the console with these filters.",

@@ -1,55 +1,26 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataTable, type Column } from "@/components/ui/data-table";
+import { PageHeader } from "@/components/ui/page-header";
 import { Plate } from "@/components/ui/plate";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StateBlock } from "@/components/ui/state-block";
 import { consoleApiMessage } from "@/console/api-message";
 import type { AuditEntry, AuditPage } from "@/console/audit/audit";
+import { readAuditPage } from "@/console/audit/audit-client";
 import { EntryDrawer } from "@/console/audit/entry-drawer";
+import { AuditExportButton, AuditExportProvider, AuditExportStatus } from "@/console/audit/export-dialog";
 import { FilterBar, type AuditMemberOption } from "@/console/audit/filter-bar";
-import { AUDIT_PAGE_SIZE, AUDIT_RESULTS, auditFiltersToSearch, clearAuditFilters, type AuditFilters } from "@/console/audit/filters";
+import { AUDIT_PAGE_SIZE, auditFiltersToSearch, clearAuditFilters, type AuditFilters } from "@/console/audit/filters";
 import { consoleMessages } from "@/console/messages";
-import { apiRequest } from "@/services/api-client";
 import { log } from "@/services/log";
 import { formatDateTime, formatTime } from "@/utils/datetime";
 
 const m = consoleMessages.audit;
 const f = consoleMessages.frame;
-
-// The response shape of GET /api/audit, restated here rather than imported: `audit.ts` reaches the
-// database through `@/console/auth/db`, which reads next/headers, so it cannot be pulled into a
-// browser bundle -- the same split src/console/account/my-keys-client.ts already draws against
-// src/console/account/my-keys.ts. Only the fields this table renders are re-validated; `before` and
-// `after` cross as whatever JSON they are, and Task 3's drawer is what will read them.
-const responseShape = z.object({
-  ok: z.literal(true),
-  total: z.number().int().nonnegative(),
-  rows: z.array(
-    z.object({
-      id: z.guid(),
-      at: z.iso.datetime({ offset: true }),
-      environment: z.string().min(1),
-      actorId: z.guid().nullable(),
-      actorName: z.string().min(1),
-      actorRole: z.enum(["owner", "admin", "support", "viewer"]).nullable(),
-      keyId: z.guid().nullable(),
-      sessionLabel: z.string().nullable(),
-      category: z.string().min(1),
-      action: z.string().min(1),
-      target: z.string().nullable(),
-      reason: z.string().nullable(),
-      result: z.enum(AUDIT_RESULTS),
-      addressHash: z.string().nullable(),
-      before: z.json(),
-      after: z.json(),
-    }),
-  ),
-});
 
 const EMPTY: AuditPage = { rows: [], total: 0 };
 
@@ -171,9 +142,16 @@ function Loading() {
  * a server round trip -- so a filtered view is still linkable and still survives a reload, and a
  * reload is the one thing that legitimately counts as opening the log again.
  *
- * The browser-side read is inline here rather than in `src/console/audit/audit-client.ts`: that
- * file is Task 4's to create (the plan's own pre-flight note), and an empty one now is a file two
- * tasks fight over.
+ * It draws the page header too, which is not where a component called "the entries plate" would
+ * naturally put it -- and it is the only place it can go. `Export CSV` is drawn in the header's own
+ * actions (:90-96), the two export status rows are drawn down here between the chip row and the
+ * plate (:136-147), and both are one export: the control has to reach the live filters and the
+ * live total, which live in this component and nowhere else. A server-rendered header above a
+ * client island could reach neither. `AuditExportProvider` is what joins them, so neither the
+ * header nor the plate owns the export.
+ *
+ * The browser-side read now lives in `src/console/audit/audit-client.ts` (Task 4's file to create),
+ * where the export's own request sits beside it.
  *
  * `initial` is `null` when the page's own server-side read failed -- the sheet draws an in-page
  * error state for this module (:201-208), unlike /keys, whose brief quoted none and which therefore
@@ -204,7 +182,7 @@ export function EntriesPlate({
     async (next: AuditFilters) => {
       const mine = ++request.current;
       setStatus("loading");
-      const result = await apiRequest(`/api/audit${auditFiltersToSearch(next, environment)}`, { method: "GET" }, responseShape);
+      const result = await readAuditPage(next, environment);
       if (mine !== request.current) return;
       if (!result.ok) {
         // consoleApiMessage is the one thing that decides what a failed console request says
@@ -241,36 +219,57 @@ export function EntriesPlate({
   const rangeLabel = m.filters.ranges[filters.range];
 
   return (
-    <div className="flex flex-col gap-4">
-      <FilterBar filters={filters} environment={environment} members={members} onChange={apply} />
+    <AuditExportProvider filters={filters} total={page.total}>
+      <div className="flex flex-col gap-8">
+        {/*
+          AuditLog.dc.html:90 draws `Export CSV` in the page header's `ph-actions`, behind the
+          sheet's own `canExport` (:351, `!noAccess`). There is no prop for that here because there
+          is nothing left for it to decide: a role below module 14's floor never reaches this
+          component at all -- the page answered it with NoAccessState -- so on this page `canExport`
+          is the same fact as "this component is rendering", exactly as src/app/console/team/page.tsx
+          reasons about its own `canManage`.
 
-      <Plate as="section" title={m.entries.title} titleId="audit-entries" headingLevel={2} meta={[m.entries.rangeCell(rangeLabel, page.total)]} padding="none">
-        {status === "loading" ? (
-          <Loading />
-        ) : status === "error" ? (
-          // role="alert", as the sheet draws this state and only this one (:202).
-          <StateBlock bare role="alert" title={m.error.title} detail={m.error.detail} actions={<Button onClick={() => void read(filters)}>{m.error.action}</Button>} />
-        ) : page.rows.length === 0 ? (
-          <StateBlock bare title={m.empty.title} detail={m.empty.detail} actions={<Button onClick={() => apply(clearAuditFilters(filters, environment))}>{m.empty.action}</Button>} />
-        ) : (
-          <>
-            <DataTable columns={columns((row) => setOpenId(row.id))} rows={page.rows} rowKey={(row) => row.id} caption={m.entries.caption[filters.range]} />
-            <div className="flex items-center gap-2 px-3.5 py-2.5">
-              <span className="legend grow">{m.entries.pageRange(first, last, page.total)}</span>
-              <Button size="sm" disabled={filters.page <= 1} onClick={() => apply({ ...filters, page: filters.page - 1 })}>
-                {m.entries.previous}
-              </Button>
-              <Button size="sm" disabled={last >= page.total} onClick={() => apply({ ...filters, page: filters.page + 1 })}>
-                {m.entries.next}
-              </Button>
-            </div>
-          </>
-        )}
-      </Plate>
+          The phone is a different question and not this task's: AuditLogPhone.dc.html:64 replaces
+          this control with "Open on a larger screen to export." Task 5 owns that, and the control is
+          one element in one slot so that removing it there is one line.
+        */}
+        <PageHeader kicker={m.kicker} title={m.title} lead={m.lead} actions={<AuditExportButton />} />
 
-      {/* Outside the plate, as the sheet draws it (:215): the drawer is a plate of its own over the
-          board, not something nested inside the Entries plate -- plates do not nest. */}
-      <EntryDrawer entryId={openId} onClose={() => setOpenId(null)} />
-    </div>
+        <div className="flex flex-col gap-4">
+          <FilterBar filters={filters} environment={environment} members={members} onChange={apply} />
+
+          {/* Between the chip row and the Entries plate, where the sheet draws both of them (:136-147). */}
+          <AuditExportStatus />
+
+          <Plate as="section" title={m.entries.title} titleId="audit-entries" headingLevel={2} meta={[m.entries.rangeCell(rangeLabel, page.total)]} padding="none">
+            {status === "loading" ? (
+              <Loading />
+            ) : status === "error" ? (
+              // role="alert", as the sheet draws this state and only this one (:202).
+              <StateBlock bare role="alert" title={m.error.title} detail={m.error.detail} actions={<Button onClick={() => void read(filters)}>{m.error.action}</Button>} />
+            ) : page.rows.length === 0 ? (
+              <StateBlock bare title={m.empty.title} detail={m.empty.detail} actions={<Button onClick={() => apply(clearAuditFilters(filters, environment))}>{m.empty.action}</Button>} />
+            ) : (
+              <>
+                <DataTable columns={columns((row) => setOpenId(row.id))} rows={page.rows} rowKey={(row) => row.id} caption={m.entries.caption[filters.range]} />
+                <div className="flex items-center gap-2 px-3.5 py-2.5">
+                  <span className="legend grow">{m.entries.pageRange(first, last, page.total)}</span>
+                  <Button size="sm" disabled={filters.page <= 1} onClick={() => apply({ ...filters, page: filters.page - 1 })}>
+                    {m.entries.previous}
+                  </Button>
+                  <Button size="sm" disabled={last >= page.total} onClick={() => apply({ ...filters, page: filters.page + 1 })}>
+                    {m.entries.next}
+                  </Button>
+                </div>
+              </>
+            )}
+          </Plate>
+
+          {/* Outside the plate, as the sheet draws it (:215): the drawer is a plate of its own over
+              the board, not something nested inside the Entries plate -- plates do not nest. */}
+          <EntryDrawer entryId={openId} onClose={() => setOpenId(null)} />
+        </div>
+      </div>
+    </AuditExportProvider>
   );
 }

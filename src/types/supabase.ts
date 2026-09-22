@@ -59,6 +59,15 @@ export type Database = {
         Returns: Json
       }
       console_audit_entry: { Args: { p_id: string }; Returns: Json }
+      console_audit_export: {
+        Args: {
+          p_environment: string
+          p_filters: string
+          p_range: string
+          p_reason: string
+        }
+        Returns: Json
+      }
       console_auth_accept_invite: {
         Args: {
           p_environment: string
