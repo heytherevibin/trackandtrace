@@ -33,7 +33,8 @@ function formatLastActive(value: string | null, now: Date): string {
 /**
  * The Members plate (ConsoleTeam.dc.html): who is in this console, in the order console_team
  * already returns them (by role rank, then name). Every row carries the sheet's own Actions trigger
- * and the menu behind it (:145, :193-199); Task 5 wires its first item, Task 6 the other two.
+ * and the menu behind it (:145, :193-199), with all three of its items now wired -- Change role by
+ * Task 5, Reset keys and Remove by Task 6.
  *
  * Still a server component. Only the menu inside each Actions cell is "use client", the same split
  * the only-you row's InviteDialog already draws, so the roster this plate renders is the roster the
@@ -41,9 +42,10 @@ function formatLastActive(value: string | null, now: Date): string {
  * client-side copy that could disagree with it (task-4-addendum.md §5, Ruling 14).
  *
  * `signedInId` and the active-Owner count are what the row menu's last-Owner guard reads
- * (task-5-addendum.md §3). Both are facts about the roster as a whole, so they are worked out here,
- * once, rather than by each row: `activeOwners` counts what console.require_another_active_owner()
- * counts -- every member who is an Owner *and* active -- and not "is this row the only Owner".
+ * (task-5-addendum.md §3), for a removal as well as a role change (task-6-addendum.md §4). Both are
+ * facts about the roster as a whole, so they are worked out here, once, rather than by each row:
+ * `activeOwners` counts what console.require_another_active_owner() counts -- every member who is
+ * an Owner *and* active -- and not "is this row the only Owner".
  *
  * The sheet draws a distinct Only-you state for a console with exactly one member
  * (task-3-addendum.md §1): the same single-row table this component always renders, plus a note

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ConsoleDb } from "@/console/auth/db";
-import { changeMemberRole, getTeam, inviteTeamMember } from "@/console/team/team";
+import { changeMemberRole, getTeam, inviteTeamMember, removeTeamMember, resetMemberKeys } from "@/console/team/team";
 
 // console_team() itself (supabase/migrations/20260922090000_console_team.sql): both halves, one
 // call, never a token_hash. Dates arrive from Postgres with an offset ("+00:00"), not "Z" -- the
@@ -270,6 +270,96 @@ describe("changeMemberRole", () => {
   it("answers anything else with the console's own unavailable line, never the database's words", async () => {
     const db = dbAnswering({ error: { message: 'relation "console.members" does not exist', code: "42P01" } });
     await expect(changeMemberRole(MEMBER, "admin", WHY, "production", db)).rejects.toMatchObject({
+      code: "SOURCE_UNAVAILABLE",
+      message: "The console could not be reached. Try again.",
+    });
+  });
+});
+
+describe("resetMemberKeys", () => {
+  const MEMBER = "d1111111-1111-1111-1111-111111111111";
+  const WHY = "Lost a security key on the train.";
+
+  it("passes the member as a uuid and the reason and environment as text, and returns the count", async () => {
+    const { db, rpc } = dbSpy({ data: 2 });
+    await expect(resetMemberKeys(MEMBER, WHY, "production", db)).resolves.toBe(2);
+    expect(rpc).toHaveBeenCalledWith("console_reset_keys", { p_member: MEMBER, p_reason: WHY, p_environment: "production" });
+  });
+
+  // Parsed, never cast: console_reset_keys promises an integer and a caller builds a sentence out
+  // of it, so a shape that drifted must fail closed rather than reach a toast as "NaN keys".
+  it("refuses a count that is not a non-negative integer", async () => {
+    for (const data of ["2", 2.5, -1, null]) {
+      await expect(resetMemberKeys(MEMBER, WHY, "production", dbAnswering({ data }))).rejects.toMatchObject({
+        code: "SOURCE_UNAVAILABLE",
+        message: "The console could not be reached. Try again.",
+      });
+    }
+  });
+
+  // The genuine race (task-6-addendum.md §3): the browser mints over the count it rendered and the
+  // database recounts inside its own transaction, so a key added or removed in between spends
+  // against a digest the tap was never taken for. Failing closed is correct; a developer string on
+  // screen is not.
+  it("translates use_tap's own 'no tap for this action' into a sentence about the keys", async () => {
+    const db = dbAnswering({ error: { message: "no tap for this action", code: "42501" } });
+    await expect(resetMemberKeys(MEMBER, WHY, "production", db)).rejects.toMatchObject({
+      code: "INVALID_INPUT",
+      message: "That confirmation no longer matches this member's keys. Their keys changed since this page loaded; reload it and try again.",
+    });
+  });
+
+  it("answers a vanished or removed target by its errcode, in the console's own words", async () => {
+    const db = dbAnswering({ error: { message: "no access", code: "42501" } });
+    await expect(resetMemberKeys(MEMBER, WHY, "production", db)).rejects.toMatchObject({
+      code: "INVALID_INPUT",
+      message: "The team has changed since this page loaded. Reload it and try again.",
+    });
+  });
+
+  it("answers anything else with the console's own unavailable line, never the database's words", async () => {
+    const db = dbAnswering({ error: { message: 'relation "console.keys" does not exist', code: "42P01" } });
+    await expect(resetMemberKeys(MEMBER, WHY, "production", db)).rejects.toMatchObject({
+      code: "SOURCE_UNAVAILABLE",
+      message: "The console could not be reached. Try again.",
+    });
+  });
+});
+
+describe("removeTeamMember", () => {
+  const MEMBER = "d1111111-1111-1111-1111-111111111111";
+  const WHY = "Left the support rota at the end of September.";
+
+  it("passes the member as a uuid and the reason and environment as text", async () => {
+    const { db, rpc } = dbSpy({});
+    await expect(removeTeamMember(MEMBER, WHY, "production", db)).resolves.toBeUndefined();
+    expect(rpc).toHaveBeenCalledWith("console_remove_member", { p_member: MEMBER, p_reason: WHY, p_environment: "production" });
+  });
+
+  // The tap's own value here is the target's CURRENT role, which the page read and the database
+  // re-reads under a lock -- so a role changed in another tab between mint and spend lands here.
+  it("translates use_tap's own 'no tap for this action' into a sentence about the member", async () => {
+    const db = dbAnswering({ error: { message: "no tap for this action", code: "42501" } });
+    await expect(removeTeamMember(MEMBER, WHY, "production", db)).rejects.toMatchObject({
+      code: "INVALID_INPUT",
+      message: "That confirmation no longer matches this member. Their role changed since this page loaded; reload it and try again.",
+    });
+  });
+
+  // Both of console_remove_member's own refusals share one developer string and one errcode with
+  // every other console refusal, so they are answered by the code, never by reading the words --
+  // and the browser decided both before any request went out anyway (task-6-addendum.md §4).
+  it("answers the last-Owner and self-removal refusals by their errcode, in the console's own words", async () => {
+    const db = dbAnswering({ error: { message: "a console needs at least one owner", code: "42501" } });
+    await expect(removeTeamMember(MEMBER, WHY, "production", db)).rejects.toMatchObject({
+      code: "INVALID_INPUT",
+      message: "The team has changed since this page loaded. Reload it and try again.",
+    });
+  });
+
+  it("answers anything else with the console's own unavailable line, never the database's words", async () => {
+    const db = dbAnswering({ error: { message: 'relation "console.members" does not exist', code: "42P01" } });
+    await expect(removeTeamMember(MEMBER, WHY, "production", db)).rejects.toMatchObject({
       code: "SOURCE_UNAVAILABLE",
       message: "The console could not be reached. Try again.",
     });

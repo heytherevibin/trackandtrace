@@ -2,13 +2,13 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// The row menu (ConsoleTeam.dc.html:145 for its trigger, :193-199 for the menu itself). Task 5 owns
-// the menu and its first item; Reset keys and Remove are Task 6's, and are drawn here inert so the
-// menu the sheet draws exists once rather than being rebuilt around new items later
-// (task-5-addendum.md §5).
-const { changeRole } = vi.hoisted(() => ({ changeRole: vi.fn() }));
-vi.mock("@/console/team/team-client", () => ({ changeRole }));
-vi.mock("@/console/keys/tap-client", () => ({ runTap: vi.fn() }));
+// The row menu (ConsoleTeam.dc.html:145 for its trigger, :193-199 for the menu itself). Task 5 drew
+// all three items and wired the first; Task 6 wires the other two, so every item now opens the
+// dialog the sheet draws for it (task-5-addendum.md §5, task-6-addendum.md §5).
+const { changeRole, resetKeys, removeMember } = vi.hoisted(() => ({ changeRole: vi.fn(), resetKeys: vi.fn(), removeMember: vi.fn() }));
+const { runTap } = vi.hoisted(() => ({ runTap: vi.fn() }));
+vi.mock("@/console/team/team-client", () => ({ changeRole, resetKeys, removeMember }));
+vi.mock("@/console/keys/tap-client", () => ({ runTap }));
 vi.mock("@/components/ui/toast", () => ({ notify: { success: vi.fn(), error: vi.fn() } }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 
@@ -27,6 +27,9 @@ const KIRAN: TeamMember = {
 
 beforeEach(() => {
   changeRole.mockReset();
+  resetKeys.mockReset();
+  removeMember.mockReset();
+  runTap.mockReset();
 });
 
 function draw() {
@@ -63,13 +66,17 @@ describe("MemberRowMenu", () => {
     expect(screen.getByRole("menu", { name: "Actions for Kiran Das" })).toBeInTheDocument();
   });
 
-  // Task 6's two, present so the menu is transcribed once, inert so neither pretends to work.
-  it("leaves Reset keys and Remove inert for Task 6", async () => {
+  // This assertion was Task 5's, and it read the opposite way: it pinned Reset keys and Remove as
+  // `aria-disabled="true"` so neither pretended to work while only Change role was wired. Task 6
+  // wires both, so the fact worth holding is now that no item is inert -- deliberately rewritten
+  // rather than deleted, because "all three items are live" is exactly what the old assertion would
+  // otherwise have stopped saying anything about.
+  it("leaves none of the three inert now that all three are wired", async () => {
     draw();
     await openMenu();
-    expect(screen.getByRole("menuitem", { name: "Reset keys" })).toHaveAttribute("aria-disabled", "true");
-    expect(screen.getByRole("menuitem", { name: "Remove" })).toHaveAttribute("aria-disabled", "true");
-    expect(screen.getByRole("menuitem", { name: "Change role" })).not.toHaveAttribute("aria-disabled", "true");
+    for (const name of ["Change role", "Reset keys", "Remove"]) {
+      expect(screen.getByRole("menuitem", { name }), name).not.toHaveAttribute("aria-disabled", "true");
+    }
   });
 
   it("opens the change-role flow from its first item", async () => {
@@ -80,9 +87,74 @@ describe("MemberRowMenu", () => {
     expect(screen.getByRole("radiogroup", { name: "New role" })).toBeInTheDocument();
   });
 
-  it("opens nothing until its first item is used", () => {
+  it("opens the reset-keys confirmation from its second item", async () => {
+    draw();
+    const user = await openMenu();
+    await user.click(screen.getByRole("menuitem", { name: "Reset keys" }));
+    expect(await screen.findByText("Reset Kiran Das's keys")).toBeInTheDocument();
+    expect(screen.getByText("Form TC-01")).toBeInTheDocument();
+  });
+
+  it("opens the remove confirmation from its last item", async () => {
+    draw();
+    const user = await openMenu();
+    await user.click(screen.getByRole("menuitem", { name: "Remove" }));
+    expect(await screen.findByText("Remove Kiran Das from the console")).toBeInTheDocument();
+    expect(screen.getByText("Form TC-01")).toBeInTheDocument();
+  });
+
+  it("opens nothing until an item is used", () => {
     draw();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  });
+
+  // Only one at a time: each item replaces whatever the last one opened, so a member can never
+  // have two confirmations stacked over one row.
+  it("opens one dialog at a time", async () => {
+    draw();
+    const user = await openMenu();
+    await user.click(screen.getByRole("menuitem", { name: "Reset keys" }));
+    await screen.findByText("Reset Kiran Das's keys");
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await user.click(screen.getByRole("button", { name: "Actions for Kiran Das" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Remove" }));
+    expect(await screen.findByText("Remove Kiran Das from the console")).toBeInTheDocument();
+    expect(screen.queryByText("Reset Kiran Das's keys")).not.toBeInTheDocument();
+  });
+});
+
+// A refusal comes back after TC-01 has already closed (ConfirmItsYou's onConfirmed fires the moment
+// the tap verifies, before the request this menu then sends), so there is no dialog left to show it
+// in -- the same thing src/console/account/keys-plate.tsx found for Remove, and it answered the same
+// way: an alert that stays on screen beside the control that would retry it, never a toast that
+// goes away.
+describe("MemberRowMenu's refusals", () => {
+  it("keeps a refused reset on screen, beside the menu that would retry it", async () => {
+    runTap.mockResolvedValue({ kind: "done" });
+    resetKeys.mockResolvedValue({ kind: "failed", message: "The team has changed since this page loaded. Reload it and try again." });
+    draw();
+    const user = await openMenu();
+    await user.click(screen.getByRole("menuitem", { name: "Reset keys" }));
+    await user.type(await screen.findByLabelText("Reason"), "Lost a security key on the train.");
+    await user.click(screen.getByRole("button", { name: "Tap your key" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("The team has changed since this page loaded. Reload it and try again.");
+  });
+
+  // Cleared when the next attempt opens, not when it lands: a sentence about an attempt that has
+  // already been replaced is worse than none (the rule Task 5's own picker alert follows).
+  it("drops a previous refusal the moment another item is opened", async () => {
+    runTap.mockResolvedValue({ kind: "done" });
+    resetKeys.mockResolvedValue({ kind: "failed", message: "The team has changed since this page loaded. Reload it and try again." });
+    draw();
+    const user = await openMenu();
+    await user.click(screen.getByRole("menuitem", { name: "Reset keys" }));
+    await user.type(await screen.findByLabelText("Reason"), "Lost a security key on the train.");
+    await user.click(screen.getByRole("button", { name: "Tap your key" }));
+    await screen.findByRole("alert");
+    await user.click(screen.getByRole("button", { name: "Actions for Kiran Das" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Remove" }));
+    await screen.findByText("Remove Kiran Das from the console");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });

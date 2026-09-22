@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-// The browser half of inviting (task-4) and of changing a role (task-5). Stubs global fetch and
-// asserts on the spy directly, the same shape tests/unit/console/account/my-keys-client.test.ts
-// uses for removeKey: apiRequest has its own tests, so these only cover what the two functions add
-// on top of it.
-import { changeRole, inviteMember } from "@/console/team/team-client";
+// The browser half of inviting (task-4), changing a role (task-5), and resetting a member's keys
+// or removing them (task-6). Stubs global fetch and asserts on the spy directly, the same shape
+// tests/unit/console/account/my-keys-client.test.ts uses for removeKey: apiRequest has its own
+// tests, so these only cover what the four functions add on top of it.
+import { changeRole, inviteMember, removeMember, resetKeys } from "@/console/team/team-client";
 
 function answer(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -154,6 +154,106 @@ describe("changeRole", () => {
       }),
     );
     await expect(changeRole(MEMBER, "admin", REASON)).resolves.toEqual({
+      kind: "failed",
+      message: "The console could not be reached. Try again.",
+    });
+  });
+});
+
+// Resetting a member's keys (task-6). The one call on this page whose success carries something
+// back: console_reset_keys returns how many keys it deleted, and the toast reports it.
+describe("resetKeys", () => {
+  const MEMBER = "d1111111-1111-1111-1111-111111111111";
+  const REASON = "Lost a security key on the train.";
+
+  it("sends the member's id and the reason to DELETE /api/team/keys", async () => {
+    const fetchSpy = vi.fn().mockResolvedValue(answer({ ok: true, count: 2 }));
+    vi.stubGlobal("fetch", fetchSpy);
+    await expect(resetKeys(MEMBER, REASON)).resolves.toEqual({ kind: "done", count: 2 });
+    expect(fetchSpy).toHaveBeenCalledOnce();
+    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/team/keys");
+    expect(init).toMatchObject({ method: "DELETE" });
+    expect(JSON.parse(String(init.body))).toEqual({ member: MEMBER, reason: REASON });
+  });
+
+  // The count is the whole point of this response, so a body without one is not a success this
+  // caller can report -- it would leave the toast with nothing true to say.
+  it("refuses a response with no count", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(answer({ ok: true })));
+    await expect(resetKeys(MEMBER, REASON)).resolves.toEqual({
+      kind: "failed",
+      message: "The console could not be reached. Try again.",
+    });
+  });
+
+  it("refuses a response carrying anything besides ok and count", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(answer({ ok: true, count: 2, keys: [] })));
+    await expect(resetKeys(MEMBER, REASON)).resolves.toEqual({
+      kind: "failed",
+      message: "The console could not be reached. Try again.",
+    });
+  });
+
+  it("passes the server's own refusal message through", async () => {
+    const message = "That confirmation no longer matches this member's keys. Their keys changed since this page loaded; reload it and try again.";
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(answer({ ok: false, code: "INVALID_INPUT", message }, 403)));
+    await expect(resetKeys(MEMBER, REASON)).resolves.toEqual({ kind: "failed", message });
+  });
+
+  it("replaces an unreachable-source refusal with the console's own line, via the shared mapper", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("Failed to fetch");
+      }),
+    );
+    await expect(resetKeys(MEMBER, REASON)).resolves.toEqual({
+      kind: "failed",
+      message: "The console could not be reached. Try again.",
+    });
+  });
+});
+
+// Removing a member (task-6). Shaped on changeRole above: nothing comes back that the refreshed
+// roster will not show, so `.strict()` on `{ ok: true }` is what keeps it that way.
+describe("removeMember", () => {
+  const MEMBER = "d1111111-1111-1111-1111-111111111111";
+  const REASON = "Left the support rota at the end of September.";
+
+  it("sends the member's id and the reason to DELETE /api/team/member", async () => {
+    const fetchSpy = vi.fn().mockResolvedValue(answer({ ok: true }));
+    vi.stubGlobal("fetch", fetchSpy);
+    await expect(removeMember(MEMBER, REASON)).resolves.toEqual({ kind: "done" });
+    expect(fetchSpy).toHaveBeenCalledOnce();
+    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/team/member");
+    expect(init).toMatchObject({ method: "DELETE" });
+    expect(JSON.parse(String(init.body))).toEqual({ member: MEMBER, reason: REASON });
+  });
+
+  it("refuses a response carrying anything besides ok", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(answer({ ok: true, status: "removed" })));
+    await expect(removeMember(MEMBER, REASON)).resolves.toEqual({
+      kind: "failed",
+      message: "The console could not be reached. Try again.",
+    });
+  });
+
+  it("passes the server's own refusal message through", async () => {
+    const message = "The team has changed since this page loaded. Reload it and try again.";
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(answer({ ok: false, code: "INVALID_INPUT", message }, 403)));
+    await expect(removeMember(MEMBER, REASON)).resolves.toEqual({ kind: "failed", message });
+  });
+
+  it("replaces an unreachable-source refusal with the console's own line, via the shared mapper", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("Failed to fetch");
+      }),
+    );
+    await expect(removeMember(MEMBER, REASON)).resolves.toEqual({
       kind: "failed",
       message: "The console could not be reached. Try again.",
     });

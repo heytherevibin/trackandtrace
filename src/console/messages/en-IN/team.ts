@@ -8,6 +8,14 @@ import { signIn } from "./sign-in";
 // comes from, and a caller passing the wrong half is not a thing a type can catch.
 const firstName = (name: string) => name.split(" ")[0];
 
+// Not drawn, and authored once for all three row actions rather than three times. Every console
+// refusal raises SQLSTATE 42501 with a developer string nobody wrote for a member -- 'a console
+// needs at least one owner', 'no access' for a member removed a moment ago, require_role's own for
+// an Owner demoted in another tab. Through this console's own UI every one of them means the same
+// thing, whichever action met it: the roster moved underneath this page. Saying it once is what
+// keeps three copies from drifting into three slightly different claims about the same fact.
+const rosterMoved = "The team has changed since this page loaded. Reload it and try again.";
+
 // Word for word from docs/design/sheets/console/ConsoleTeam.dc.html, with corrections recorded in
 // task-3-report.md:
 //
@@ -195,20 +203,69 @@ export const team = {
     // Not drawn. console.use_tap's own 'no tap for this action' -- the four fields the database
     // re-digests differ from the ones the tap was minted over. Same shape as invite.tapMismatch and
     // myKeys.tapMismatch, and for the same reason: it is not an outage, so it must not read as one.
+    // "Try again", with no reload: unlike the two below, nothing this dialog digests comes from the
+    // roster it rendered. The tap is minted over the member's id and the role just chosen in the
+    // picker, so a retry from the page as it stands can genuinely succeed.
     tapMismatch: "That confirmation no longer matches this change. Try again.",
     // Not drawn. Every console refusal raises SQLSTATE 42501 and a developer string nobody wrote
     // for a member: 'a console needs at least one owner' (decided in the browser before any request
     // goes out, task-5-addendum.md §3), 'no access' for a member removed a moment ago, and
-    // require_role's own for an Owner who was demoted in another tab. Through this console's own UI
-    // every one of them means the same thing -- the roster moved underneath this page -- and this
-    // says that without restating any rule, so no wording here can drift from a rule elsewhere.
-    refused: "The team has changed since this page loaded. Reload it and try again.",
+    // require_role's own for an Owner who was demoted in another tab. One sentence for all of them,
+    // authored above so the three row actions cannot drift apart.
+    refused: rosterMoved,
+  },
+
+  // dlg_reset (ConsoleTeam.dc.html:288-300, task-6) -- TC-01 itself, like dlg_role, with a bold
+  // line and a hint and no Change row at all (task-6-addendum.md §1). The menu item that opens it
+  // is `changeRole.resetKeys` above, where the sheet draws the whole three-item menu at once.
+  resetKeys: {
+    // :291's own bold line -- TC-01's `summary`. The member's FULL name.
+    title: (name: string) => `Reset ${name}'s keys`,
+    // :293, word for word, and the member's FIRST name only -- the same split dlg_role draws. "two
+    // new keys" is the sheet's own wording for spec §B's two-key floor at sign-in, not a count read
+    // from this member's row.
+    hint: (name: string) => `${firstName(name)} is signed out everywhere and will add two new keys at next sign-in.`,
+
+    // Not drawn. console_reset_keys returns how many keys it deleted -- task-6-brief.md's "a reset
+    // reports how many keys went" -- and this is the sentence built from it, in the shape
+    // ConsoleMyKeys' own "Key removed · logged" set. The count is the server's, recounted inside
+    // its own transaction, never the number this page happened to be showing.
+    resetToast: (n: number) => `${n} key${n === 1 ? "" : "s"} removed · logged`,
+    // Not drawn, and deliberately longer than changeRole's. console.use_tap digests the key count
+    // the browser rendered against the count the database recounts in the same transaction
+    // (task-6-addendum.md §3), so this refusal means the member's keys moved in between. "Try
+    // again" alone would be wrong advice: a retry from the same unrefreshed page would mint over
+    // the same stale number and fail identically, which is why this asks for a reload.
+    tapMismatch: "That confirmation no longer matches this member's keys. Their keys changed since this page loaded; reload it and try again.",
+    refused: rosterMoved,
+  },
+
+  // dlg_remove (ConsoleTeam.dc.html:313-325, task-6) -- TC-01 again, and the sheet's own dlg_owner
+  // in front of it when the floor would refuse (see `lastOwner` below). The menu item that opens it
+  // is `changeRole.remove` above.
+  removeMember: {
+    // :316's own bold line. The member's FULL name, and "from the console" is part of the line.
+    title: (name: string) => `Remove ${name} from the console`,
+    // :318, word for word. FIRST name only. Shorter than dlg_role's on purpose: a removed member
+    // does not sign in again, so there is no second half about what they come back as.
+    hint: (name: string) => `${firstName(name)} is signed out everywhere at once.`,
+
+    // Not drawn, in the same shape as the two toasts above.
+    removedToast: "Member removed · logged",
+    // Not drawn. `console.use_tap('Removed a member', p_member::text, v_target.role::text, …)`
+    // digests the target's role as the database reads it under a lock, against the role this page
+    // rendered -- so this refusal means their role moved in between, and a retry from the same
+    // unrefreshed page would fail the same way. Same reasoning as resetKeys.tapMismatch above.
+    tapMismatch: "That confirmation no longer matches this member. Their role changed since this page loaded; reload it and try again.",
+    refused: rosterMoved,
   },
 
   // dlg_owner (:334-346), a `role="alertdialog"` with a single primary button. Word for word. It is
   // drawn from the roster the page already holds, never from the database's refusal: that message
   // is a developer string, and it arrives with the same 42501 as every other refusal, so there is
-  // nothing in it to tell the two apart by (task-5-addendum.md §3).
+  // nothing in it to tell the two apart by (task-5-addendum.md §3). Shown for a role change and for
+  // a removal alike -- console_remove_member carries console_change_role's two refusals word for
+  // word (task-6-addendum.md §4) -- so one set of words serves both, as the sheet draws it.
   lastOwner: {
     title: "A console needs at least one Owner",
     detail: "Make someone else Owner first.",

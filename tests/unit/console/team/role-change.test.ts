@@ -51,6 +51,36 @@ describe("needsAnotherOwner", () => {
   });
 });
 
+// Removal asks this very predicate the same question, with `null` for the role the member is left
+// holding -- none at all (task-6-addendum.md §4). console_remove_member's own guard is
+// console_change_role's with the `v_role is distinct from 'owner'` arm already decided:
+// `if p_member = v_member.user_id then raise` unconditionally, then
+// `if v_target.role = 'owner' then require_another_active_owner()` with no second condition,
+// because a removed member is not an Owner by any reading
+// (supabase/migrations/20260922090000_console_team.sql:259-305). One predicate, not two: a second
+// copy of the floor rule is a second thing to drift.
+describe("needsAnotherOwner for a removal, which leaves no role at all", () => {
+  it("refuses an Owner removing themselves however many Owners stand by", () => {
+    expect(needsAnotherOwner({ userId: ME, role: "owner" }, null, { signedInId: ME, activeOwners: 4 })).toBe(true);
+  });
+
+  // `if v_target.role = 'owner' then require_another_active_owner()` -- no `is distinct from`
+  // escape here, unlike a role change, because removal always takes the Owner away.
+  it("refuses removing an Owner when the console has only one active Owner left", () => {
+    expect(needsAnotherOwner({ userId: THEM, role: "owner" }, null, { signedInId: ME, activeOwners: 1 })).toBe(true);
+  });
+
+  it("allows removing an Owner once a second active Owner stands", () => {
+    expect(needsAnotherOwner({ userId: THEM, role: "owner" }, null, { signedInId: ME, activeOwners: 2 })).toBe(false);
+  });
+
+  it("allows removing someone who is not an Owner, whatever the Owner count", () => {
+    for (const role of CONSOLE_ROLES.filter((r) => r !== "owner")) {
+      expect(needsAnotherOwner({ userId: THEM, role }, null, { signedInId: ME, activeOwners: 1 }), role).toBe(false);
+    }
+  });
+});
+
 describe("rolesOfferedInstead", () => {
   // task-5-brief.md's own test list: "the row's own role is not offered as the new one".
   it("leaves the member's current role out", () => {

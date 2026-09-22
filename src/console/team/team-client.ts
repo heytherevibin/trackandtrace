@@ -6,14 +6,16 @@ import type { ConsoleRole } from "@/console/auth/member";
 import { consoleMessages } from "@/console/messages";
 import { apiRequest } from "@/services/api-client";
 
-// The browser-side call the Team page's one client component needs: sending an invite. Modelled on
+// The browser-side calls the Team page's client components need: sending an invite (task-4),
+// changing a role (task-5), and resetting a member's keys or removing them (task-6). Modelled on
 // `removeKey` in src/console/account/my-keys-client.ts.
 //
-// There is deliberately no `fetchTeam()` beside it (task-4-addendum.md §5). The three plates stay
-// server components and an invite refreshes them with `router.refresh()`, so the page re-runs
-// `getTeam()` server-side and the refreshed list cannot disagree with the first paint. Tasks 5-7
-// convert the plates to client components for their own row actions, and that is where a re-fetch
-// belongs.
+// There is still deliberately no `fetchTeam()` beside them (task-4-addendum.md §5). The three
+// plates stayed server components through Task 6: every row action refreshes them with
+// `router.refresh()`, so the page re-runs `getTeam()` server-side and the refreshed list cannot
+// disagree with the first paint. Task 4's note expected Tasks 5-7 to convert the plates and add a
+// re-fetch; neither task needed to, because a dialog opened from one row has nothing to patch that
+// a server re-render does not do better.
 
 // `.strict()` is the point, not decoration: POST /api/team answers `{ ok: true }` and nothing more,
 // because the raw invite token is a console-access credential and must never reach a browser
@@ -114,6 +116,71 @@ export async function changeRole(member: string, role: ConsoleRole, reason: stri
     "/api/team/member",
     { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ member, role, reason }) },
     changedSchema,
+  );
+  return result.ok ? { kind: "done" } : { kind: "failed", message: consoleApiMessage(result.error) };
+}
+
+// DELETE /api/team/keys answers `{ ok: true, count }`: the one call on this page whose success
+// carries something back, because console_reset_keys returns how many keys it deleted and the
+// caller builds a sentence out of it. `.strict()` again -- and the count is required, not optional:
+// a success with no count is not one this caller can report, and guessing at it (from the row, say)
+// would have the console tell a member what it assumed rather than what happened.
+const resetSchema = z.object({ ok: z.literal(true), count: z.number().int().nonnegative() }).strict();
+
+/**
+ * Two shapes, not one, and `count` is the reason: `done` carries what to say, `failed` carries what
+ * went wrong. There is no `boundToAddress` counterpart here for the same reason changeRole has none
+ * -- this dialog has a reason field and nothing else, and no refusal it can receive is about that.
+ */
+export type ResetKeysOutcome = { readonly kind: "done"; readonly count: number } | { readonly kind: "failed"; readonly message: string };
+
+/**
+ * Resets one member's keys (task-6, ConsoleTeam.dc.html's dlg_reset). Called only after
+ * ConfirmItsYou's `onConfirmed` fires -- a completed tap -- never before.
+ *
+ * The key count the tap was minted over is deliberately not sent. `console_reset_keys` counts the
+ * member's keys itself, inside the transaction that deletes them, and `console.use_tap` re-digests
+ * that count -- so the browser's own number is the thing being *checked*, not a thing to pass along
+ * (task-6-addendum.md §3). Sending it would invite a caller to send the number that matches rather
+ * than the number the page showed, which is the whole point of the digest.
+ *
+ * `member` is the id `console_team` returned, passed through untouched, and `reason` goes out
+ * exactly as the member typed it -- only the route's own `tapReason` import trims and digests it.
+ *
+ * Every refusal comes back as a message already written for a member to read: the route's mapper
+ * translates `console_reset_keys`' developer strings, and `consoleApiMessage` answers the two codes
+ * that carry a failing layer's own wording with the console's own sentence instead.
+ */
+export async function resetKeys(member: string, reason: string): Promise<ResetKeysOutcome> {
+  const result = await apiRequest(
+    "/api/team/keys",
+    { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ member, reason }) },
+    resetSchema,
+  );
+  return result.ok ? { kind: "done", count: result.data.count } : { kind: "failed", message: consoleApiMessage(result.error) };
+}
+
+// DELETE /api/team/member answers `{ ok: true }` and nothing more: a removed member falls out of
+// console_team's roster entirely, so there is nothing to report back that the refreshed list will
+// not show by their absence.
+const removedSchema = z.object({ ok: z.literal(true) }).strict();
+
+export type RemoveMemberOutcome = { readonly kind: "done" } | { readonly kind: "failed"; readonly message: string };
+
+/**
+ * Removes one member (task-6, ConsoleTeam.dc.html's dlg_remove). Called only after ConfirmItsYou's
+ * `onConfirmed` fires -- a completed tap -- never before.
+ *
+ * No role is sent, although the tap is minted over one: `console_remove_member` digests
+ * `v_target.role::text`, the role it reads for the target under a lock, so the browser's own copy
+ * is what is being checked rather than what is being passed. The same reasoning as the key count
+ * above, and the route's `.strict()` body enforces it.
+ */
+export async function removeMember(member: string, reason: string): Promise<RemoveMemberOutcome> {
+  const result = await apiRequest(
+    "/api/team/member",
+    { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ member, reason }) },
+    removedSchema,
   );
   return result.ok ? { kind: "done" } : { kind: "failed", message: consoleApiMessage(result.error) };
 }

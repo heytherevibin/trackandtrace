@@ -29,7 +29,22 @@ const VALID_REASON = "Left at the old office; replaced.";
 // A realistic controlled harness: reason and open both live here, exactly as a real caller would
 // own them, so "leaves the dialog open" and "starts nothing" are assertions about ConfirmItsYou's
 // own behaviour rather than something the test fakes by construction.
-function Harness({ onCancel, onConfirmed, hint }: { readonly onCancel: () => void; readonly onConfirmed: () => void; readonly hint?: string }) {
+function Harness({
+  onCancel,
+  onConfirmed,
+  hint,
+  change = CHANGE,
+}: {
+  readonly onCancel: () => void;
+  readonly onConfirmed: () => void;
+  readonly hint?: string;
+  /**
+   * `null` stands for "this caller passes no `change` at all" -- the two Task 6 dialogs, which the
+   * sheet draws with no Change row. Spelt as null rather than undefined because a default parameter
+   * cannot tell an omitted prop from an explicit undefined one, and the harness needs to.
+   */
+  readonly change?: { readonly label: string; readonly before: string; readonly after: string } | null;
+}) {
   const [open, setOpen] = useState(true);
   const [reason, setReason] = useState("");
   return (
@@ -40,7 +55,7 @@ function Harness({ onCancel, onConfirmed, hint }: { readonly onCancel: () => voi
       value={VALUE}
       reason={reason}
       summary={SUMMARY}
-      change={CHANGE}
+      change={change ?? undefined}
       hint={hint}
       onReasonChange={setReason}
       onCancel={() => {
@@ -94,6 +109,20 @@ describe("ConfirmItsYou", () => {
     expect(screen.queryByText(/signed out everywhere/)).toBeNull();
     rerender(<Harness onCancel={vi.fn()} onConfirmed={vi.fn()} hint="Kiran is signed out everywhere at once." />);
     expect(screen.getByText("Kiran is signed out everywhere at once.")).toBeVisible();
+  });
+
+  // ConsoleTeam.dc.html's dlg_reset (:288-300) and dlg_remove (:313-325) draw a bold line and a
+  // hint and *no Change row at all*, unlike dlg_role beside them (task-6-addendum.md §1). `change`
+  // is optional for the same reason `hint` is: a shared TC-01 that could not draw the sheet's own
+  // two-thirds body would have been forked into a second implementation rather than reused. The
+  // "Change" legend goes with it -- a label with nothing after it is worse than no row.
+  it("omits the change line, and its legend, when the caller has none to draw", () => {
+    render(<Harness onCancel={vi.fn()} onConfirmed={vi.fn()} change={null} hint="Kiran is signed out everywhere at once." />);
+    expect(screen.getByText(SUMMARY)).toBeVisible();
+    expect(screen.getByText("Kiran is signed out everywhere at once.")).toBeVisible();
+    expect(screen.queryByText("Change")).toBeNull();
+    expect(screen.queryByText(CHANGE_TEXT)).toBeNull();
+    expect(screen.queryByText(/→/)).toBeNull();
   });
 
   it("refuses a reason under 10 characters, without starting a ceremony", async () => {

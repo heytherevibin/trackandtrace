@@ -4,7 +4,7 @@ import { consoleEnvironment } from "@/console/auth/session";
 import { assertConsoleAvailable } from "@/console/availability";
 import { tapReason } from "@/console/keys/tap";
 import { assertSameOrigin } from "@/console/same-origin";
-import { changeMemberRole } from "@/console/team/team";
+import { changeMemberRole, removeTeamMember } from "@/console/team/team";
 import { jsonError, jsonOk } from "@/services/api-response";
 import { readBody } from "@/services/request-body";
 
@@ -54,6 +54,40 @@ export async function PATCH(req: Request): Promise<Response> {
     await requireConsoleMember("owner");
     const { member, role, reason } = await readBody(req, changeRoleBody);
     await changeMemberRole(member, role, reason, consoleEnvironment());
+    return jsonOk({ ok: true });
+  } catch (err) {
+    return jsonError(err);
+  }
+}
+
+// Two fields and no more. There is deliberately no `role` here even though the tap is minted over
+// one: `console.use_tap('Removed a member', p_member::text, v_target.role::text, …)` digests the
+// role the *database* reads for the target, under a lock, so a role in the body would be a caller's
+// claim about a fact the database is about to check for itself -- at best redundant, at worst a
+// second source of truth to disagree with. `.strict()` is what keeps it that way, and keeps
+// `p_environment` the server's to decide.
+const removeMemberBody = z.object({ member: z.guid(), reason: tapReason }).strict();
+
+/**
+ * DELETE /api/team/member -- remove a member (Task 6, ConsoleTeam.dc.html's dlg_remove). Follows a
+ * tap, exactly as PATCH above does, and adds no check of its own beyond the same-origin and shape
+ * validation every mutating console route has: `console_remove_member` re-verifies the Owner floor,
+ * the unconditional self-check, the last-Owner floor and the tap's own digest itself.
+ *
+ * It also adds nothing after the removal. The function revokes every session the member holds and
+ * writes its own audit row inside the same transaction; doing either from here would be a second
+ * half of one action, outside the transaction that makes it atomic.
+ *
+ * `member` reaches the database exactly as the browser sent it -- the same string `console_team`
+ * put on the page and the same string the tap was minted over.
+ */
+export async function DELETE(req: Request): Promise<Response> {
+  try {
+    assertConsoleAvailable();
+    assertSameOrigin(req);
+    await requireConsoleMember("owner");
+    const { member, reason } = await readBody(req, removeMemberBody);
+    await removeTeamMember(member, reason, consoleEnvironment());
     return jsonOk({ ok: true });
   } catch (err) {
     return jsonError(err);

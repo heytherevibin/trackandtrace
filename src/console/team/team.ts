@@ -263,3 +263,107 @@ export async function changeMemberRole(member: string, role: ConsoleRole, reason
   const { error } = await client.rpc("console_change_role", { p_member: member, p_role: role, p_reason: reason, p_environment: environment });
   if (error) throw fromChangeRoleError(error);
 }
+
+/**
+ * `console_reset_keys` raises exactly two developer strings, and they mean different things to a
+ * member, so they are told apart by the only two things in the error that can be trusted -- a
+ * substring the function itself raises, and the SQLSTATE:
+ *
+ * - console.use_tap's own 'no tap for this action'. Here that has one live cause and it is a
+ *   genuine race (task-6-addendum.md §3): the function counts the member's keys inside its own
+ *   transaction and digests that count, while the browser minted its tap over the count
+ *   `console_team` put on the page. A key added or removed in between and the two disagree. Failing
+ *   closed is the correct outcome; a developer string on screen is not, and neither is "try again"
+ *   without a reload -- the same stale page would mint the same wrong number.
+ * - 'no access' -- a target removed a moment ago, or an Owner demoted in another tab. Answered by
+ *   its 42501 rather than by reading it, for the reason fromChangeRoleError spells out above: what
+ *   every console refusal has in common by the time it reaches here is that the roster moved.
+ *
+ * There is deliberately no last-Owner case. `console_reset_keys` has no owner guard and no
+ * self-check at all -- an Owner may reset their own keys, which signs them out everywhere and has
+ * them enrol two new ones, recoverable and consistent with My keys letting a member remove their
+ * own (task-6-addendum.md §4).
+ */
+function fromResetKeysError(error: { readonly message: string; readonly code?: string }): AppError {
+  const m = consoleMessages.team.resetKeys;
+  if (error.message.includes("no tap for this action")) return new AppError("INVALID_INPUT", m.tapMismatch, { status: 403 });
+  if (error.code === "42501") return new AppError("INVALID_INPUT", m.refused, { status: 403 });
+  return unavailable();
+}
+
+/**
+ * A thin typed wrapper over `console_reset_keys` (spec §E, Task 6): every one of a member's keys,
+ * the revocation of every session they hold, the `keys_reset_at`/`keys_reset_by` stamp on their
+ * row, and an audit row, all inside the function's own transaction, in exchange for a completed tap.
+ *
+ * Returns how many keys went -- the function's own `return v_count`, counted before the delete and
+ * inside the same transaction. Parsed, never cast, the same way `signOutOtherSessions` parses its
+ * own count (src/console/account/my-sessions.ts): a caller builds a sentence for a member out of
+ * this number, so a shape that drifted must read as "couldn't load" rather than reach a screen as
+ * "NaN keys removed".
+ *
+ * `p_member` is a uuid and everything else is text. Never pass an enum-typed argument to a
+ * `public.console_*` function: PostgREST casts it in the caller's context, before `security
+ * definer` applies, and the call fails with "permission denied for schema console"
+ * (20260921000000_console_enum_args_as_text.sql is the whole phase that cost).
+ *
+ * `member` must be the id console_team returned, unchanged -- `console.use_tap` re-digests
+ * `p_member::text`, Postgres's lowercase canonical form -- and `reason` arrives exactly as the
+ * shared `tapReason` schema trimmed it at the route boundary, never re-scrubbed here. Both for the
+ * same reason as every other tap-spending call in this file: a string reshaped in between spends
+ * against a digest the tap was never taken for.
+ *
+ * Adds nothing to what the function already does. It revokes the member's sessions itself
+ * (`console_auth_revoke_member_sessions(p_member, null)`) and writes its own audit row.
+ *
+ * Makes no access check of its own -- the DELETE route calls `requireConsoleMember("owner")` first,
+ * and `console_reset_keys` re-checks `console.require_role('owner')` itself regardless.
+ */
+export async function resetMemberKeys(member: string, reason: string, environment: string, db?: ConsoleDb): Promise<number> {
+  const client = db ?? (await createConsoleDb());
+  const { data, error } = await client.rpc("console_reset_keys", { p_member: member, p_reason: reason, p_environment: environment });
+  if (error) throw fromResetKeysError(error);
+  const parsed = z.number().int().nonnegative().safeParse(data);
+  if (!parsed.success) throw unavailable();
+  return parsed.data;
+}
+
+/**
+ * `console_remove_member` raises the same three developer strings `console_change_role` does, and
+ * they are answered the same way and for the same reasons -- see fromChangeRoleError above. Only
+ * the tap's own sentence differs: the value this function digests is the target's *current* role,
+ * read under a lock, against the role this page rendered, so a mismatch means their role moved
+ * rather than that any choice here was stale (task-6-addendum.md §3).
+ */
+function fromRemoveMemberError(error: { readonly message: string; readonly code?: string }): AppError {
+  const m = consoleMessages.team.removeMember;
+  if (error.message.includes("no tap for this action")) return new AppError("INVALID_INPUT", m.tapMismatch, { status: 403 });
+  if (error.code === "42501") return new AppError("INVALID_INPUT", m.refused, { status: 403 });
+  return unavailable();
+}
+
+/**
+ * A thin typed wrapper over `console_remove_member` (spec §E, Task 6): one member's access, the
+ * revocation of every session they hold, and an audit row, all inside the function's own
+ * transaction, in exchange for a completed tap.
+ *
+ * A soft delete. The function sets `status = 'removed'`; the row stays, and so does the audit trail
+ * naming them. `console_team` then leaves them out of the roster entirely (`where m.status <>
+ * 'removed'`), which is why the page's own `router.refresh()` is all the list needs afterwards.
+ *
+ * `p_member` is a uuid and both other arguments are text -- and there is no role argument at all,
+ * unlike changeMemberRole: the role the tap was minted over is the one the database reads for
+ * itself, never one a caller asserts.
+ *
+ * `member` unchanged and `reason` un-rescrubbed, for the same digest reasons as every other
+ * tap-spending call in this file.
+ *
+ * Makes no access check of its own -- the DELETE route calls `requireConsoleMember("owner")` first,
+ * and `console_remove_member` re-checks `console.require_role('owner')`, the unconditional
+ * self-check and the last-Owner floor itself regardless.
+ */
+export async function removeTeamMember(member: string, reason: string, environment: string, db?: ConsoleDb): Promise<void> {
+  const client = db ?? (await createConsoleDb());
+  const { error } = await client.rpc("console_remove_member", { p_member: member, p_reason: reason, p_environment: environment });
+  if (error) throw fromRemoveMemberError(error);
+}

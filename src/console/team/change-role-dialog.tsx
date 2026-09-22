@@ -1,22 +1,20 @@
 "use client";
 
-import { AlertDialog } from "@base-ui/react/alert-dialog";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Corners } from "@/components/ui/corners";
 import { DialogClose, DialogContent, DialogRoot } from "@/components/ui/dialog";
 import { notify } from "@/components/ui/toast";
 import type { ConsoleRole } from "@/console/auth/member";
 import { ConfirmItsYou } from "@/console/components/confirm-its-you";
 import { consoleMessages } from "@/console/messages";
+import { LastOwnerNotice } from "@/console/team/last-owner-notice";
 import { needsAnotherOwner, rolesOfferedInstead } from "@/console/team/role-change";
 import { RolePicker } from "@/console/team/role-picker";
 import type { TeamMember } from "@/console/team/team";
 import { changeRole } from "@/console/team/team-client";
 
 const c = consoleMessages.team.changeRole;
-const o = consoleMessages.team.lastOwner;
 const f = consoleMessages.frame;
 const t = consoleMessages.tap;
 
@@ -25,35 +23,6 @@ const t = consoleMessages.tap;
 // lives beside the dialog it feeds rather than in the copy file with the drawn strings, the same
 // place invite-dialog.tsx keeps its own INVITE_ACTION.
 const CHANGE_ACTION = "Changed a role";
-
-/** dlg_owner (ConsoleTeam.dc.html:334-346): a title, a detail, one primary OK, and no way past it. */
-function LastOwnerNotice({ open, onClose }: { readonly open: boolean; readonly onClose: () => void }) {
-  return (
-    <AlertDialog.Root
-      open={open}
-      onOpenChange={(next) => {
-        if (!next) onClose();
-      }}
-    >
-      <AlertDialog.Portal>
-        <AlertDialog.Backdrop className="fixed inset-0 z-dialog bg-backdrop transition-opacity duration-(--duration-base) data-[starting-style]:opacity-0 data-[ending-style]:opacity-0" />
-        <AlertDialog.Viewport className="fixed inset-0 z-dialog flex items-center justify-center p-4">
-          <AlertDialog.Popup className="blueprint w-full max-w-narrow bg-surface-3 p-6 shadow-3 outline-none transition-[transform,opacity] duration-(--duration-slow) ease-out data-[starting-style]:scale-98 data-[starting-style]:opacity-0 data-[ending-style]:scale-98 data-[ending-style]:opacity-0">
-            <Corners />
-            <AlertDialog.Title className="text-3xl tracking-head">{o.title}</AlertDialog.Title>
-            <AlertDialog.Description className="mt-2.5 text-body text-ink-2">{o.detail}</AlertDialog.Description>
-            {/* One button, not the Cancel/Confirm pair @/components/ui/confirm-dialog draws: the
-                sheet gives dlg_owner a single primary OK, because there is nothing here to confirm
-                -- it is the console saying no. */}
-            <div className="mt-6 flex justify-end">
-              <AlertDialog.Close render={<Button variant="primary">{o.ok}</Button>} />
-            </div>
-          </AlertDialog.Popup>
-        </AlertDialog.Viewport>
-      </AlertDialog.Portal>
-    </AlertDialog.Root>
-  );
-}
 
 /**
  * Where the flow is. `picker` and `blocked` are the two ways it can open; `confirming` and

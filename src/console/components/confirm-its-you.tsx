@@ -45,8 +45,17 @@ export interface ConfirmItsYouProps extends TapRequest {
    * rendered.
    */
   readonly summary: string;
-  /** The sheet's Change line, drawn as `${label}: ${before} → ${after}` (e.g. "Keys: 3 → 2"). */
-  readonly change: { readonly label: string; readonly before: string; readonly after: string };
+  /**
+   * The sheet's Change line, drawn as `${label}: ${before} → ${after}` (e.g. "Keys: 3 → 2"), with
+   * the "Change" legend beside it.
+   *
+   * Optional for the same reason `hint` is, and found the same way one task later: ConsoleTeam's
+   * dlg_reset (:288-300) and dlg_remove (:313-325) are TC-01 too, and neither draws a Change row at
+   * all -- a reset and a removal have no before-and-after pair to show, only the bold line and the
+   * consequence beneath it (task-6-addendum.md §1). The legend goes with it when it is absent: a
+   * label with nothing after it says less than no row.
+   */
+  readonly change?: { readonly label: string; readonly before: string; readonly after: string };
   /**
    * The one consequence of going through with it, in the sheet's own `hint` class, under the
    * Change line and in the same column ("Kiran is signed out everywhere at once and signs in again
@@ -173,10 +182,12 @@ export function ConfirmItsYou({ open, action, target, value, reason, summary, ch
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
             <span className="text-lg font-medium text-ink-1">{summary}</span>
-            <span className="flex items-baseline gap-2.5">
-              <span className="legend">{m.changeLabel}</span>
-              <span className="text-sm text-ink-1">{`${change.label}: ${change.before} → ${change.after}`}</span>
-            </span>
+            {change ? (
+              <span className="flex items-baseline gap-2.5">
+                <span className="legend">{m.changeLabel}</span>
+                <span className="text-sm text-ink-1">{`${change.label}: ${change.before} → ${change.after}`}</span>
+              </span>
+            ) : null}
             {hint ? <p className="text-label text-ink-3">{hint}</p> : null}
           </div>
           <div className="flex flex-col gap-1.5">
