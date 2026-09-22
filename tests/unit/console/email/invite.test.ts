@@ -20,7 +20,13 @@ const ROLES = ["owner", "admin", "support", "viewer"] as const satisfies readonl
 
 const ARGS = {
   to: "kiran@example.com",
-  token: "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+  // Says what it is rather than imitating one. A real invite token is
+  // `encode(gen_random_bytes(32), 'hex')` -- 64 hex characters -- and a fixture wearing that exact
+  // shape is indistinguishable from a leaked one to a secret scanner, which is what GitGuardian
+  // called on PR #28. Nothing here needs the real shape: the two url tests use "abc" and "a b&c",
+  // and this value only has to appear in the link and nowhere else in the body (see below), which a
+  // distinctive placeholder does better than hex a body could plausibly contain by accident.
+  token: "invite-token-fixture-not-a-real-secret",
   role: "support" as ConsoleRole,
   invitedBy: "Asha Rao",
   origin: "https://admin.trakline.in",
