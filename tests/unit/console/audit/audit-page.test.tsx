@@ -7,6 +7,7 @@ import type { ConsoleAuditRow } from "@/console/auth/audit";
 import type { ConsoleMember, ConsoleRole } from "@/console/auth/member";
 import { consoleMessages } from "@/console/messages";
 import { AppError } from "@/services/errors";
+import { log } from "@/services/log";
 
 // ConsoleFrame is stood in for rather than rendered: it is an async server component that reads
 // next/headers, so @testing-library/react cannot render it at all (its own note says so, and
@@ -16,6 +17,8 @@ const { requireConsoleMember, getAuditLog, getAuditActors, writeConsoleAudit, he
   requireConsoleMember: vi.fn<(least?: string) => Promise<ConsoleMember>>(),
   getAuditLog: vi.fn<() => Promise<AuditPage>>(),
   getAuditActors: vi.fn<() => Promise<readonly AuditMemberOption[]>>(),
+  // `null` is the read having failed and `[]` a log with nobody in it, so the page must not blur
+  // them -- and only the first is logged. See "tells a failed read apart ..." below.
   writeConsoleAudit: vi.fn<(db: unknown, row: ConsoleAuditRow) => Promise<void>>(),
   headerStore: new Map<string, string>(),
 }));
@@ -181,6 +184,25 @@ describe("the Member filter's roster", () => {
     expect(screen.getByRole("heading", { level: 1, name: m.title })).toBeInTheDocument();
     expect(screen.queryByText(m.error.title)).toBeNull();
     expect(within(screen.getByRole("combobox", { name: m.filters.member })).queryByRole("option", { name: DEVI.name })).toBeNull();
+  });
+
+  // A failed read is `null` and is logged; `[]` is a log with nobody in it and is passed through as
+  // itself. Collapsing the two would let a failure revert the picker to accumulating from the rows
+  // with nothing saying so -- the one failure mode that could hide a regression of this task.
+  it("tells a failed read apart from a log with nobody in it", async () => {
+    const warn = vi.spyOn(log, "warn").mockImplementation(() => undefined);
+    render(await open());
+    expect(warn).not.toHaveBeenCalled();
+
+    getAuditActors.mockRejectedValue(new AppError("SOURCE_UNAVAILABLE", "The console couldn't reach its database.", { status: 503 }));
+    render(await open());
+    expect(warn).toHaveBeenCalledWith("[console] the audit log's member roster could not be read", expect.anything());
+
+    warn.mockClear();
+    getAuditActors.mockResolvedValue([]);
+    render(await open());
+    expect(warn, "an empty roster is an answer, not a failure").not.toHaveBeenCalled();
+    warn.mockRestore();
   });
 
   // Reading a roster is reading: the one row this page records is the "Opened the audit log" row

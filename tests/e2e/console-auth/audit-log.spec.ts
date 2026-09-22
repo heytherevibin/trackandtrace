@@ -404,4 +404,63 @@ test.describe("the Audit log", () => {
     await expect(page.getByRole("table")).toHaveCount(0);
     await expectAxeClean(page);
   });
+
+  /**
+   * Task 6, end to end, and the only place the whole chain can be shown at once: the page's own
+   * server read of `public.console_audit_actors` through PostgREST with no arguments, the parse,
+   * the prop, and the picker a member actually uses.
+   *
+   * **What it is for.** The picker used to accumulate its options from the actors named by the rows
+   * it had already fetched, because `console_team` is Owner-only while this module is Owner *and*
+   * Admin. So a member who had done nothing in the range on screen could not be selected at all --
+   * which is exactly when a reader wants to ask whether they have. Nothing was hidden and the log
+   * stayed honest; the filter simply could not reach a silent member.
+   *
+   * Two rows for one actor, under two names, because the log names an actor **as they were** and a
+   * plain `DISTINCT` would put two options carrying the same `value` in the picker. Asserting one
+   * option, named by the later row, pins `distinct on (actor_id) … order by actor_id, at desc` from
+   * the browser rather than from SQL -- and it stays deterministic across repeated suite runs,
+   * which matters here because `resetConsole()` deliberately leaves the audit log alone.
+   */
+  test("offers a member who has done nothing in the range, and answers them with the empty state", async ({ page, baseURL }) => {
+    await setUpFirstOwner(page, baseURL ?? BASE);
+
+    // Written straight into the log, which is also the point: this person has no console.members
+    // row at all, so console_team could not name them even if module 14 were allowed to read it.
+    // A hundred days back, so nothing they did can fall inside any range this file asks for.
+    const actor = "d1f00000-0000-4000-8000-00000000f00d";
+    const name = "Priya Nathan";
+    consoleSql(
+      `insert into console.audit_log (at, environment, actor_id, actor_name, actor_role, category, action, target, result) values
+         (now() - interval '101 days', 'development', '${actor}', 'Priya N.', 'support', 'leads', 'Looked up an email', 'p•••@example.com', 'done'),
+         (now() - interval '100 days', 'development', '${actor}', '${name}', 'admin', 'configure', 'Changed a switch', 'Site notice', 'done')`,
+    );
+
+    await gotoReady(page, "/audit-log");
+    // The page opens on Today, so nothing this actor has ever done is on screen.
+    await expect(page.getByRole("button", { name: m.filters.ranges.today })).toHaveAttribute("aria-pressed", "true");
+
+    const picker = page.getByRole("combobox", { name: m.filters.member });
+    await expect(picker.getByRole("option", { name })).toHaveCount(1);
+    await expect(picker.getByRole("option", { name: "Priya N." })).toHaveCount(0);
+
+    await picker.selectOption(actor);
+    // Still linkable: the filter goes into the address without a server render, as every other one
+    // on this page does.
+    await expect.poll(() => new URL(page.url()).searchParams.get("member")).toBe(actor);
+
+    // The answer the old picker could not give. Not a dead end -- "nothing, here".
+    await expect(page.getByText(m.empty.title)).toBeVisible();
+    await expect(page.getByText(m.empty.detail)).toBeVisible();
+    await expect(page.getByRole("table")).toHaveCount(0);
+
+    // The chip names them, which only the roster can do: without it `memberName` falls through to
+    // the raw uuid, because no row on screen carries this actor.
+    await expect(page.getByText(m.filters.chip(m.filters.member, name))).toBeVisible();
+
+    // And the roster does not narrow with the rows it filtered away: they are still selected, and
+    // everyone else is still reachable without clearing the filter first.
+    await expect(picker).toHaveValue(actor);
+    await expect(picker.getByRole("option", { name })).toHaveCount(1);
+  });
 });

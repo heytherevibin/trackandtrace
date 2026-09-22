@@ -159,15 +159,19 @@ export default async function AuditLogPage({ searchParams }: { readonly searchPa
       be a DISTINCT over two years of history per keystroke, for an answer that cannot have moved.
       Reading it writes nothing; the one row this page records is written by `recordOpened` above.
 
-      An empty list, not a throw, when the read fails: a picker that could not load its options must
-      not take the table down with it. The plate falls back to the actors its rows name -- the
-      behaviour this task replaces -- and nothing on screen says so, so it is logged rather than
-      dropped. The sheet draws no state for a filter that half-loaded and inventing one would be a
-      worse answer than the degraded picker.
+      `null`, not a throw and **not an empty list**, when the read fails. A picker that could not
+      load its options must not take the table down with it -- but `[]` is a real answer that this
+      function can give (a console whose log holds nothing but System rows), and collapsing the two
+      would let a failed read quietly revert the picker to the accumulate-from-the-rows behaviour
+      Task 6 removes, with nothing on screen and nothing in the logs saying so. That is the one
+      failure mode that would hide this task's own regression, so the two are kept apart: `null`
+      means the roster is unknown and the plate falls back, `[]` means there is nobody to offer.
+      The sheet draws no state for a filter that half-loaded and inventing one would be a worse
+      answer than the degraded picker, so it is logged rather than drawn.
     */
-    getAuditActors().catch((err: unknown): readonly AuditMemberOption[] => {
+    getAuditActors().catch((err: unknown): readonly AuditMemberOption[] | null => {
       log.warn("[console] the audit log's member roster could not be read", { message: err instanceof Error ? err.message : String(err) });
-      return [];
+      return null;
     }),
   ]);
 

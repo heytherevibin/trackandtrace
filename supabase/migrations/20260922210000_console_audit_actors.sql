@@ -43,9 +43,20 @@
 -- old picker could not offer, so a roster scoped to the range would leave that
 -- behaviour in place under a new name. The cost is a list that can name someone
 -- with no rows in the range on screen -- and selecting them is then an answer
--- ("nothing, here") rather than a dead end. The set stays small whichever way
--- it is called: it is one entry per actor, bounded by how many people have ever
--- held a seat in this console, not by two years of rows.
+-- ("nothing, here") rather than a dead end.
+--
+-- WHAT THE UNBOUNDED CALL ACTUALLY COSTS, measured rather than assumed. The
+-- ANSWER is small -- one entry per actor, bounded by how many people have ever
+-- held a seat in this console, not by two years of rows. The SCAN is not:
+-- PostgreSQL 17.6 has no index skip scan, so console_audit_actor_idx
+-- (actor_id, at desc) does not serve this shape and EXPLAIN gives
+-- Seq Scan -> Sort -> Unique over the whole table. That is the reason the page
+-- reads this ONCE PER OPEN and the GET route beside it does not read it at all:
+-- the roster cannot change with the filters, so a per-keystroke call would pay
+-- that scan for an answer that could not have moved. If the log ever outgrows
+-- one scan per page open, the fix is a covering path for this query (a
+-- recursive loose index scan, or a materialised roster), not a narrower window
+-- -- narrowing it would trade the cost for the defect this function removes.
 --
 -- p_environment is a CONVENIENCE, NOT A BOUNDARY -- forgeable, exactly as it is
 -- on public.console_audit and on every writer in this schema. What keeps one

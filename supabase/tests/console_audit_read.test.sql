@@ -1,10 +1,23 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(129);
+select plan(98);
 
--- The READ side of the audit log (module 14). The write side, the append-only
--- triggers and console.purge_audit are console_audit.test.sql's business and
--- are not repeated here.
+-- The READ side of the audit log (module 14): public.console_audit and
+-- public.console_audit_entry. The write side, the append-only triggers and
+-- console.purge_audit are console_audit.test.sql's business; the export is
+-- console_audit_export.test.sql's; and the Member filter's roster
+-- (public.console_audit_actors) is console_audit_actors.test.sql's.
+--
+-- The roster lived here for one round and was moved out, for a reason worth
+-- keeping: its exact-list assertion needs a day whose actor set is known
+-- exactly, and the seventeen-row day below is shaped for the *list's* filters,
+-- so a row added for either purpose silently broke the other. Each file now
+-- owns the days it asserts on.
+--
+-- This file is over the project's 500-line rule and was before Task 6 touched
+-- it. The obvious next cut is console_audit_entry, whose block (the entry, its
+-- key_name join and the three key states behind it) stands on its own the way
+-- the roster did.
 --
 -- Scoping. console.audit_log holds no foreign keys and survives every reset by
 -- design, so a bare count sees every row any run on this machine ever wrote.
@@ -516,231 +529,6 @@ select matches(
   public.console_audit(p_search => 'audit-read-probe') -> 'rows' -> 0 ->> 'at',
   '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}([.][0-9]+)?[+-][0-9]{2}:[0-9]{2}$',
   'and its timestamp has the same offset shape as the fixture''s'
-);
-
--- ===========================================================================
--- console_audit_actors -- the Member filter's roster (Task 6).
---
--- The picker used to accumulate its options from the actors named by the rows
--- it had fetched, because console_team is Owner-only while this module is
--- Owner AND Admin. A member who had done nothing in the chosen range could
--- therefore not be selected -- which is exactly when a reader wants to ask
--- whether they have. This function is the roster an Admin may read.
---
--- It is read from console.audit_log and never from console.members, and that
--- is the point rather than a convenience: a removed member's history does not
--- go anywhere, so the one roster that can reach every row of this log is the
--- log itself. Neither of the two actors added below has a console.members row
--- at all.
--- ===========================================================================
-
-select is(has_function_privilege('authenticated', 'public.console_audit_actors(timestamptz, timestamptz, text)', 'execute')::text, 'true', 'a member can read the roster');
-select is(has_function_privilege('anon', 'public.console_audit_actors(timestamptz, timestamptz, text)', 'execute')::text, 'false', 'anon cannot');
-select is(has_function_privilege('service_role', 'public.console_audit_actors(timestamptz, timestamptz, text)', 'execute')::text, 'false', 'nor the service role');
-
-select is(
-  (select p.prosecdef from pg_catalog.pg_proc p join pg_catalog.pg_namespace n on n.oid = p.pronamespace
-    where n.nspname = 'public' and p.proname = 'console_audit_actors'),
-  true,
-  'the roster runs as definer -- authenticated has no usage on schema console'
-);
-select is(
-  (select p.proconfig from pg_catalog.pg_proc p join pg_catalog.pg_namespace n on n.oid = p.pronamespace
-    where n.nspname = 'public' and p.proname = 'console_audit_actors'),
-  array['search_path=""'],
-  'and with an empty search_path'
-);
-
--- Never an enum parameter. PostgREST casts an enum argument in the CALLING
--- role's context, before security definer applies, and authenticated has no
--- usage on schema console -- so such a call dies with "permission denied for
--- schema console" before the body runs. An enum here would be invisible until
--- the first request from a browser.
-select is(
-  (select array_agg(format_type(t.oid, null) order by t.ord)
-     from pg_catalog.pg_proc p
-     join pg_catalog.pg_namespace n on n.oid = p.pronamespace
-     cross join lateral unnest(p.proargtypes) with ordinality as t(oid, ord)
-    where n.nspname = 'public' and p.proname = 'console_audit_actors'),
-  array['timestamp with time zone', 'timestamp with time zone', 'text'],
-  'every parameter is timestamptz or text, never an enum'
-);
-
--- Two actors nobody has ever made a member of this console, on two days no
--- window above touches. Devi acts once, in preview, on 10 March; Nikhil acts
--- twice, in production, under two different names -- which is what the log
--- really holds after someone is renamed, because each row names the actor as
--- they were at the time.
-insert into console.audit_log
-  (id, at, environment, actor_id, actor_name, actor_role, key_id, session_label, category, action, target, reason, result, address_hash, before, after)
-values
-  ('c1000000-0000-4000-8000-00000000d001', '2019-03-10 08:00:00+00', 'preview', 'e0000000-0000-4000-8000-000000000005', 'Devi Menon', 'admin', null, 'Chrome on Android',
-   'configure', 'Changed a switch', 'Site notice', 'Announced the March window.', 'done', 'd4e1…5f70', null, null),
-  ('c1000000-0000-4000-8000-00000000d002', '2019-03-10 09:00:00+00', 'production', 'f1000000-0000-4000-8000-000000000006', 'Nikhil B.', 'support', null, 'Firefox on Windows',
-   'leads', 'Looked up an email', 'n•••@example.com', null, 'done', '6c88…11ab', null, null),
-  ('c1000000-0000-4000-8000-00000000d003', '2019-03-11 09:00:00+00', 'production', 'f1000000-0000-4000-8000-000000000006', 'Nikhil Bose', 'admin', null, 'Firefox on Windows',
-   'configure', 'Resumed PNR checks', 'PNR checks', 'Provider back after the night outage.', 'done', '6c88…11ab', null, null);
-
--- Every windowed call goes through here, so no exact-list assertion below can
--- be satisfied by a row another run left behind -- console.audit_log survives
--- every reset by design. The two unbounded calls further down assert only
--- properties that hold whatever else is in the table, or existence of an
--- actor_id this file wrote.
-create or replace function pg_temp.actors(
-  p_from timestamptz, p_to timestamptz, p_environment text default null
-) returns jsonb
-language sql as $$
-  select public.console_audit_actors(p_from, p_to, p_environment);
-$$;
-
-create or replace function pg_temp.names(p_roster jsonb) returns text[]
-language sql as $$
-  select array_agg(a ->> 'actor_name' order by n)
-    from jsonb_array_elements(p_roster) with ordinality as t(a, n);
-$$;
-
--- The floor is a floor, exactly as it is on the list beside it: Owner and
--- Admin both pass, Support and Viewer are refused. Module 14 is Owner+Admin,
--- so anything narrower would lock out a role the sheet's own access map
--- admits -- and a roster an Admin cannot read is the whole reason this
--- function exists rather than console_team.
---
--- Each refusal NAMES console.require_role's own message. Every console refusal
--- raises 42501, so a bare `'42501', null` would pass for a refusal from any
--- other check -- including one a later change adds -- and the assertion would
--- stop being about the role floor.
-select pg_temp.speak_as('a0000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-00000000aaa1');
-select is(
-  pg_temp.names(pg_temp.actors('2019-03-14 00:00:00+00', '2019-03-15 00:00:00+00')),
-  array['Asha Rao', 'Kiran Das', 'Meera Nair', 'Rohan Iyer'],
-  'an Owner reads the roster: every actor of that day, once each, by name'
-);
-select pg_temp.speak_as('b0000000-0000-4000-8000-000000000002', 'b0000000-0000-4000-8000-00000000bbb2');
-select is(
-  pg_temp.names(pg_temp.actors('2019-03-14 00:00:00+00', '2019-03-15 00:00:00+00')),
-  array['Asha Rao', 'Kiran Das', 'Meera Nair', 'Rohan Iyer'],
-  'and so does an Admin -- the floor admits both, which is why this is not console_team'
-);
-select pg_temp.speak_as('c0000000-0000-4000-8000-000000000003', 'c0000000-0000-4000-8000-00000000ccc3');
-select throws_ok(
-  $$ select public.console_audit_actors('2019-03-14 00:00:00+00', '2019-03-15 00:00:00+00') $$,
-  '42501', 'no access', 'a Support member cannot read the roster'
-);
-select pg_temp.speak_as('d0000000-0000-4000-8000-000000000004', 'd0000000-0000-4000-8000-00000000ddd4');
-select throws_ok(
-  $$ select public.console_audit_actors('2019-03-14 00:00:00+00', '2019-03-15 00:00:00+00') $$,
-  '42501', 'no access', 'nor can a Viewer'
-);
-
-select pg_temp.speak_as('a0000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-00000000aaa1');
-
--- The shape the picker is written from.
-select is(jsonb_typeof(pg_temp.actors('2019-03-14 00:00:00+00', '2019-03-15 00:00:00+00')), 'array', 'the roster is an array');
-select is(
-  (select array_agg(k order by k) from jsonb_object_keys(pg_temp.actors('2019-03-14 00:00:00+00', '2019-03-15 00:00:00+00') -> 0) as t(k)),
-  array['actor_id', 'actor_name', 'actor_role'],
-  'and an actor carries three keys: id, name and role'
-);
-select is(
-  pg_temp.actors('2019-03-14 00:00:00+00', '2019-03-15 00:00:00+00') -> 0 ->> 'actor_id',
-  'a0000000-0000-4000-8000-000000000001',
-  'the id is the one the Member filter sends back as p_member'
-);
--- jsonb_agg over no rows is null, and a window nobody acted in must still be
--- an empty array: Task 6 parses this with z.array(), which would throw on a
--- console whose log is younger than the range on screen.
-select is(pg_temp.actors('2018-01-01 00:00:00+00', '2018-01-02 00:00:00+00'), '[]'::jsonb, 'a window nobody acted in is an empty array, never JSON null');
-
--- The System actor is not a member and cannot be filtered to. 14 March holds
--- one System row (actor_id null, actor_name 'System'); the four names above
--- are the four members, and 'System' is not among them.
-select ok(
-  not (pg_temp.names(pg_temp.actors('2019-03-14 00:00:00+00', '2019-03-15 00:00:00+00')) @> array['System']),
-  'the System actor is left out -- it is not a member and p_member cannot reach it'
-);
-select ok(
-  not exists (
-    select 1 from jsonb_array_elements(public.console_audit_actors()) as t(a)
-     where a -> 'actor_id' = 'null'::jsonb
-  ),
-  'and no entry anywhere in the roster carries a null actor_id'
-);
-
--- One entry per actor, however many rows and however many names they have.
--- A second entry for one id would put two options with the same value in the
--- picker, and picking either would send the same p_member.
-select is(
-  pg_temp.names(pg_temp.actors('2019-03-10 00:00:00+00', '2019-03-12 00:00:00+00')),
-  array['Devi Menon', 'Nikhil Bose'],
-  'an actor with two rows under two names appears once, under the later one'
-);
-select is(
-  pg_temp.actors('2019-03-10 00:00:00+00', '2019-03-12 00:00:00+00') -> 1 ->> 'actor_role',
-  'admin',
-  'and the role comes from that same later row, not from an older one'
-);
-select is(
-  pg_temp.names(pg_temp.actors('2019-03-10 00:00:00+00', '2019-03-11 00:00:00+00')),
-  array['Devi Menon', 'Nikhil B.'],
-  'a window that ends before the rename still names them as that window has them'
-);
-select is(
-  pg_temp.actors('2019-03-10 00:00:00+00', '2019-03-11 00:00:00+00') -> 1 ->> 'actor_role',
-  'support',
-  'with the role that row carried'
-);
-select ok(
-  (select count(*) = count(distinct a ->> 'actor_id')
-     from jsonb_array_elements(public.console_audit_actors()) as t(a)),
-  'no actor_id appears twice in the whole-log roster either'
-);
-
--- THE WHOLE POINT. The console calls this with no window, so the picker can
--- reach a member who has done nothing in the range on screen -- which is
--- exactly the member a reader opens this module to ask about. Scoped to the
--- range, the roster would answer a different question and leave that member
--- unselectable, which is the behaviour Task 6 exists to remove.
-select ok(
-  not (pg_temp.names(pg_temp.actors('2019-03-14 00:00:00+00', '2019-03-15 00:00:00+00')) @> array['Devi Menon']),
-  'Devi did nothing on 14 March, so a roster scoped to that day cannot offer her'
-);
-select ok(
-  exists (
-    select 1 from jsonb_array_elements(public.console_audit_actors()) as t(a)
-     where a ->> 'actor_id' = 'e0000000-0000-4000-8000-000000000005'
-  ),
-  'but the whole-log roster offers her, which is what the picker asks for'
-);
-select is(
-  (select a ->> 'actor_name' from jsonb_array_elements(public.console_audit_actors()) as t(a)
-    where a ->> 'actor_id' = 'f1000000-0000-4000-8000-000000000006'),
-  'Nikhil Bose',
-  'and names a renamed actor by their latest row in the log, not their first'
-);
-select ok(
-  not exists (select 1 from console.members where user_id in (
-    'e0000000-0000-4000-8000-000000000005', 'f1000000-0000-4000-8000-000000000006')),
-  'neither of them is a member of this console -- the roster is the log''s, not console_team''s'
-);
-
--- p_environment narrows it, exactly as it narrows the list. A convenience and
--- never a boundary: a member picks it and a member can forge it.
-select is(pg_temp.names(pg_temp.actors('2019-03-10 00:00:00+00', '2019-03-11 00:00:00+00', 'production')), array['Nikhil B.'], 'the environment filter narrows the roster to production');
-select is(pg_temp.names(pg_temp.actors('2019-03-10 00:00:00+00', '2019-03-11 00:00:00+00', 'preview')), array['Devi Menon'], 'and to preview');
-select is(pg_temp.actors('2019-03-10 00:00:00+00', '2019-03-11 00:00:00+00', 'development'), '[]'::jsonb, 'and to a development nobody acted in');
-
--- The range is half-open here too, so the roster agrees with the rows it is
--- offered beside: a member whose only row sits exactly on p_to is out of both.
-select is(pg_temp.names(pg_temp.actors('2019-03-10 08:00:00+00', '2019-03-10 09:00:00+00')), array['Devi Menon'], 'p_from is inclusive and p_to is exclusive -- the 09:00 row is out');
-select is(pg_temp.names(pg_temp.actors('2019-03-10 08:00:00+00', '2019-03-10 09:00:00.000001+00')), array['Devi Menon', 'Nikhil B.'], 'and one microsecond later it is in');
-
--- Reading a roster is reading. Scoped to this section's own two days, because
--- console.audit_log survives every reset and a bare count would see every row
--- any run on this machine ever wrote.
-select is(
-  (select count(*)::integer from console.audit_log where at >= '2019-03-10 00:00:00+00' and at < '2019-03-12 00:00:00+00'),
-  3,
-  'reading the roster, windowed and unbounded, wrote nothing to the log'
 );
 
 -- Reading is reading. Nothing in this module may add to an append-only table,

@@ -173,10 +173,16 @@ export function EntriesPlate({
   readonly initial: AuditPage | null;
   /**
    * Every actor in the log, from `public.console_audit_actors` (Task 6) -- the whole log, not the
-   * range on screen, so the Member picker can reach someone who has done nothing in it. Empty when
-   * that read failed, which is the one case `seen` below answers.
+   * range on screen, so the Member picker can reach someone who has done nothing in it.
+   *
+   * **`null` is the read having failed; `[]` is a log with nobody in it.** They are kept apart
+   * deliberately: `[]` is a real answer this function gives (a console whose log holds nothing but
+   * System rows), and treating it as failure would let a failed read quietly revert the picker to
+   * the accumulate-from-the-rows behaviour this task removes, with nothing saying so -- which is
+   * the one failure mode that would hide the regression. Only `null` falls back to `seen`, and
+   * only `null` is logged (src/app/console/audit-log/page.tsx).
    */
-  readonly roster: readonly AuditMemberOption[];
+  readonly roster: readonly AuditMemberOption[] | null;
   readonly filters: AuditFilters;
   readonly environment: string;
 }) {
@@ -184,12 +190,12 @@ export function EntriesPlate({
   const [page, setPage] = useState<AuditPage>(initial ?? EMPTY);
   const [status, setStatus] = useState<Status>(initial ? "ready" : "error");
   // The fallback, and only the fallback: the actors the loaded rows name, accumulated across reads.
-  // It is maintained solely while the roster is empty -- a failed roster read -- so the picker is
-  // not left holding nothing but "All". `rosterEmpty` rather than `roster.length` in the dependency
-  // list, because the array's identity is a prop and its emptiness is the only thing that decides.
+  // Maintained solely while the roster is unknown, so the picker is not left holding nothing but
+  // "All" after a failed read. `rosterFailed` rather than `roster` in the dependency list, because
+  // the array's identity is a prop and only its absence decides anything.
   const [seen, setSeen] = useState<readonly AuditMemberOption[]>(() => actorsIn(initial?.rows ?? []));
-  const rosterEmpty = roster.length === 0;
-  const members = rosterEmpty ? seen : roster;
+  const rosterFailed = roster === null;
+  const members = roster ?? seen;
   // The id alone, not the row: the drawer reads the entry itself, because the key's *name* is not
   // in any row the table holds (task-3-addendum.md §2). Holding the row here would invite drawing
   // the drawer from it and quietly losing the key clause.
@@ -214,11 +220,11 @@ export function EntriesPlate({
       }
       setPage({ rows: result.data.rows, total: result.data.total });
       // Nothing to accumulate when the roster loaded: it already holds every actor in the log,
-      // including every one these rows can name.
-      if (rosterEmpty) setSeen((known) => withActors(known, result.data.rows));
+      // including every one these rows can name -- and an empty one means there are none.
+      if (rosterFailed) setSeen((known) => withActors(known, result.data.rows));
       setStatus("ready");
     },
-    [environment, rosterEmpty],
+    [environment, rosterFailed],
   );
 
   // The address follows the filters without re-rendering the page: history.replaceState is Next's

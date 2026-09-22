@@ -65,7 +65,7 @@ const ASHA_OPTION = { id: "a0000000-0000-4000-8000-000000000001", name: "Asha Ra
 const DEVI = { id: "e0000000-0000-4000-8000-000000000005", name: "Devi Menon" };
 const ROSTER: readonly AuditMemberOption[] = [ASHA_OPTION, DEVI];
 
-function plate(initial: AuditPage | null = PAGE, roster: readonly AuditMemberOption[] = ROSTER) {
+function plate(initial: AuditPage | null = PAGE, roster: readonly AuditMemberOption[] | null = ROSTER) {
   return <EntriesPlate initial={initial} roster={roster} filters={defaultAuditFilters("production")} environment="production" />;
 }
 
@@ -230,7 +230,7 @@ describe("the Member picker's options", () => {
   // equality and no null ever satisfies it, so a "System" option would always return nothing. The
   // SQL drops it; this holds that the fallback below does not put it back.
   it("never offers the System row, at either end", () => {
-    render(plate(PAGE, []));
+    render(plate(PAGE, null));
     expect(within(screen.getByRole("combobox", { name: m.filters.member })).queryByRole("option", { name: "System" })).toBeNull();
   });
 
@@ -247,21 +247,38 @@ describe("the Member picker's options", () => {
   });
 
   /**
-   * The one case the old behaviour is still reached in: the roster's own read failed and the page
-   * handed down an empty list. A picker holding nothing but "All" would be worse than one holding
-   * the members on screen, so the accumulate path stays as the fallback -- and it still accumulates
-   * across reads, so filtering by one member does not narrow the picker to them alone.
+   * The one case the old behaviour is still reached in: `roster` is `null`, meaning the read
+   * failed. A picker holding nothing but "All" would be worse than one holding the members on
+   * screen, so the accumulate path stays as the fallback -- and it still accumulates across reads,
+   * so filtering by one member does not narrow the picker to them alone.
    */
   it("falls back to the actors the rows name when the roster could not be read", async () => {
     const rohan: AuditEntry = { ...ASHA, id: "5a000000-0000-4000-8000-000000000099", actorId: "a0000000-0000-4000-8000-000000000002", actorName: "Rohan Iyer" };
     apiRequest.mockResolvedValue({ ok: true, data: { ok: true, rows: [rohan], total: 1 } });
-    render(plate({ rows: [ASHA], total: 1 }, []));
+    render(plate({ rows: [ASHA], total: 1 }, null));
     await userEvent.click(screen.getByRole("button", { name: m.filters.ranges["7d"] }));
     const picker = await screen.findByRole("combobox", { name: m.filters.member });
     await waitFor(() => expect(within(picker).getByRole("option", { name: "Rohan Iyer" })).toBeInTheDocument());
     expect(within(picker).getByRole("option", { name: ASHA_OPTION.name })).toBeInTheDocument();
     // And only them: with no roster there is nobody else to know about.
     expect(within(picker).queryByRole("option", { name: DEVI.name })).toBeNull();
+  });
+
+  /**
+   * `[]` is a read that succeeded and found nobody -- a console whose log holds nothing but System
+   * rows -- and it must **not** fall back. Collapsing it into `null` is what would let a failed
+   * read quietly revert this picker to accumulating from the rows, which is the one failure mode
+   * that could hide a regression of this very task. `null` falls back and is logged; `[]` offers
+   * "All" and nothing else, because there is nobody to offer.
+   */
+  it("offers nobody, rather than falling back, when the roster is empty because the log is", async () => {
+    apiRequest.mockResolvedValue({ ok: true, data: { ok: true, rows: [ASHA], total: 1 } });
+    render(plate({ rows: [ASHA], total: 1 }, []));
+    await userEvent.click(screen.getByRole("button", { name: m.filters.ranges["7d"] }));
+    const picker = await screen.findByRole("combobox", { name: m.filters.member });
+    await waitFor(() => expect(screen.getByRole("table")).toBeVisible());
+    expect(within(picker).getAllByRole("option")).toHaveLength(1);
+    expect(within(picker).getByRole("option", { name: m.filters.all })).toBeInTheDocument();
   });
 });
 
