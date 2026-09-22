@@ -18,9 +18,11 @@ import { env } from "@/services/env";
  * ConsoleRail (desktop, `sm:` and up) and ConsoleRailDrawer (phone, its left-drawer counterpart,
  * task-10-brief.md, corrected to a drawer by task-10-fix-1.md) are two views of the one `groups`,
  * gated together: a role railFor gives nothing gets neither, not an empty rail beside a working
- * trigger or the reverse (task-10-addendum.md §1 -- true of every role today, since no module is
- * built yet; nav.test.ts's and console-rail.test.tsx's own "today's reality" checks pin this and
- * will need updating the day that changes). The drawer's own trigger goes to ConsoleMasthead's
+ * trigger or the reverse (task-10-addendum.md §1). That was every role in 2d-1, when no module was
+ * built; as of 2d-2 task-8 it is every role but the Owner, who gets Configure and 13 Team --
+ * nav.test.ts's and console-rail.test.tsx's own real-CONSOLE_MODULES checks pin both halves, and
+ * tests/e2e/console-auth/scans.spec.ts is where the phone drawer is laid out for real. The drawer's
+ * own trigger goes to ConsoleMasthead's
  * `leading` slot (task-10-fix-1.md), before the mark, where both phone sheets draw it -- not the
  * rail's own slot below, which now carries only the desktop `<nav>`.
  *

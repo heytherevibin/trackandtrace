@@ -5,6 +5,7 @@ import { SignedOutFrame } from "@/console/components/signed-out-frame";
 import { consoleHref } from "@/console/href";
 import { requireLinkSession } from "@/console/keys/ceremony";
 import { consoleMessages } from "@/console/messages";
+import { lookupInviteToken } from "@/console/setup/redeem";
 import { RedeemToken } from "./redeem-token";
 import { SetupFlow } from "./setup-flow";
 
@@ -14,9 +15,10 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: m.pageTitle };
 
 /**
- * Setup (Form TC-03), First Owner entry only -- Team's Invite states are drawn but unreachable
- * until the next PR. A `token` in the URL is the one-time link out of the SQL editor, redeemed
- * server to server with no email at all; without one, this is where a fresh link session lands.
+ * Setup (Form TC-03): a first Owner's arrival, and (Task 2b) an invited member's. A `token` in the
+ * URL is one of two one-time links -- out of the SQL editor with no email at all, or mailed to an
+ * address an Owner named -- and `lookupInviteToken` is the read that tells them apart before
+ * `RedeemToken` decides what to draw. Without a token, this is where a fresh link session lands.
  *
  * The session is checked *before* the token, not after: `create_first_owner_link` is deliberately
  * free to issue more than one link (losing one before redemption is a real scenario), so a second,
@@ -53,9 +55,10 @@ export default async function ConsoleSetupPage({ searchParams }: { readonly sear
   const { token: rawToken } = await searchParams;
   const token = typeof rawToken === "string" ? rawToken : null;
   if (token) {
+    const entry = await lookupInviteToken(token);
     return (
       <SignedOutFrame>
-        <RedeemToken token={token} />
+        <RedeemToken token={token} entry={entry} />
       </SignedOutFrame>
     );
   }

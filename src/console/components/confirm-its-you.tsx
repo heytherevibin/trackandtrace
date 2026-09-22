@@ -45,15 +45,37 @@ export interface ConfirmItsYouProps extends TapRequest {
    * rendered.
    */
   readonly summary: string;
-  /** The sheet's Change line, drawn as `${label}: ${before} → ${after}` (e.g. "Keys: 3 → 2"). */
-  readonly change: { readonly label: string; readonly before: string; readonly after: string };
+  /**
+   * The sheet's Change line, drawn as `${label}: ${before} → ${after}` (e.g. "Keys: 3 → 2"), with
+   * the "Change" legend beside it.
+   *
+   * Optional for the same reason `hint` is, and found the same way one task later: ConsoleTeam's
+   * dlg_reset (:288-300) and dlg_remove (:313-325) are TC-01 too, and neither draws a Change row at
+   * all -- a reset and a removal have no before-and-after pair to show, only the bold line and the
+   * consequence beneath it (task-6-addendum.md §1). The legend goes with it when it is absent: a
+   * label with nothing after it says less than no row.
+   */
+  readonly change?: { readonly label: string; readonly before: string; readonly after: string };
+  /**
+   * The one consequence of going through with it, in the sheet's own `hint` class, under the
+   * Change line and in the same column ("Kiran is signed out everywhere at once and signs in again
+   * with the new role.", ConsoleTeam.dc.html:267; :291 and :316 draw one for Task 6's two actions).
+   *
+   * Optional because TC-01 as drawn in Main.dc.html:213-231 genuinely has none -- it carries a
+   * bespoke "Message to travellers" field in that space instead -- and the invite (Task 4) has none
+   * either. A per-action line the shared component had no slot for is the sort of thing that gets
+   * dropped, or gets TC-01 forked into a second implementation; it is neither (task-5-addendum.md
+   * §1). For the role change it is the only place the console says that changing a role signs the
+   * member out everywhere.
+   */
+  readonly hint?: string;
   readonly onReasonChange: (reason: string) => void;
   readonly onCancel: () => void;
   readonly onConfirmed: () => void;
 }
 
 /** Form TC-01: confirms it's the member, with a typed reason and one tap, before a risky action runs. */
-export function ConfirmItsYou({ open, action, target, value, reason, summary, change, onReasonChange, onCancel, onConfirmed }: ConfirmItsYouProps) {
+export function ConfirmItsYou({ open, action, target, value, reason, summary, change, hint, onReasonChange, onCancel, onConfirmed }: ConfirmItsYouProps) {
   const [stage, setStage] = useState<Stage>({ kind: "idle" });
   // The reason a confirm attempt refused, or null once none has (or the member has since edited
   // it away). reasonAlert below is derived from comparing this to the live `reason` prop rather
@@ -160,10 +182,13 @@ export function ConfirmItsYou({ open, action, target, value, reason, summary, ch
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
             <span className="text-lg font-medium text-ink-1">{summary}</span>
-            <span className="flex items-baseline gap-2.5">
-              <span className="legend">{m.changeLabel}</span>
-              <span className="text-sm text-ink-1">{`${change.label}: ${change.before} → ${change.after}`}</span>
-            </span>
+            {change ? (
+              <span className="flex items-baseline gap-2.5">
+                <span className="legend">{m.changeLabel}</span>
+                <span className="text-sm text-ink-1">{`${change.label}: ${change.before} → ${change.after}`}</span>
+              </span>
+            ) : null}
+            {hint ? <p className="text-label text-ink-3">{hint}</p> : null}
           </div>
           <div className="flex flex-col gap-1.5">
             <label htmlFor="confirm-reason" className="legend-md text-accent-text">

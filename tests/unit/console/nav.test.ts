@@ -5,11 +5,13 @@ import { CONSOLE_MODULES, railFor, type ConsoleModule } from "@/console/nav";
 
 const ROLES = ["owner", "admin", "support", "viewer"] as const satisfies readonly ConsoleRole[];
 
-// A small, self-contained fixture -- built: true throughout -- so railFor's role filtering can be
-// asserted meaningfully. The real CONSOLE_MODULES has no built module yet (see "today's reality"
-// below); testing role filtering against it directly would assert nothing (task-4-addendum.md
-// §1 -- that was the brief's own defect, fixed there). Shaped like the real thing but not
-// exported from nav.ts: the fixture belongs in the test.
+// A small, self-contained fixture -- built: true but for the last row -- so railFor's role
+// filtering can be asserted meaningfully. The real CONSOLE_MODULES has exactly one built module as
+// of 2d-2 task-8 (see "today's real CONSOLE_MODULES" below), and one Owner-only module cannot show
+// that a Viewer is filtered differently from an Admin (task-4-addendum.md §1 -- that was the
+// brief's own defect, fixed there). Shaped like the real thing but not exported from nav.ts: the
+// fixture belongs in the test. Its row 13 is the unbuilt one on purpose, so "never shows an unbuilt
+// module" has something to prove -- it is not the real module 13, whose roles are Owner-only.
 const FIXTURE: readonly ConsoleModule[] = [
   { num: "01", label: "Overview", group: "operate", roles: ["owner", "admin", "support", "viewer"], href: consoleHref("/"), built: true },
   { num: "02", label: "Sources & usage", group: "operate", roles: ["owner", "admin", "viewer"], href: consoleHref("/sources"), built: true },
@@ -46,13 +48,26 @@ describe("railFor: role filtering (fixture)", () => {
 });
 
 describe("railFor against today's real CONSOLE_MODULES", () => {
-  // This plan (2d-1) ships every module with built: false -- the brief's own ruling: a rail of
-  // fourteen links that all lead nowhere is worse than a short one. This test pins that ruling
-  // deliberately: it must change the day 2d-2 flips Team and the Audit log to built: true.
-  it("shows nothing for any role, yet", () => {
-    for (const role of ROLES) {
-      expect(railFor(role)).toEqual([]);
-    }
+  // 2d-1 shipped every module with built: false -- a rail of fourteen links that all lead nowhere is
+  // worse than a short one. 2d-2 task-8 flips the first of them: 13 Team has a page now
+  // (src/app/console/team/page.tsx), so the rail renders for the first time, for one role and with
+  // one module in it. The Audit log is still to come.
+  const TEAM = CONSOLE_MODULES.find((m) => m.num === "13");
+
+  it("gives an Owner the Configure group with Team in it", () => {
+    expect(TEAM).toBeDefined();
+    expect(railFor("owner")).toEqual([{ group: "configure", modules: [TEAM] }]);
+  });
+
+  // Main.dc.html:293-298's own access.Admin list has no '13' -- Team is Owner-only, whatever the
+  // plan's table said (task-4-addendum.md §5, re-checked for task-8 in task-7-addendum.md §6).
+  it("still gives an Admin nothing, because Team is Owner-only", () => {
+    expect(railFor("admin")).toEqual([]);
+  });
+
+  it("gives Support and a Viewer nothing either", () => {
+    expect(railFor("support")).toEqual([]);
+    expect(railFor("viewer")).toEqual([]);
   });
 });
 
@@ -91,8 +106,11 @@ describe("CONSOLE_MODULES", () => {
     });
   });
 
-  it("builds nothing yet -- this plan's own ruling", () => {
-    expect(CONSOLE_MODULES.every((m) => m.built === false)).toBe(true);
+  // A module's flag flips to true in the same PR that adds its page, and exactly one page exists:
+  // 13 Team (2d-2 task-8). Pinned as a list rather than a count so the day 11 Switches or 14 Audit
+  // log arrives, this test names what changed instead of merely counting one more.
+  it("builds 13 Team and nothing else yet", () => {
+    expect(CONSOLE_MODULES.filter((m) => m.built).map((m) => m.num)).toEqual(["13"]);
   });
 
   it("gives every module a distinct, non-empty label and a console href", () => {

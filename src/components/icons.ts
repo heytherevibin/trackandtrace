@@ -33,6 +33,9 @@ export {
   FlowchartRegular,
   QuestionCircleRegular,
   RoadRegular,
+  // The row-menu dots. Filled, not Regular, because ConsoleTeam.dc.html:145 draws three solid
+  // circles (`fill="currentColor"`, r=1.25) rather than three outlines.
+  MoreHorizontalFilled,
   // Filled: the navigation set (masthead, footer sections, theme cells, sign in)
   CalendarClockFilled,
   DarkThemeFilled,
