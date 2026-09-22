@@ -1,5 +1,19 @@
-import type { Page } from "@playwright/test";
-import { addVirtualKey, consoleSql, expect, expectSignedInAs, ownerIdentity, readOutbox, resetConsole, setUpFirstOwner, swapAuthenticatorAfterTap, test } from "./fixtures";
+import { addVirtualKey, consoleSql, expect, expectSignedInAs, ownerIdentity, resetConsole, setUpFirstOwner, swapAuthenticatorAfterTap, test } from "./fixtures";
+import {
+  auditCount,
+  freshAddress,
+  idOf,
+  inviteMember,
+  invitesTable,
+  letterFor,
+  linkIn,
+  membersTable,
+  roleOf,
+  rowMenu,
+  tapThrough,
+  INVITE_SUBJECT,
+  SIGN_IN_SUBJECT,
+} from "./team-helpers";
 import { gotoReady } from "../helpers";
 
 /**
@@ -20,6 +34,9 @@ import { gotoReady } from "../helpers";
  *
  * `resetConsole()` empties console.members and console.setup_links but never console.audit_log
  * (it holds no foreign keys), so every audit assertion is scoped to this run's own actor.
+ *
+ * The page-driving helpers moved to ./team-helpers.ts when team-rejoin.spec.ts arrived and needed
+ * the same ones -- a pure move, no behaviour with them.
  */
 
 const BASE = "http://admin.localhost:4211";
@@ -35,83 +52,6 @@ test.beforeEach(() => resetConsole());
  * file the property held by luck: sign-in.spec.ts ran last and its own last test creates no member.
  */
 test.afterAll(() => resetConsole());
-
-/**
- * An address nothing has seen. Unique across runs on purpose: `resetConsole()` does not touch
- * auth.users, and `console_invite_member` refuses any address that already has one
- * (20260922110000_console_invite_blocks_traveller.sql), so a fixed address would pass once and
- * refuse for the rest of this machine's life.
- */
-function freshAddress(prefix: string): string {
-  return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@trakline.in`;
-}
-
-/**
- * The one letter waiting for `email`. `readOutbox`'s own `to` filter removes what it returns, so
- * the poll keeps its own read rather than reading a second time (sign-in.spec.ts's own note).
- * Polled because both sends run in `after()`, off the response path.
- */
-async function letterFor(page: Page, email: string, subject: string): Promise<{ to: string; subject: string; text: string }> {
-  let found: Awaited<ReturnType<typeof readOutbox>> = [];
-  await expect
-    .poll(
-      async () => {
-        found = await readOutbox(page, email);
-        return found.length;
-      },
-      { timeout: 10_000 },
-    )
-    .toBeGreaterThan(0);
-  const letter = found[0];
-  if (!letter) throw new Error(`no letter for ${email}`);
-  expect(letter.subject).toBe(subject);
-  return letter;
-}
-
-function linkIn(text: string, path: "setup" | "auth/confirm"): string {
-  const link = new RegExp(`https?://\\S+/${path}\\S+`).exec(text)?.[0];
-  expect(link, `no /${path} link in: ${text}`).toBeTruthy();
-  return String(link);
-}
-
-const membersTable = (page: Page) => page.getByRole("region", { name: "Console members", exact: true });
-const invitesTable = (page: Page) => page.getByRole("region", { name: "Invites waiting to be accepted", exact: true });
-
-/** TC-01: type the reason, tap, and wait for the dialog the completed tap closes. */
-async function tapThrough(page: Page, reason: string): Promise<void> {
-  const tc01 = page.getByRole("dialog", { name: "Confirm it's you" });
-  await expect(tc01).toBeVisible();
-  await tc01.getByLabel("Reason").fill(reason);
-  await tc01.getByRole("button", { name: "Tap your key" }).click();
-  await expect(tc01).not.toBeVisible();
-}
-
-/** TC-04 then TC-01: one invite, through the drawn dialog and a real tap. */
-async function inviteMember(page: Page, email: string, role: string, reason: string): Promise<void> {
-  // Two triggers carry these words while the console has one member -- the page header's primary
-  // (:106) and the secondary beside the only-you note (:157). Either opens the one dialog.
-  await page.getByRole("button", { name: "Invite a member" }).first().click();
-  const dialog = page.getByRole("dialog", { name: "Invite a member" });
-  await expect(dialog).toBeVisible();
-  await dialog.getByLabel("Email").fill(email);
-  await dialog.getByRole("radio", { name: role }).click();
-  await dialog.getByRole("button", { name: "Continue" }).click();
-  await tapThrough(page, reason);
-}
-
-async function rowMenu(page: Page, name: string, item: "Change role" | "Reset keys" | "Remove"): Promise<void> {
-  await membersTable(page).getByRole("button", { name: `Actions for ${name}` }).click();
-  await page.getByRole("menuitem", { name: item, exact: true }).click();
-}
-
-const idOf = (email: string) => consoleSql(`select user_id from console.members where email = '${email}'`);
-const roleOf = (email: string) => consoleSql(`select role from console.members where email = '${email}'`);
-
-/** Scoped to one actor, one action and one target: the audit log outlives every reset. */
-function auditCount(actor: string, action: string, target: string): string {
-  const quoted = action.replaceAll("'", "''");
-  return consoleSql(`select count(*) from console.audit_log where actor_id = '${actor}' and action = '${quoted}' and target = '${target}'`);
-}
 
 test.describe("Team", () => {
   /**
@@ -241,13 +181,13 @@ test.describe("Team", () => {
     if (!browser) throw new Error("no browser instance available for a fresh context");
     const theirs = await browser.newContext();
     const them = await theirs.newPage();
-    const invite = await letterFor(them, email, "You're invited to the Trakline console");
+    const invite = await letterFor(them, email, INVITE_SUBJECT);
     expect(invite.text, "the letter names the role they were invited as").toContain("as Admin");
     await them.goto(linkIn(invite.text, "setup"));
     await them.getByRole("button", { name: "Accept and email me a sign-in link" }).click();
     await expect(them.getByText("Check your inbox. Open the link on the device you'll set up.")).toBeVisible();
 
-    const signIn = await letterFor(them, email, "Your Trakline console sign-in link");
+    const signIn = await letterFor(them, email, SIGN_IN_SUBJECT);
     await them.goto(linkIn(signIn.text, "auth/confirm"));
     const theirFirstKey = await addVirtualKey(them, "usb");
     await expect(them.getByRole("heading", { name: "Add your first key" })).toBeVisible();
@@ -343,7 +283,7 @@ test.describe("Team", () => {
     await gotoReady(page, "/team");
     await inviteMember(page, email, "Viewer", "Read-only access for the audit.");
     await expect(page.getByText("Invite sent · logged")).toBeVisible();
-    const firstLetter = await letterFor(page, email, "You're invited to the Trakline console");
+    const firstLetter = await letterFor(page, email, INVITE_SUBJECT);
     const firstLink = linkIn(firstLetter.text, "setup");
 
     const inviteRow = invitesTable(page).getByRole("row").filter({ hasText: email });
@@ -369,7 +309,7 @@ test.describe("Team", () => {
     // compared as a string: it is a console-access credential, and a failing assertion prints what
     // it was given. The link either changed or it did not, which is the whole claim.
     expect(consoleSql(`select expires_at > now() + interval '6 days' from console.invites where id = '${inviteId}'`), "live again, for 7 days").toBe("t");
-    const second = await letterFor(page, email, "You're invited to the Trakline console");
+    const second = await letterFor(page, email, INVITE_SUBJECT);
     expect(linkIn(second.text, "setup") === firstLink, "the second letter carries a fresh token, not the spent one").toBe(false);
     expect(auditCount(idOf(owner.email), "Resent an invite", email), "the resend's own audit row").toBe("1");
 
@@ -405,7 +345,7 @@ test.describe("Team", () => {
     if (!browser) throw new Error("no browser instance available for a fresh context");
     const theirs = await browser.newContext();
     const them = await theirs.newPage();
-    const invite = await letterFor(them, email, "You're invited to the Trakline console");
+    const invite = await letterFor(them, email, INVITE_SUBJECT);
     await them.goto(linkIn(invite.text, "setup"));
     await them.getByRole("button", { name: "Accept and email me a sign-in link" }).click();
     await expect(them.getByText("Check your inbox. Open the link on the device you'll set up.")).toBeVisible();
