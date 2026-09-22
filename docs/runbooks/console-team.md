@@ -36,7 +36,9 @@ Three refusals are by design:
   address that has neither.
 
 A member who was **removed** can be invited again: removal is a soft delete, and only a member row
-that is not `removed` blocks a fresh invite.
+that is not `removed` blocks a fresh invite. They come back the same way anyone does — the letter,
+then Setup, then two fresh keys — because removal deleted the keys they used to hold. The keys they
+had before are gone for good; a physical key they kept is enrolled again as a new one.
 
 ## Resending, and an invite that has expired
 
@@ -91,9 +93,16 @@ fail the same way.
 
 ## Removing a member
 
-**Remove** signs them out everywhere and takes their access away. It is a soft delete: the row stays
-with `status = 'removed'`, so every audit row naming them still resolves, and they can be invited
-again later. The same two refusals as a role change apply — your own row, and the last active Owner.
+**Remove** signs them out everywhere, **deletes every security key they hold**, and takes their
+access away. It is a soft delete of the *member*, not of their credentials: the row stays with
+`status = 'removed'`, so every audit row naming them still resolves, and they can be invited again
+later — but the keys do not come back with them, and the audit row records how many went. The same
+two refusals as a role change apply — your own row, and the last active Owner.
+
+The keys go on purpose. Without that, a re-invited member's old keys stayed on the row their
+acceptance reactivates, which sent their sign-in to the key step instead of Setup and left them
+unable ever to reach the step that finishes it — signed out of every page with "Your session ended",
+while their roster row read an ordinary "Setup incomplete · 2 keys".
 
 ## What is written down
 

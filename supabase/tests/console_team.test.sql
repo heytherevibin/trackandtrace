@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(80);
+select plan(82);
 
 -- What an Owner may do to the team: list it, invite someone, change a role,
 -- reset a member's keys, remove a member, and resend or revoke an invite.
@@ -400,12 +400,24 @@ select is(
 
 -- Removing a member. A second Owner (Priya) is added purely so this can
 -- prove self-removal is refused even with a spare on hand, the same shape
--- the role-change block above proved for demotion.
+-- the role-change block above proved for demotion. She holds two keys, as
+-- every active member does and as Devi no longer does by this point (the
+-- reset above took hers): removal tested against a member holding none
+-- proves nothing about what removal does to credentials.
 insert into auth.users (id, email) values ('c1111111-1111-1111-1111-111111111111', 'priya@trakline.in');
 insert into console.members (user_id, email, name, role, status)
 values ('c1111111-1111-1111-1111-111111111111', 'priya@trakline.in', 'Priya Nambiar', 'owner', 'active');
 insert into console.sessions (session_id, member_id, device_label, address_hash, expires_at, key_verified_at)
 values ('c2222222-2222-2222-2222-222222222222', 'c1111111-1111-1111-1111-111111111111', 'Edge on Windows', 'hash', now() + interval '7 days', now());
+insert into console.keys (id, member_id, credential_id, public_key, counter, name, type) values
+  ('c3333333-0000-0000-0000-000000000001', 'c1111111-1111-1111-1111-111111111111', '\x31'::bytea, '\x41'::bytea, 0, 'Priya''s YubiKey', 'security_key'),
+  ('c3333333-0000-0000-0000-000000000002', 'c1111111-1111-1111-1111-111111111111', '\x32'::bytea, '\x42'::bytea, 0, 'Priya''s iPhone', 'passkey');
+
+select is(
+  (select count(*)::int from console.keys where member_id = 'c1111111-1111-1111-1111-111111111111'),
+  2,
+  'the member about to be removed holds the two keys an active member must have'
+);
 
 select throws_ok(
   $$ select public.console_remove_member('c1111111-1111-1111-1111-111111111111', 'No tap yet.', 'development') $$,
@@ -439,6 +451,18 @@ select is((select status from console.members where user_id = 'c1111111-1111-111
 select ok(
   (select revoked_at is not null from console.sessions where session_id = 'c2222222-2222-2222-2222-222222222222'),
   'removal revokes every one of that member''s sessions'
+);
+-- 20260922130000_console_remove_member_clears_keys.sql. A count rather than a message: nothing
+-- here is refused, the removal succeeds either way, and what differs is a number -- two, which the
+-- fixture put on her row five assertions ago, so this cannot pass by her never having had a key.
+-- What it holds: a re-invited member accepts onto the row she already has, and keys left behind
+-- make her key_count >= 2, which routes her sign-in to /sign-in-key instead of /setup
+-- (src/console/auth/session.ts:59) -- past the only step that moves setup -> active, into
+-- `28000 session ended` forever. The journey is tests/e2e/console-auth/team-rejoin.spec.ts.
+select is(
+  (select count(*)::int from console.keys where member_id = 'c1111111-1111-1111-1111-111111111111'),
+  0,
+  'and it takes her keys with it -- a removed member is left holding no credentials'
 );
 select is(
   (select count(*)::int from console.audit_log where category = 'team' and action = 'Removed a member' and actor_id = 'a1111111-1111-1111-1111-111111111111'),

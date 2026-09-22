@@ -86,8 +86,10 @@ begin
     -- Never token_hash: a live invite (unaccepted, unrevoked) is what "pending"
     -- means here, matching the table's own console_invites_live_email_idx --
     -- an invite past its expires_at still shows, because nothing else prunes
-    -- it and an Owner must be able to see it to revoke it or learn resending
-    -- is refused.
+    -- it and the live-email index goes on holding that address until the
+    -- invite is accepted or revoked. Resending it is the recovery path, not a
+    -- refusal (Ruling 12, and console_resend_invite's own comment below); an
+    -- Owner who cannot see the row can neither resend it nor free the address.
     'invites', coalesce((
       select jsonb_agg(jsonb_build_object(
         'id', i.id,

@@ -72,11 +72,20 @@ begin
   -- An address with a traveller account and no member row at all is still
   -- refused, which is the case the sheet draws.
   --
-  -- console_auth_accept_invite already lands a re-invite correctly: its insert
-  -- is `on conflict (user_id) do update set role, status = 'setup', name`, and
-  -- a removed member keeps both their user_id and their email, so accepting
+  -- console_auth_accept_invite lands the *row* correctly: its insert is
+  -- `on conflict (user_id) do update set role, status = 'setup', name`, and a
+  -- removed member keeps both their user_id and their email, so accepting
   -- reactivates the row they already have rather than colliding with
   -- console_members_email_key.
+  --
+  -- That is all this check ever verified, and the fuller claim it used to make
+  -- here -- that a re-invite "lands correctly" -- was false when it was
+  -- written. Removal left console.keys intact, so the reactivated row came
+  -- back carrying two old keys, which sent the member's sign-in to
+  -- /sign-in-key instead of /setup and left her permanently unable to reach
+  -- the step that moves setup -> active. The whole-branch review found it;
+  -- 20260922130000_console_remove_member_clears_keys.sql is what makes the
+  -- exemption above actually lead somewhere, and carries the five-step trace.
   if exists (select 1 from auth.users u where lower(u.email) = v_email)
      and not exists (select 1 from console.members where email = v_email and status = 'removed')
   then
