@@ -10,12 +10,15 @@ import { Led } from "@/components/ui/led";
 import { PlateHeader } from "@/components/ui/plate";
 import { SweepBar } from "@/components/ui/sweep-bar";
 import { consoleApiMessage } from "@/console/api-message";
+import type { ConsoleRole } from "@/console/auth/member";
 import { consoleHref } from "@/console/href";
 import { consoleMessages } from "@/console/messages";
 import type { InviteTokenLookup } from "@/console/setup/redeem";
 import { apiRequest } from "@/services/api-client";
 
 const m = consoleMessages.setup;
+const f = consoleMessages.frame;
+const team = consoleMessages.team;
 const REDEEMED = z.object({ ok: z.literal(true), kind: z.enum(["owner", "invite"]) });
 
 // /api/setup runs the link lookup, createUser, generateLink, verifyOtp, the redeem RPC and
@@ -99,8 +102,22 @@ function RedeemOwnerLink({ token }: { readonly token: string }) {
  * mailed link must not, by itself, send mail on the member's behalf (a scanner or a prefetch could
  * open it first). Accepting establishes the invited address; the sign-in link that follows is what
  * actually gets the member into the console, on whatever device opens it.
+ *
+ * `role` closes half of task-3-addendum.md §2's two setup-page gaps: ConsoleSetup.dc.html's own
+ * head lead for this state ("Asha Rao (Owner) invited kiran@example.com as Support.", :273) names
+ * both the inviter and the role, and `lookupInviteToken` (src/console/setup/redeem.ts) has carried
+ * `role` since Task 2b without a caller for it (this file's own test fixture said so explicitly).
+ * The inviter's name is the other half, and stays unwired: `console_auth_invite` -- the read this
+ * flow actually uses, read before any session exists -- returns only `email, role, expired,
+ * withdrawn` (supabase/migrations/20260922100000_console_auth_invite.sql), never `invited_by`, and
+ * `console_team()` cannot help either, being Owner-only and unreachable by an unauthenticated setup
+ * visitor. Resolving it needs a join this page task must not add on its own
+ * (task-3-addendum.md §2's own instruction); reported in task-3-report.md rather than guessed at
+ * or left to claim a name it does not have. So this shows the role half only, composed from the
+ * same words the Roles plate and Task 4's own invite dialog use
+ * (consoleMessages.team.roleDescription), not the sheet's full two-clause sentence.
  */
-function AcceptInvite({ token }: { readonly token: string }) {
+function AcceptInvite({ token, role }: { readonly token: string; readonly role: ConsoleRole }) {
   const [stage, setStage] = useState<
     { readonly kind: "idle" } | { readonly kind: "accepting" } | { readonly kind: "sent" } | { readonly kind: "failed"; readonly message: string }
   >({ kind: "idle" });
@@ -124,6 +141,7 @@ function AcceptInvite({ token }: { readonly token: string }) {
       <h1 ref={headingRef} tabIndex={-1} className="optical-hang mt-6 text-5xl tracking-display outline-none">
         {m.invite.title}
       </h1>
+      <p className="mt-3.5 text-base text-ink-2">{`${f.roleLabel[role]}: ${team.roleDescription[role]}`}</p>
       <div className="mt-8 blueprint">
         <Corners />
         {stage.kind === "accepting" ? <SweepBar /> : null}
@@ -183,7 +201,7 @@ function InviteClosed({ state }: { readonly state: "expired" | "withdrawn" }) {
  */
 export function RedeemToken({ token, entry }: { readonly token: string; readonly entry: InviteTokenLookup }) {
   if (entry.kind === "invite") {
-    return entry.state === "live" ? <AcceptInvite token={token} /> : <InviteClosed state={entry.state} />;
+    return entry.state === "live" ? <AcceptInvite token={token} role={entry.role} /> : <InviteClosed state={entry.state} />;
   }
   return <RedeemOwnerLink token={token} />;
 }

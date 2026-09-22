@@ -22,9 +22,13 @@ export const setup = {
   // Invite's own arrival (Task 2b): renderVals's `heads.Invite` head, and the sheet's one action
   // and its "Link sent" status line. Not `title`/`lead` above -- those are First Owner's words,
   // and showing them to an invited member would say something false ("You'll be its first Owner").
-  // The sheet's own lead line for Invite also names who invited them and their role, which needs
-  // more than this call site resolves (the inviter's name); until that is wired, this shows the
-  // fixed half of the sheet's head and none of the interpolated lead, rather than inventing one.
+  // The sheet's own lead line for Invite names both who invited the member and their role
+  // ("Asha Rao (Owner) invited kiran@example.com as Support.", ConsoleSetup.dc.html:273). The role
+  // half is wired (task-3-addendum.md §2, src/app/console/setup/redeem-token.tsx's own AcceptInvite,
+  // composed from consoleMessages.team.roleDescription rather than a second copy here) since
+  // Task 3; the inviter's-name half still is not -- no interface a pre-session setup visitor can
+  // call resolves console.invites.invited_by to a name (task-3-report.md) -- so this shows the role
+  // half only, not the sheet's full two-clause sentence.
   invite: {
     title: "You're invited to the Trakline console",
     accept: "Accept and email me a sign-in link",

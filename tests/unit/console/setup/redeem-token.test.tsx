@@ -17,10 +17,11 @@ const EXPIRED = "This invite has expired. Ask an Owner to send a new one.";
 const WITHDRAWN = "This invite was withdrawn.";
 const ACCEPT = "Accept and email me a sign-in link";
 const SENT = "Check your inbox. Open the link on the device you'll set up.";
-// email/role travel on a live entry (lookupInviteToken's real shape) even though this component
-// never reads either -- see redeem-token.tsx and setup.ts's own comment on why the head stays
-// unpersonalised for now.
+// email/role travel on a live entry (lookupInviteToken's real shape). `role` now feeds the
+// role-specific sub-line (task-3-addendum.md §2); `email` still goes unread here -- see
+// redeem-token.tsx and setup.ts's own comment on why the head names no inviter yet.
 const LIVE_INVITE: InviteTokenLookup = { kind: "invite", state: "live", email: "kiran.das@trakline.in", role: "support" };
+const ROLE_LEAD = "Support: Overview, Leads, Privacy requests and Wrong-status reports.";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -47,6 +48,14 @@ describe("RedeemToken — a live invite (kind: invite, state: live)", () => {
     render(<RedeemToken token="abc" entry={LIVE_INVITE} />);
     expect(screen.getByRole("button", { name: ACCEPT })).toBeEnabled();
     expect(apiRequest).not.toHaveBeenCalled();
+  });
+
+  // task-3-addendum.md §2: the role half of the sheet's personalised head lead, composed from the
+  // same words the Roles plate carries (consoleMessages.team.roleDescription) rather than a second
+  // copy grown here. The inviter's name stays unwired -- see setup.ts's own comment.
+  it("names the invited role and what it can reach, even though the inviter itself stays unnamed", () => {
+    render(<RedeemToken token="abc" entry={LIVE_INVITE} />);
+    expect(screen.getByText(ROLE_LEAD)).toBeInTheDocument();
   });
 
   it("accepts on click, and then draws the sheet's own inbox line -- not a redirect", async () => {
