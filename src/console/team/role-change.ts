@@ -33,7 +33,7 @@ export interface RoleChangeRoster {
 /**
  * Whether this change would leave the console without an Owner -- the two cases
  * `console_change_role` refuses with 'a console needs at least one owner', mirrored line for line
- * from supabase/migrations/20260922090000_console_team.sql:162-217:
+ * from supabase/migrations/20260922090000_console_team.sql:164-215:
  *
  * - `if p_member = v_member.user_id then raise` -- an Owner acting on their own row. Unconditional,
  *   checked before the target row is even read, and refused whatever the new role is and however

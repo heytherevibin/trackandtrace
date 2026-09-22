@@ -1,7 +1,7 @@
 -- Removing a member deletes their security keys.
 --
 -- console_remove_member shipped revoking every session and leaving console.keys untouched
--- (20260922090000_console_team.sql:292). That is what dead-ends a re-invited member, permanently
+-- (20260922090000_console_team.sql:294). That is what dead-ends a re-invited member, permanently
 -- and with nothing on screen to say so. The whole-branch review proved the path by execution --
 -- real functions, real taps, one rolled-back transaction -- and it is reproduced here because
 -- reading the five steps is the only way the fix looks proportionate:

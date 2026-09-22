@@ -10,7 +10,7 @@ import { CONSOLE_ROLES, needsAnotherOwner, rolesOfferedInstead } from "@/console
 // it here is what lets the sheet's own dlg_owner be drawn with the sheet's own words.
 //
 // Every assertion below is a mirror of a line in console_change_role
-// (supabase/migrations/20260922090000_console_team.sql:162-217). Where the two could drift, the
+// (supabase/migrations/20260922090000_console_team.sql:164-215). Where the two could drift, the
 // migration wins and this file is the thing that is wrong.
 
 const ME = "aaaaaaaa-0000-0000-0000-000000000001";
@@ -57,7 +57,7 @@ describe("needsAnotherOwner", () => {
 // `if p_member = v_member.user_id then raise` unconditionally, then
 // `if v_target.role = 'owner' then require_another_active_owner()` with no second condition,
 // because a removed member is not an Owner by any reading
-// (supabase/migrations/20260922090000_console_team.sql:259-305). One predicate, not two: a second
+// (supabase/migrations/20260922090000_console_team.sql:261-304). One predicate, not two: a second
 // copy of the floor rule is a second thing to drift.
 describe("needsAnotherOwner for a removal, which leaves no role at all", () => {
   it("refuses an Owner removing themselves however many Owners stand by", () => {

@@ -1,6 +1,6 @@
 -- A member cannot reset their own keys.
 --
--- console_reset_keys shipped with no self-check (20260922090000_console_team.sql:218), on the
+-- console_reset_keys shipped with no self-check (20260922090000_console_team.sql:220), on the
 -- stated reasoning that a self-reset was "recoverable, and consistent with My keys letting a member
 -- remove their own keys". Both halves are false, and the second is exactly inverted. The Task 6
 -- review caught it; every link below was then re-traced against the migrations rather than taken on
