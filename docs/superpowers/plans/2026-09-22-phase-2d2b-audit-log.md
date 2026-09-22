@@ -143,7 +143,23 @@ That line is the specification: the prepared export is single-use, bound to the 
 
 ---
 
-### Task 6: The rail, end to end, and the docs
+### Task 6: The Member filter's roster
+
+**Files:** Create `supabase/migrations/20260922150000_console_audit_actors.sql`; modify `supabase/tests/console_audit_read.test.sql`, `src/console/audit/audit.ts`, `src/console/audit/filter-bar.tsx`, `src/app/console/api/audit/route.ts`; tests alongside.
+
+**Added after Task 2, on the reviewer's advice.** The Member picker currently accumulates its options from the actors visible in the rows it fetched, because `console_team` is Owner-only while this module is Owner **and** Admin — so there is no roster an Admin may read. The consequence: **a member who has done nothing in the chosen range cannot be selected**, which is exactly when you most want to ask "has this person done anything?". No row is hidden and the log stays honest; the filter simply cannot reach a silent member, and free-text search over `reason`/`target` is not a substitute for filtering by actor.
+
+**Interfaces — Produces:** `public.console_audit_actors(p_from timestamptz, p_to timestamptz, p_environment text) returns jsonb` — the distinct actors with rows in that window: `[{actor_id, actor_name, actor_role}]`, ordered by name. Its own `console.require_role('admin')` floor, `security definer`, `set search_path = ''`, every parameter `text`/`timestamptz`/`uuid`, grants revoked from `public, anon, authenticated, service_role` then granted to `authenticated`.
+
+Decide and record whether the roster spans the chosen range or the whole log. The range keeps the list short and matches what the rows can show; the whole log is what answers "has this person ever done anything?". They are different questions and the picker can only serve one.
+
+- [ ] **Step 1: Write the failing pgTAP** — the actor list is distinct, ordered, scoped to the window, and excludes the System actor (`actor_id is null`); a Support member is refused with the message **named**, not a bare `42501`.
+- [ ] **Step 2: Run them failing.** **Step 3:** the migration. **Step 4:** wire the picker.
+- [ ] **Step 5: Run everything**, then commit — `feat(console): the Audit log's Member filter knows the whole roster`
+
+---
+
+### Task 7: The rail, end to end, and the docs
 
 **Files:** Modify `src/console/nav.ts`, `tests/unit/console/nav.test.ts`, `tests/e2e/console-auth/scans.spec.ts`; create `tests/e2e/console-auth/audit-log.spec.ts`, `docs/runbooks/console-audit-log.md`; modify `docs/architecture.md`.
 
