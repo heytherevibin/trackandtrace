@@ -19,7 +19,7 @@
 --     keys_reset_at/keys_reset_by are stamped and nothing in the repo reads either one.
 --  2. They cannot sign in. Sign-in's second factor is a key, and they have none.
 --  3. They cannot be re-invited. console_invite_member refuses any address whose console.members
---     row is `status <> 'removed'` (20260922110000:60) -- and that file's own comment sends an Owner
+--     row is `status <> 'removed'` (20260922110000:46) -- and that file's own comment sends an Owner
 --     helping someone stuck in setup to *reset their keys*, which is circular once the keys are
 --     already gone.
 --  4. Nothing puts them back into enrolment. console_auth_activate_member only updates

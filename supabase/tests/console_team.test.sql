@@ -413,11 +413,7 @@ insert into console.keys (id, member_id, credential_id, public_key, counter, nam
   ('c3333333-0000-0000-0000-000000000001', 'c1111111-1111-1111-1111-111111111111', '\x31'::bytea, '\x41'::bytea, 0, 'Priya''s YubiKey', 'security_key'),
   ('c3333333-0000-0000-0000-000000000002', 'c1111111-1111-1111-1111-111111111111', '\x32'::bytea, '\x42'::bytea, 0, 'Priya''s iPhone', 'passkey');
 
-select is(
-  (select count(*)::int from console.keys where member_id = 'c1111111-1111-1111-1111-111111111111'),
-  2,
-  'the member about to be removed holds the two keys an active member must have'
-);
+select is((select count(*)::int from console.keys where member_id = 'c1111111-1111-1111-1111-111111111111'), 2, 'the member about to be removed holds two keys');
 
 select throws_ok(
   $$ select public.console_remove_member('c1111111-1111-1111-1111-111111111111', 'No tap yet.', 'development') $$,
@@ -459,11 +455,7 @@ select ok(
 -- make her key_count >= 2, which routes her sign-in to /sign-in-key instead of /setup
 -- (src/console/auth/session.ts:59) -- past the only step that moves setup -> active, into
 -- `28000 session ended` forever. The journey is tests/e2e/console-auth/team-rejoin.spec.ts.
-select is(
-  (select count(*)::int from console.keys where member_id = 'c1111111-1111-1111-1111-111111111111'),
-  0,
-  'and it takes her keys with it -- a removed member is left holding no credentials'
-);
+select is((select count(*)::int from console.keys where member_id = 'c1111111-1111-1111-1111-111111111111'), 0, 'and it takes her keys with it -- a removed member holds no credentials');
 select is(
   (select count(*)::int from console.audit_log where category = 'team' and action = 'Removed a member' and actor_id = 'a1111111-1111-1111-1111-111111111111'),
   1,
