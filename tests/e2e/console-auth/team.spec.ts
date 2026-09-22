@@ -43,15 +43,12 @@ const BASE = "http://admin.localhost:4211";
 
 test.beforeEach(() => resetConsole());
 
-/**
- * The console is also left as this file found it, which `beforeEach` alone does not do: it fixes
- * the state each test *starts* in, so the last test's rows outlive the run. That matters because
- * `npm run db:test`'s pgTAP suite is not isolated from them -- console_team.test.sql counts Owners,
- * invites and roster rows across the whole console, not only its own fixtures, so one leftover Owner
- * and one leftover invite fail seven of its assertions (task-9-report.md has the list). Before this
- * file the property held by luck: sign-in.spec.ts ran last and its own last test creates no member.
- */
-test.afterAll(() => resetConsole());
+// Leaving the console empty afterwards is no longer this file's job. It used to be -- `beforeEach`
+// fixes the state each test *starts* in, so the last test's rows outlive the run, and
+// `npm run db:test` is not isolated from them. But the property was only ever held for a **full**
+// run, by `workers: 1` and this file sorting last, and a single-spec run left the database dirty
+// with nothing to say so. `globalTeardown` (./global-teardown.ts) holds it for any subset now, so
+// the `afterAll` that was here is gone rather than duplicated.
 
 test.describe("Team", () => {
   /**

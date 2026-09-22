@@ -91,10 +91,14 @@ select lives_ok(
   'a challenge exactly five minutes out is accepted'
 );
 
--- A member's rows go when the member goes.
+-- A member's rows go when the member goes. Counted over this member's own rows
+-- and not over the table: `supabase test db` runs against the same database the
+-- console e2e suite drove, and a run that leaves one member behind leaves their
+-- two keys and their session behind with them -- which a bare count(*) reads as
+-- this cascade having failed.
 delete from auth.users where id = '11111111-1111-1111-1111-111111111111';
-select is((select count(*) from console.keys)::int, 0, 'keys follow the member');
-select is((select count(*) from console.sessions)::int, 0, 'sessions follow the member');
+select is((select count(*) from console.keys where member_id = '11111111-1111-1111-1111-111111111111')::int, 0, 'keys follow the member');
+select is((select count(*) from console.sessions where member_id = '11111111-1111-1111-1111-111111111111')::int, 0, 'sessions follow the member');
 
 select * from finish();
 rollback;

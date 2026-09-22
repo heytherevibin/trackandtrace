@@ -1,3 +1,4 @@
+import { shot } from "./audit-helpers";
 import { consoleSql, expect, resetConsole, setUpFirstOwner, test } from "./fixtures";
 import { freshAddress, idOf, invitesTable, membersTable } from "./team-helpers";
 import { expectAxeClean, gotoReady } from "../helpers";
@@ -190,6 +191,7 @@ test.describe("the signed-in frame at 390px", () => {
     await expect(page.getByRole("searchbox", { name: "Search reasons and targets" }), "the desktop search box").toHaveCount(0);
 
     expect(await layoutBreaks(page), "the Audit log at 390px").toEqual([]);
+    await shot(page, "audit-cards-390");
     await expectAxeClean(page);
 
     // Every drawn control at 44px, which the sheet draws and only a real layout can measure.
@@ -242,6 +244,7 @@ test.describe("the signed-in frame at 390px", () => {
     await expect(page.getByText("Filters", { exact: true }), "the wide bar's legend").toBeHidden();
     expect((await page.getByRole("button", { name: "Clear filters" }).boundingBox())?.height).toBeGreaterThanOrEqual(44);
     expect(await layoutBreaks(page), "the Audit log filtered at 390px").toEqual([]);
+    await shot(page, "audit-cards-filtered-390");
 
     // :149-162 -- an entry opens full-bleed, not as the desktop's 480px drawer 12px clear of three
     // edges. Measured, because that is the whole difference between the two.
@@ -254,6 +257,7 @@ test.describe("the signed-in frame at 390px", () => {
     expect(entryBox?.width, "the entry sheet's width").toBe(390);
     expect((await entry.getByRole("button", { name: "Close" }).boundingBox())?.height, "the entry's Close").toBeGreaterThanOrEqual(44);
     expect(await layoutBreaks(page), "the entry at 390px").toEqual([]);
+    await shot(page, "audit-entry-390");
     await expectAxeClean(page);
     await entry.getByRole("button", { name: "Close" }).click();
     await expect(entry).toBeHidden();

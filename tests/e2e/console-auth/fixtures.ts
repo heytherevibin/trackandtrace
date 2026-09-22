@@ -128,10 +128,11 @@ function sql(statement: string): string {
 }
 
 /**
- * A direct read against the local database, for the handful of things this console has no UI or API
- * for yet -- the audit log (module 14, `built: false`) chief among them. `resetConsole` and
- * `firstOwnerLink` already reach the database this way for setup; this is the same `psql` call,
- * exported for a spec's own assertions rather than kept private to this file.
+ * A direct read against the local database, for the things a spec has to check behind the console's
+ * back -- chiefly `console.audit_log`, which module 14 now reads but nothing anywhere may write to
+ * except the actions that record themselves. `resetConsole` and `firstOwnerLink` already reach the
+ * database this way for setup; this is the same `psql` call, exported for a spec's own assertions
+ * rather than kept private to this file.
  */
 export function consoleSql(statement: string): string {
   return sql(statement);

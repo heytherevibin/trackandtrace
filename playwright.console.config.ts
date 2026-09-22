@@ -18,6 +18,10 @@ const baseURL = `http://admin.localhost:${PORT}`;
 // resetConsole() before each test is what makes several tests able to set one up in turn.
 export default defineConfig({
   testDir: "tests/e2e/console-auth",
+  // The console is emptied once, after the whole run, whatever ran and however it ended -- so that
+  // `supabase test db` against the same database is not at the mercy of which specs were selected
+  // or of `team.spec.ts` happening to sort last. See the file's own note.
+  globalTeardown: "./tests/e2e/console-auth/global-teardown.ts",
   fullyParallel: false,
   workers: 1,
   forbidOnly: !!process.env.CI,

@@ -45,6 +45,20 @@ select is(has_function_privilege('service_role', 'public.console_revoke_invite(u
 -- console.members row behind it, which is exactly the shape spec §E line 103
 -- ("An address that already has a traveller account can't be invited") is
 -- about, and the one ConsoleTeam.dc.html's dlg_refused draws.
+
+-- The slate, first. `console_team()` returns the whole roster and the Owner
+-- floor counts every active Owner in the console, so neither "all four
+-- non-removed members come back" nor "the guard refuses once only one active
+-- Owner remains" can be narrowed to this file's own rows with a WHERE clause:
+-- they are statements about a console holding only what this file put there.
+-- `supabase test db` runs against the same database the console e2e suite
+-- drove, and one member left behind there adds a fifth roster row and a spare
+-- Owner that keeps the floor from ever being reached. Everything console.*
+-- holds hangs off auth.users by `on delete cascade`, and this file is one
+-- transaction that ends in `rollback` -- the same clean slate
+-- console_first_owner.test.sql takes between its own blocks.
+delete from auth.users;
+
 insert into auth.users (id, email) values
   ('a1111111-1111-1111-1111-111111111111', 'asha@trakline.in'),
   ('b1111111-1111-1111-1111-111111111111', 'rohan@trakline.in'),

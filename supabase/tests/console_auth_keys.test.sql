@@ -33,6 +33,19 @@ select is(has_function_privilege('service_role', 'public.console_auth_write_audi
 select is(has_function_privilege('authenticated', 'public.console_auth_write_audit(text, uuid, text, text, uuid, text, text, text, text, text, text, text, jsonb, jsonb)', 'execute')::text, 'false', 'authenticated cannot write an audit row directly');
 select is(has_function_privilege('anon', 'public.console_auth_write_audit(text, uuid, text, text, uuid, text, text, text, text, text, text, text, jsonb, jsonb)', 'execute')::text, 'false', 'anon cannot write an audit row directly');
 
+-- `console_auth_owner_addresses()` below answers for the WHOLE console -- it is
+-- the Security-email list, and there is no WHERE clause that could narrow it to
+-- one test file's rows. Its three assertions are therefore statements about a
+-- console holding only what this file put there, and `supabase test db` runs
+-- against the same database the console e2e suite drove, where an Owner left
+-- behind is an extra address in every one of them. So the empty console is made
+-- rather than assumed. Everything console.* holds hangs off auth.users by
+-- `on delete cascade` (members, and keys/sessions/challenges/invites behind
+-- them), and this whole file is one transaction that ends in `rollback` --
+-- console_first_owner.test.sql already clears its own slate exactly this way,
+-- four times over.
+delete from auth.users;
+
 insert into auth.users (id, email) values
   ('11111111-1111-1111-1111-111111111111', 'owner@trakline.in'),
   ('99999999-9999-9999-9999-999999999999', 'new@trakline.in');
@@ -69,17 +82,18 @@ select throws_ok(
   'a key cannot be registered for a member that does not exist'
 );
 
+-- Scoped to this file's own member, so `limit 1` picks the one key it has just
+-- recorded rather than whichever row an unordered scan of the whole table
+-- happens to return first.
 select public.console_auth_touch_key(
-  (select id from console.keys limit 1), 7
+  (select id from console.keys where member_id = '11111111-1111-1111-1111-111111111111' limit 1), 7
 );
-select is((select counter from console.keys limit 1)::int, 7, 'the counter moves forward');
-select public.console_auth_touch_key((select id from console.keys limit 1), 3);
-select is((select counter from console.keys limit 1)::int, 7, 'the counter never moves back');
+select is((select counter from console.keys where member_id = '11111111-1111-1111-1111-111111111111' limit 1)::int, 7, 'the counter moves forward');
+select public.console_auth_touch_key((select id from console.keys where member_id = '11111111-1111-1111-1111-111111111111' limit 1), 3);
+select is((select counter from console.keys where member_id = '11111111-1111-1111-1111-111111111111' limit 1)::int, 7, 'the counter never moves back');
 
 -- keys_for_member filters on member_id; a second member's key must not leak
--- into another member's ceremony payload. Added only now, after the counter
--- assertions above, so their own `limit 1` still resolves to the one row
--- that exists at that point.
+-- into another member's ceremony payload.
 insert into auth.users (id, email) values ('22222222-2222-2222-2222-222222222222', 'second@trakline.in');
 insert into console.members (user_id, email, name, role, status)
 values ('22222222-2222-2222-2222-222222222222', 'second@trakline.in', 'Second', 'admin', 'active');

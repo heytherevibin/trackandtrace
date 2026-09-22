@@ -19,14 +19,13 @@ import { gotoReady } from "../helpers";
  * would have caught it. Two full enrolments and two taps are why it asks for its own timeout.
  *
  * Its own file rather than a fifth test in team.spec.ts, which is already at its length budget.
- * Playwright sorts spec files by path and `team-rejoin` sorts before `team`, so team.spec.ts still
- * runs last -- but nothing here leans on that: this file cleans up after itself too.
+ * Nothing in this directory depends on where it sorts any more: the console is emptied after the
+ * whole run by ./global-teardown.ts, so neither this file nor team.spec.ts carries an `afterAll`.
  */
 
 const BASE = "http://admin.localhost:4211";
 
 test.beforeEach(() => resetConsole());
-test.afterAll(() => resetConsole());
 
 test.describe("Team: a removed member comes back", () => {
   // Two complete key enrolments (each: a link, a registration, a tap and a second registration),

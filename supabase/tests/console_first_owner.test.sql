@@ -26,6 +26,18 @@ select is(has_function_privilege('service_role', 'console.has_owner()', 'execute
 -- exist" guard is spelled out, shared by create_first_owner_link and the
 -- redemption function alike -- pin its meaning here so an edit to one
 -- caller's copy can never again silently diverge from the other's.
+
+-- `has_owner()` answers for the WHOLE console; "an empty console" is a
+-- precondition of the four assertions below and not something a WHERE clause
+-- could narrow them to. `supabase test db` runs against the same database the
+-- console e2e suite drove, so a run that left one Owner behind makes the first
+-- and last of them read as though the function had stopped working. The slate
+-- is therefore cleared first -- the same two statements this file already runs
+-- between its own later blocks, inside the same transaction, which `rollback`
+-- undoes.
+delete from console.setup_links;
+delete from auth.users;
+
 insert into auth.users (id, email) values ('e1111111-1111-1111-1111-111111111111', 'has-owner-check@trakline.in');
 
 select is(console.has_owner(), false, 'has_owner is false on an empty console');

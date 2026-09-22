@@ -1,8 +1,9 @@
 import { readFileSync } from "node:fs";
-import { consoleSql, expect, resetConsole, setUpFirstOwner, test } from "./fixtures";
-// TC-01 is one dialog wherever it is opened from, so its helper is shared rather than copied. It
+import { EXPORTED, OPENED, auditRows, expectEntriesTotal, inviteAndSignIn, settledAuditRows, shot, writeForeignRows } from "./audit-helpers";
+import { consoleSql, expect, ownerIdentity, resetConsole, setUpFirstOwner, test } from "./fixtures";
+// TC-01 is one dialog wherever it is opened from, so its helper is shared rather than copied; it
 // lives in team-helpers.ts because the Team page was the first module to need it.
-import { tapThrough } from "./team-helpers";
+import { freshAddress, idOf, tapThrough } from "./team-helpers";
 import { consoleMessages } from "@/console/messages";
 import { TIME_ZONE } from "@/utils/datetime";
 import { expectAxeClean, gotoReady } from "../helpers";
@@ -10,6 +11,7 @@ import { layoutBreaks } from "../layout";
 
 const BASE = "http://admin.localhost:4211";
 const m = consoleMessages.audit;
+const frame = consoleMessages.frame;
 
 test.beforeEach(() => resetConsole());
 
@@ -32,35 +34,10 @@ test.describe("the Audit log", () => {
   test("shows its own open, and neither filtering nor paging records another", async ({ page, baseURL }) => {
     const owner = await setUpFirstOwner(page, baseURL ?? BASE);
 
-    // Scoped to the rows this test wrote, and nothing else. `resetConsole()` deletes members,
-    // sessions and keys; it deliberately leaves the audit log alone, because the log holds no
-    // foreign keys and outliving its subjects is the whole point of it (fixtures.ts's own note). So
-    // every earlier run's rows -- including the Refused one the second test below writes -- are
-    // still in this table, and a bare count of "Opened the audit log" would be counting them too.
-    // `actor_name` is the log's own denormalised copy of the member's name, and this owner's
-    // address is freshly minted per run, so it names exactly the rows this test is responsible for.
-    const opensByThisOwner = () =>
-      Number(consoleSql(`select count(*) from console.audit_log where action = 'Opened the audit log' and actor_name = '${owner.name}'`));
-
-    /**
-     * The count once it has stopped moving. `after()` writes the page's own row *after* the response
-     * has already gone out, so a count taken the moment a row appears can still grow by one while
-     * the next assertion runs -- which is exactly how the first version of this test failed, as
-     * before+1. Polling for a single value would only move the race; polling for two consecutive
-     * reads that agree is what actually waits for the write to land.
-     */
-    const settledOpens = async (): Promise<number> => {
-      let previous = -1;
-      await expect
-        .poll(() => {
-          const now = opensByThisOwner();
-          const settled = now > 0 && now === previous;
-          previous = now;
-          return settled;
-        })
-        .toBe(true);
-      return previous;
-    };
+    // Scoped to the rows this test wrote: `resetConsole()` deliberately leaves the audit log alone,
+    // so a bare count would be counting every earlier run on this machine too. The scoped counter
+    // and the settle that waits for `after()`'s own write live in ./audit-helpers.ts, with why.
+    const opensByThisOwner = () => auditRows(owner.name, OPENED);
 
     await gotoReady(page, "/audit-log");
     await expect(page.getByRole("heading", { level: 1, name: "Audit log" })).toBeVisible();
@@ -83,7 +60,7 @@ test.describe("the Audit log", () => {
     await expect(mine.first()).toBeVisible();
     await expect(mine.first()).toContainText("Audit log");
     await expect(mine.first()).toContainText("Owner");
-    const before = await settledOpens();
+    const before = await settledAuditRows(owner.name, OPENED);
 
     // A filter change re-reads from GET /api/audit and writes nothing. The address follows it
     // (history.replaceState) so the filtered view stays linkable without a server render.
@@ -165,20 +142,12 @@ test.describe("the Audit log", () => {
    */
   test("a prefetch never renders the page; the same request without the header does, and is recorded", async ({ page, baseURL }) => {
     const owner = await setUpFirstOwner(page, baseURL ?? BASE);
-    const opens = () => Number(consoleSql(`select count(*) from console.audit_log where action = 'Opened the audit log' and actor_name = '${owner.name}'`));
+    const opens = () => auditRows(owner.name, OPENED);
     const url = `${baseURL ?? BASE}/audit-log`;
 
     await gotoReady(page, url);
     // Settled, not merely non-zero: `after()` writes the row once the response has already gone out.
-    let before = -1;
-    await expect
-      .poll(() => {
-        const now = opens();
-        const settled = now > 0 && now === before;
-        before = now;
-        return settled;
-      })
-      .toBe(true);
+    const before = await settledAuditRows(owner.name, OPENED);
 
     for (let attempt = 0; attempt < 3; attempt++) {
       const prefetch = await page.request.get(url, { headers: { RSC: "1", "Next-Router-Prefetch": "1" } });
@@ -214,25 +183,11 @@ test.describe("the Audit log", () => {
   test("opens one entry in full, and names the key that was tapped until it is gone", async ({ page, baseURL }) => {
     const owner = await setUpFirstOwner(page, baseURL ?? BASE);
 
-    // Scoped to this owner's own rows. console.audit_log survives resetConsole() by design, so a
-    // bare count would be counting every earlier run on this machine as well -- the trap this
-    // branch has now fallen into four times, most recently in Task 2's own e2e.
-    const mine = () => Number(consoleSql(`select count(*) from console.audit_log where actor_name = '${owner.name}'`));
-    const settled = async (): Promise<number> => {
-      let previous = -1;
-      await expect
-        .poll(() => {
-          const now = mine();
-          const stopped = now > 0 && now === previous;
-          previous = now;
-          return stopped;
-        })
-        .toBe(true);
-      return previous;
-    };
-
+    // Scoped to this owner's own rows (./audit-helpers.ts): console.audit_log survives
+    // resetConsole() by design, so a bare count would be counting every earlier run too.
+    const mine = () => auditRows(owner.name);
     await gotoReady(page, "/audit-log");
-    const before = await settled();
+    const before = await settledAuditRows(owner.name);
 
     // The setup journey writes two "Added a key" rows; this is the first key's. Scoped to this
     // owner, for the same reason the count above is: the log survives resetConsole(), so every
@@ -245,25 +200,17 @@ test.describe("the Audit log", () => {
 
     const drawer = page.getByRole("dialog", { name: m.entry.title });
     await expect(drawer).toBeVisible();
-    // The sheet's nine labels and Environment second (AuditLog.dc.html:229-238).
-    await expect(drawer.locator("dt")).toHaveText([
-      m.entry.labels.time,
-      m.entry.labels.environment,
-      m.entry.labels.member,
-      m.entry.labels.action,
-      m.entry.labels.target,
-      m.entry.labels.reason,
-      m.entry.labels.result,
-      m.entry.labels.address,
-      m.entry.labels.session,
-      m.entry.labels.change,
-    ]);
+    // The sheet's nine labels and Environment second (AuditLog.dc.html:229-238). Named one by one
+    // rather than as `Object.values`, so a reordering of the messages file cannot pass this.
+    const { time, environment, member, action, target, reason, result, address, session, change } = m.entry.labels;
+    await expect(drawer.locator("dt")).toHaveText([time, environment, member, action, target, reason, result, address, session, change]);
     await expect(drawer.getByText(m.entry.retention)).toBeVisible();
     // The key the ceremony really recorded, through the join rather than through anything the
     // table handed over -- no row the list returns carries a key name at all.
     await expect(drawer.getByText(`${owner.name} · Owner · ${m.entry.keyNamed("YubiKey 5C")}`)).toBeVisible();
     // "Added a key" writes an `after` and no `before`: one of the three shapes the sheet composes.
     await expect(drawer.locator("dt", { hasText: m.entry.labels.change }).locator("+ dd")).toHaveText(/^type: none → “(security_key|passkey)”\.$/);
+    await shot(page, "audit-entry-drawer-1280");
     await expectAxeClean(page);
 
     expect(mine(), "opening an entry must not record anything").toBe(before);
@@ -280,7 +227,6 @@ test.describe("the Audit log", () => {
     await expect(drawer.getByText("YubiKey 5C")).toHaveCount(1); // the target, and no longer the key clause
     expect(mine(), "and neither must re-opening it").toBe(before);
   });
-
 
   /**
    * The export (Task 4), end to end: a real tap against a real virtual key, a real
@@ -304,10 +250,8 @@ test.describe("the Audit log", () => {
    */
   test("exports the log after a real tap, hands over the file once, and records that it did", async ({ page, baseURL }) => {
     const owner = await setUpFirstOwner(page, baseURL ?? BASE);
-    // Scoped to this owner, whose address is freshly minted per run: console.audit_log survives
-    // resetConsole() by design, so a bare count would be counting every earlier run's exports too.
-    const exportsByThisOwner = () =>
-      Number(consoleSql(`select count(*) from console.audit_log where action = 'Exported the audit log' and actor_name = '${owner.name}'`));
+    // Scoped to this owner, whose address is freshly minted per run (./audit-helpers.ts).
+    const exportsByThisOwner = () => auditRows(owner.name, EXPORTED);
 
     await gotoReady(page, "/audit-log");
     await expect(page.getByRole("heading", { level: 1, name: "Audit log" })).toBeVisible();
@@ -332,6 +276,7 @@ test.describe("the Audit log", () => {
     // The name is a function of the range, and the range is today in IST -- the console's one clock.
     const today = new Intl.DateTimeFormat("en-CA", { timeZone: TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
     await expect(ready.getByText(`audit-${today}.csv`)).toBeVisible();
+    await shot(page, "audit-export-ready-1280");
     await expectAxeClean(page);
 
     /**
@@ -355,6 +300,7 @@ test.describe("the Audit log", () => {
     // And the asymmetry, in the same breath: what a phone may not do is *start* one.
     await expect(page.getByRole("button", { name: m.export.action }), "the control that starts an export").toHaveCount(0);
     await expect(page.getByText(m.exportOnLargerScreen)).toBeVisible();
+    await shot(page, "audit-export-ready-390");
     await page.setViewportSize({ width: 1280, height: 800 });
     await expect(ready).toBeVisible();
 
@@ -390,19 +336,100 @@ test.describe("the Audit log", () => {
     await expect(page.getByRole("dialog", { name: "Confirm it's you" })).toBeVisible();
   });
 
-  // The other half of the sheet's own no-access row: a Viewer opening module 14 gets the state, not
-  // a redirect, and the attempt is recorded as Refused (AuditLog.dc.html:312, task-2-addendum.md §5).
-  test("gives a Viewer the sheet's no-access state rather than the log", async ({ page, baseURL }) => {
+  /**
+   * The two questions this module gets opened to answer -- "what happened to the team?" and "what
+   * did this person do?" -- with the count on the page following each. A member is pinned
+   * throughout, and that is not decoration: the page opens on Today, and Today holds every other
+   * test in this run too, because `resetConsole()` deliberately leaves the log alone. Pinned, the
+   * numbers are exact: one `team` row per first-Owner setup, one `session` row per key.
+   */
+  test("narrows by category and by member, and the count the page shows follows each", async ({ page, baseURL }) => {
     const owner = await setUpFirstOwner(page, baseURL ?? BASE);
-    // Demoted directly: this is about what the page does with a role, not about how the role got
-    // there, and console_change_role needs a second Owner and a tap to get there through the UI.
-    consoleSql(`update console.members set role = 'viewer' where email = '${owner.email}'`);
-
+    const otherName = "Nikhil Rao";
+    const other = writeForeignRows(otherName, "team", ["Changed a role", "Removed a member"]);
     await gotoReady(page, "/audit-log");
-    await expect(page.getByText("This module isn't part of the Viewer role.")).toBeVisible();
-    await expect(page.getByText("Ask an Owner if you need it.")).toBeVisible();
-    await expect(page.getByRole("table")).toHaveCount(0);
-    await expectAxeClean(page);
+    const member = page.getByRole("combobox", { name: m.filters.member });
+    const category = page.getByRole("combobox", { name: m.filters.category });
+    await member.selectOption(idOf(owner.email));
+    await category.selectOption("team");
+    await expectEntriesTotal(page, "today", 1);
+    await expect(page.getByRole("row").filter({ hasText: "First Owner created" })).toHaveCount(1);
+    // The same member, a different category: two keys, two rows.
+    await category.selectOption("session");
+    await expectEntriesTotal(page, "today", 2);
+    await expect(page.getByRole("row").filter({ hasText: "Added a key" })).toHaveCount(2);
+    await shot(page, "audit-table-filtered-1280");
+    // The same category, a different member -- and the count moves the other way.
+    await category.selectOption("team");
+    await expectEntriesTotal(page, "today", 1);
+    await member.selectOption(other);
+    await expectEntriesTotal(page, "today", 2);
+    await expect(page.getByRole("row").filter({ hasText: otherName })).toHaveCount(2);
+    // Both filters at once, and still a link somebody else can open.
+    const query = new URL(page.url()).searchParams;
+    expect([query.get("member"), query.get("category")], "the whole filtered view is in the address").toEqual([other, "team"]);
+  });
+
+  /**
+   * The other half of the sheet's own no-access row: a role below the floor opening module 14 gets
+   * the state, not a redirect, and the attempt is recorded as Refused (AuditLog.dc.html:312,
+   * task-2-addendum.md §5). Both refused roles in one test rather than two -- the sheet draws this
+   * page as **Support** opening 14 (Main.dc.html:285's own note) and `access.Viewer` excludes it
+   * too, and the two differ only in the word the state says. Neither has a rail either: 13 Team is
+   * Owner-only and this module is Owner and Admin, so below Admin no built module is left to link.
+   */
+  test("gives a Support member and a Viewer the no-access state, and records each attempt as Refused", async ({ page, baseURL }) => {
+    const owner = await setUpFirstOwner(page, baseURL ?? BASE);
+    // Scoped to this owner, to refusals, and to the role refused: their setup journey's Done rows
+    // are in the same table and are not what this counts.
+    const refused = (role: string) =>
+      Number(consoleSql(`select count(*) from console.audit_log where actor_name = '${owner.name}' and result = 'refused' and actor_role = '${role}'`));
+    for (const role of ["support", "viewer"] as const) {
+      // Demoted directly: this is about what the page does with a role, not about how the role got
+      // there, and console_change_role needs a second Owner and a tap to get there through the UI.
+      consoleSql(`update console.members set role = '${role}' where email = '${owner.email}'`);
+      await gotoReady(page, "/audit-log");
+      await expect(page.getByText(frame.states.noAccess.title(frame.roleLabel[role]))).toBeVisible();
+      await expect(page.getByText(frame.states.noAccess.detail)).toBeVisible();
+      await expect(page.getByRole("table")).toHaveCount(0);
+      await expect(page.getByRole("navigation", { name: "Console" }), "no built module is theirs, so no rail").toHaveCount(0);
+      await expectAxeClean(page);
+      // `after()` writes the row once the response has already gone out, hence the poll.
+      await expect.poll(() => refused(role), { message: `a refused open by a ${role} is recorded` }).toBe(1);
+    }
+  });
+
+  /**
+   * An **Admin**, invited and signed in on a device of their own, reaching module 14 from the rail
+   * -- the first module an Admin can open at all: 13 Team, the only other built one, is Owner-only
+   * (Main.dc.html:293-298's `access.Admin` has no '13' in it), so until this page shipped an Admin
+   * signed in to a console with no rail and nowhere to go. Through the real invite, acceptance and
+   * two real key enrolments rather than an `update … set role`, because the claim is about a role a
+   * console can hand out -- and the Owner's own actions are in the log the Admin then reads, which
+   * is the other half of what "Owner *and* Admin" buys.
+   */
+  test("an Admin reaches the Audit log from the rail, and reads the Owner's own actions in it", async ({ page, baseURL }) => {
+    test.setTimeout(180_000); // A first-Owner setup, an invite tap and a full enrolment; the default 30s is for none of those.
+    const owner = await setUpFirstOwner(page, baseURL ?? BASE);
+    const email = freshAddress("rohan");
+    const admin = ownerIdentity(email).name;
+    const them = await inviteAndSignIn(page, email, "Admin", "Second pair of eyes on the console.");
+    try {
+      // The rail an Admin gets. Configure is 13 Team's group and Team is Owner-only, so its absence
+      // is the access map holding rather than a missing link.
+      const rail = them.getByRole("navigation", { name: "Console" });
+      await expect(rail.getByText("Configure"), "13 Team is not an Admin's").toHaveCount(0);
+      await rail.getByRole("link", { name: /Audit log/ }).click();
+      await expect(them.getByRole("heading", { level: 1, name: "Audit log" })).toBeVisible();
+      // The Owner's own history, read by somebody else: the invite that created this Admin is in it.
+      await expect(them.getByRole("row").filter({ hasText: owner.name }).filter({ hasText: "Invited a member" })).toHaveCount(1);
+      await expectAxeClean(them);
+      // And the Admin's own open is recorded as theirs, under their own role.
+      await expect.poll(() => auditRows(admin, OPENED), { message: "an Admin's open is recorded too" }).toBeGreaterThan(0);
+      expect(consoleSql(`select distinct actor_role from console.audit_log where actor_name = '${admin}' and action = '${OPENED}'`).trim()).toBe("admin");
+    } finally {
+      await them.context().close();
+    }
   });
 
   /**
