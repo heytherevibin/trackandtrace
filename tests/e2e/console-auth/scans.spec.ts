@@ -1,4 +1,5 @@
-import { expect, resetConsole, setUpFirstOwner, test } from "./fixtures";
+import { consoleSql, expect, resetConsole, setUpFirstOwner, test } from "./fixtures";
+import { freshAddress, idOf, invitesTable, membersTable } from "./team-helpers";
 import { expectAxeClean, gotoReady } from "../helpers";
 import { layoutBreaks } from "../layout";
 
@@ -82,5 +83,63 @@ test.describe("the signed-in frame at 390px", () => {
     // note, task-6-addendum.md §2) -- setUpFirstOwner's own member is always the first Owner, so this
     // run already covers the widest version of the page without a second sign-in.
     expect(owner.role).toBe("Owner");
+  });
+
+  /**
+   * /team, the page this scan never opened. That omission is the whole reason the build shipped
+   * the entire management surface at 390px against a phone sheet that deliberately draws none of
+   * it -- eight controls the desktop sheet draws and ConsoleTeamPhone.dc.html does not, plus one
+   * sentence (:85) that appeared nowhere in src/. The gap could reopen the moment /team is out of
+   * this file, so it is in it.
+   *
+   * The invite row is written straight into console.invites rather than sent through TC-04 and a
+   * real tap: this is a layout and affordance scan, the ceremony is proven five ways over in
+   * team.spec.ts and team-rejoin.spec.ts, and a scan that spends a minute on WebAuthn is a scan
+   * people stop running. `console.invites.invited_by` cascades from console.members, so
+   * `resetConsole()` still clears it.
+   */
+  test("Team at 390px shows the phone sheet's notice and none of the management surface", async ({ page, baseURL }) => {
+    const owner = await setUpFirstOwner(page, baseURL ?? BASE);
+    const invited = freshAddress("priya");
+    consoleSql(
+      `insert into console.invites (email, role, invited_by, token_hash, sent_at, expires_at)
+       values ('${invited}', 'support', '${idOf(owner.email)}', extensions.digest('${invited}', 'sha256'), now(), now() + interval '7 days')`,
+    );
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await gotoReady(page, "/team");
+    await expect(page.getByRole("heading", { level: 1, name: "Team" })).toBeVisible();
+
+    // ConsoleTeamPhone.dc.html:85, in the place the sheet puts it.
+    await expect(page.getByText("Open on a larger screen to manage the team.")).toBeVisible();
+
+    // And none of what the desktop sheet draws. Counted through `getByRole`, which is the point
+    // rather than an implementation detail: role queries skip what is out of the accessibility
+    // tree, and `display: none` takes these out of it and out of the tab order together. So this
+    // asserts a phone cannot *reach* them, which is the claim -- not merely that they are faint.
+    await expect(page.getByRole("button", { name: "Invite a member" }), "both Invite triggers").toHaveCount(0);
+    await expect(membersTable(page).getByRole("button", { name: `Actions for ${owner.name}` }), "the row menu").toHaveCount(0);
+    await expect(invitesTable(page).getByRole("button", { name: "Resend" }), "Resend").toHaveCount(0);
+    await expect(invitesTable(page).getByRole("button", { name: "Revoke" }), "Revoke").toHaveCount(0);
+
+    // What the phone sheet does draw: the roster, the pending invite and the Roles table, all
+    // readable. Team is not hidden on a phone -- only managed elsewhere.
+    await expect(membersTable(page).getByRole("row").filter({ hasText: owner.email })).toContainText("Owner");
+    await expect(invitesTable(page).getByRole("row").filter({ hasText: invited })).toContainText("Support");
+    await expect(page.getByText("14 modules")).toBeVisible();
+    await expect(page.getByText("Only Owners manage the team and provider keys.")).toBeVisible();
+
+    expect(await layoutBreaks(page), "Team at 390px").toEqual([]);
+    await expectAxeClean(page);
+
+    // The control, and the thing that makes the four counts above mean "below sm" rather than
+    // "gone": the same page at the desktop width the rest of this suite runs at. A gate that
+    // swallowed the management surface everywhere would pass every assertion above.
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await expect(page.getByText("Open on a larger screen to manage the team.")).toBeHidden();
+    await expect(page.getByRole("button", { name: "Invite a member" }).first()).toBeVisible();
+    await expect(membersTable(page).getByRole("button", { name: `Actions for ${owner.name}` })).toBeVisible();
+    await expect(invitesTable(page).getByRole("button", { name: "Resend" })).toBeVisible();
+    await expect(invitesTable(page).getByRole("button", { name: "Revoke" })).toBeVisible();
   });
 });

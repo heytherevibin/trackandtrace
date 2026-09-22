@@ -34,10 +34,15 @@ export function InvitesPlate({ invites }: { readonly invites: readonly TeamInvit
     // for this header. Through `hideHeader` rather than a wrapped element, so the header stays a
     // plain string: DataTable also prints it as the stacked phone layout's row label, and a DOM
     // attribute can only carry a string (src/components/ui/data-table.tsx's own note).
+    //
+    // `phoneHidden`: ConsoleTeamPhone.dc.html's own invites plate draws the address and its
+    // "Support · sent … · expires …" legend and nothing else -- no Resend, no Revoke -- under the
+    // same "Open on a larger screen to manage the team." the members plate sits below.
     {
       key: "actions",
       header: m.columns.actions,
       hideHeader: true,
+      phoneHidden: true,
       cell: (row) => <InviteRowActions invite={row} />,
       align: "end",
     },

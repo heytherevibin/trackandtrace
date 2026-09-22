@@ -13,6 +13,14 @@ export interface Column<Row> {
   readonly header: string;
   /** Renders the header for screen readers only, as ConsoleMyKeys.dc.html:111 draws its Actions column. */
   readonly hideHeader?: boolean;
+  /**
+   * Drops the column below `sm` -- header, cells and the stacked layout's own row label alike, so
+   * nothing prints a heading over an empty value. For a column a phone sheet deliberately does not
+   * draw (ConsoleTeamPhone.dc.html carries no row actions at all), not for one that is merely
+   * cramped. The rule lives in `table-stack` (src/styles/utilities.css), because the stacked
+   * layout's `display: contents` on a cell out-specifies any utility class put on it here.
+   */
+  readonly phoneHidden?: boolean;
   readonly cell: (row: Row) => ReactNode;
   readonly align?: "start" | "end";
   readonly numeric?: boolean;
@@ -42,7 +50,12 @@ export function DataTable<Row>({ columns, rows, rowKey, caption, showCaption = f
         <thead>
           <tr>
             {columns.map((c) => (
-              <th key={c.key} scope="col" className={cn("legend-md border-b border-line", dense ? "px-3.5 py-2" : "px-5 py-2.5", c.align === "end" ? "text-right" : "text-left")}>
+              <th
+                key={c.key}
+                scope="col"
+                data-phone-hidden={c.phoneHidden ? "" : undefined}
+                className={cn("legend-md border-b border-line", dense ? "px-3.5 py-2" : "px-5 py-2.5", c.align === "end" ? "text-right" : "text-left")}
+              >
                 {c.hideHeader ? <VisuallyHidden>{c.header}</VisuallyHidden> : c.header}
               </th>
             ))}
@@ -52,7 +65,12 @@ export function DataTable<Row>({ columns, rows, rowKey, caption, showCaption = f
           {rows.map((row) => (
             <tr key={rowKey(row)}>
               {columns.map((c) => (
-                <td key={c.key} data-label={c.header} className={cn(cell, "border-b border-line align-middle text-ink-1", c.numeric && "tnum", c.align === "end" && "text-right")}>
+                <td
+                  key={c.key}
+                  data-label={c.header}
+                  data-phone-hidden={c.phoneHidden ? "" : undefined}
+                  className={cn(cell, "border-b border-line align-middle text-ink-1", c.numeric && "tnum", c.align === "end" && "text-right")}
+                >
                   {c.cell(row)}
                 </td>
               ))}

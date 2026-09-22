@@ -78,4 +78,18 @@ describe("InvitesPlate", () => {
     expect(row).not.toBeNull();
     expect(within(row as HTMLTableRowElement).getByRole("button", { name: "Resend" })).toBeVisible();
   });
+
+  // ConsoleTeamPhone.dc.html's own invites plate draws the address and a
+  // "Support · sent … · expires …" legend and nothing else -- no Resend, no Revoke, under the same
+  // "Open on a larger screen to manage the team." the members plate sits below. jsdom evaluates no
+  // media query, so this asserts the marker `table-stack` keys its `display: none` off; the width
+  // is proven in a real Chromium by tests/e2e/console-auth/scans.spec.ts.
+  it("marks the Actions column as one the phone layout drops, and marks no other", () => {
+    render(<InvitesPlate invites={INVITES} />);
+    expect(screen.getByRole("columnheader", { name: "Actions" })).toHaveAttribute("data-phone-hidden");
+    expect(screen.getByRole("button", { name: "Resend" }).closest("td")).toHaveAttribute("data-phone-hidden");
+    for (const name of ["Email", "Role", "Sent", "Expires"]) {
+      expect(screen.getByRole("columnheader", { name }), name).not.toHaveAttribute("data-phone-hidden");
+    }
+  });
 });

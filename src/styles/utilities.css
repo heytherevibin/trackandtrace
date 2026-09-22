@@ -227,6 +227,18 @@
       align-self: center;
     }
   }
+  /* Below sm a column can leave the stack entirely -- its cells and its label with it, so no row
+     prints an ACTIONS heading over nothing. It lives here rather than as a `max-sm:hidden` on the
+     cell because `.table-stack td { display: contents }` above out-specifies a bare utility class
+     and would keep winning; `.table-stack td[data-phone-hidden]` does not.
+     ConsoleTeamPhone.dc.html is the sheet that asks for it (:254 hard-forces the members' row menu
+     off and neither plate draws a row action at all). */
+  @media (width < 40rem) {
+    & th[data-phone-hidden],
+    & td[data-phone-hidden] {
+      display: none;
+    }
+  }
 }
 
 @utility z-nav {

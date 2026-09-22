@@ -60,8 +60,31 @@ export default async function TeamPage() {
           NoAccessState above -- so on this page `canManage` is the same fact as "an Owner is
           reading it". The second, secondary trigger the sheet draws (:157) is inside MembersPlate,
           beside the only-you note.
+
+          `max-sm:hidden`: ConsoleTeamPhone.dc.html draws no trigger here either (0 occurrences of
+          these words in the phone sheet against the desktop sheet's two), and the notice below
+          takes its place. Both breakpoints stay in the tree and CSS chooses between them, the same
+          pattern ConsoleRail and ConsoleRailDrawer already use.
         */}
-        <PageHeader kicker={m.kicker} title={m.title} lead={m.lead} actions={<InviteDialog variant="primary" />} />
+        <PageHeader
+          kicker={m.kicker}
+          title={m.title}
+          lead={m.lead}
+          actions={
+            <div className="max-sm:hidden">
+              <InviteDialog variant="primary" />
+            </div>
+          }
+        />
+        {/*
+          ConsoleTeamPhone.dc.html:85, word for word, in the place the sheet puts it: directly under
+          the page header and above the first plate. Team is readable on a phone -- the roster, the
+          pending invites and the whole Roles table are all drawn there -- and managed on a larger
+          screen, which is why the phone sheet draws this one line instead of the eight controls the
+          desktop sheet draws. `sm:hidden` alone: the desktop sheet draws no such sentence.
+          The same device its sibling phone sheets use ("… to export.", "… to edit").
+        */}
+        <p className="text-label text-ink-3 sm:hidden">{m.manageOnLargerScreen}</p>
         {/*
           The signed-in Owner's own id goes down with the roster: the row menu's last-Owner guard
           refuses a member acting on their own row, which is a fact about who is reading the page

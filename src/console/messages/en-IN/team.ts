@@ -39,6 +39,11 @@ export const team = {
   kicker: "13 · Team",
   title: "Team",
   lead: "Who can use the console, and with which role.",
+  // ConsoleTeamPhone.dc.html:85, the phone sheet's one line in place of every management control
+  // the desktop sheet draws -- no Invite trigger, no row menu (:254 forces it off), no Resend or
+  // Revoke. Drawn, not authored: its siblings use the same device (AuditLogPhone's "… to export.",
+  // ConsoleSwitchesPhone's "… to edit"), so it is a house pattern rather than one page's idea.
+  manageOnLargerScreen: "Open on a larger screen to manage the team.",
 
   members: {
     title: "Members",

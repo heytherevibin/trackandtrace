@@ -77,10 +77,18 @@ export function MembersPlate({ members, signedInId }: { readonly members: readon
     // for this header. Through `hideHeader` rather than a wrapped element, so the header stays a
     // plain string: DataTable also prints it as the stacked phone layout's row label, and a DOM
     // attribute can only carry a string (src/components/ui/data-table.tsx's own note).
+    //
+    // `phoneHidden`: ConsoleTeamPhone.dc.html draws no Actions column and hard-forces the row menu
+    // off at :254 (`var dialogs = true ? { dlg_menu: false } : {…}`), drawing instead one line --
+    // "Open on a larger screen to manage the team." -- above the plates. Team is readable on a
+    // phone and managed on a larger screen; the notice is in the page, this is the half that takes
+    // the controls away, and `display: none` takes them out of the tab order and the accessibility
+    // tree with them rather than leaving a hidden button a keyboard could still reach.
     {
       key: "actions",
       header: m.columns.actions,
       hideHeader: true,
+      phoneHidden: true,
       cell: (row) => <MemberRowMenu member={row} signedInId={signedInId} activeOwners={activeOwners} />,
       align: "end",
     },
@@ -97,7 +105,15 @@ export function MembersPlate({ members, signedInId }: { readonly members: readon
         // (task-4-addendum.md §5).
         <div className="flex items-center gap-4 border-t border-line px-5 pb-4 pt-3.5">
           <p className="grow text-sm text-ink-2">{m.onlyYouNote}</p>
-          <InviteDialog variant="secondary" />
+          {/* ConsoleTeamPhone.dc.html draws this state as the note alone (:112) -- no trigger
+              beside it, the same way it draws no row actions. `max-sm:hidden` rather than a
+              conditional render for the reason console-rail.tsx gives for its own pair: both
+              breakpoints stay in the tree and CSS chooses, so a resize cannot leave the page in a
+              state neither branch rendered. The dialog itself portals to the body, so only the
+              trigger goes. */}
+          <div className="max-sm:hidden">
+            <InviteDialog variant="secondary" />
+          </div>
         </div>
       ) : null}
     </Plate>

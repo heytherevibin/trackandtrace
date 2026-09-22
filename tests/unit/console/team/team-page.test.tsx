@@ -75,3 +75,27 @@ describe("the Team page's signed-in member", () => {
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
   });
 });
+
+/**
+ * ConsoleTeamPhone.dc.html:85's one line, and the trigger it stands in for. The phone sheet draws
+ * neither Invite trigger (0 occurrences against the desktop sheet's two, :106 and :157) and no row
+ * actions at all; it draws this sentence instead, directly under the page header and above the
+ * first plate. The sentence appeared nowhere in src/ until now.
+ *
+ * jsdom evaluates no media query, so these hold the markers CSS chooses on. The widths are proven
+ * in a real Chromium by tests/e2e/console-auth/scans.spec.ts's 390px pass over /team.
+ */
+describe("the Team page at phone width", () => {
+  it("draws the phone sheet's notice, gated to below sm", async () => {
+    render(await TeamPage());
+    const notice = screen.getByText("Open on a larger screen to manage the team.");
+    expect(notice).toHaveClass("sm:hidden");
+  });
+
+  it("puts the page header's Invite trigger behind the opposite gate, so exactly one of the two shows at any width", async () => {
+    render(await TeamPage());
+    // Two triggers on a one-member roster; on this two-member one, only the page header's.
+    const trigger = screen.getByRole("button", { name: "Invite a member" });
+    expect(trigger.closest(".max-sm\\:hidden")).not.toBeNull();
+  });
+});

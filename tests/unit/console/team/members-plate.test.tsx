@@ -184,6 +184,46 @@ describe("MembersPlate", () => {
 });
 
 /**
+ * ConsoleTeamPhone.dc.html draws this plate with no management surface at all: no Actions column,
+ * the row menu hard-forced off at :254, and one line above the plates reading "Open on a larger
+ * screen to manage the team." (:85). The build shipped every control at every width, and the only
+ * 390px scan covered `/` and never `/team`, so nothing held it.
+ *
+ * jsdom has no layout and evaluates no media query, so these assert the *marker* CSS chooses on --
+ * the `data-phone-hidden` attribute `table-stack` keys its `display: none` off, and the wrapper
+ * class on the trigger. The width at which those markers actually bite is proven in a real
+ * Chromium by tests/e2e/console-auth/scans.spec.ts, which now opens /team at 390px. Neither half
+ * is sufficient alone: delete the attribute and this fails, get the breakpoint wrong and the scan
+ * does.
+ */
+describe("MembersPlate on a phone", () => {
+  it("marks the Actions column, header and cells alike, as one the phone layout drops", () => {
+    render(<MembersPlate members={ALL} signedInId={OWNER.userId} />);
+    const header = screen.getByRole("columnheader", { name: "Actions" });
+    expect(header).toHaveAttribute("data-phone-hidden");
+    const cell = screen.getByRole("button", { name: `Actions for ${OWNER.name}` }).closest("td");
+    expect(cell).not.toBeNull();
+    expect(cell).toHaveAttribute("data-phone-hidden");
+  });
+
+  // The control: no other column is marked, so the rule is about this one column and not about
+  // every cell in the table.
+  it("marks no other column, so the roster itself still reads on a phone", () => {
+    render(<MembersPlate members={ALL} signedInId={OWNER.userId} />);
+    for (const name of ["Name", "Email", "Role", "Keys", "Last active", "Status"]) {
+      expect(screen.getByRole("columnheader", { name }), name).not.toHaveAttribute("data-phone-hidden");
+    }
+  });
+
+  it("puts the only-you row's Invite trigger behind the same phone gate", () => {
+    render(<MembersPlate members={[OWNER]} signedInId={OWNER.userId} />);
+    expect(screen.getByRole("button", { name: "Invite a member" }).closest(".max-sm\\:hidden")).not.toBeNull();
+    // The note itself is not gated: the phone sheet draws it (:112), alone on its own row.
+    expect(screen.getByText("You're the only member.").closest(".max-sm\\:hidden")).toBeNull();
+  });
+});
+
+/**
  * What the last-Owner guard is actually fed. `needsAnotherOwner` is exercised directly in
  * tests/unit/console/team/role-change.test.ts and through the dialog in change-role-dialog.test.tsx,
  * but both of those receive `activeOwners` and `signedInId` already worked out. This plate is where
