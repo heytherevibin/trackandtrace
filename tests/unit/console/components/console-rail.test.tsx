@@ -68,15 +68,16 @@ describe("the console rail", () => {
 });
 
 // The brief's own first test ("at 390px the rail is not rendered and the bottom-sheet trigger is")
-// cannot be written as stated: railFor(role) is [] for every role against the real CONSOLE_MODULES
-// today (nav.ts's own ruling -- no module is built yet), and console-frame.tsx already gates the
-// rail behind `groups.length > 0`, so an assertion against real data would pass against an empty
-// page and prove nothing (task-10-addendum.md §1). ConsoleRailDrawer goes behind the same gate as
-// ConsoleRail -- both are driven by the one `groups.length > 0` in console-frame.tsx -- so this
-// fixture (built: true throughout, the same shape nav.test.ts and this file's own GROUPS already
-// use) is what lets "opening it lists the same modules railFor gives" mean anything, and "today's
-// reality" below is asserted separately, against the real data, the way nav.test.ts's own "today's
-// reality" block already does for railFor itself.
+// could not be written as stated in 2d-1: railFor(role) was [] for every role against the real
+// CONSOLE_MODULES (no module was built), and console-frame.tsx gates the rail behind
+// `groups.length > 0`, so an assertion against real data would have passed against an empty page
+// and proved nothing (task-10-addendum.md §1). That is no longer true as of 2d-2 task-8 -- an Owner
+// now gets one group with one module -- but one Owner-only module still cannot show that a Viewer
+// is filtered differently from an Admin, so this fixture (several modules, several groups, the same
+// shape nav.test.ts and this file's own GROUPS already use) is still what lets "opening it lists the
+// same modules railFor gives" mean anything. "Today's reality" below is asserted separately,
+// against the real data, the way nav.test.ts's own real-CONSOLE_MODULES block does for railFor.
+// A real browser layout at 390px is tests/e2e/console-auth/scans.spec.ts's; jsdom has none.
 //
 // task-10-fix-1.md: this was first built over src/components/ui/sheet.tsx's bottom tray, on the
 // brief and addendum's own repeated "bottom sheet" instruction -- both wrong, per ShellPhone.dc.html's
@@ -140,16 +141,41 @@ describe("ConsoleRailDrawer: the phone trigger and its drawer", () => {
 // console-frame.tsx's own gate -- `groups.length > 0` drives both `<ConsoleRail>` and the `leading`
 // slot's `<ConsoleRailDrawer>` together -- so a role that gets nothing from railFor gets neither the
 // desktop rail nor the phone trigger. This is the same ternary nav.test.ts's own "railFor against
-// today's real CONSOLE_MODULES" block already pins at the railFor level ("shows nothing for any
-// role, yet"); this test pins the boolean console-frame.tsx itself branches on, using the real
-// (non-fixture) railFor and CONSOLE_MODULES, so it fails the day 2d-2 flips Team or the Audit log to
-// built: true -- exactly as it should.
-describe("today's reality: the rail and its phone trigger render for no role, yet", () => {
-  it("groups.length > 0 is false for every role against the real CONSOLE_MODULES", () => {
-    for (const role of ROLES) {
+// today's real CONSOLE_MODULES" block pins at the railFor level; this test pins the boolean
+// console-frame.tsx itself branches on, using the real (non-fixture) railFor and CONSOLE_MODULES.
+//
+// 2d-2 task-8 is where it stopped reading "no role, yet": 13 Team is built, and it is Owner-only
+// (Main.dc.html:293-298's own access map), so an Owner is the first and so far only role for which
+// this console renders a rail at all -- on the desktop and in the phone drawer alike.
+describe("today's reality: the rail and its phone trigger render for an Owner, and for no one else", () => {
+  it("groups.length > 0 is true for an Owner against the real CONSOLE_MODULES", () => {
+    expect(railFor("owner").length > 0).toBe(true);
+    expect(railFor("owner", CONSOLE_MODULES).length > 0).toBe(true);
+  });
+
+  it("and false for every other role", () => {
+    for (const role of ROLES.filter((r) => r !== "owner")) {
       expect(railFor(role).length > 0, role).toBe(false);
       expect(railFor(role, CONSOLE_MODULES).length > 0, role).toBe(false);
     }
+  });
+
+  // What the Owner's rail actually draws, through the real components rather than a fixture: the
+  // Configure legend and one numbered, linked Team row. Both layouts, because both are fed the same
+  // `groups` and this is the first time either has had anything real to render.
+  it("draws Configure and a linked Team row, in the rail and in the phone drawer alike", async () => {
+    const groups = railFor("owner");
+    render(<ConsoleRail groups={groups} />);
+    const rail = screen.getByRole("navigation", { name: "Console" });
+    expect(within(rail).getByText("Configure")).toBeVisible();
+    expect(within(rail).getByRole("link", { name: /Team/ })).toHaveAttribute("href", "/team");
+    expect(within(rail).getByText("13")).toBeVisible();
+
+    render(<ConsoleRailDrawer groups={groups} />);
+    fireEvent.click(screen.getByRole("button", { name: "Open menu" }));
+    const drawer = await screen.findByRole("dialog", { name: "Console" });
+    expect(within(drawer).getByText("Configure")).toBeVisible();
+    expect(within(drawer).getByRole("link", { name: /Team/ })).toHaveAttribute("href", "/team");
   });
 });
 

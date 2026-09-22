@@ -48,9 +48,9 @@ const PHONE_ROW = "flex h-11 items-center gap-2.5 pl-5 pr-4 text-label text-ink-
 
 /**
  * The module rail (Main.dc.html): each visible group's legend and its modules, then the build
- * line. ConsoleFrame renders this only once `groups` is non-empty -- in 2d-1 that is never (see
- * nav.ts's own ruling), so this component's tests are what prove the drawing until 2d-2 gives it
- * something to show.
+ * line. ConsoleFrame renders this only once `groups` is non-empty -- in 2d-1 that was never (see
+ * nav.ts's own ruling), so this component's own tests were what proved the drawing. 2d-2 task-8
+ * gives it something real to show: an Owner's Configure group, with 13 Team in it.
  *
  * VERCEL_GIT_COMMIT_SHA and BUILD_DATE are read here rather than threaded down as props: Next
  * inlines `process.env.BUILD_DATE` at build time only where the literal expression appears

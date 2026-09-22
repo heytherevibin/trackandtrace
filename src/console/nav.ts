@@ -34,12 +34,13 @@ const EVERY_ROLE = ["owner", "admin", "support", "viewer"] as const;
  * in `renderVals()` (Main.dc.html:293-298), not against the brief's table -- which mistranscribed
  * row 13: it gives Admin "Team", the sheet's access.Admin list does not (nav.test.ts pins this).
  *
- * `built` is false for all fourteen in this plan (2d-1): no module has a page yet, and a rail of
- * links that all lead nowhere is worse than no rail (task-4-brief.md's ruling). A module's flag
- * flips to true in the same PR that adds its page -- so far that is known to be:
+ * `built` was false for all fourteen in 2d-1: no module had a page, and a rail of links that all
+ * lead nowhere is worse than no rail (task-4-brief.md's ruling). A module's flag flips to true in
+ * the same PR that adds its page, and 2d-2 task-8 flips the first one -- 13 Team. The rest are still
+ * to come:
  *   - 01 Overview: 2f
  *   - 11 Switches & settings: 2e
- *   - 13 Team, 14 Audit log: 2d-2
+ *   - 14 Audit log: 2d-2
  * The other nine modules have no page planned yet.
  */
 export const CONSOLE_MODULES: readonly ConsoleModule[] = [
@@ -56,7 +57,10 @@ export const CONSOLE_MODULES: readonly ConsoleModule[] = [
   { num: "11", label: "Switches & settings", group: "configure", roles: OWNER_ADMIN, href: consoleHref("/settings"), built: false },
   { num: "12", label: "Provider keys", group: "configure", roles: OWNER_ONLY, href: consoleHref("/provider-keys"), built: false },
   // Sheet's access.Admin (Main.dc.html:295) excludes '13': Owner only, not Owner+Admin as the brief's table said.
-  { num: "13", label: "Team", group: "configure", roles: OWNER_ONLY, href: consoleHref("/team"), built: false },
+  // The first module to be built (2d-2 task-8): src/app/console/team/page.tsx exists, so this is the
+  // one `built: true` in the list -- and because it is Owner-only, an Owner is the first and so far
+  // only role for which the rail and the phone drawer render at all.
+  { num: "13", label: "Team", group: "configure", roles: OWNER_ONLY, href: consoleHref("/team"), built: true },
   { num: "14", label: "Audit log", group: "record", roles: OWNER_ADMIN, href: consoleHref("/audit-log"), built: false },
 ];
 
@@ -65,8 +69,9 @@ export const CONSOLE_MODULES: readonly ConsoleModule[] = [
  * (`built`), grouped in the sheet's own order, with any group left empty dropped entirely.
  *
  * `modules` defaults to the real `CONSOLE_MODULES`; tests pass a fixture instead (task-4-addendum.md
- * §1), because every real module is `built: false` today and would assert nothing about role
- * filtering.
+ * §1), because the real list has exactly one built module -- 13 Team, and Owner-only -- which cannot
+ * show a Viewer being filtered differently from an Admin. Both are asserted: the fixture for the
+ * filtering, the real list for what a role actually sees today (tests/unit/console/nav.test.ts).
  */
 export function railFor(role: ConsoleRole, modules: readonly ConsoleModule[] = CONSOLE_MODULES): readonly ConsoleNavGroup[] {
   // Not `module`: reserved by webpack's module wrapper (@next/next/no-assign-module-variable).
