@@ -1,4 +1,4 @@
-import { addVirtualKey, expect, expectSignedInAs, firstOwnerLink, ownerIdentity, resetConsole, swapAuthenticatorAfterTap, test } from "./fixtures";
+import { addVirtualKey, chooseKeyKind, expect, expectSignedInAs, firstOwnerLink, ownerIdentity, resetConsole, swapAuthenticatorAfterTap, test } from "./fixtures";
 
 const BASE = "http://admin.localhost:4211";
 
@@ -11,6 +11,7 @@ test("the first Owner sets up with two keys and lands in the console", async ({ 
 
   await expect(page.getByText("Step 1 of 3")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Add your first key" })).toBeVisible();
+  await chooseKeyKind(page, "usb");
   await page.getByLabel("Name this key").fill("YubiKey 5C");
   await page.getByRole("button", { name: "Add key" }).click();
 
@@ -19,6 +20,7 @@ test("the first Owner sets up with two keys and lands in the console", async ({ 
   // swapAuthenticatorAfterTap -- Chromium's virtual authenticator excludes across every attached
   // authenticator at once, so both can never be present for the registration half of this step).
   await swapAuthenticatorAfterTap(page, firstKey, "internal");
+  await chooseKeyKind(page, "internal");
   await page.getByLabel("Name this key").fill("iPhone");
   await page.getByRole("button", { name: "Add key" }).click();
 
@@ -35,11 +37,13 @@ test("the same key twice is refused", async ({ page, baseURL }) => {
   const email = `owner-same-${Date.now()}@trakline.in`;
   await addVirtualKey(page, "usb");
   await page.goto(firstOwnerLink(email, baseURL ?? BASE));
+  await chooseKeyKind(page, "usb");
   await page.getByLabel("Name this key").fill("YubiKey 5C");
   await page.getByRole("button", { name: "Add key" }).click();
 
   await expect(page.getByRole("heading", { name: "Add a second key" })).toBeVisible();
   // No second authenticator this time: the only key present is the one already added.
+  await chooseKeyKind(page, "usb");
   await page.getByLabel("Name this key").fill("YubiKey 5C again");
   await page.getByRole("button", { name: "Add key" }).click();
   // Scoped to the plate, not the bare page: Next's route announcer (role="alert", announcing the

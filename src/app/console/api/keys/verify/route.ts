@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { AuthenticationResponseJSON, RegistrationResponseJSON } from "@simplewebauthn/server";
 import { assertConsoleAvailable } from "@/console/availability";
 import { completeRegistration, completeSignIn, completeTap } from "@/console/keys/ceremony";
+import { consoleKeyKind } from "@/console/keys/kind";
 import { consoleMessages } from "@/console/messages";
 import { assertSameOrigin } from "@/console/same-origin";
 import { jsonError, jsonOk } from "@/services/api-response";
@@ -24,7 +25,9 @@ const ceremonyResponse = z.custom<Record<string, unknown> & { id: string }>(
 const body = z.discriminatedUnion("intent", [
   z.object({ intent: z.literal("sign_in"), response: ceremonyResponse }).strict(),
   z.discriminatedUnion("step", [
-    z.object({ intent: z.literal("add_key"), step: z.literal("tap"), response: ceremonyResponse }).strict(),
+    // The tap step is what mints the registration options for every key after the first, so the
+    // kind the member chose is named here, not only on the options route.
+    z.object({ intent: z.literal("add_key"), step: z.literal("tap"), kind: consoleKeyKind, response: ceremonyResponse }).strict(),
     z
       .object({
         intent: z.literal("add_key"),
@@ -33,6 +36,10 @@ const body = z.discriminatedUnion("intent", [
         // the cases only it can see.
         name: z.string().trim().min(1).max(60),
         response: ceremonyResponse,
+        // No `kind` here, and `.strict()` refuses one that is sent anyway. The options are already
+        // minted by this point, so a kind would change nothing about the ceremony -- the only thing
+        // it could plausibly reach is console.keys' own type column, which is read off the
+        // attestation that actually answered (verifyRegistration) and is never the client's to name.
       })
       .strict(),
   ]),
@@ -49,7 +56,7 @@ export async function POST(req: Request): Promise<Response> {
       return jsonOk({ ok: true, next: "/" });
     }
     if (parsed.step === "tap") {
-      const { options } = await completeTap({ req, response: parsed.response as unknown as AuthenticationResponseJSON });
+      const { options } = await completeTap({ req, kind: parsed.kind, response: parsed.response as unknown as AuthenticationResponseJSON });
       return jsonOk({ ok: true, step: "register", options });
     }
     const { keyCount, activated } = await completeRegistration({

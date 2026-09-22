@@ -1,5 +1,5 @@
 import type { Browser, Page } from "@playwright/test";
-import { addVirtualKey, consoleSql, expect, expectSignedInAs, ownerIdentity, readOutbox, swapAuthenticatorAfterTap } from "./fixtures";
+import { addVirtualKey, chooseKeyKind, consoleSql, expect, expectSignedInAs, ownerIdentity, readOutbox, swapAuthenticatorAfterTap } from "./fixtures";
 
 /**
  * The pieces both Team end-to-end specs drive the page with. Not a spec file itself -- Playwright's
@@ -119,10 +119,12 @@ export async function joinFromInvite(browser: Browser, email: string, role: stri
     await them.goto(linkIn(signIn.text, "auth/confirm"));
     const firstKey = await addVirtualKey(them, "usb");
     await expect(them.getByRole("heading", { name: "Add your first key" }), `${email} was sent to enrol, not to tap a key they should no longer hold`).toBeVisible();
+    await chooseKeyKind(them, "usb");
     await them.getByLabel("Name this key").fill("YubiKey 5C");
     await them.getByRole("button", { name: "Add key" }).click();
     await expect(them.getByRole("heading", { name: "Add a second key" })).toBeVisible();
     await swapAuthenticatorAfterTap(them, firstKey, "internal");
+    await chooseKeyKind(them, "internal");
     await them.getByLabel("Name this key").fill("iPhone");
     await them.getByRole("button", { name: "Add key" }).click();
     await them.getByRole("button", { name: "Open the console" }).click();

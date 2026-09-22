@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { expect, test as base, type Page } from "@playwright/test";
+import { expect, test as base, type Locator, type Page } from "@playwright/test";
 import { consoleMessages } from "@/console/messages";
 import { nameFromAddress } from "@/console/setup/redeem";
 
@@ -94,6 +94,20 @@ export async function swapAuthenticatorAfterTap(
       return real(options);
     }) as typeof navigator.credentials.create;
   }, bindingName);
+}
+
+/**
+ * The undrawn chooser every add-key step now opens with (src/console/keys/key-kind-picker.tsx).
+ * Nothing is pre-selected, so no ceremony starts until this is clicked.
+ *
+ * The kind has to match the virtual authenticator that will answer, because it becomes a real
+ * `authenticatorSelection.authenticatorAttachment` on the options: Chromium reports a `usb`
+ * authenticator as cross-platform and an `internal` one as platform, and a create() whose
+ * attachment does not match the attached authenticator finds nothing to talk to. `scope` is the
+ * page for setup's own form and the dialog for My keys'.
+ */
+export function chooseKeyKind(scope: Page | Locator, transport: "usb" | "internal"): Promise<void> {
+  return scope.getByRole("radio", { name: transport === "usb" ? /Security key/ : /This device/ }).click();
 }
 
 /** The letters the console captured since the last read (src/app/console/api/test-outbox). */
@@ -195,6 +209,7 @@ export async function setUpFirstOwner(page: Page, baseUrl: string): Promise<Sign
   const email = `owner-${Date.now()}-${Math.floor(Math.random() * 1e6)}@trakline.in`;
   const firstKey = await addVirtualKey(page, "usb");
   await page.goto(firstOwnerLink(email, baseUrl));
+  await chooseKeyKind(page, "usb");
   await page.getByLabel("Name this key").fill("YubiKey 5C");
   await page.getByRole("button", { name: "Add key" }).click();
   await page.getByRole("heading", { name: "Add a second key" }).waitFor();
@@ -203,6 +218,7 @@ export async function setUpFirstOwner(page: Page, baseUrl: string): Promise<Sign
   await swapAuthenticatorAfterTap(page, firstKey, "internal", (next) => {
     secondKey = next;
   });
+  await chooseKeyKind(page, "internal");
   await page.getByLabel("Name this key").fill("iPhone");
   await page.getByRole("button", { name: "Add key" }).click();
   await page.getByRole("button", { name: "Open the console" }).click();

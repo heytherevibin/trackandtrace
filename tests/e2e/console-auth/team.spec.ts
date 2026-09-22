@@ -1,4 +1,4 @@
-import { addVirtualKey, consoleSql, expect, expectSignedInAs, ownerIdentity, resetConsole, setUpFirstOwner, swapAuthenticatorAfterTap, test } from "./fixtures";
+import { addVirtualKey, chooseKeyKind, consoleSql, expect, expectSignedInAs, ownerIdentity, resetConsole, setUpFirstOwner, swapAuthenticatorAfterTap, test } from "./fixtures";
 import {
   auditCount,
   freshAddress,
@@ -191,10 +191,12 @@ test.describe("Team", () => {
     await them.goto(linkIn(signIn.text, "auth/confirm"));
     const theirFirstKey = await addVirtualKey(them, "usb");
     await expect(them.getByRole("heading", { name: "Add your first key" })).toBeVisible();
+    await chooseKeyKind(them, "usb");
     await them.getByLabel("Name this key").fill("YubiKey 5C");
     await them.getByRole("button", { name: "Add key" }).click();
     await expect(them.getByRole("heading", { name: "Add a second key" })).toBeVisible();
     await swapAuthenticatorAfterTap(them, theirFirstKey, "internal");
+    await chooseKeyKind(them, "internal");
     await them.getByLabel("Name this key").fill("iPhone");
     await them.getByRole("button", { name: "Add key" }).click();
     await them.getByRole("button", { name: "Open the console" }).click();

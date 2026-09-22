@@ -5,6 +5,7 @@ import { z } from "zod";
 import { consoleApiMessage } from "@/console/api-message";
 import { consoleMessages } from "@/console/messages";
 import { apiRequest } from "@/services/api-client";
+import type { ConsoleKeyKind } from "./kind";
 
 // The browser half of every ceremony (spec §D): ask the server for options, run the
 // @simplewebauthn/browser ceremony, then post what it returns. Every outcome becomes one of three
@@ -91,26 +92,43 @@ export async function tapToSignIn(): Promise<CeremonyOutcome> {
   return verified.ok ? { kind: "done" } : { kind: "failed", message: consoleApiMessage(verified.error) };
 }
 
-/** The server alone decides whether a tap comes first: it knows how many keys this member holds. */
-async function resolveRegistrationOptions(begun: {
-  readonly step: "tap" | "register";
-  readonly options: unknown;
-}): Promise<{ readonly kind: "done"; readonly options: unknown } | FailureOutcome> {
+/**
+ * The server alone decides whether a tap comes first: it knows how many keys this member holds.
+ *
+ * `keyKind` travels with the tap because whichever of the two routes ends up minting the
+ * registration options is the one that has to hear it -- this one does for every key after the
+ * first, which is exactly the member in the defect report. Named `keyKind`, not `kind`, because
+ * `kind` already means "which outcome is this" on every shape in this module.
+ */
+async function resolveRegistrationOptions(
+  begun: { readonly step: "tap" | "register"; readonly options: unknown },
+  keyKind: ConsoleKeyKind,
+): Promise<{ readonly kind: "done"; readonly options: unknown } | FailureOutcome> {
   if (begun.step !== "tap") return { kind: "done", options: begun.options };
 
   const tapped = await runCeremony(() => startAuthentication({ optionsJSON: begun.options as never }));
   if (tapped.kind !== "done") return tapped;
 
-  const unlocked = await apiRequest("/api/keys/verify", jsonPost({ intent: "add_key", step: "tap", response: tapped.response }), tapVerifiedSchema);
+  const unlocked = await apiRequest(
+    "/api/keys/verify",
+    jsonPost({ intent: "add_key", step: "tap", kind: keyKind, response: tapped.response }),
+    tapVerifiedSchema,
+  );
   if (!unlocked.ok) return { kind: "failed", message: consoleApiMessage(unlocked.error) };
   return { kind: "done", options: unlocked.data.options };
 }
 
-export async function addKey(name: string): Promise<AddKeyOutcome> {
-  const begun = await apiRequest("/api/keys/options", jsonPost({ intent: "add_key" }), optionsSchema);
+/**
+ * `keyKind` is what the member said they are about to present, and it decides one thing: which
+ * sheet the browser opens. It is sent with the two calls that mint registration options and with
+ * neither of the two that do not -- in particular not with the register step, which records the
+ * key: the type stored there is read off the attestation on the server, never off this.
+ */
+export async function addKey(name: string, keyKind: ConsoleKeyKind): Promise<AddKeyOutcome> {
+  const begun = await apiRequest("/api/keys/options", jsonPost({ intent: "add_key", kind: keyKind }), optionsSchema);
   if (!begun.ok) return { kind: "failed", message: consoleApiMessage(begun.error) };
 
-  const resolved = await resolveRegistrationOptions(begun.data);
+  const resolved = await resolveRegistrationOptions(begun.data, keyKind);
   if (resolved.kind !== "done") return resolved;
 
   const registered = await runCeremony(() => startRegistration({ optionsJSON: resolved.options as never }));

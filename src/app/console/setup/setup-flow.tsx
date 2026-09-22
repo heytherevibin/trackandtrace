@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Corners } from "@/components/ui/corners";
 import { Field, FieldError, FieldHint, FieldLabel } from "@/components/ui/field";
@@ -11,6 +11,8 @@ import { PlateHeader } from "@/components/ui/plate";
 import { SweepBar } from "@/components/ui/sweep-bar";
 import { consoleHref } from "@/console/href";
 import { addKey, keysUsable } from "@/console/keys/client";
+import { KeyKindPicker } from "@/console/keys/key-kind-picker";
+import type { ConsoleKeyKind } from "@/console/keys/kind";
 import { consoleMessages } from "@/console/messages";
 
 const m = consoleMessages.setup;
@@ -39,7 +41,13 @@ export function SetupFlow({ keyCount }: { readonly keyCount: number }) {
   const [step, setStep] = useState<Step>(stepFor(keyCount));
   const [addedKeys, setAddedKeys] = useState<readonly string[]>([]);
   const [name, setName] = useState("");
+  // Which kind of key this step is adding (@/console/keys/kind). Cleared between the two steps
+  // along with the name: spec §D asks for two keys and nothing about them being two different
+  // kinds, so step 2 starts on the same blank question step 1 did rather than on an answer derived
+  // from what step 1 turned out to be.
+  const [keyKind, setKeyKind] = useState<ConsoleKeyKind | null>(null);
   const [stage, setStage] = useState<Stage>({ kind: "idle", error: null });
+  const kindLabelId = useId();
   const buttonRef = useRef<HTMLButtonElement>(null);
   // What the previous render's stage was, so the button is refocused only on a genuine
   // "adding" -> "idle" return (a failed or cancelled attempt), never on first render (key-step.tsx's
@@ -55,12 +63,16 @@ export function SetupFlow({ keyCount }: { readonly keyCount: number }) {
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     const trimmed = name.trim();
-    if (!trimmed) return;
+    // Both guards read the same way: the submit is already disabled without them, so neither is a
+    // refusal the member can see -- they are what keeps a stray Enter from starting a ceremony the
+    // form is not ready for.
+    if (!trimmed || keyKind === null) return;
     setStage({ kind: "adding" });
-    const outcome = await addKey(trimmed);
+    const outcome = await addKey(trimmed, keyKind);
     if (outcome.kind === "done") {
       setAddedKeys((current) => [...current, trimmed]);
       setName("");
+      setKeyKind(null);
       setStage({ kind: "idle", error: null });
       // One rule for step 3, the same stepFor the initial render uses: keyCount alone. An
       // already-active member recovering from zero keys (docs/runbooks/console-keys.md) never gets
@@ -111,6 +123,12 @@ export function SetupFlow({ keyCount }: { readonly keyCount: number }) {
             <>
               {lead ? <p className="text-body text-ink-2">{lead}</p> : null}
               <form noValidate onSubmit={(event) => void submit(event)} className="flex flex-col gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <span id={kindLabelId} className="legend-md text-accent-text">
+                    {k.kindLabel}
+                  </span>
+                  <KeyKindPicker value={keyKind} labelId={kindLabelId} disabled={adding || !usable} onChange={setKeyKind} />
+                </div>
                 <Field invalid={error !== null}>
                   <FieldLabel>{m.nameLabel}</FieldLabel>
                   <Input
@@ -128,7 +146,7 @@ export function SetupFlow({ keyCount }: { readonly keyCount: number }) {
                     </FieldError>
                   ) : null}
                 </Field>
-                <Button ref={buttonRef} type="submit" variant="primary" fullWidth className="max-sm:h-11" disabled={adding || !usable}>
+                <Button ref={buttonRef} type="submit" variant="primary" fullWidth className="max-sm:h-11" disabled={adding || !usable || keyKind === null}>
                   {adding ? m.touching : m.addKey}
                 </Button>
               </form>
