@@ -2,16 +2,23 @@ import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FilterBar } from "@/console/audit/filter-bar";
-import { AUDIT_SEARCH_MAX, auditRangeAsDays, defaultAuditFilters, type AuditFilters } from "@/console/audit/filters";
+import { AUDIT_SEARCH_MAX, auditRangeAsDays, defaultAuditFilters, type AuditFilters, type AuditMemberOption } from "@/console/audit/filters";
 import { consoleMessages } from "@/console/messages";
 
 const m = consoleMessages.audit;
 const ENVIRONMENT = "production";
 const ASHA = { id: "a0000000-0000-4000-8000-000000000001", name: "Asha Rao" };
+/**
+ * Someone the roster names and the rows on screen do not (Task 6). She is the member this module
+ * could not previously offer: `console_audit_actors` reads the whole log, so she is selectable even
+ * on a day she did nothing -- which is the day a reader most wants to ask.
+ */
+const DEVI = { id: "e0000000-0000-4000-8000-000000000005", name: "Devi Menon" };
+const ROSTER = [ASHA, DEVI];
 
-function bar(filters: AuditFilters = defaultAuditFilters(ENVIRONMENT)) {
+function bar(filters: AuditFilters = defaultAuditFilters(ENVIRONMENT), members: readonly AuditMemberOption[] = ROSTER) {
   const onChange = vi.fn<(next: AuditFilters) => void>();
-  render(<FilterBar filters={filters} environment={ENVIRONMENT} members={[ASHA]} onChange={onChange} />);
+  render(<FilterBar filters={filters} environment={ENVIRONMENT} members={members} onChange={onChange} />);
   return onChange;
 }
 
@@ -193,6 +200,31 @@ describe("the phone's Search and filters dialog", () => {
     for (const name of [m.filters.member, m.filters.category, m.filters.result, m.filters.environment]) {
       expect(within(sheet).getByRole("combobox", { name }), name).toBeInTheDocument();
     }
+  });
+
+  /**
+   * The Member picker exists twice -- here and in the wide bar -- and a roster that reached only
+   * one of them would leave the phone with the accumulate-from-the-rows-on-screen behaviour Task 6
+   * exists to remove, with nothing on screen to say so. Both are one `pickers()` call reading one
+   * `members` prop, and this is what holds that: Devi is in the roster and in no row.
+   */
+  it("offers the whole roster in its Member picker, not only the actors the rows name", async () => {
+    bar();
+    await userEvent.click(screen.getByRole("button", { name: m.filters.phoneTrigger }));
+    const sheet = await screen.findByRole("dialog", { name: m.filters.phoneTrigger });
+    const picker = within(sheet).getByRole("combobox", { name: m.filters.member });
+    for (const one of ROSTER) expect(within(picker).getByRole("option", { name: one.name }), one.name).toBeInTheDocument();
+    expect(within(picker).getByRole("option", { name: m.filters.all })).toBeInTheDocument();
+  });
+
+  // The same option values at both widths, so a view filtered on a phone is the view a link opens
+  // on a desktop: the picker sends `actor_id`, which is exactly what `p_member` matches on.
+  it("sends the roster's own id when a member is picked from the dialog", async () => {
+    const onChange = bar();
+    await userEvent.click(screen.getByRole("button", { name: m.filters.phoneTrigger }));
+    const sheet = await screen.findByRole("dialog", { name: m.filters.phoneTrigger });
+    await userEvent.selectOptions(within(sheet).getByRole("combobox", { name: m.filters.member }), DEVI.id);
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ member: DEVI.id, page: 1 }));
   });
 
   // The same `onChange` the desktop bar reports to, so the same URL is written and a filtered view

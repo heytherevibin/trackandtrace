@@ -2,7 +2,7 @@ import { cleanup, render, screen, waitFor, within } from "@testing-library/react
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuditEntry, AuditEntryDetail, AuditPage } from "@/console/audit/audit";
-import { defaultAuditFilters } from "@/console/audit/filters";
+import { defaultAuditFilters, type AuditMemberOption } from "@/console/audit/filters";
 import { consoleMessages } from "@/console/messages";
 
 // The two things stood in for: the browser-side re-read the filter bar and the pager drive, and the
@@ -56,8 +56,17 @@ const SYSTEM: AuditEntry = {
 
 const PAGE: AuditPage = { rows: [ASHA, SYSTEM], total: 2 };
 
-function plate(initial: AuditPage | null = PAGE) {
-  return <EntriesPlate initial={initial} filters={defaultAuditFilters("production")} environment="production" />;
+const ASHA_OPTION = { id: "a0000000-0000-4000-8000-000000000001", name: "Asha Rao" };
+/**
+ * In the roster and in no row (Task 6). `console_audit_actors` reads the whole log, so a member who
+ * has done nothing in the range on screen is still selectable -- which is exactly the member a
+ * reader opens this module to ask about, and the one the old picker could not offer.
+ */
+const DEVI = { id: "e0000000-0000-4000-8000-000000000005", name: "Devi Menon" };
+const ROSTER: readonly AuditMemberOption[] = [ASHA_OPTION, DEVI];
+
+function plate(initial: AuditPage | null = PAGE, roster: readonly AuditMemberOption[] = ROSTER) {
+  return <EntriesPlate initial={initial} roster={roster} filters={defaultAuditFilters("production")} environment="production" />;
 }
 
 /**
@@ -154,7 +163,7 @@ describe("the Entries table", () => {
   });
 
   it("counts the filtered set in the plate's own header cell", () => {
-    render(<EntriesPlate initial={{ rows: [ASHA], total: 137 }} filters={defaultAuditFilters("production")} environment="production" />);
+    render(<EntriesPlate initial={{ rows: [ASHA], total: 137 }} roster={ROSTER} filters={defaultAuditFilters("production")} environment="production" />);
     expect(screen.getByText(m.entries.rangeCell(m.filters.ranges.today, 137))).toBeInTheDocument();
   });
 });
@@ -202,26 +211,57 @@ describe("the Open column", () => {
   });
 });
 
+/**
+ * Task 6. `console_team` is Owner-only and this module is Owner+Admin, so the picker used to
+ * accumulate its options from the actors the fetched rows happened to name -- which meant a member
+ * who had done nothing in the chosen range could not be selected, and that is precisely when a
+ * reader wants to ask whether they have. `public.console_audit_actors` is the roster an Admin may
+ * read, and the page hands it down whole.
+ */
 describe("the Member picker's options", () => {
-  // `console_team` is Owner-only and this module is Owner+Admin, so the rows are the only roster
-  // module 14 can reach. The System row has no actor and must not become a member to filter by.
-  it("offers the actors the loaded rows name, and not the System row", () => {
+  it("offers every member in the roster, including one no row on screen names", () => {
     render(plate());
     const picker = screen.getByRole("combobox", { name: m.filters.member });
-    expect(within(picker).getByRole("option", { name: "Asha Rao" })).toBeInTheDocument();
-    expect(within(picker).queryByRole("option", { name: "System" })).toBeNull();
+    expect(within(picker).getByRole("option", { name: ASHA_OPTION.name })).toBeInTheDocument();
+    expect(within(picker).getByRole("option", { name: DEVI.name })).toBeInTheDocument();
   });
 
-  // Filtering by one member narrows the rows to that member. If the picker were derived from the
-  // page in hand, it would narrow with them and leave no way to switch to anyone else.
-  it("keeps an actor it has already seen after a filter narrows the rows past them", async () => {
-    const rohan: AuditEntry = { ...ASHA, id: "5a000000-0000-4000-8000-000000000099", actorId: "a0000000-0000-4000-8000-000000000002", actorName: "Rohan Iyer" };
-    apiRequest.mockResolvedValue({ ok: true, data: { ok: true, rows: [rohan], total: 1 } });
-    render(<EntriesPlate initial={{ rows: [ASHA], total: 1 }} filters={defaultAuditFilters("production")} environment="production" />);
+  // The System row has no actor and must not become a member to filter by: `p_member` is an
+  // equality and no null ever satisfies it, so a "System" option would always return nothing. The
+  // SQL drops it; this holds that the fallback below does not put it back.
+  it("never offers the System row, at either end", () => {
+    render(plate(PAGE, []));
+    expect(within(screen.getByRole("combobox", { name: m.filters.member })).queryByRole("option", { name: "System" })).toBeNull();
+  });
+
+  // The roster does not depend on the filters, so it cannot narrow with them -- unlike the old
+  // accumulate-from-the-page behaviour, which narrowed to the one member being filtered by and left
+  // no way to switch to anyone else.
+  it("keeps the whole roster after a filter narrows the rows to one member", async () => {
+    apiRequest.mockResolvedValue({ ok: true, data: { ok: true, rows: [ASHA], total: 1 } });
+    render(plate());
     await userEvent.click(screen.getByRole("button", { name: m.filters.ranges["7d"] }));
     const picker = await screen.findByRole("combobox", { name: m.filters.member });
-    expect(within(picker).getByRole("option", { name: "Rohan Iyer" })).toBeInTheDocument();
-    expect(within(picker).getByRole("option", { name: "Asha Rao" })).toBeInTheDocument();
+    await waitFor(() => expect(within(picker).getByRole("option", { name: DEVI.name })).toBeInTheDocument());
+    expect(within(picker).getByRole("option", { name: ASHA_OPTION.name })).toBeInTheDocument();
+  });
+
+  /**
+   * The one case the old behaviour is still reached in: the roster's own read failed and the page
+   * handed down an empty list. A picker holding nothing but "All" would be worse than one holding
+   * the members on screen, so the accumulate path stays as the fallback -- and it still accumulates
+   * across reads, so filtering by one member does not narrow the picker to them alone.
+   */
+  it("falls back to the actors the rows name when the roster could not be read", async () => {
+    const rohan: AuditEntry = { ...ASHA, id: "5a000000-0000-4000-8000-000000000099", actorId: "a0000000-0000-4000-8000-000000000002", actorName: "Rohan Iyer" };
+    apiRequest.mockResolvedValue({ ok: true, data: { ok: true, rows: [rohan], total: 1 } });
+    render(plate({ rows: [ASHA], total: 1 }, []));
+    await userEvent.click(screen.getByRole("button", { name: m.filters.ranges["7d"] }));
+    const picker = await screen.findByRole("combobox", { name: m.filters.member });
+    await waitFor(() => expect(within(picker).getByRole("option", { name: "Rohan Iyer" })).toBeInTheDocument());
+    expect(within(picker).getByRole("option", { name: ASHA_OPTION.name })).toBeInTheDocument();
+    // And only them: with no roster there is nobody else to know about.
+    expect(within(picker).queryByRole("option", { name: DEVI.name })).toBeNull();
   });
 });
 
@@ -284,7 +324,7 @@ describe("the two layouts", () => {
   // One pager under both, not one each: two would put two "Next" buttons in the tree with the same
   // name, and the range line is the same sentence either way.
   it("draws one pager for both, at a 44px target on a phone", () => {
-    render(<EntriesPlate initial={{ rows: [ASHA], total: 137 }} filters={defaultAuditFilters("production")} environment="production" />);
+    render(<EntriesPlate initial={{ rows: [ASHA], total: 137 }} roster={ROSTER} filters={defaultAuditFilters("production")} environment="production" />);
     for (const name of [m.entries.previous, m.entries.next]) {
       expect(screen.getByRole("button", { name }).className, name).toContain("max-sm:h-11");
     }
@@ -386,7 +426,7 @@ describe("the Download, once an export is prepared", () => {
 
 describe("the pager", () => {
   it("says which slice of the filtered set is on screen", () => {
-    render(<EntriesPlate initial={{ rows: [ASHA], total: 137 }} filters={defaultAuditFilters("production")} environment="production" />);
+    render(<EntriesPlate initial={{ rows: [ASHA], total: 137 }} roster={ROSTER} filters={defaultAuditFilters("production")} environment="production" />);
     expect(screen.getByText(m.entries.pageRange(1, 1, 137))).toBeInTheDocument();
   });
 
@@ -399,7 +439,7 @@ describe("the pager", () => {
   // Paging re-reads from the route; it never re-renders the page server-side, because the server
   // render is what writes the "Opened the audit log" row (task-2-addendum.md §5).
   it("asks the route for the next page", async () => {
-    render(<EntriesPlate initial={{ rows: [ASHA], total: 137 }} filters={defaultAuditFilters("production")} environment="production" />);
+    render(<EntriesPlate initial={{ rows: [ASHA], total: 137 }} roster={ROSTER} filters={defaultAuditFilters("production")} environment="production" />);
     await userEvent.click(screen.getByRole("button", { name: m.entries.next }));
     expect(apiRequest).toHaveBeenCalledWith(expect.stringContaining("page=2"), expect.objectContaining({ method: "GET" }), expect.anything());
   });

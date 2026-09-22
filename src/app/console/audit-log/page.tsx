@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { getAuditLog, type AuditPage } from "@/console/audit/audit";
+import { getAuditActors, getAuditLog, type AuditPage } from "@/console/audit/audit";
 import { EntriesPlate } from "@/console/audit/entries-plate";
-import { auditQueryFor, parseAuditFilters, type AuditSearchParams } from "@/console/audit/filters";
+import { auditQueryFor, parseAuditFilters, type AuditMemberOption, type AuditSearchParams } from "@/console/audit/filters";
 import { writeConsoleAudit } from "@/console/auth/audit";
 import { createConsoleServiceDb } from "@/console/auth/db";
 import { requireConsoleMember } from "@/console/auth/guard";
@@ -148,9 +148,28 @@ export default async function AuditLogPage({ searchParams }: { readonly searchPa
   }
 
   const filters = parseAuditFilters(await searchParams, environment);
-  // `null`, not a throw: the plate draws the sheet's own error state and offers the Retry that
-  // re-reads from the GET route, which is a real recovery -- a reload would only re-run this.
-  const page: AuditPage | null = await getAuditLog(auditQueryFor(filters, new Date())).catch(() => null);
+  const [page, roster] = await Promise.all([
+    // `null`, not a throw: the plate draws the sheet's own error state and offers the Retry that
+    // re-reads from the GET route, which is a real recovery -- a reload would only re-run this.
+    getAuditLog(auditQueryFor(filters, new Date())).catch((): AuditPage | null => null),
+    /*
+      The Member filter's roster (Task 6): every actor in the log, read once here rather than on the
+      GET route beside it. It is the same list whatever the filters say -- `getAuditActors` asks for
+      the whole log deliberately -- so re-reading it on every filter change and every page turn would
+      be a DISTINCT over two years of history per keystroke, for an answer that cannot have moved.
+      Reading it writes nothing; the one row this page records is written by `recordOpened` above.
+
+      An empty list, not a throw, when the read fails: a picker that could not load its options must
+      not take the table down with it. The plate falls back to the actors its rows name -- the
+      behaviour this task replaces -- and nothing on screen says so, so it is logged rather than
+      dropped. The sheet draws no state for a filter that half-loaded and inventing one would be a
+      worse answer than the degraded picker.
+    */
+    getAuditActors().catch((err: unknown): readonly AuditMemberOption[] => {
+      log.warn("[console] the audit log's member roster could not be read", { message: err instanceof Error ? err.message : String(err) });
+      return [];
+    }),
+  ]);
 
   // The page header is drawn by EntriesPlate rather than here, and that moved with Task 4: the
   // sheet puts `Export CSV` in the header's own actions (:90) while the export's status rows belong
@@ -158,7 +177,7 @@ export default async function AuditLogPage({ searchParams }: { readonly searchPa
   // only the client component holds. A header rendered here could reach neither.
   return (
     <ConsoleFrame member={member}>
-      <EntriesPlate initial={page} filters={filters} environment={environment} />
+      <EntriesPlate initial={page} roster={roster} filters={filters} environment={environment} />
     </ConsoleFrame>
   );
 }

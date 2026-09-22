@@ -1,5 +1,12 @@
 import { z } from "zod";
-import { AUDIT_EXPORT_MAX, AUDIT_RESULTS, auditExportFileName, type AuditQuery, type AuditResult } from "@/console/audit/filters";
+import {
+  AUDIT_EXPORT_MAX,
+  AUDIT_RESULTS,
+  auditExportFileName,
+  type AuditMemberOption,
+  type AuditQuery,
+  type AuditResult,
+} from "@/console/audit/filters";
 import { createConsoleDb, type ConsoleDb } from "@/console/auth/db";
 import type { ConsoleRole } from "@/console/auth/member";
 import { consoleMessages } from "@/console/messages";
@@ -215,6 +222,60 @@ export async function getAuditEntry(id: string, db?: ConsoleDb): Promise<AuditEn
   const { data, error } = await client.rpc("console_audit_entry", { p_id: id });
   if (error) throw fromAuditError(error);
   return parseAuditEntry(data);
+}
+
+/**
+ * One actor of `console_audit_actors`, as it serialises them.
+ *
+ * `actor_role` is **deliberately not here.** The function returns it -- an actor is who they were on
+ * their latest row, role included, and anyone reading the function from psql should get the whole of
+ * that -- but the picker draws a plain name, as both sheets do, and zod strips a key no shape names.
+ * A field parsed and then thrown away would be one more thing to keep in step with nothing.
+ *
+ * 1..120 is `console.audit_log.actor_name`'s own check constraint. `actor_id` is never null in this
+ * answer: the System actor is excluded in SQL, because `p_member` is an equality and no null ever
+ * satisfies it -- so offering "System" would be a picker entry that always returns an empty table.
+ */
+const actorShape = z.object({ actor_id: z.guid(), actor_name: z.string().min(1).max(120) });
+
+/**
+ * Parsed, never cast, exactly as the page and the entry are: a roster that drifted must read as
+ * "couldn't load" rather than put a value in the picker that `p_member` cannot match. Exported on
+ * its own so the shape can be held by a test without a database in front of it.
+ */
+export function parseAuditActors(data: unknown): readonly AuditMemberOption[] {
+  const parsed = z.array(actorShape).safeParse(data);
+  if (!parsed.success) throw unavailable();
+  // The order is the database's -- by name, then by id -- and is kept rather than re-sorted here: a
+  // second sort would be a second implementation of the same rule, and the two would collate
+  // differently the first time a name is not ASCII.
+  return parsed.data.map((actor) => ({ id: actor.actor_id, name: actor.actor_name }));
+}
+
+/**
+ * The Member filter's roster (Task 6): every actor in the log, once each, by name.
+ *
+ * **Called with no arguments, and that is the decision rather than an omission.**
+ * `console_audit_actors` takes `p_from`, `p_to` and `p_environment`, all nullable and all meaning
+ * "no filter" when absent, so it can answer either of two questions: *who acted in these dates* or
+ * *has this person done anything at all*. The picker can only serve one, and this module exists
+ * because of the second: a member silent in the range on screen is exactly the member the old
+ * accumulate-from-visible-rows picker could not offer, so a roster scoped to that range would leave
+ * that behaviour in place under a new name. The environment is left off for the same reason -- a
+ * member who has only ever acted in preview must still be selectable from a production board.
+ *
+ * Choosing someone with no rows in the range then returns an empty table, which is an *answer*
+ * ("nothing, here"), not a dead end -- and it is the answer this module could not previously give.
+ *
+ * Makes no access check of its own, exactly as `getAuditLog` makes none: the page above guards, and
+ * `console.require_role('admin')` inside the function is the boundary -- a floor, so Owner and Admin
+ * both pass and Support and Viewer are refused.
+ */
+export async function getAuditActors(db?: ConsoleDb): Promise<readonly AuditMemberOption[]> {
+  const client = db ?? (await createConsoleDb());
+  const { data, error } = await client.rpc("console_audit_actors", {});
+  if (error) throw fromAuditError(error);
+  return parseAuditActors(data);
 }
 
 // ---------------------------------------------------------------------------

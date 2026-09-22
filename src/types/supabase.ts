@@ -58,6 +58,10 @@ export type Database = {
         }
         Returns: Json
       }
+      console_audit_actors: {
+        Args: { p_environment?: string; p_from?: string; p_to?: string }
+        Returns: Json
+      }
       console_audit_entry: { Args: { p_id: string }; Returns: Json }
       console_audit_export: {
         Args: {

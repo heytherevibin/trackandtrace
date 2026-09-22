@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { getAuditEntry, getAuditLog, parseAuditEntry, parseAuditPage, type AuditQuery } from "@/console/audit/audit";
+import { getAuditActors, getAuditEntry, getAuditLog, parseAuditActors, parseAuditEntry, parseAuditPage, type AuditQuery } from "@/console/audit/audit";
 import type { ConsoleDb } from "@/console/auth/db";
 
 // The two shapes console_audit actually returns, copied from task-1-report.md's own captured output
@@ -279,5 +279,75 @@ describe("getAuditEntry", () => {
   it("fails closed on a shape console_audit_entry never produces", async () => {
     const { db } = dbAnswering({ data: { ...ENTRY, environment: null } });
     await expect(getAuditEntry("5a000000-0000-4000-8000-000000000013", db)).rejects.toMatchObject({ code: "SOURCE_UNAVAILABLE" });
+  });
+});
+
+// The Member filter's roster (Task 6). Copied from console_audit_actors' own answer, so the third
+// key is here on purpose: the function returns actor_role -- an actor is who they were on their
+// latest row, role included -- while the picker draws a plain name, so the shape names two of the
+// three and zod strips the other.
+const ROSTER = [
+  { actor_id: "a0000000-0000-4000-8000-000000000001", actor_name: "Asha Rao", actor_role: "owner" },
+  { actor_id: "e0000000-0000-4000-8000-000000000005", actor_name: "Devi Menon", actor_role: "admin" },
+];
+
+describe("parseAuditActors", () => {
+  it("takes the id the filter sends back and the name the picker draws", () => {
+    expect(parseAuditActors(ROSTER)).toEqual([
+      { id: "a0000000-0000-4000-8000-000000000001", name: "Asha Rao" },
+      { id: "e0000000-0000-4000-8000-000000000005", name: "Devi Menon" },
+    ]);
+  });
+
+  // The database orders by name and then by id, and this keeps that order rather than re-sorting:
+  // a second sort would be a second implementation of one rule, and the two would collate
+  // differently the first time a name is not ASCII.
+  it("keeps the order the database chose", () => {
+    const back = [...ROSTER].reverse();
+    expect(parseAuditActors(back).map((one) => one.name)).toEqual(["Devi Menon", "Asha Rao"]);
+  });
+
+  // A console whose log is younger than the range on screen, and the `coalesce(..., '[]')` in
+  // 20260922210000_console_audit_actors.sql: jsonb_agg over no rows is null, and z.array() would
+  // throw on that.
+  it("takes an empty roster as an empty roster", () => {
+    expect(parseAuditActors([])).toEqual([]);
+  });
+
+  // Parsed, never cast. A null actor_id is drift and not data: the SQL leaves the System actor out
+  // because `p_member` is an equality no null satisfies, so an option carrying one would be a
+  // picker entry that always returns an empty table.
+  it("fails closed on an actor with no id", () => {
+    expect(() => parseAuditActors([{ actor_id: null, actor_name: "System", actor_role: null }])).toThrow();
+  });
+
+  it("fails closed on an actor with no name, and on an answer that is not a list", () => {
+    expect(() => parseAuditActors([{ actor_id: "a0000000-0000-4000-8000-000000000001", actor_name: "" }])).toThrow();
+    expect(() => parseAuditActors(null)).toThrow();
+  });
+});
+
+describe("getAuditActors", () => {
+  /**
+   * **No arguments, and that is the decision rather than an omission.** `console_audit_actors` takes
+   * p_from, p_to and p_environment, all nullable and all meaning "no filter" when absent, so sending
+   * none asks for the whole log. A roster scoped to the range on screen would answer a different
+   * question and leave a member who has done nothing in that range unselectable -- which is exactly
+   * the behaviour this task exists to remove.
+   */
+  it("asks for the whole log, passing no window and no environment", async () => {
+    const { db, rpc } = dbAnswering({ data: ROSTER });
+    await getAuditActors(db);
+    expect(rpc).toHaveBeenCalledWith("console_audit_actors", {});
+  });
+
+  it("answers a database refusal with the console's own no-access line, never Postgres's", async () => {
+    const { db } = dbAnswering({ error: { message: "no access", code: "42501" } });
+    await expect(getAuditActors(db)).rejects.toMatchObject({ code: "INVALID_INPUT", message: "You don't have access to this." });
+  });
+
+  it("fails closed on a shape console_audit_actors never produces", async () => {
+    const { db } = dbAnswering({ data: { members: ROSTER } });
+    await expect(getAuditActors(db)).rejects.toMatchObject({ code: "SOURCE_UNAVAILABLE" });
   });
 });

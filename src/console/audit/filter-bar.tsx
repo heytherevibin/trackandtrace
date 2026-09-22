@@ -14,6 +14,7 @@ import {
   clearAuditFilters,
   hasActiveAuditFilters,
   type AuditFilters,
+  type AuditMemberOption,
   type AuditRange,
 } from "@/console/audit/filters";
 import { consoleMessages } from "@/console/messages";
@@ -31,12 +32,6 @@ const m = consoleMessages.audit;
  * cannot do, and it is behaviour rather than layout (see the effect that uses it).
  */
 const SM_UP = "(min-width: 40rem)";
-
-/** An actor the Member picker can offer, as the loaded rows name them. */
-export interface AuditMemberOption {
-  readonly id: string;
-  readonly name: string;
-}
 
 /** A category's label, or the value itself for one this console has never written. */
 export function auditCategoryLabel(category: string): string {
@@ -213,6 +208,12 @@ export function FilterBar({
 }: {
   readonly filters: AuditFilters;
   readonly environment: string;
+  /**
+   * The Member picker's roster: every actor in the log, from `public.console_audit_actors`, and
+   * **not** the actors the rows on screen happen to name (Task 6). It is passed once and read by
+   * both copies of the picker below -- the wide bar and the phone's filter dialog -- because both
+   * are one `pickers()` call, so a roster that reached only one of them is not expressible here.
+   */
   readonly members: readonly AuditMemberOption[];
   readonly onChange: (next: AuditFilters) => void;
 }) {

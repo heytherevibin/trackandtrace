@@ -1,7 +1,8 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuditPage } from "@/console/audit/audit";
+import type { AuditMemberOption } from "@/console/audit/filters";
 import type { ConsoleAuditRow } from "@/console/auth/audit";
 import type { ConsoleMember, ConsoleRole } from "@/console/auth/member";
 import { consoleMessages } from "@/console/messages";
@@ -11,15 +12,16 @@ import { AppError } from "@/services/errors";
 // next/headers, so @testing-library/react cannot render it at all (its own note says so, and
 // tests/unit/console/team/team-page.test.tsx makes the same point). Everything else the page
 // composes -- the real PageHeader, the real NoAccessState, the real EntriesPlate -- runs.
-const { requireConsoleMember, getAuditLog, writeConsoleAudit, headerStore } = vi.hoisted(() => ({
+const { requireConsoleMember, getAuditLog, getAuditActors, writeConsoleAudit, headerStore } = vi.hoisted(() => ({
   requireConsoleMember: vi.fn<(least?: string) => Promise<ConsoleMember>>(),
   getAuditLog: vi.fn<() => Promise<AuditPage>>(),
+  getAuditActors: vi.fn<() => Promise<readonly AuditMemberOption[]>>(),
   writeConsoleAudit: vi.fn<(db: unknown, row: ConsoleAuditRow) => Promise<void>>(),
   headerStore: new Map<string, string>(),
 }));
 
 vi.mock("@/console/auth/guard", () => ({ requireConsoleMember }));
-vi.mock("@/console/audit/audit", async (importOriginal) => ({ ...(await importOriginal<object>()), getAuditLog }));
+vi.mock("@/console/audit/audit", async (importOriginal) => ({ ...(await importOriginal<object>()), getAuditLog, getAuditActors }));
 vi.mock("@/console/auth/audit", () => ({ writeConsoleAudit }));
 vi.mock("@/console/auth/db", () => ({ createConsoleServiceDb: () => ({}) }));
 vi.mock("@/console/components/console-frame", () => ({ ConsoleFrame: ({ children }: { children: ReactNode }) => <>{children}</> }));
@@ -35,6 +37,8 @@ const m = consoleMessages.audit;
 
 const ASHA: ConsoleMember = { userId: "a0000000-0000-4000-8000-000000000001", email: "asha@trakline.in", name: "Asha Rao", role: "owner", status: "active" };
 const EMPTY: AuditPage = { rows: [], total: 0 };
+/** In the roster and in no row: the member Task 6 exists to make selectable. */
+const DEVI: AuditMemberOption = { id: "e0000000-0000-4000-8000-000000000005", name: "Devi Menon" };
 
 function member(role: ConsoleRole): ConsoleMember {
   return { ...ASHA, role };
@@ -47,6 +51,7 @@ async function open(search: Record<string, string> = {}) {
 beforeEach(() => {
   requireConsoleMember.mockReset().mockResolvedValue(ASHA);
   getAuditLog.mockReset().mockResolvedValue(EMPTY);
+  getAuditActors.mockReset().mockResolvedValue([DEVI]);
   writeConsoleAudit.mockReset().mockResolvedValue();
   headerStore.clear();
   headerStore.set("user-agent", "Mozilla/5.0 (Macintosh) Chrome/140.0");
@@ -147,5 +152,42 @@ describe("the first page of entries", () => {
     getAuditLog.mockRejectedValue(new AppError("SOURCE_UNAVAILABLE", "The console couldn't reach its database.", { status: 503 }));
     render(await open());
     expect(screen.getByText(m.error.title)).toBeInTheDocument();
+  });
+});
+
+/**
+ * Task 6. The Member picker used to accumulate its options from the rows it had fetched, so a member
+ * who had done nothing in the chosen range could not be selected -- which is exactly when a reader
+ * wants to ask whether they have. The page reads the roster here, once, and hands it down whole.
+ */
+describe("the Member filter's roster", () => {
+  it("reads it for the whole log, whatever the address filters by", async () => {
+    render(await open({ result: "failed", q: "pnr", range: "30d" }));
+    expect(getAuditActors).toHaveBeenCalledTimes(1);
+    expect(getAuditActors).toHaveBeenCalledWith();
+  });
+
+  it("offers a member the rows on screen do not name", async () => {
+    render(await open());
+    expect(within(screen.getByRole("combobox", { name: m.filters.member })).getByRole("option", { name: DEVI.name })).toBeInTheDocument();
+  });
+
+  // A picker that could not load its options must not take the table down with it: the rows are the
+  // page, and the filter is a way to narrow them. The plate falls back to the actors its own rows
+  // name, which is what this picker did before Task 6.
+  it("still draws the log when the roster could not be read", async () => {
+    getAuditActors.mockRejectedValue(new AppError("SOURCE_UNAVAILABLE", "The console couldn't reach its database.", { status: 503 }));
+    render(await open());
+    expect(screen.getByRole("heading", { level: 1, name: m.title })).toBeInTheDocument();
+    expect(screen.queryByText(m.error.title)).toBeNull();
+    expect(within(screen.getByRole("combobox", { name: m.filters.member })).queryByRole("option", { name: DEVI.name })).toBeNull();
+  });
+
+  // Reading a roster is reading: the one row this page records is the "Opened the audit log" row
+  // that `recordOpened` writes, and the roster must not add a second.
+  it("writes no audit row of its own", async () => {
+    render(await open());
+    expect(writeConsoleAudit).toHaveBeenCalledTimes(1);
+    expect(writeConsoleAudit).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ action: "Opened the audit log" }));
   });
 });

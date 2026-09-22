@@ -14,8 +14,8 @@ import { readAuditPage } from "@/console/audit/audit-client";
 import { CardsLoading, EntriesCards } from "@/console/audit/entries-cards";
 import { EntryDrawer } from "@/console/audit/entry-drawer";
 import { AuditExportButton, AuditExportProvider, AuditExportStatus } from "@/console/audit/export-dialog";
-import { FilterBar, type AuditMemberOption } from "@/console/audit/filter-bar";
-import { AUDIT_PAGE_SIZE, auditFiltersToSearch, clearAuditFilters, type AuditFilters } from "@/console/audit/filters";
+import { FilterBar } from "@/console/audit/filter-bar";
+import { AUDIT_PAGE_SIZE, auditFiltersToSearch, clearAuditFilters, type AuditFilters, type AuditMemberOption } from "@/console/audit/filters";
 import { consoleMessages } from "@/console/messages";
 import { log } from "@/services/log";
 import { formatDateTime, formatTime } from "@/utils/datetime";
@@ -28,9 +28,15 @@ const EMPTY: AuditPage = { rows: [], total: 0 };
 type Status = "ready" | "loading" | "error";
 
 /**
- * The actors named by a set of rows. This is the only roster module 14 can reach: `console_team` is
- * Owner-only and the audit log is Owner+Admin, so an Admin filtering by member has no other source
- * for the names -- and the System rows, which have no actor at all, are not members to filter by.
+ * The actors named by a set of rows.
+ *
+ * **This is no longer where the Member picker's options come from** -- `public.console_audit_actors`
+ * is (Task 6), read once by the page and handed down as `roster`. It is kept as the one fallback for
+ * a roster read that failed, where the choice is between the actors on screen and a picker holding
+ * nothing but "All". Filtering by a member you can see is worth more than filtering by nobody.
+ *
+ * The System rows have no actor at all and are dropped here for the same reason the SQL drops them:
+ * `p_member` is an equality and no null ever satisfies it.
  */
 function actorsIn(rows: readonly AuditEntry[]): readonly AuditMemberOption[] {
   return [...new Map(rows.flatMap((row) => (row.actorId ? ([[row.actorId, { id: row.actorId, name: row.actorName }]] as const) : []))).values()];
@@ -39,7 +45,7 @@ function actorsIn(rows: readonly AuditEntry[]): readonly AuditMemberOption[] {
 /**
  * Every actor seen so far, not merely those on the page in hand: filtering by one member would
  * otherwise narrow the rows to that member and so narrow the picker to them alone, leaving no way
- * to switch to another without clearing the filter first.
+ * to switch to another without clearing the filter first. Only reached on the fallback path above.
  */
 function withActors(known: readonly AuditMemberOption[], rows: readonly AuditEntry[]): readonly AuditMemberOption[] {
   const merged = new Map(known.map((one) => [one.id, one]));
@@ -160,17 +166,30 @@ function Loading() {
  */
 export function EntriesPlate({
   initial,
+  roster,
   filters: initialFilters,
   environment,
 }: {
   readonly initial: AuditPage | null;
+  /**
+   * Every actor in the log, from `public.console_audit_actors` (Task 6) -- the whole log, not the
+   * range on screen, so the Member picker can reach someone who has done nothing in it. Empty when
+   * that read failed, which is the one case `seen` below answers.
+   */
+  readonly roster: readonly AuditMemberOption[];
   readonly filters: AuditFilters;
   readonly environment: string;
 }) {
   const [filters, setFilters] = useState(initialFilters);
   const [page, setPage] = useState<AuditPage>(initial ?? EMPTY);
   const [status, setStatus] = useState<Status>(initial ? "ready" : "error");
-  const [members, setMembers] = useState<readonly AuditMemberOption[]>(() => actorsIn(initial?.rows ?? []));
+  // The fallback, and only the fallback: the actors the loaded rows name, accumulated across reads.
+  // It is maintained solely while the roster is empty -- a failed roster read -- so the picker is
+  // not left holding nothing but "All". `rosterEmpty` rather than `roster.length` in the dependency
+  // list, because the array's identity is a prop and its emptiness is the only thing that decides.
+  const [seen, setSeen] = useState<readonly AuditMemberOption[]>(() => actorsIn(initial?.rows ?? []));
+  const rosterEmpty = roster.length === 0;
+  const members = rosterEmpty ? seen : roster;
   // The id alone, not the row: the drawer reads the entry itself, because the key's *name* is not
   // in any row the table holds (task-3-addendum.md §2). Holding the row here would invite drawing
   // the drawer from it and quietly losing the key clause.
@@ -194,10 +213,12 @@ export function EntriesPlate({
         return;
       }
       setPage({ rows: result.data.rows, total: result.data.total });
-      setMembers((known) => withActors(known, result.data.rows));
+      // Nothing to accumulate when the roster loaded: it already holds every actor in the log,
+      // including every one these rows can name.
+      if (rosterEmpty) setSeen((known) => withActors(known, result.data.rows));
       setStatus("ready");
     },
-    [environment],
+    [environment, rosterEmpty],
   );
 
   // The address follows the filters without re-rendering the page: history.replaceState is Next's

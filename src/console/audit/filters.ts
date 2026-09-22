@@ -33,6 +33,22 @@ export const AUDIT_PAGE_SIZE = 50;
  */
 export const AUDIT_ENVIRONMENT_ALL = "all";
 
+/**
+ * One actor the Member picker can offer.
+ *
+ * It lives here rather than beside the picker because it now crosses the server/client line:
+ * `public.console_audit_actors` is read on the server (audit.ts), and the two places the picker is
+ * drawn are in the browser. This file is the one module all three already share.
+ *
+ * `id` is `console.audit_log.actor_id` and is exactly what the filter sends back as `p_member`;
+ * `name` is `actor_name` from that actor's **latest** row, because the log names an actor as they
+ * were at the time and one person can carry several names across their rows.
+ */
+export interface AuditMemberOption {
+  readonly id: string;
+  readonly name: string;
+}
+
 export interface AuditFilters {
   readonly range: AuditRange;
   /** An IST calendar day, `yyyy-mm-dd`, for the Custom range only. */
