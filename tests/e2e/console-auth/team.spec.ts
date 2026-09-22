@@ -202,10 +202,15 @@ test.describe("Team", () => {
     await them.getByRole("button", { name: "Open the console" }).click();
     await expectSignedInAs(them, name, "Admin");
 
-    // The rail an Admin is allowed: nothing. 13 Team is the only built module and it is Owner-only,
-    // so ConsoleFrame draws neither the rail nor the phone drawer's trigger, and /team itself
-    // answers with the sheet's no-access state rather than a redirect (task-3-addendum.md §4).
-    await expect(them.getByRole("navigation", { name: "Console" })).toHaveCount(0);
+    // The rail an Admin is allowed. This assertion used to be "nothing at all", and was true while
+    // 13 Team was the only built module and Owner-only. Phase 2d-2b's Task 2 made 14 Audit log
+    // built, and the sheet's own access map (Main.dc.html:293-298) gives an Admin 14 but not 13 --
+    // so an Admin has a rail for the first time (src/console/nav.ts:64), holding Audit log and not
+    // Team. Both halves matter: the rail exists, and it does not leak a module this role cannot
+    // open. /team itself still answers with the sheet's no-access state rather than a redirect
+    // (2d-2's task-3-addendum.md §4).
+    await expect(them.getByRole("navigation", { name: "Console" })).toHaveCount(1);
+    await expect(them.getByRole("link", { name: "Audit log", exact: true })).toHaveCount(1);
     await expect(them.getByRole("link", { name: "Team", exact: true })).toHaveCount(0);
     await gotoReady(them, "/team");
     await expect(them.getByText("This module isn't part of the Admin role.")).toBeVisible();
