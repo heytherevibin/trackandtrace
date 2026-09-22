@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(53);
+select plan(54);
 
 -- public.console_audit_export: the one console function that reads the audit
 -- log in bulk. It is not a second reader -- it is the export, which is an
@@ -444,8 +444,24 @@ select is((select used_at from console.challenges where challenge = pg_temp.ch('
 -- rows left, the row read `environment=Production`, and every picker value
 -- showed nothing.
 --
--- Four ways in, all closed, each named separately because they fail for
--- different reasons and a single assertion would pass on whichever fired.
+-- Four ways in, all closed. They do NOT carry four different messages -- all
+-- four reach one `if` and raise the one sentence, and only the pgTAP
+-- descriptions differ. An earlier version of this comment said otherwise and
+-- was wrong.
+--
+-- They are all kept because each pins a different SUB-CLAUSE of that `if`, which
+-- is a weaker claim than four messages and a true one. Measured by dropping each
+-- sub-clause in turn and running the file:
+--
+--   drop `v_deployment is null`          -> 43 fails (and the audit-row counts)
+--   drop `v_deployment <> p_environment` -> 45 and 46 fail
+--   drop `not in (production, …)`        -> 44 fails
+--
+-- 46 is the one that matters most: it is the redirect, and it is what shows the
+-- DIGEST half is load-bearing on its own. The closed set is not what closes this
+-- function -- drop the constraint and leave everything else and all four still
+-- refuse, because this `if` does it. The constraint is for the ten other writers
+-- (see 20260923090000's own comment, and the write_audit assertion below).
 select pg_temp.tap('forge-absent', pg_temp.day17(), '{"category":null,"environment":null,"member":null,"result":null,"search":null}');
 select throws_ok(
   format($$ select public.console_audit_export(%L, %L, %L, 'development') $$,
@@ -477,15 +493,36 @@ select throws_ok(
   '42501', 'the export names a deployment this console is not',
   'nor a tap taken for this deployment spent to file the record under another'
 );
--- And the other half, on its own: the column refuses a value outside the set
--- however it is reached, so a writer that never went through this function
--- cannot put a row where the Environment picker cannot look. console.write_audit
--- is revoked from authenticated, so this is belt to the function's braces.
+-- And the other half, which is not about this function at all.
+--
+-- Ten member-callable public.console_* functions take a p_environment nothing
+-- digests and write an audit row under it -- console_change_role,
+-- console_invite_member, console_remove_key, console_remove_member,
+-- console_rename_key, console_resend_invite, console_reset_keys,
+-- console_revoke_invite, console_save_settings, console_sign_out_others. Every
+-- one is the same evasion with a different verb, and none of them has a `not in`
+-- clause of its own. The column's constraint is what stands in front of all ten.
+--
+-- Asserted through console.write_audit rather than through a bare INSERT,
+-- because write_audit is the one call every one of those ten makes: this is the
+-- chokepoint they share, not merely the table they land in. The INSERT beside it
+-- covers the table for anything that ever bypasses write_audit.
+--
+-- Both name the message. A check violation is 23514 and nothing else in this
+-- file raises one -- but a bare null here is the pattern this branch has been
+-- naming everywhere else, and a constraint added later would inherit the
+-- assertion without earning it.
+select throws_ok(
+  $$ select console.write_audit('Production', null, 'Forged', null, null, null,
+       'team', 'Changed a role', 'Someone', null, 'done', null, null, null) $$,
+  '23514', 'new row for relation "audit_log" violates check constraint "console_audit_log_environment_known"',
+  'the writer every other console action shares refuses an environment the picker cannot reach'
+);
 select throws_ok(
   $$ insert into console.audit_log (environment, actor_name, category, action, result)
      values ('Production', 'Forged', 'record', 'Exported the audit log', 'done') $$,
-  '23514', null,
-  'and the column itself refuses an environment the picker cannot reach'
+  '23514', 'new row for relation "audit_log" violates check constraint "console_audit_log_environment_known"',
+  'and so does the column itself, for anything that never went through it'
 );
 select is(
   (select count(*)::integer from pg_catalog.pg_constraint

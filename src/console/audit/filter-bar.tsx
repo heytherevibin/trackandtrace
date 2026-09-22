@@ -272,12 +272,18 @@ export function FilterBar({
     ...(filters.member ? [{ label: m.filters.chip(m.filters.member, memberName), clear: { member: null } }] : []),
     ...(filters.category ? [{ label: m.filters.chip(m.filters.category, auditCategoryLabel(filters.category)), clear: { category: null } }] : []),
     ...(filters.result ? [{ label: m.filters.chip(m.filters.result, m.results[filters.result]), clear: { result: null } }] : []),
-    // The environment IS chipped at its default, unlike every filter above it, and that is a branch
-    // review finding rather than a preference. This filter always has a value -- a board opens
-    // scoped to its own deployment -- so without a chip a member cannot tell a log with no exports
-    // in it from a log whose exports were filed against a different deployment. "No export rows"
-    // must never be silently "no export rows *in production*": an Owner running an access review
-    // has to be able to see what they are looking through rather than infer it.
+    // **Departure from the sheet, deliberate and approved** (branch review; signed off by the
+    // plan's owner). AuditLog.dc.html:130 draws the chip row only when a filter is active, behind
+    // its own `hasActiveFilter`, which is false on an unfiltered page. This chip is drawn at its
+    // default, so the row is now on screen every time the module opens.
+    //
+    // The reason is the Critical this branch just closed. The Environment filter always has a value
+    // -- a board opens scoped to its own deployment -- so with no chip a member cannot tell a log
+    // with no exports in it from a log whose exports were filed against a different deployment.
+    // That is not hypothetical: it is the exact state an Admin could put an Owner in by forging
+    // `p_environment`, and chipping the default is what makes the scope visible instead of
+    // inferred. An empty result that is silently "empty *in production*" is worse than a chip the
+    // sheet did not draw.
     //
     // Chipped whenever the view is scoped to one deployment, and not when it is already every one:
     // "Environment: All" is not a filter, and a chip whose removal does nothing is worse than none.
@@ -407,10 +413,13 @@ export function FilterBar({
       </DialogRoot>
 
       {/*
-        The row shows whenever there is a chip in it, which -- since the environment is chipped
-        while the view is scoped -- is the ordinary case rather than the filtered one. Clear filters
-        keeps its old condition: `clearAuditFilters` returns to the default view, so beside only the
-        environment chip it would be a button that visibly does nothing.
+        `chips.length > 0` where the sheet has `hasActiveFilter` (:130) -- the second half of the
+        approved departure recorded beside the Environment chip above. Since that chip is drawn at
+        its default, this row is the ordinary case rather than the filtered one.
+
+        Clear filters keeps the sheet's own condition, and that is not an inconsistency:
+        `clearAuditFilters` returns to the default view, so beside only the environment chip it
+        would be a button that visibly does nothing.
       */}
       {chips.length > 0 ? (
         <div className="flex flex-wrap items-center gap-2.5 max-sm:gap-x-2.5 max-sm:gap-y-2">

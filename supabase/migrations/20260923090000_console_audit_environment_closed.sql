@@ -16,23 +16,33 @@
 -- What was defeated is the record of the taking, by the person who did it, for
 -- the most concentrated personal data in this product.
 --
--- TWO HALVES, AND EACH IS NECESSARY ALONE.
+-- TWO HALVES. BOTH ARE NECESSARY -- BUT NOT, AS AN EARLIER DRAFT OF THIS
+-- COMMENT CLAIMED, BOTH ON THIS PATH.
 --
---   The closed set, below, stops a value the reader cannot reach. Without it,
---   digesting merely means the forger must mint their own tap over
---   'Production' -- which they can, in one request -- and the row is invisible
---   again. This is the half that makes every possible value findable.
+--   The digest, further down, is what closes the export. It stops the
+--   deployment being chosen after the ceremony, and it is load-bearing on its
+--   own: remove it and a tap minted honestly for this deployment can be spent
+--   to file the record under another. Measured.
 --
---   The digest, further down, stops the value being chosen AFTER the ceremony.
---   Without it, the set being closed only narrows the forgery to three buckets:
---   an Admin exports production and files the record under 'preview', spending
---   a tap the UI minted for them over something else entirely. This is the half
---   that binds the record to what the member actually approved.
+--   The closed set, below, does NOT close the export. Drop it and leave the
+--   digest, and every forgery still bounces off console_audit_export's own
+--   `not in` clause -- which a reviewer demonstrated after the first version of
+--   this comment asserted otherwise. Stating it wrongly here was worse than not
+--   stating it: the next person inherits a comment as fact.
 --
--- Neither is redundant, and neither is sufficient. A third change, in the
--- reader, is what closes the remaining gap: the Environment filter is now drawn
--- as a chip even at its default, so "no export rows" can never be silently "no
--- export rows in production" (src/console/audit/filter-bar.tsx).
+--   What the closed set is for is EVERY OTHER WRITER. Ten member-callable
+--   public.console_* functions take a p_environment that nothing digests and
+--   write an audit row under it: console_change_role, console_invite_member,
+--   console_remove_key, console_remove_member, console_rename_key,
+--   console_resend_invite, console_reset_keys, console_revoke_invite,
+--   console_save_settings and console_sign_out_others. Every one of them is the
+--   same evasion with a different verb -- change a role, file the record under
+--   'Production' -- and this constraint is the only thing standing in front of
+--   all ten. It is the broader fix, not the narrower one.
+--
+-- A third change, in the reader, closes the last of it: the Environment filter
+-- is now drawn as a chip even at its default, so "no export rows" can never be
+-- silently "no export rows in production" (src/console/audit/filter-bar.tsx).
 
 -- Legible before it is enforced. A bare ADD CONSTRAINT on a live table reports
 -- "violates check constraint" and names no row; this names the values, so the
@@ -54,11 +64,24 @@ begin
 end;
 $$;
 
--- NOT VALID then VALIDATE, which is the online shape: the first statement takes
--- ACCESS EXCLUSIVE only long enough to record the constraint and applies to
--- every new row from that instant, and the scan that follows takes only SHARE
--- UPDATE EXCLUSIVE, so the console keeps writing history while it runs. It ends
--- validated either way; the two steps are about the lock, not the outcome.
+-- NOT VALID here, and VALIDATE in the migration that follows this one --
+-- 20260923090100. The split is the whole point and it is not tidiness: the
+-- runner wraps each migration FILE in one transaction, so the two statements
+-- together held ACCESS EXCLUSIVE across the scan and a concurrent console write
+-- blocked on it. Measured both ways, twice:
+--
+--   one file   txid 1454 for both statements; a concurrent insert died with
+--              "canceling statement due to lock timeout"
+--   two files  txid 1456 and 1457; the same insert returned normally
+--
+-- So: this statement takes ACCESS EXCLUSIVE just long enough to record the
+-- constraint, and binds every new row from that instant. The scan next door
+-- takes only SHARE UPDATE EXCLUSIVE, and the console keeps writing history
+-- while it runs.
+--
+-- On a table one day old the difference is nothing. The reason to get it right
+-- is that this is a shape someone will copy onto a table where it is
+-- everything -- and they will copy the comment with it.
 --
 -- 'test' is deliberately NOT in the set. NODE_ENV is 'test' under vitest, and
 -- nothing under vitest reaches a real database -- every integration test mocks
@@ -68,7 +91,6 @@ alter table console.audit_log
   add constraint console_audit_log_environment_known
   check (environment in ('production', 'preview', 'development')) not valid;
 
-alter table console.audit_log validate constraint console_audit_log_environment_known;
 
 -- The export, with the deployment inside the digest.
 --

@@ -1,0 +1,16 @@
+-- The scan for 20260923090100's sibling, deliberately alone in this file.
+--
+-- The runner gives each migration file its own transaction, so this is the only
+-- way the scan can run outside the ACCESS EXCLUSIVE lock the ADD took. Put back
+-- beside the ADD, the two become one transaction and every console write blocks
+-- until the scan finishes -- measured, in both shapes, and written down in the
+-- file next door.
+--
+-- VALIDATE CONSTRAINT takes SHARE UPDATE EXCLUSIVE: it conflicts with another
+-- schema change on this table and with nothing a member does. The constraint is
+-- already enforced on new rows by then; this is what makes it true of the old
+-- ones as well, and what lets the planner rely on it.
+--
+-- If it fails, it fails here rather than halfway through the sibling: the
+-- preflight there has already named any row that would fail it.
+alter table console.audit_log validate constraint console_audit_log_environment_known;
