@@ -33,6 +33,19 @@ export const audit = {
   title: "Audit log",
   lead: "Every action taken in the console: who took it, when and why.",
 
+  // AuditLogPhone.dc.html:64, word for word, in the place the sheet puts it: under the page lead,
+  // where the desktop draws `Export CSV`. It sits inside the phone sheet's own `showMeta`
+  // (:62, `stRows || Empty`), so a page that failed to load does not advertise an export of rows it
+  // has not got.
+  //
+  // Drawn, and a house device rather than one page's idea: its siblings say the same thing the same
+  // way (ConsoleTeamPhone's "Open on a larger screen to manage the team.", ConsoleSwitchesPhone's
+  // "… to edit"), which is why team.ts's `manageOnLargerScreen` reads as its twin.
+  //
+  // Export is the **only** thing the phone loses. Search, Member, Category, Result and Environment
+  // all move behind `filters.phoneTrigger` below; they are not dropped.
+  exportOnLargerScreen: "Open on a larger screen to export.",
+
   filters: {
     // AuditLog.dc.html:111's own role="search" landmark name.
     regionLabel: "Filter the audit log",
@@ -47,6 +60,13 @@ export const audit = {
     all: "All",
     // :120's own group name.
     rangeLabel: "Date range",
+    // AuditLogPhone.dc.html:85's own accessible name for the phone's single filter control -- an
+    // icon button carrying `aria-haspopup="dialog"`, behind which the search box and all four
+    // pickers live. The sheet draws the trigger and stops: **the dialog behind it is Not drawn**,
+    // so its own title is this same name rather than a second invented one. The controls inside it
+    // keep the labels the desktop bar already gives them, which is what keeps one filter model
+    // (filters.ts) answering both widths.
+    phoneTrigger: "Search and filters",
     ranges: {
       today: "Today",
       "7d": "7 days",

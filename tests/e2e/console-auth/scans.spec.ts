@@ -142,4 +142,134 @@ test.describe("the signed-in frame at 390px", () => {
     await expect(invitesTable(page).getByRole("button", { name: "Resend" })).toBeVisible();
     await expect(invitesTable(page).getByRole("button", { name: "Revoke" })).toBeVisible();
   });
+
+  /**
+   * The Audit log (AuditLogPhone.dc.html), which is a different layout and not the table narrowed.
+   *
+   * This is the only place the claim can be made at all. Both layouts are in the tree at every
+   * width and CSS picks one, so jsdom -- which has no CSS -- sees two of everything and can say
+   * nothing about which a member reaches. `display: none` takes a subtree out of the accessibility
+   * tree and out of the tab order together, so every `toHaveCount(0)` below means "a phone cannot
+   * reach this", not "a phone cannot see it".
+   *
+   * Nothing here counts `console.audit_log`, so nothing here needs scoping to its own rows -- but
+   * the page writes an "Opened the audit log" row per server render either way, which is why the
+   * filter changes below go through the dialog rather than through a reload.
+   */
+  test("the Audit log at 390px draws cards, keeps every filter and loses only the export", async ({ page, baseURL }) => {
+    await setUpFirstOwner(page, baseURL ?? BASE);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    // Twice, for the reason audit-log.spec.ts records: the page writes its own "Opened the audit
+    // log" row in `after()`, once the response has already gone out, so the first paint need not
+    // carry it. A reload is what makes a row certain -- and a reload is itself a legitimate open.
+    await gotoReady(page, "/audit-log");
+    await gotoReady(page, "/audit-log");
+    await expect(page.getByRole("heading", { level: 1, name: "Audit log" })).toBeVisible();
+
+    // AuditLogPhone.dc.html:64, in the place the sheet puts it -- and the control it replaces.
+    // Export is the *only* thing this width loses.
+    await expect(page.getByText("Open on a larger screen to export.")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Export CSV" }), "the export control").toHaveCount(0);
+
+    // :101-113 -- a card per entry, and no table at all. The page has at least its own open by now.
+    await expect(page.getByRole("table"), "the wide table").toHaveCount(0);
+    const cards = page.getByRole("button", { name: /^Open the entry: / });
+    await expect(cards.first()).toBeVisible();
+
+    // :103-110 -- the whole card is the control, and it carries the four labelled cells under the
+    // action.
+    const first = cards.first();
+    for (const label of ["Member", "Target", "Reason", "Address"]) await expect(first).toContainText(label);
+
+    // :79-88 -- the four date tabs, and one icon button where the desktop draws four pickers. The
+    // brief said a phone has no pickers; the sheet says they are one tap away.
+    const group = page.getByRole("group", { name: "Date range" });
+    await expect(group.getByRole("button")).toHaveText(["Today", "7 days", "30 days", "Custom"]);
+    await expect(page.getByRole("combobox", { name: "Member" }), "the desktop pickers").toHaveCount(0);
+    await expect(page.getByRole("searchbox", { name: "Search reasons and targets" }), "the desktop search box").toHaveCount(0);
+
+    expect(await layoutBreaks(page), "the Audit log at 390px").toEqual([]);
+    await expectAxeClean(page);
+
+    // Every drawn control at 44px, which the sheet draws and only a real layout can measure.
+    for (const name of ["Today", "Custom"]) {
+      const box = await group.getByRole("button", { name }).boundingBox();
+      expect(box?.height, `the ${name} tab`).toBeGreaterThanOrEqual(44);
+    }
+    const trigger = page.getByRole("button", { name: "Search and filters" });
+    const triggerBox = await trigger.boundingBox();
+    expect(triggerBox?.height, "the filters trigger").toBeGreaterThanOrEqual(44);
+    expect(triggerBox?.width, "the filters trigger").toBeGreaterThanOrEqual(44);
+
+    // The dialog the trigger promises, and the whole filter surface inside it.
+    await trigger.click();
+    const sheet = page.getByRole("dialog", { name: "Search and filters" });
+    await expect(sheet).toBeVisible();
+    await expect(sheet.getByRole("searchbox", { name: "Search reasons and targets" })).toBeVisible();
+    for (const name of ["Member", "Category", "Result", "Environment"]) {
+      await expect(sheet.getByRole("combobox", { name }), name).toBeVisible();
+    }
+    expect(await layoutBreaks(page), "the filters dialog at 390px").toEqual([]);
+    await expectAxeClean(page);
+
+    // The Environment picker defaults to *this deployment's own*, so this is the page's own answer
+    // to "where am I" rather than a hard-coded word -- asserted against a card once the dialog is
+    // out of the way, because a modal takes the rest of the page out of the accessibility tree.
+    const here = await sheet.getByRole("combobox", { name: "Environment" }).inputValue();
+    expect(here, "the deployment's own environment").not.toBe("");
+
+    // The same URL a wide screen writes: filters.ts is one model, so a view filtered on a phone is
+    // still a link somebody can open on a laptop.
+    await sheet.getByRole("combobox", { name: "Result" }).selectOption("done");
+    await expect.poll(() => new URL(page.url()).searchParams.get("result")).toBe("done");
+    await sheet.getByRole("button", { name: "Close" }).click();
+    await expect(sheet).toBeHidden();
+
+    // Not drawn on either sheet, and non-negotiable all the same (task-2-addendum.md §4): every row
+    // says which deployment wrote it. A log that showed a preview deployment's row as though it
+    // were production's would lie, and that is the one thing this module must never do.
+    await expect(cards.first(), "every card says which deployment wrote the row").toContainText(here);
+
+    // :91-94 -- the chip *is* the remove control at 44px, and the desktop's "Filters" legend is not
+    // drawn here. `Clear filters` is `btn-lg`.
+    const chip = page.getByRole("button", { name: "Remove the filter Result: Done" });
+    await expect(chip).toBeVisible();
+    expect((await chip.boundingBox())?.height, "the filter chip").toBeGreaterThanOrEqual(44);
+    // `toBeHidden`, not `toHaveCount(0)`: a text locator counts the DOM and knows nothing about
+    // visibility, unlike the role locators above it -- which is the whole reason those are role
+    // locators. The legend is a `span`, not a control, so it has no role to ask for.
+    await expect(page.getByText("Filters", { exact: true }), "the wide bar's legend").toBeHidden();
+    expect((await page.getByRole("button", { name: "Clear filters" }).boundingBox())?.height).toBeGreaterThanOrEqual(44);
+    expect(await layoutBreaks(page), "the Audit log filtered at 390px").toEqual([]);
+
+    // :149-162 -- an entry opens full-bleed, not as the desktop's 480px drawer 12px clear of three
+    // edges. Measured, because that is the whole difference between the two.
+    await page.getByRole("button", { name: /^Open the entry: / }).first().click();
+    const entry = page.getByRole("dialog", { name: "Audit entry" });
+    await expect(entry).toBeVisible();
+    await expect(entry.getByText("Entries can't be edited. They're deleted automatically after 2 years.")).toBeVisible();
+    const entryBox = await entry.boundingBox();
+    expect(entryBox?.x, "the entry sheet's left edge").toBe(0);
+    expect(entryBox?.width, "the entry sheet's width").toBe(390);
+    expect((await entry.getByRole("button", { name: "Close" }).boundingBox())?.height, "the entry's Close").toBeGreaterThanOrEqual(44);
+    expect(await layoutBreaks(page), "the entry at 390px").toEqual([]);
+    await expectAxeClean(page);
+    await entry.getByRole("button", { name: "Close" }).click();
+    await expect(entry).toBeHidden();
+
+    // The control, and the thing that makes every count above mean "below sm" rather than "gone":
+    // the same page at the width the rest of this suite runs at.
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await expect(page.getByText("Open on a larger screen to export.")).toBeHidden();
+    await expect(page.getByRole("button", { name: "Export CSV" })).toBeVisible();
+    await expect(page.getByRole("table")).toBeVisible();
+    await expect(page.getByRole("combobox", { name: "Member" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Search and filters" })).toBeHidden();
+    // The same entry, now as the desktop sheet's 480px drawer against the right edge.
+    await page.getByRole("button", { name: /^Open the entry: / }).first().click();
+    const wide = page.getByRole("dialog", { name: "Audit entry" });
+    await expect(wide).toBeVisible();
+    expect((await wide.boundingBox())?.width, "the drawer at 1280px").toBe(480);
+  });
 });

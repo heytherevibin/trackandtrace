@@ -256,3 +256,33 @@ describe("closing", () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 });
+
+/**
+ * AuditLogPhone.dc.html:149-162 draws this same panel a second time and draws it differently: no
+ * plate, no registration marks, no shadow, `position: absolute; inset: 0` rather than 12px clear of
+ * three edges, and a `box-lg` close where the desktop draws `box-sm`. It is the same ten fields and
+ * the same retention line, so it stays one component with two geometries rather than a second
+ * implementation that would drift from this one a field at a time.
+ */
+describe("the entry at phone width", () => {
+  it("fills the screen on a phone and keeps the sheet's 480px drawer on a wide one", async () => {
+    answering(ASHA);
+    render(<EntryDrawer entryId={ASHA.id} onClose={vi.fn()} />);
+    const dialog = await screen.findByRole("dialog");
+    // The 12px the desktop sheet keeps clear (:215) is the phone sheet's `inset: 0`.
+    expect(dialog.parentElement?.className).toContain("max-sm:p-0");
+    // 480px against the right edge above sm; the whole width below it.
+    expect(dialog.className).toContain("sm:w-[480px]");
+    // A blueprint object's hairline and its four registration marks are what the desktop draws
+    // here and the phone does not -- there is no board behind it to be an object on.
+    expect(dialog.className).toContain("max-sm:border-0");
+    expect(dialog.querySelector(".corner")?.parentElement?.className, "the registration marks").toContain("max-sm:hidden");
+  });
+
+  it("gives the close a 44px target on a phone", async () => {
+    answering(ASHA);
+    render(<EntryDrawer entryId={ASHA.id} onClose={vi.fn()} />);
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByRole("button", { name: messages.common.close }).className).toContain("max-sm:size-11");
+  });
+});

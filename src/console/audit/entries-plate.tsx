@@ -11,6 +11,7 @@ import { StateBlock } from "@/components/ui/state-block";
 import { consoleApiMessage } from "@/console/api-message";
 import type { AuditEntry, AuditPage } from "@/console/audit/audit";
 import { readAuditPage } from "@/console/audit/audit-client";
+import { CardsLoading, EntriesCards } from "@/console/audit/entries-cards";
 import { EntryDrawer } from "@/console/audit/entry-drawer";
 import { AuditExportButton, AuditExportProvider, AuditExportStatus } from "@/console/audit/export-dialog";
 import { FilterBar, type AuditMemberOption } from "@/console/audit/filter-bar";
@@ -229,35 +230,125 @@ export function EntriesPlate({
           is the same fact as "this component is rendering", exactly as src/app/console/team/page.tsx
           reasons about its own `canManage`.
 
-          The phone is a different question and not this task's: AuditLogPhone.dc.html:64 replaces
-          this control with "Open on a larger screen to export." Task 5 owns that, and the control is
-          one element in one slot so that removing it there is one line.
+          The phone is a different question, and this is the one line Task 4 left for it:
+          AuditLogPhone.dc.html draws no export control at all (:77-95 has none of these words) and
+          replaces it at :64 with one sentence. `max-sm:hidden` rather than an unmounted branch, so
+          exactly one of the two is ever reachable and neither depends on a width read in JavaScript
+          -- the pattern ConsoleRail/ConsoleRailDrawer and the Team page already use.
+
+          **The export is the only thing the phone loses.** Search, Member, Category, Result and
+          Environment all move into AuditLogPhone.dc.html:85's dialog rather than disappearing; the
+          brief said otherwise and the sheet says this.
         */}
-        <PageHeader kicker={m.kicker} title={m.title} lead={m.lead} actions={<AuditExportButton />} />
+        <PageHeader
+          kicker={m.kicker}
+          title={m.title}
+          lead={m.lead}
+          actions={
+            <div className="max-sm:hidden">
+              <AuditExportButton />
+            </div>
+          }
+        />
+
+        {/*
+          AuditLogPhone.dc.html:64, word for word, in the place the sheet puts it: under the page
+          lead, where the desktop draws the control. It sits inside the phone sheet's own `showMeta`
+          (:62-65), which is `stRows || Empty` -- so a page whose read failed says what went wrong
+          and does not also advertise an export of rows it has not got.
+        */}
+        {status === "error" ? null : <p className="text-label text-ink-3 sm:hidden">{m.exportOnLargerScreen}</p>}
 
         <div className="flex flex-col gap-4">
           <FilterBar filters={filters} environment={environment} members={members} onChange={apply} />
 
-          {/* Between the chip row and the Entries plate, where the sheet draws both of them (:136-147). */}
+          {/*
+            Between the chip row and the Entries plate, where the sheet draws both of them (:136-147).
+
+            Deliberately **not** gated with the control above. These rows cannot appear on a phone --
+            nothing there can start an export -- so the phone sheet has nothing to draw and draws
+            nothing. The one way to reach them at 390px is to start an export on a wide screen and
+            then narrow it, and hiding the Ready row there would strand a single-use export that has
+            already spent a tap and already written its own audit row: a permanent record of an
+            export nobody received, which is the exact harm Task 4 built this state to avoid.
+          */}
           <AuditExportStatus />
 
           <Plate as="section" title={m.entries.title} titleId="audit-entries" headingLevel={2} meta={[m.entries.rangeCell(rangeLabel, page.total)]} padding="none">
             {status === "loading" ? (
-              <Loading />
+              <>
+                {/* Two skeletons, because the two layouts are not the same shape: eight rows of
+                    five bars for the table (AuditLog.dc.html:184-191), four card-shaped blocks for
+                    the phone (AuditLogPhone.dc.html:121-127). Each carries `role="status"`, so only
+                    one may be in the accessibility tree -- hence the same gating as the layouts. */}
+                <div className="max-sm:hidden">
+                  <Loading />
+                </div>
+                <div className="sm:hidden">
+                  <CardsLoading />
+                </div>
+              </>
             ) : status === "error" ? (
-              // role="alert", as the sheet draws this state and only this one (:202).
-              <StateBlock bare role="alert" title={m.error.title} detail={m.error.detail} actions={<Button onClick={() => void read(filters)}>{m.error.action}</Button>} />
+              // role="alert", as the sheet draws this state and only this one (:202). `btn-lg` on a
+              // phone, as both sheets' state buttons are drawn (AuditLogPhone.dc.html:142).
+              <StateBlock
+                bare
+                role="alert"
+                title={m.error.title}
+                detail={m.error.detail}
+                actions={
+                  <Button className="max-sm:h-11" onClick={() => void read(filters)}>
+                    {m.error.action}
+                  </Button>
+                }
+              />
             ) : page.rows.length === 0 ? (
-              <StateBlock bare title={m.empty.title} detail={m.empty.detail} actions={<Button onClick={() => apply(clearAuditFilters(filters, environment))}>{m.empty.action}</Button>} />
+              <StateBlock
+                bare
+                title={m.empty.title}
+                detail={m.empty.detail}
+                actions={
+                  <Button className="max-sm:h-11" onClick={() => apply(clearAuditFilters(filters, environment))}>
+                    {m.empty.action}
+                  </Button>
+                }
+              />
             ) : (
               <>
-                <DataTable columns={columns((row) => setOpenId(row.id))} rows={page.rows} rowKey={(row) => row.id} caption={m.entries.caption[filters.range]} />
-                <div className="flex items-center gap-2 px-3.5 py-2.5">
+                {/*
+                  The same rows, drawn twice, because the two sheets draw two different things: a
+                  nine-column table (AuditLog.dc.html:160-176) and a list of cards
+                  (AuditLogPhone.dc.html:101-113). Not the table narrowed -- `DataTable`'s stacked
+                  layout would print nine labelled pairs per entry where the sheet draws a heading
+                  row, an action line and four cells in two columns.
+
+                  Both stay in the tree and CSS picks one, so neither depends on a width read in
+                  JavaScript and neither can be reached at the width it is not for: `display: none`
+                  takes a subtree out of the accessibility tree and out of the tab order together,
+                  which is what makes the 390px scan's `toHaveCount(0)` mean "cannot reach" rather
+                  than "cannot see".
+                */}
+                <div data-layout="table" className="max-sm:hidden">
+                  <DataTable columns={columns((row) => setOpenId(row.id))} rows={page.rows} rowKey={(row) => row.id} caption={m.entries.caption[filters.range]} />
+                </div>
+                {/* No region and no caption of its own, unlike the table: `role="region"` there is
+                    DataTable's handle on a scroller a keyboard must be able to reach, and a list of
+                    cards has nothing to scroll. The phone sheet agrees -- :97 puts the cards
+                    straight inside the plate, under its `Entries` heading, and draws no caption.
+                    Each card carries its own full accessible name. */}
+                <div data-layout="cards" className="sm:hidden">
+                  <EntriesCards rows={page.rows} onOpen={(row) => setOpenId(row.id)} />
+                </div>
+
+                {/* One pager under both (:114-118): two would put two controls named "Next" in the
+                    tree, and the range line is the same sentence either way. `btn-lg` on a phone,
+                    as the sheet draws both of them (:116-117). */}
+                <div className="flex items-center gap-2 px-3.5 py-2.5 max-sm:px-4 max-sm:py-2.5">
                   <span className="legend grow">{m.entries.pageRange(first, last, page.total)}</span>
-                  <Button size="sm" disabled={filters.page <= 1} onClick={() => apply({ ...filters, page: filters.page - 1 })}>
+                  <Button size="sm" className="max-sm:h-11" disabled={filters.page <= 1} onClick={() => apply({ ...filters, page: filters.page - 1 })}>
                     {m.entries.previous}
                   </Button>
-                  <Button size="sm" disabled={last >= page.total} onClick={() => apply({ ...filters, page: filters.page + 1 })}>
+                  <Button size="sm" className="max-sm:h-11" disabled={last >= page.total} onClick={() => apply({ ...filters, page: filters.page + 1 })}>
                     {m.entries.next}
                   </Button>
                 </div>

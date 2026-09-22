@@ -154,4 +154,66 @@ describe("the active-filter row", () => {
     await userEvent.click(screen.getByRole("button", { name: m.filters.clear }));
     expect(onChange).toHaveBeenCalledWith(defaultAuditFilters(ENVIRONMENT));
   });
+
+  /**
+   * AuditLogPhone.dc.html:92 -- the chip carries `min-height: 44px` and the remove label itself.
+   * The chip **is** the control there, where the desktop sheet (:131) draws a tag with a 16px x
+   * inside it. One button serves both: two chip rows would put two controls with the same
+   * accessible name in the tree at once, and a screen reader cannot tell a member which of them is
+   * the real one.
+   */
+  it("gives the chip a 44px target, because on a phone the chip is the remove control", () => {
+    bar({ ...defaultAuditFilters(ENVIRONMENT), category: "messages" });
+    const chip = screen.getByRole("button", { name: m.filters.remove(m.filters.chip(m.filters.category, m.categories.messages)) });
+    expect(chip.className).toContain("max-sm:min-h-11");
+  });
+});
+
+/**
+ * The phone's own filter row (AuditLogPhone.dc.html:78-88): the four date tabs, and **one** icon
+ * button behind which the search and every picker live. The brief said a phone has no pickers; the
+ * sheet says it has all of them, one tap away. A phone that cannot filter the audit log is a phone
+ * that cannot answer a question about it.
+ */
+describe("the phone's Search and filters dialog", () => {
+  it("draws one trigger, which promises a dialog", () => {
+    bar();
+    const trigger = screen.getByRole("button", { name: m.filters.phoneTrigger });
+    expect(trigger).toHaveAttribute("aria-haspopup", "dialog");
+    // `sm:hidden`, not a second mount: the desktop bar keeps its own row and CSS picks between
+    // them, the pattern ConsoleRail and ConsoleRailDrawer already use.
+    expect(trigger.className).toContain("sm:hidden");
+  });
+
+  it("holds the search and all four pickers, so nothing the desktop can filter by is lost", async () => {
+    bar();
+    await userEvent.click(screen.getByRole("button", { name: m.filters.phoneTrigger }));
+    const sheet = await screen.findByRole("dialog", { name: m.filters.phoneTrigger });
+    expect(within(sheet).getByRole("searchbox", { name: m.filters.search })).toHaveAttribute("maxlength", String(AUDIT_SEARCH_MAX));
+    for (const name of [m.filters.member, m.filters.category, m.filters.result, m.filters.environment]) {
+      expect(within(sheet).getByRole("combobox", { name }), name).toBeInTheDocument();
+    }
+  });
+
+  // The same `onChange` the desktop bar reports to, so the same URL is written and a filtered view
+  // stays linkable whichever width it was filtered at (filters.ts is the one model).
+  it("reports a change through the same filter model the desktop bar uses", async () => {
+    const onChange = bar({ ...defaultAuditFilters(ENVIRONMENT), page: 3 });
+    await userEvent.click(screen.getByRole("button", { name: m.filters.phoneTrigger }));
+    const sheet = await screen.findByRole("dialog", { name: m.filters.phoneTrigger });
+    await userEvent.selectOptions(within(sheet).getByRole("combobox", { name: m.filters.result }), "refused");
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ result: "refused", page: 1 }));
+  });
+
+  // :79-84 -- `tabs tabs-lg`, so every tab is 44px and they share the row's width. Kept as
+  // `aria-pressed` buttons in a `role="group"`, which is what both sheets draw and what a tablist
+  // would wrongly promise a panel underneath.
+  it("gives every date tab a 44px target on a phone", () => {
+    bar();
+    const group = screen.getByRole("group", { name: m.filters.rangeLabel });
+    for (const tab of within(group).getAllByRole("button")) {
+      expect(tab.className, tab.textContent ?? "").toContain("max-sm:h-11");
+      expect(tab).toHaveAttribute("aria-pressed");
+    }
+  });
 });

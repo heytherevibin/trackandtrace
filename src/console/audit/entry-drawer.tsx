@@ -233,20 +233,44 @@ export function EntryDrawer({ entryId, onClose }: EntryDrawerProps) {
     >
       <BaseDialog.Portal>
         <BaseDialog.Backdrop className="fixed inset-0 z-dialog bg-backdrop transition-opacity duration-(--duration-base) data-[starting-style]:opacity-0 data-[ending-style]:opacity-0" />
-        <BaseDialog.Viewport className="fixed inset-0 z-dialog flex justify-end p-3">
-          {/* The sheet's own drawer: 480px against the right edge, 12px clear of it on every side. */}
+        <BaseDialog.Viewport className="fixed inset-0 z-dialog flex justify-end p-3 max-sm:p-0">
+          {/*
+            Two geometries, one drawer. The desktop sheet (AuditLog.dc.html:215) draws a 480px plate
+            against the right edge, 12px clear of it on every side, with a shadow and its four
+            registration marks. The phone sheet (AuditLogPhone.dc.html:150) draws the same ten
+            fields and the same retention line full-bleed -- `position: absolute; inset: 0`, no
+            plate, no marks, no shadow -- because there is no board behind it for it to be an object
+            *on*, and 480px of drawer does not fit in 390.
+
+            One component rather than two, because the content is identical and a second
+            implementation would drift from this one a field at a time -- which is exactly what the
+            drawer must not do: it is the half of this module a member screenshots into a ticket.
+          */}
           <BaseDialog.Popup
             className={
-              "blueprint flex w-[480px] max-w-full flex-col bg-surface-3 shadow-3 outline-none " +
+              "blueprint flex w-[480px] max-w-full flex-col bg-surface-3 shadow-3 outline-none sm:w-[480px] " +
+              "max-sm:w-full max-sm:border-0 max-sm:shadow-none " +
               "transition-transform duration-(--duration-slow) ease-out-expo data-[starting-style]:translate-x-full data-[ending-style]:translate-x-full"
             }
           >
             {/* :218's four `rm` marks: a blueprint object is its hairline and its registration
-                marks at once, and the sheet draws them on this plate like any other. */}
-            <Corners />
+                marks at once, and the desktop sheet draws them on this plate like any other. The
+                phone sheet draws none, so they go with the hairline above. */}
+            <span className="max-sm:hidden">
+              <Corners />
+            </span>
             <PlateHeader
               title={<BaseDialog.Title render={<span />}>{m.entry.title}</BaseDialog.Title>}
               headingLevel={2}
+              // Left stacked below sm (PlateHeader's default), though AuditLogPhone.dc.html:151
+              // draws a plain `tb` here and not the `tb stack` the Entries plate beside it uses
+              // (:99). The difference is the id, not the header: the sheet's `#58213` is six
+              // characters and `console.audit_log.id` is a 36-character uuid, which Task 3 already
+              // recorded and let wrap rather than push through the drawer's edge. Forced onto one
+              // row at 390px it does exactly that -- measured, not reasoned about; the uuid runs
+              // off the right edge and the Close wraps below it anyway, which is neither sheet.
+              // So the id takes a row of its own, which is the drawn layout for the id the
+              // database really has.
               meta={[
                 // `whitespace-normal`, against the header cell's own nowrap: console.audit_log.id
                 // is a uuid and the sheet's `#58213` is not, so it is let wrap rather than pushed
@@ -255,7 +279,11 @@ export function EntryDrawer({ entryId, onClose }: EntryDrawerProps) {
                   {entryId}
                 </span>,
               ]}
-              actions={<BaseDialog.Close render={<IconButton label={messages.common.close} icon={<DismissRegular className="size-5" aria-hidden="true" />} size="sm" />} />}
+              // `box-sm` on the desktop sheet (:219), `box-lg` on the phone (:151): 44px, as every
+              // control in that layout is drawn.
+              actions={
+                <BaseDialog.Close render={<IconButton className="max-sm:size-11" label={messages.common.close} icon={<DismissRegular className="size-5" aria-hidden="true" />} size="sm" />} />
+              }
             />
 
             {/* Scrolls, and the retention line below it does not: a long reason or a wide

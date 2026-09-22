@@ -58,6 +58,24 @@ function plate(initial: AuditPage | null = PAGE) {
   return <EntriesPlate initial={initial} filters={defaultAuditFilters("production")} environment="production" />;
 }
 
+/**
+ * One of the two layouts, by name.
+ *
+ * Both are in the tree at once and CSS picks between them (the ConsoleRail/ConsoleRailDrawer
+ * pattern), so in jsdom -- which has no CSS at all -- an entry's control exists twice under the one
+ * accessible name the sheets give it. In a browser only one of the two is ever in the accessibility
+ * tree, because `display: none` removes a subtree from it; here the query has to say which layout
+ * it means. That a phone genuinely reaches only the cards is measured at 390px in
+ * tests/e2e/console-auth/scans.spec.ts.
+ */
+function layout(which: "table" | "cards"): HTMLElement {
+  const found = document.querySelector<HTMLElement>(`[data-layout="${which}"]`);
+  if (!found) throw new Error(`no ${which} layout rendered`);
+  return found;
+}
+const tableLayout = () => layout("table");
+const cardsLayout = () => layout("cards");
+
 beforeEach(() => {
   apiRequest.mockReset().mockResolvedValue({ ok: true, data: { ok: true, rows: [], total: 0 } });
 });
@@ -144,10 +162,10 @@ describe("the Open column", () => {
 
   it("names each row's control as the sheet names it", () => {
     render(plate());
-    expect(screen.getByRole("button", { name: `Open the entry: Paused PNR checks at 14:02 ${consoleMessages.frameSignedIn.clock.ist}` })).toBeInTheDocument();
+    expect(within(tableLayout()).getByRole("button", { name: `Open the entry: Paused PNR checks at 14:02 ${consoleMessages.frameSignedIn.clock.ist}` })).toBeInTheDocument();
     // The System row is an entry like any other and gets a control of its own, named after its own
     // action and its own time -- 02:00 IST, the row the sheet draws at the bottom of its table.
-    expect(screen.getByRole("button", { name: `Open the entry: Purged unconfirmed sign-ups at 02:00 ${consoleMessages.frameSignedIn.clock.ist}` })).toBeInTheDocument();
+    expect(within(tableLayout()).getByRole("button", { name: `Open the entry: Purged unconfirmed sign-ups at 02:00 ${consoleMessages.frameSignedIn.clock.ist}` })).toBeInTheDocument();
   });
 
   it("opens the drawer on the row that was pressed, and no other", async () => {
@@ -155,9 +173,20 @@ describe("the Open column", () => {
     apiRequest.mockResolvedValue({ ok: true, data: { ok: true, entry: detail } });
     render(plate());
     expect(screen.queryByRole("dialog")).toBeNull();
-    await userEvent.click(screen.getByRole("button", { name: `Open the entry: Paused PNR checks at 14:02 ${consoleMessages.frameSignedIn.clock.ist}` }));
+    await userEvent.click(within(tableLayout()).getByRole("button", { name: `Open the entry: Paused PNR checks at 14:02 ${consoleMessages.frameSignedIn.clock.ist}` }));
     const dialog = await screen.findByRole("dialog", { name: m.entry.title });
     expect(within(dialog).getByText(ASHA.id)).toBeInTheDocument();
+    expect(apiRequest).toHaveBeenCalledWith(expect.stringContaining(`id=${ASHA.id}`), expect.objectContaining({ method: "GET" }), expect.anything());
+  });
+
+  // The other half of the same wiring: a card opens the same drawer through the same handler, so
+  // the entry a phone opens is the one the drawer reads -- not the row the list already had.
+  it("opens the same drawer from a card", async () => {
+    const detail: AuditEntryDetail = { ...ASHA, keyName: "YubiKey 5C" };
+    apiRequest.mockResolvedValue({ ok: true, data: { ok: true, entry: detail } });
+    render(plate());
+    await userEvent.click(within(cardsLayout()).getByRole("button", { name: `Open the entry: Paused PNR checks at 14:02 ${consoleMessages.frameSignedIn.clock.ist}` }));
+    expect(await screen.findByRole("dialog", { name: m.entry.title })).toBeInTheDocument();
     expect(apiRequest).toHaveBeenCalledWith(expect.stringContaining(`id=${ASHA.id}`), expect.objectContaining({ method: "GET" }), expect.anything());
   });
 });
@@ -219,6 +248,63 @@ describe("the Entries plate's states", () => {
     expect(await screen.findByRole("alert")).toBeInTheDocument();
     // A database refusal is a developer string and must never reach a member (task-2-addendum.md §7).
     expect(screen.queryByText("raw driver words")).toBeNull();
+  });
+});
+
+/**
+ * The phone (AuditLogPhone.dc.html). Both layouts stay in the tree and CSS chooses between them --
+ * the pattern ConsoleRail/ConsoleRailDrawer and the Team page already use -- so jsdom, which has no
+ * layout at all, can only say that each is present and gated. That a phone genuinely cannot reach
+ * the export is measured in a real Chromium at 390px
+ * (tests/e2e/console-auth/scans.spec.ts), which is where `getByRole` stops seeing what
+ * `display: none` takes out of the accessibility tree.
+ */
+describe("the two layouts", () => {
+  it("carries the table for a wide screen and the cards for a phone, each gated", () => {
+    render(plate());
+    expect(within(tableLayout()).getByRole("table")).toBeInTheDocument();
+    expect(tableLayout().className).toContain("max-sm:hidden");
+    // The cards are not the table narrowed: one control per entry, named as the sheet names it.
+    expect(within(cardsLayout()).getAllByRole("button")).toHaveLength(PAGE.rows.length);
+    expect(cardsLayout().className).toContain("sm:hidden");
+    expect(within(cardsLayout()).queryByRole("table")).toBeNull();
+  });
+
+  // One pager under both, not one each: two would put two "Next" buttons in the tree with the same
+  // name, and the range line is the same sentence either way.
+  it("draws one pager for both, at a 44px target on a phone", () => {
+    render(<EntriesPlate initial={{ rows: [ASHA], total: 137 }} filters={defaultAuditFilters("production")} environment="production" />);
+    for (const name of [m.entries.previous, m.entries.next]) {
+      expect(screen.getByRole("button", { name }).className, name).toContain("max-sm:h-11");
+    }
+    expect(screen.getByText(m.entries.pageRange(1, 1, 137))).toBeInTheDocument();
+  });
+});
+
+/**
+ * AuditLogPhone.dc.html:64 -- the one thing the phone genuinely loses. The line sits under the page
+ * lead, where the desktop draws `Export CSV`, and it is the house device its sibling phone sheets
+ * already use (ConsoleTeamPhone's "… to manage the team.", ConsoleSwitchesPhone's "… to edit").
+ */
+describe("the export, at phone width", () => {
+  it("draws the sheet's line in place of the control", () => {
+    render(plate());
+    const line = screen.getByText(m.exportOnLargerScreen);
+    expect(line.className).toContain("sm:hidden");
+  });
+
+  it("gates the one slot the export control lives in", () => {
+    render(plate());
+    const control = screen.getByRole("button", { name: m.export.action });
+    expect(control.parentElement?.className).toContain("max-sm:hidden");
+  });
+
+  // The line belongs to the states the sheet draws it in: `showMeta` is `stRows || Empty` (:239),
+  // so a page that failed to load says what went wrong and does not also advertise an export of
+  // rows it has not got.
+  it("says nothing about exporting on a page that failed to load", () => {
+    render(plate(null));
+    expect(screen.queryByText(m.exportOnLargerScreen)).toBeNull();
   });
 });
 

@@ -92,7 +92,19 @@ select is(
   'because [removed] asked',
   'the stored reason is scrubbed again in SQL'
 );
-select is((select result from console.audit_log limit 1)::text, 'done', 'the result is kept');
+-- Scoped to the row this file wrote, like the two assertions above it. `limit 1` over the whole
+-- table reads whichever row Postgres hands back first, which is this test's only while nothing else
+-- has ever been written -- and `console.audit_log` is the one table in this schema that deliberately
+-- outlives its subjects and is never cleared between runs (tests/e2e/console-auth/fixtures.ts's own
+-- note on why resetConsole leaves it alone). The seventh instance of that mistake on this branch.
+select is(
+  (select result from console.audit_log
+     where actor_id = '11111111-1111-1111-1111-111111111111'
+       and action = 'Role changed'
+       and target = 'asha@trakline.in')::text,
+  'done',
+  'the result is kept'
+);
 
 -- Append-only: nothing may change or remove a row.
 select throws_ok(
