@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-// The browser half of inviting (task-4), changing a role (task-5), and resetting a member's keys
-// or removing them (task-6). Stubs global fetch and asserts on the spy directly, the same shape
-// tests/unit/console/account/my-keys-client.test.ts uses for removeKey: apiRequest has its own
-// tests, so these only cover what the four functions add on top of it.
-import { changeRole, inviteMember, removeMember, resetKeys } from "@/console/team/team-client";
+// The browser half of inviting (task-4), changing a role (task-5), resetting a member's keys or
+// removing them (task-6), and resending or revoking an invite (task-7). Stubs global fetch and
+// asserts on the spy directly, the same shape tests/unit/console/account/my-keys-client.test.ts
+// uses for removeKey: apiRequest has its own tests, so these only cover what the six functions add
+// on top of it.
+import { changeRole, inviteMember, removeMember, resendInvite, resetKeys, revokeInvite } from "@/console/team/team-client";
 
 function answer(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -254,6 +255,99 @@ describe("removeMember", () => {
       }),
     );
     await expect(removeMember(MEMBER, REASON)).resolves.toEqual({
+      kind: "failed",
+      message: "The console could not be reached. Try again.",
+    });
+  });
+});
+
+// Resending an invite (task-7). No reason and no tap: resending re-sends a letter to an address an
+// Owner already approved and changes no access, so `console_resend_invite` takes neither.
+describe("resendInvite", () => {
+  const INVITE = "bbbbbbbb-0000-0000-0000-000000000001";
+
+  it("sends the invite's id to POST /api/team/invite, and nothing else", async () => {
+    const fetchSpy = vi.fn().mockResolvedValue(answer({ ok: true }));
+    vi.stubGlobal("fetch", fetchSpy);
+    await expect(resendInvite(INVITE)).resolves.toEqual({ kind: "done" });
+    expect(fetchSpy).toHaveBeenCalledOnce();
+    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/team/invite");
+    expect(init).toMatchObject({ method: "POST" });
+    expect(JSON.parse(String(init.body))).toEqual({ invite: INVITE });
+  });
+
+  // `console_resend_invite` mints a FRESH raw token and hands it back. It is the same
+  // console-access credential the first invite's was (task-4-addendum.md §3, finding I3), consumed
+  // server-side for the letter -- so this schema refuses a response that carries one rather than
+  // hand it to a caller that might log it.
+  it("refuses a response that carries a token, rather than accept it", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(answer({ ok: true, token: "a".repeat(64) })));
+    await expect(resendInvite(INVITE)).resolves.toEqual({
+      kind: "failed",
+      message: "The console could not be reached. Try again.",
+    });
+  });
+
+  it("passes the server's own refusal message through", async () => {
+    const message = "The team has changed since this page loaded. Reload it and try again.";
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(answer({ ok: false, code: "INVALID_INPUT", message }, 403)));
+    await expect(resendInvite(INVITE)).resolves.toEqual({ kind: "failed", message });
+  });
+
+  it("replaces an unreachable-source refusal with the console's own line, via the shared mapper", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("Failed to fetch");
+      }),
+    );
+    await expect(resendInvite(INVITE)).resolves.toEqual({
+      kind: "failed",
+      message: "The console could not be reached. Try again.",
+    });
+  });
+});
+
+// Revoking an invite (task-7). Takes a reason and follows a tap, unlike the resend above: revoking
+// withdraws access that was granted, and `console_revoke_invite` calls console.use_tap itself.
+describe("revokeInvite", () => {
+  const INVITE = "bbbbbbbb-0000-0000-0000-000000000001";
+  const REASON = "Sent it to the wrong address entirely.";
+
+  it("sends the invite's id and the reason to DELETE /api/team/invite", async () => {
+    const fetchSpy = vi.fn().mockResolvedValue(answer({ ok: true }));
+    vi.stubGlobal("fetch", fetchSpy);
+    await expect(revokeInvite(INVITE, REASON)).resolves.toEqual({ kind: "done" });
+    expect(fetchSpy).toHaveBeenCalledOnce();
+    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/team/invite");
+    expect(init).toMatchObject({ method: "DELETE" });
+    expect(JSON.parse(String(init.body))).toEqual({ invite: INVITE, reason: REASON });
+  });
+
+  it("refuses a response carrying anything besides ok", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(answer({ ok: true, revokedAt: "2026-09-22T00:00:00Z" })));
+    await expect(revokeInvite(INVITE, REASON)).resolves.toEqual({
+      kind: "failed",
+      message: "The console could not be reached. Try again.",
+    });
+  });
+
+  it("passes the server's own refusal message through", async () => {
+    const message = "That confirmation no longer matches this invite. Try again.";
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(answer({ ok: false, code: "INVALID_INPUT", message }, 403)));
+    await expect(revokeInvite(INVITE, REASON)).resolves.toEqual({ kind: "failed", message });
+  });
+
+  it("replaces an unreachable-source refusal with the console's own line, via the shared mapper", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("Failed to fetch");
+      }),
+    );
+    await expect(revokeInvite(INVITE, REASON)).resolves.toEqual({
       kind: "failed",
       message: "The console could not be reached. Try again.",
     });

@@ -367,3 +367,112 @@ export async function removeTeamMember(member: string, reason: string, environme
   const { error } = await client.rpc("console_remove_member", { p_member: member, p_reason: reason, p_environment: environment });
   if (error) throw fromRemoveMemberError(error);
 }
+
+// `console_resend_invite`'s own return: `jsonb_build_object('invite_id', …, 'token', …, 'email', …,
+// 'role', …)`. The address and the role travel with the token because the caller's next act is to
+// send the letter, and a second round trip to read back a row the function already had in hand
+// would be one more place for the two to disagree (the migration says so itself).
+const resentInviteShape = z.object({
+  invite_id: z.guid(),
+  token: z.string().regex(/^[0-9a-f]{64}$/),
+  email: z.string().min(3).max(254),
+  role: roleShape,
+});
+
+export interface ResentInvite {
+  readonly inviteId: string;
+  /**
+   * The freshly minted raw invite token, exactly once, and exactly as dangerous as the first one:
+   * the route consumes it server-side for `sendInviteLetter` and never echoes it into the JSON the
+   * resending Owner's browser receives (task-7-addendum.md §4, carried from task-4-addendum.md §3
+   * and the Task 2 review's finding I3).
+   */
+  readonly token: string;
+  /** The address the invite was always for, as stored -- never one a caller supplied. */
+  readonly email: string;
+  readonly role: ConsoleRole;
+}
+
+/**
+ * `console_resend_invite` raises one refusal of its own -- 'no access', for an invite that is gone,
+ * already accepted or already revoked -- and `console.require_role('owner')` raises its own for a
+ * caller who is not an Owner. Both arrive with 42501, and by the time they reach here they mean the
+ * same thing to a member: the pending list this page rendered has moved. Answered by the SQLSTATE
+ * rather than by reading the words, for the reason fromChangeRoleError spells out above.
+ *
+ * There is deliberately no tap case. This function spends no tap at all: resending changes no
+ * access, so it takes neither a reason nor a ceremony (task-7-brief.md's own ruling).
+ *
+ * There is no expiry case either, and that is the point. An expired invite is resendable on purpose
+ * -- `console_invites_live_email_idx` holds the address while an invite is neither accepted nor
+ * revoked and expiry does not release it, so refusing here would leave an Owner unable to resend
+ * *and* unable to invite that address again (task-7-addendum.md §1, and the migration's own comment
+ * at the point where a refusal would have gone). task-7-brief.md's last test asks for the opposite;
+ * it is wrong, and task-7-report.md records it.
+ */
+function fromResendInviteError(error: { readonly message: string; readonly code?: string }): AppError {
+  if (error.code === "42501") return new AppError("INVALID_INPUT", consoleMessages.team.resendInvite.refused, { status: 403 });
+  return unavailable();
+}
+
+/**
+ * A thin typed wrapper over `console_resend_invite` (spec §E, Task 7): a fresh token on the invite's
+ * row, its `sent_at`/`created_at`/`expires_at` clock restarted, and an audit row, all inside the
+ * function's own transaction -- and no tap, unlike every other mutating call in this file.
+ *
+ * `p_invite` is a uuid and `p_environment` is text. Never pass an enum-typed argument to a
+ * `public.console_*` function: PostgREST casts it in the caller's context, before `security
+ * definer` applies, and the call fails with "permission denied for schema console"
+ * (20260921000000_console_enum_args_as_text.sql is the whole phase that cost).
+ *
+ * Parsed, never cast, the same precedent `inviteTeamMember` sets for the first token: a token that
+ * came back the wrong shape is a token that would be mailed to someone as a console-access link.
+ *
+ * Makes no access check of its own -- the POST route calls `requireConsoleMember("owner")` first,
+ * and `console_resend_invite` re-checks `console.require_role('owner')` itself regardless.
+ */
+export async function resendTeamInvite(invite: string, environment: string, db?: ConsoleDb): Promise<ResentInvite> {
+  const client = db ?? (await createConsoleDb());
+  const { data, error } = await client.rpc("console_resend_invite", { p_invite: invite, p_environment: environment });
+  if (error) throw fromResendInviteError(error);
+  const parsed = resentInviteShape.safeParse(data);
+  if (!parsed.success) throw unavailable();
+  return { inviteId: parsed.data.invite_id, token: parsed.data.token, email: parsed.data.email, role: parsed.data.role };
+}
+
+/**
+ * `console_revoke_invite` raises 'no access' for an invite that is gone, accepted or already
+ * revoked, and `console.use_tap` its own 'no tap for this action'. Told apart the same way every
+ * other mapper in this file tells them apart -- a substring the function itself raises, then the
+ * SQLSTATE -- and the tap's own sentence differs from the member actions': the four fields this one
+ * digests are the invite's id and its address, neither of which moves while the invite is live, so
+ * a mismatch is a tap spent or minted for something else rather than a page gone stale.
+ */
+function fromRevokeInviteError(error: { readonly message: string; readonly code?: string }): AppError {
+  const m = consoleMessages.team.revokeInvite;
+  if (error.message.includes("no tap for this action")) return new AppError("INVALID_INPUT", m.tapMismatch, { status: 403 });
+  if (error.code === "42501") return new AppError("INVALID_INPUT", m.refused, { status: 403 });
+  return unavailable();
+}
+
+/**
+ * A thin typed wrapper over `console_revoke_invite` (spec §E, Task 7): the invite's `revoked_at`
+ * stamp and an audit row, inside the function's own transaction, in exchange for a completed tap.
+ *
+ * `p_invite` is a uuid and both other arguments are text. `invite` must be the id `console_team`
+ * returned, unchanged -- `console.use_tap` re-digests `p_invite::text`, Postgres's lowercase
+ * canonical form -- and `reason` arrives exactly as the shared `tapReason` schema trimmed it at the
+ * route boundary, never re-scrubbed here. Both for the same reason as every other tap-spending call
+ * in this file: a string reshaped in between spends against a digest the tap was never taken for.
+ *
+ * Nothing is sent. A revoked invite's letter is already out; what stops working is the link, because
+ * the row it redeems against is no longer live -- there is no second letter to write.
+ *
+ * Makes no access check of its own -- the DELETE route calls `requireConsoleMember("owner")` first,
+ * and `console_revoke_invite` re-checks `console.require_role('owner')` itself regardless.
+ */
+export async function revokeTeamInvite(invite: string, reason: string, environment: string, db?: ConsoleDb): Promise<void> {
+  const client = db ?? (await createConsoleDb());
+  const { error } = await client.rpc("console_revoke_invite", { p_invite: invite, p_reason: reason, p_environment: environment });
+  if (error) throw fromRevokeInviteError(error);
+}

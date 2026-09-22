@@ -79,6 +79,10 @@ export const team = {
       role: "Role",
       sent: "Sent",
       expires: "Expires",
+      // ConsoleTeam.dc.html:163's own fifth header, inside a visually-hidden span exactly as the
+      // Members table's is (:112). Task 3 left the column out because it had nothing to put in it
+      // -- Resend and Revoke are Task 7's (task-3-report.md) -- and this is where they arrive.
+      actions: "Actions",
     },
   },
 
@@ -257,6 +261,63 @@ export const team = {
     // rendered -- so this refusal means their role moved in between, and a retry from the same
     // unrefreshed page would fail the same way. Same reasoning as resetKeys.tapMismatch above.
     tapMismatch: "That confirmation no longer matches this member. Their role changed since this page loaded; reload it and try again.",
+    refused: rosterMoved,
+  },
+
+  // dlg_resend (ConsoleTeam.dc.html:347-357, task-7) -- a plain alertdialog, not TC-01, and the
+  // only row action on this page that opens one. Resending re-sends a letter to an address an Owner
+  // already approved and changes no access, so it takes no tap (task-7-brief.md's own ruling, the
+  // same rename-versus-remove reasoning 2d-1 used) -- and `console_resend_invite` accordingly has no
+  // p_reason to spend one with. The row button that opens it is `trigger` below.
+  resendInvite: {
+    // :163's own button label, and :355's own primary inside the dialog -- the sheet gives both the
+    // identical word, so both read it from here, the same way `invite.trigger` serves two triggers
+    // and an h2. Cancel is ConfirmDialog's own default (messages.common.cancel, "Cancel"), which is
+    // what :354 draws.
+    trigger: "Resend",
+    // :351's own title.
+    title: "Resend the invite?",
+    // :352, word for word, with the address interpolated where the sheet mocks priya@example.com.
+    // "7 days" is the sheet's own wording for the window `console_resend_invite` actually sets
+    // (`expires_at = now() + interval '7 days'`), not a number read from the row.
+    detail: (email: string) => `${email} gets a new link that lasts 7 days. The old link stops working.`,
+
+    // Not drawn: ConsoleTeam.dc.html passes no `toast` to frame() at any call site, and a mutation
+    // that succeeds with no visible confirmation is a defect. Same shape as the three above it.
+    resentToast: "Invite resent · logged",
+    // Not drawn, and there is no tapMismatch beside it: this action spends no tap, so the only
+    // refusal it can meet is 'no access' for an invite accepted, revoked or resent away in another
+    // tab, plus require_role's own for an Owner demoted in one. Both mean this page is out of date,
+    // which is what the shared line above already says.
+    refused: rosterMoved,
+  },
+
+  // dlg_revoke (ConsoleTeam.dc.html:360-370, task-7). The sheet draws it as a plain alertdialog
+  // like dlg_resend above -- no reason field, no "Tap your key" -- but `console_revoke_invite` calls
+  // `console.use_tap('Revoked an invite', p_invite::text, v_invite.email, p_reason)` and *requires*
+  // both. The database is shipped and is the security boundary, and the plan's own ruling is that
+  // revoking withdraws access that was granted and so takes a tap; the sheet is the document that is
+  // behind (task-7-addendum.md §3). So both of its drawn lines are carried into TC-01 -- the title
+  // as `summary`, the detail as `hint` -- and TC-01 adds only the reason and the tap. No Change row:
+  // there is no before-and-after pair here, the same shape dlg_reset and dlg_remove take.
+  revokeInvite: {
+    // :163's own button label, which is also :368's own primary inside the dialog -- but the dialog
+    // is TC-01 now, whose primary is "Tap your key", so here this names the row button alone.
+    trigger: "Revoke",
+    // :364's own title -- TC-01's `summary`. The address is not in it, exactly as the sheet writes
+    // it: the line beneath names the address, so the bold line does not repeat it.
+    title: "Revoke the invite?",
+    // :366, word for word -- TC-01's `hint`, the optional slot Task 5 added for precisely this.
+    hint: (email: string) => `The link sent to ${email} stops working at once.`,
+
+    // Not drawn, in the same shape as the toasts above.
+    revokedToast: "Invite revoked · logged",
+    // Not drawn. console.use_tap's own 'no tap for this action'. "Try again", with no reload --
+    // unlike resetKeys' and removeMember's, and for the reason changeRole.tapMismatch gives: nothing
+    // this tap digests comes from data that could have moved underneath the page. The invite's id
+    // and its address are both fixed for the life of the invite, and a resend changes neither, so a
+    // retry from the page as it stands can genuinely succeed.
+    tapMismatch: "That confirmation no longer matches this invite. Try again.",
     refused: rosterMoved,
   },
 

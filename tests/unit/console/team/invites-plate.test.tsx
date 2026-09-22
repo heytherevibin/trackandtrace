@@ -1,5 +1,11 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { render, screen, within } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+
+// The row actions are a client component with its own tests
+// (tests/unit/console/team/invite-row-actions.test.tsx); here only their presence in the Actions
+// cell matters, so next/navigation is stubbed rather than dragging a router into a plate test.
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+
 import { InvitesPlate } from "@/console/team/invites-plate";
 import type { TeamInvite } from "@/console/team/team";
 
@@ -21,17 +27,18 @@ describe("InvitesPlate", () => {
     expect(screen.getByRole("heading", { name: "Pending invites" })).toBeInTheDocument();
   });
 
-  it("draws every column heading", () => {
+  // Five headers, the fifth visually hidden: ConsoleTeam.dc.html:163's own
+  // `<th scope="col"><span style="position: absolute; …">Actions</span></th>`, the same shape the
+  // Members table's own Actions header takes. Task 3 left this column out because it had nothing to
+  // put in it (task-3-report.md); Task 7 is where the two buttons arrive.
+  it("draws every column heading, Actions included", () => {
     render(<InvitesPlate invites={INVITES} />);
-    for (const name of ["Email", "Role", "Sent", "Expires"]) {
+    for (const name of ["Email", "Role", "Sent", "Expires", "Actions"]) {
       expect(screen.getByRole("columnheader", { name })).toBeInTheDocument();
     }
   });
 
-  // ConsoleTeam.dc.html:163's own visually-hidden caption, transcribed rather than the brief's
-  // "Actions" column: the brief lists no Actions header for this plate (unlike Members), matching
-  // the sheet, which has no Row-menu-equivalent for invites in this task -- Resend/Revoke are
-  // Task 7's (task-3-report.md).
+  // ConsoleTeam.dc.html:163's own visually-hidden caption.
   it("names the accessible caption from the sheet", () => {
     render(<InvitesPlate invites={INVITES} />);
     expect(screen.getByRole("region", { name: "Invites waiting to be accepted" })).toBeInTheDocument();
@@ -55,5 +62,20 @@ describe("InvitesPlate", () => {
     render(<InvitesPlate invites={[]} />);
     expect(screen.getByRole("heading", { name: "Pending invites" })).toBeInTheDocument();
     expect(screen.queryByText("priya@trakline.in")).not.toBeInTheDocument();
+  });
+
+  // Two inline ghost buttons per row, not a menu: the sheet draws the Members table's actions
+  // behind a trigger and this table's in the open (task-7-addendum.md §2).
+  it("gives every row its own Resend and Revoke, in the open rather than behind a menu", () => {
+    render(
+      <InvitesPlate
+        invites={[...INVITES, { id: "bbbbbbbb-0000-0000-0000-000000000002", email: "nadia@trakline.in", role: "viewer", sentAt: "2026-09-20T00:00:00Z", expiresAt: "2026-09-27T00:00:00Z" }]}
+      />,
+    );
+    expect(screen.getAllByRole("button", { name: "Resend" })).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "Revoke" })).toHaveLength(2);
+    const row = screen.getByText("priya@trakline.in").closest("tr");
+    expect(row).not.toBeNull();
+    expect(within(row as HTMLTableRowElement).getByRole("button", { name: "Resend" })).toBeVisible();
   });
 });

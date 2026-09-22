@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ConsoleDb } from "@/console/auth/db";
-import { changeMemberRole, getTeam, inviteTeamMember, removeTeamMember, resetMemberKeys } from "@/console/team/team";
+import { changeMemberRole, getTeam, inviteTeamMember, removeTeamMember, resendTeamInvite, resetMemberKeys, revokeTeamInvite } from "@/console/team/team";
 
 // console_team() itself (supabase/migrations/20260922090000_console_team.sql): both halves, one
 // call, never a token_hash. Dates arrive from Postgres with an offset ("+00:00"), not "Z" -- the
@@ -360,6 +360,92 @@ describe("removeTeamMember", () => {
   it("answers anything else with the console's own unavailable line, never the database's words", async () => {
     const db = dbAnswering({ error: { message: 'relation "console.members" does not exist', code: "42P01" } });
     await expect(removeTeamMember(MEMBER, WHY, "production", db)).rejects.toMatchObject({
+      code: "SOURCE_UNAVAILABLE",
+      message: "The console could not be reached. Try again.",
+    });
+  });
+});
+
+describe("resendTeamInvite", () => {
+  const INVITE = "bbbbbbbb-0000-0000-0000-000000000001";
+  // console_resend_invite's own return: the id, a fresh raw token, and the address and role that
+  // travel with it so the caller can send the letter without a second round trip.
+  const RESENT = { invite_id: INVITE, token: "b".repeat(64), email: "priya@trakline.in", role: "support" };
+
+  it("passes the invite as a uuid and the environment as text, and takes no reason at all", async () => {
+    const { db, rpc } = dbSpy({ data: RESENT });
+    await expect(resendTeamInvite(INVITE, "production", db)).resolves.toEqual({
+      inviteId: INVITE,
+      token: "b".repeat(64),
+      email: "priya@trakline.in",
+      role: "support",
+    });
+    expect(rpc).toHaveBeenCalledWith("console_resend_invite", { p_invite: INVITE, p_environment: "production" });
+  });
+
+  // Parsed, never cast, exactly as the first invite's own token is: a token that came back the
+  // wrong shape is a token that would be mailed to someone as a console-access link.
+  it("refuses a return whose token is not 32 hex-encoded bytes", async () => {
+    for (const data of [{ ...RESENT, token: "nope" }, { ...RESENT, token: "b".repeat(63) }, { ...RESENT, role: "superadmin" }, null]) {
+      await expect(resendTeamInvite(INVITE, "production", dbAnswering({ data }))).rejects.toMatchObject({
+        code: "SOURCE_UNAVAILABLE",
+        message: "The console could not be reached. Try again.",
+      });
+    }
+  });
+
+  // console_resend_invite raises one refusal of its own -- 'no access', for an invite accepted,
+  // revoked or gone -- plus require_role's own for a caller who is not an Owner. Both arrive with
+  // 42501, and by the time they get here they mean the same thing: this page is out of date.
+  it("answers a vanished, accepted or revoked invite by its errcode, in the console's own words", async () => {
+    const db = dbAnswering({ error: { message: "no access", code: "42501" } });
+    await expect(resendTeamInvite(INVITE, "production", db)).rejects.toMatchObject({
+      code: "INVALID_INPUT",
+      message: "The team has changed since this page loaded. Reload it and try again.",
+    });
+  });
+
+  it("answers anything else with the console's own unavailable line, never the database's words", async () => {
+    const db = dbAnswering({ error: { message: 'relation "console.invites" does not exist', code: "42P01" } });
+    await expect(resendTeamInvite(INVITE, "production", db)).rejects.toMatchObject({
+      code: "SOURCE_UNAVAILABLE",
+      message: "The console could not be reached. Try again.",
+    });
+  });
+});
+
+describe("revokeTeamInvite", () => {
+  const INVITE = "bbbbbbbb-0000-0000-0000-000000000001";
+  const WHY = "Sent it to the wrong address entirely.";
+
+  it("passes the invite as a uuid and the reason and environment as text", async () => {
+    const { db, rpc } = dbSpy({});
+    await expect(revokeTeamInvite(INVITE, WHY, "production", db)).resolves.toBeUndefined();
+    expect(rpc).toHaveBeenCalledWith("console_revoke_invite", { p_invite: INVITE, p_reason: WHY, p_environment: "production" });
+  });
+
+  // The tap's own four fields here are the invite's id and its address, neither of which moves
+  // while the invite is live -- a resend changes neither -- so a mismatch is a tap spent or minted
+  // for something else, and the very same page can retry.
+  it("translates use_tap's own 'no tap for this action' into a sentence about the invite", async () => {
+    const db = dbAnswering({ error: { message: "no tap for this action", code: "42501" } });
+    await expect(revokeTeamInvite(INVITE, WHY, "production", db)).rejects.toMatchObject({
+      code: "INVALID_INPUT",
+      message: "That confirmation no longer matches this invite. Try again.",
+    });
+  });
+
+  it("answers a vanished, accepted or already-revoked invite by its errcode, in the console's own words", async () => {
+    const db = dbAnswering({ error: { message: "no access", code: "42501" } });
+    await expect(revokeTeamInvite(INVITE, WHY, "production", db)).rejects.toMatchObject({
+      code: "INVALID_INPUT",
+      message: "The team has changed since this page loaded. Reload it and try again.",
+    });
+  });
+
+  it("answers anything else with the console's own unavailable line, never the database's words", async () => {
+    const db = dbAnswering({ error: { message: 'relation "console.invites" does not exist', code: "42P01" } });
+    await expect(revokeTeamInvite(INVITE, WHY, "production", db)).rejects.toMatchObject({
       code: "SOURCE_UNAVAILABLE",
       message: "The console could not be reached. Try again.",
     });

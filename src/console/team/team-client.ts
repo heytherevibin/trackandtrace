@@ -184,3 +184,69 @@ export async function removeMember(member: string, reason: string): Promise<Remo
   );
   return result.ok ? { kind: "done" } : { kind: "failed", message: consoleApiMessage(result.error) };
 }
+
+// POST /api/team/invite answers `{ ok: true }` and nothing more, and `.strict()` is load-bearing
+// here for exactly the reason it is on `invitedSchema` at the top of this file: a resend mints a
+// FRESH raw invite token, which is the same console-access credential the first one was. The route
+// consumes it server-side for the letter; a route that started echoing one would fail to parse here
+// rather than quietly hand it to a caller that might log it (task-7-addendum.md §4).
+const resentSchema = z.object({ ok: z.literal(true) }).strict();
+
+/**
+ * No `boundToAddress` counterpart, for the reason changeRole's own note gives: there is no field to
+ * latch. The resend dialog is a plain confirmation over a row the Owner picked, and its one refusal
+ * -- the invite moved -- wants the page re-read, not a value edited.
+ */
+export type ResendInviteOutcome = { readonly kind: "done" } | { readonly kind: "failed"; readonly message: string };
+
+/**
+ * Resends one pending invite (task-7, ConsoleTeam.dc.html's dlg_resend). The one call on this page
+ * that follows no tap: resending re-sends a letter to an address an Owner already approved and
+ * changes no access, so `console_resend_invite` takes neither a reason nor a ceremony.
+ *
+ * `invite` is the id `console_team` returned, passed through untouched. Nothing digests it here --
+ * there is no tap to match -- but the route checks it as a uuid, and reshaping an id on its way to a
+ * lookup is how a row that exists is reported as one that does not.
+ *
+ * Every refusal comes back as a message already written for a member to read: the route's mapper
+ * translates `console_resend_invite`'s own refusal, and `consoleApiMessage` answers the two codes
+ * that carry a failing layer's own wording with the console's own sentence instead.
+ */
+export async function resendInvite(invite: string): Promise<ResendInviteOutcome> {
+  const result = await apiRequest(
+    "/api/team/invite",
+    { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ invite }) },
+    resentSchema,
+  );
+  return result.ok ? { kind: "done" } : { kind: "failed", message: consoleApiMessage(result.error) };
+}
+
+// DELETE /api/team/invite answers `{ ok: true }` and nothing more: a revoked invite falls out of
+// console_team's pending list entirely (`where revoked_at is null`), so there is nothing to report
+// back that the refreshed list will not show by its absence.
+const revokedSchema = z.object({ ok: z.literal(true) }).strict();
+
+export type RevokeInviteOutcome = { readonly kind: "done" } | { readonly kind: "failed"; readonly message: string };
+
+/**
+ * Revokes one pending invite (task-7, ConsoleTeam.dc.html's dlg_revoke). Called only after
+ * ConfirmItsYou's `onConfirmed` fires -- a completed tap -- never before: unlike the resend above,
+ * this withdraws access that was granted, and `console_revoke_invite` calls `console.use_tap` itself.
+ *
+ * No address is sent, although the tap is minted over one: `console.use_tap('Revoked an invite',
+ * p_invite::text, v_invite.email, …)` digests the address the database reads for the invite under a
+ * lock, so the browser's own copy is what is being checked rather than what is being passed. The
+ * same reasoning `removeMember` gives for not sending a role, and the route's `.strict()` body
+ * enforces it.
+ *
+ * `invite` goes through untouched and `reason` exactly as the member typed it -- only the route's own
+ * `tapReason` import trims and digests it, so a second trim here would risk the two disagreeing.
+ */
+export async function revokeInvite(invite: string, reason: string): Promise<RevokeInviteOutcome> {
+  const result = await apiRequest(
+    "/api/team/invite",
+    { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ invite, reason }) },
+    revokedSchema,
+  );
+  return result.ok ? { kind: "done" } : { kind: "failed", message: consoleApiMessage(result.error) };
+}
