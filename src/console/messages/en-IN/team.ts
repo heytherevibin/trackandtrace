@@ -16,6 +16,11 @@ const firstName = (name: string) => name.split(" ")[0];
 // keeps three copies from drifting into three slightly different claims about the same fact.
 const rosterMoved = "The team has changed since this page loaded. Reload it and try again.";
 
+// The sheet gives dlg_owner one primary button reading "OK" (ConsoleTeam.dc.html:344). Every other
+// notice drawn in that shape gets the same word, because it is the same button doing the same
+// nothing -- acknowledging a refusal there is nothing to confirm.
+const noticeOk = "OK";
+
 // Word for word from docs/design/sheets/console/ConsoleTeam.dc.html, with corrections recorded in
 // task-3-report.md:
 //
@@ -242,6 +247,28 @@ export const team = {
     // the same stale number and fail identically, which is why this asks for a reload.
     tapMismatch: "That confirmation no longer matches this member's keys. Their keys changed since this page loaded; reload it and try again.",
     refused: rosterMoved,
+
+    // Not drawn, and its own words rather than dlg_owner's: this refusal is not about Owners or
+    // about the console's floor, so "A console needs at least one Owner" / "Make someone else
+    // Owner first." would answer a question nobody asked.
+    //
+    // `console_reset_keys` refuses a member acting on their own row outright
+    // (20260922120000_console_reset_keys_blocks_self.sql, and see that file for the whole trace).
+    // It deletes every key and never touches `status`, so a self-reset leaves the member signed out
+    // with no key, unable to be re-invited -- console_invite_member refuses any address whose
+    // member row is not 'removed' -- and, for a console's only Owner, with no supported way back at
+    // all. The sheet's own hint on that row would meanwhile promise "two new keys at next sign-in",
+    // a sign-in that cannot happen.
+    //
+    // The title states why rather than merely "you can't", and the detail names the route that
+    // actually works: My keys adds a key and removes the old one under its own two-key floor, which
+    // never passes through zero. That floor is the console's existing answer to "I want fresh
+    // keys", and this is the first surface that had to point at it.
+    ownKeys: {
+      title: "Resetting your own keys would lock you out",
+      detail: "Add a new key under My keys and remove the old one instead.",
+      ok: noticeOk,
+    },
   },
 
   // dlg_remove (ConsoleTeam.dc.html:313-325, task-6) -- TC-01 again, and the sheet's own dlg_owner
@@ -330,6 +357,6 @@ export const team = {
   lastOwner: {
     title: "A console needs at least one Owner",
     detail: "Make someone else Owner first.",
-    ok: "OK",
+    ok: noticeOk,
   },
 } as const satisfies MessageTree;

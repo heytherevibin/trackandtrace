@@ -9,6 +9,7 @@ import { ChangeRoleDialog } from "@/console/team/change-role-dialog";
 import { RemoveMemberDialog } from "@/console/team/remove-member-dialog";
 import { ResetKeysDialog } from "@/console/team/reset-keys-dialog";
 import type { TeamMember } from "@/console/team/team";
+import { cn } from "@/utils/cn";
 
 const c = consoleMessages.team.changeRole;
 
@@ -84,9 +85,10 @@ export function MemberRowMenu({
         open={opened === "role"}
         onClose={() => setOpened("none")}
       />
-      {/* No guard props: console_reset_keys has no owner floor and no self-check, so an Owner may
-          reset their own keys (task-6-addendum.md §4). */}
-      <ResetKeysDialog member={member} open={opened === "reset"} onClose={() => setOpened("none")} onFailed={setError} />
+      {/* `signedInId` but no `activeOwners`: resetting keys is refused on your own row and nowhere
+          else, because console_reset_keys never touches role or status and so cannot leave a
+          console short of an Owner (20260922120000_console_reset_keys_blocks_self.sql). */}
+      <ResetKeysDialog member={member} signedInId={signedInId} open={opened === "reset"} onClose={() => setOpened("none")} onFailed={setError} />
       <RemoveMemberDialog
         member={member}
         signedInId={signedInId}
@@ -95,14 +97,20 @@ export function MemberRowMenu({
         onClose={() => setOpened("none")}
         onFailed={setError}
       />
-      {error ? (
-        // Capped and left-aligned inside this end-aligned cell: the Actions column is the narrowest
-        // on the table, and a refusal running its full width would stretch the column rather than
-        // wrap. `text-pretty` keeps the last line from being one orphaned word.
-        <p role="alert" className="ml-auto mt-1.5 max-w-[34ch] text-pretty text-left text-label font-medium text-ink-alert">
-          {error}
-        </p>
-      ) : null}
+      {/*
+        Always rendered, empty while there is nothing to say. A `role="alert"` region that is
+        inserted already carrying its message relies on node-insertion announcement, which current
+        screen readers do handle but is the less reliable of the two shapes; a region that is
+        present and then *changes* is the robust one.
+
+        Capped and left-aligned inside this end-aligned cell: the Actions column is the narrowest on
+        the table, and a refusal running its full width would stretch the column rather than wrap.
+        `text-pretty` keeps the last line from being one orphaned word. The top margin is
+        conditional so an empty region takes no space at all.
+      */}
+      <p role="alert" className={cn("ml-auto max-w-[34ch] text-pretty text-left text-label font-medium text-ink-alert", error && "mt-1.5")}>
+        {error}
+      </p>
     </>
   );
 }

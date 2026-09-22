@@ -265,9 +265,8 @@ export async function changeMemberRole(member: string, role: ConsoleRole, reason
 }
 
 /**
- * `console_reset_keys` raises exactly two developer strings, and they mean different things to a
- * member, so they are told apart by the only two things in the error that can be trusted -- a
- * substring the function itself raises, and the SQLSTATE:
+ * `console_reset_keys` raises three developer strings, told apart by the only two things in the
+ * error that can be trusted -- a substring the function itself raises, and the SQLSTATE:
  *
  * - console.use_tap's own 'no tap for this action'. Here that has one live cause and it is a
  *   genuine race (task-6-addendum.md §3): the function counts the member's keys inside its own
@@ -275,14 +274,23 @@ export async function changeMemberRole(member: string, role: ConsoleRole, reason
  *   `console_team` put on the page. A key added or removed in between and the two disagree. Failing
  *   closed is the correct outcome; a developer string on screen is not, and neither is "try again"
  *   without a reload -- the same stale page would mint the same wrong number.
- * - 'no access' -- a target removed a moment ago, or an Owner demoted in another tab. Answered by
- *   its 42501 rather than by reading it, for the reason fromChangeRoleError spells out above: what
- *   every console refusal has in common by the time it reaches here is that the roster moved.
+ * - 'no access' -- a target removed a moment ago, or an Owner demoted in another tab.
+ * - 'a member cannot reset their own keys' -- the self-check
+ *   (20260922120000_console_reset_keys_blocks_self.sql), decided in the browser before any request
+ *   goes out, so nothing reaches this line through the console's own UI; a race or a hostile caller
+ *   does.
  *
- * There is deliberately no last-Owner case. `console_reset_keys` has no owner guard and no
- * self-check at all -- an Owner may reset their own keys, which signs them out everywhere and has
- * them enrol two new ones, recoverable and consistent with My keys letting a member remove their
- * own (task-6-addendum.md §4).
+ * The last two are answered by their 42501 rather than by reading them, for the reason
+ * fromChangeRoleError spells out above: deciding what a refusal *means* from its wording breaks
+ * silently the first time either string is edited.
+ *
+ * There is deliberately no last-Owner case, and that is a fact about this function rather than an
+ * omission: `console_reset_keys` never touches `role` or `status`, so it cannot leave a console
+ * short of an Owner. The self-check is the guard it does have, and it is unconditional. Task 6
+ * first shipped without it, on the addendum's claim that a self-reset was "recoverable, and
+ * consistent with My keys letting a member remove their own keys" -- both halves false, and the
+ * second inverted: `console_remove_key` refuses below a floor of two precisely so a member can
+ * never reach zero keys. The migration carries the full trace of what a self-reset actually did.
  */
 function fromResetKeysError(error: { readonly message: string; readonly code?: string }): AppError {
   const m = consoleMessages.team.resetKeys;
@@ -317,7 +325,8 @@ function fromResetKeysError(error: { readonly message: string; readonly code?: s
  * (`console_auth_revoke_member_sessions(p_member, null)`) and writes its own audit row.
  *
  * Makes no access check of its own -- the DELETE route calls `requireConsoleMember("owner")` first,
- * and `console_reset_keys` re-checks `console.require_role('owner')` itself regardless.
+ * and `console_reset_keys` re-checks `console.require_role('owner')` and its own self-check
+ * regardless.
  */
 export async function resetMemberKeys(member: string, reason: string, environment: string, db?: ConsoleDb): Promise<number> {
   const client = db ?? (await createConsoleDb());

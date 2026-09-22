@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -130,31 +130,61 @@ describe("MemberRowMenu", () => {
 // way: an alert that stays on screen beside the control that would retry it, never a toast that
 // goes away.
 describe("MemberRowMenu's refusals", () => {
-  it("keeps a refused reset on screen, beside the menu that would retry it", async () => {
-    runTap.mockResolvedValue({ kind: "done" });
-    resetKeys.mockResolvedValue({ kind: "failed", message: "The team has changed since this page loaded. Reload it and try again." });
-    draw();
-    const user = await openMenu();
+  const REFUSED = "The team has changed since this page loaded. Reload it and try again.";
+
+  /** Opens Reset keys, taps through, and lets the mocked resetKeys refuse. */
+  async function refuseAReset(user: ReturnType<typeof userEvent.setup>): Promise<void> {
     await user.click(screen.getByRole("menuitem", { name: "Reset keys" }));
     await user.type(await screen.findByLabelText("Reason"), "Lost a security key on the train.");
     await user.click(screen.getByRole("button", { name: "Tap your key" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("The team has changed since this page loaded. Reload it and try again.");
+  }
+
+  // The live region is rendered from the start and empty while there is nothing to say (Minor 1 of
+  // the task-6 review: a role="alert" inserted already carrying its message relies on
+  // node-insertion announcement, the less reliable of the two shapes). So this waits for the
+  // region's *text* to arrive rather than for the element itself, which was there all along.
+  it("keeps a refused reset on screen, beside the menu that would retry it", async () => {
+    runTap.mockResolvedValue({ kind: "done" });
+    resetKeys.mockResolvedValue({ kind: "failed", message: REFUSED });
+    draw();
+    const user = await openMenu();
+    await refuseAReset(user);
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(REFUSED));
+  });
+
+  it("mounts that live region empty rather than inserting it with its message", () => {
+    draw();
+    const region = screen.getByRole("alert");
+    expect(region).toBeInTheDocument();
+    expect(region).toBeEmptyDOMElement();
   });
 
   // Cleared when the next attempt opens, not when it lands: a sentence about an attempt that has
   // already been replaced is worse than none (the rule Task 5's own picker alert follows).
+  //
+  // Asserted on the TEXT, not on `queryByRole("alert")`. The first version of this test used the
+  // role and could not fail: it ran while the next TC-01 was open, and Base UI marks the page
+  // behind a modal `inert`/`aria-hidden`, so *every* role query returns null there whether the
+  // refusal was cleared or not. The review's probe found the `<p>` still in the DOM with its text
+  // intact under a mutation that deleted the clearing. `queryByText` does not filter by
+  // accessibility, so it sees through the inert page and the assertion is about the thing it
+  // claims to be about. Confirmed by deleting `setError(null)` from member-row-menu.tsx and
+  // watching this fail; see task-6-report.md's fix-round section.
   it("drops a previous refusal the moment another item is opened", async () => {
     runTap.mockResolvedValue({ kind: "done" });
-    resetKeys.mockResolvedValue({ kind: "failed", message: "The team has changed since this page loaded. Reload it and try again." });
+    resetKeys.mockResolvedValue({ kind: "failed", message: REFUSED });
     draw();
     const user = await openMenu();
-    await user.click(screen.getByRole("menuitem", { name: "Reset keys" }));
-    await user.type(await screen.findByLabelText("Reason"), "Lost a security key on the train.");
-    await user.click(screen.getByRole("button", { name: "Tap your key" }));
-    await screen.findByRole("alert");
+    await refuseAReset(user);
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(REFUSED));
     await user.click(screen.getByRole("button", { name: "Actions for Kiran Das" }));
     await user.click(await screen.findByRole("menuitem", { name: "Remove" }));
     await screen.findByText("Remove Kiran Das from the console");
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByText(REFUSED)).toBeNull();
+    // And still gone once the dialog that was hiding the page closes, so this is not merely the
+    // modal's inerting seen from the other side.
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByText(REFUSED)).toBeNull();
+    expect(screen.getByRole("alert")).toBeEmptyDOMElement();
   });
 });

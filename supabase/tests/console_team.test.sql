@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(79);
+select plan(80);
 
 -- What an Owner may do to the team: list it, invite someone, change a role,
 -- reset a member's keys, remove a member, and resend or revoke an invite.
@@ -351,6 +351,28 @@ select throws_ok(
 select throws_ok(
   $$ select public.console_reset_keys('d1111111-1111-1111-1111-111111111111', 'No tap yet.', 'development') $$,
   '42501', null, 'resetting keys with no tap is refused'
+);
+
+-- Resetting your OWN keys is refused outright (20260922120000_console_reset_keys_blocks_self.sql):
+-- it deletes every key and never touches status, so the member is left signed out with no key, no
+-- way to be re-invited (console_invite_member refuses any non-removed member) and, for a console's
+-- only Owner, no supported way back at all.
+--
+-- Two things this assertion does that its neighbours do not, both deliberate. A matching tap is
+-- minted first -- Asha holds no keys in this fixture, so the digest's count is '0' -- so deleting
+-- the self-check would let this call fall through to use_tap and still raise 42501, and the test
+-- would pass over a lockout it was written to prevent. And the expected message is named: every
+-- console refusal raises 42501, so a bare `'42501', null` here would pass whatever went wrong,
+-- including the missing tap, the Owner floor, or a target that could not be found.
+select pg_temp.tap(
+  'a1111111-1111-1111-1111-111111111111', 'a2222222-2222-2222-2222-222222222222', 'self-reset-challenge',
+  'Reset a member''s keys', 'a1111111-1111-1111-1111-111111111111', '0', 'Starting over with fresh keys.'
+);
+select throws_ok(
+  $$ select public.console_reset_keys('a1111111-1111-1111-1111-111111111111', 'Starting over with fresh keys.', 'development') $$,
+  '42501',
+  'a member cannot reset their own keys',
+  'an Owner cannot reset their own keys, even with a matching tap in hand and a second Owner standing by'
 );
 select pg_temp.tap(
   'a1111111-1111-1111-1111-111111111111', 'a2222222-2222-2222-2222-222222222222', 'reset-devi-keys-challenge',

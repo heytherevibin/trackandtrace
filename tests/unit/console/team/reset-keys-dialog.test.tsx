@@ -21,6 +21,17 @@ import type { TeamMember } from "@/console/team/team";
 
 const REASON = "Lost a security key on the train.";
 
+// The Owner reading the page, and the member whose row the menu was opened on.
+const ME = "aaaaaaaa-0000-0000-0000-000000000001";
+const OWNER: TeamMember = {
+  userId: ME,
+  email: "asha@trakline.in",
+  name: "Asha Rao",
+  role: "owner",
+  status: "active",
+  keyCount: 2,
+  lastActiveAt: "2026-09-21T08:32:00Z",
+};
 const KIRAN: TeamMember = {
   userId: "d1111111-1111-1111-1111-111111111111",
   email: "kiran@trakline.in",
@@ -35,7 +46,7 @@ const onClose = vi.fn();
 const onFailed = vi.fn();
 
 function open(member: TeamMember = KIRAN) {
-  return render(<ResetKeysDialog member={member} open onClose={onClose} onFailed={onFailed} />);
+  return render(<ResetKeysDialog member={member} signedInId={ME} open onClose={onClose} onFailed={onFailed} />);
 }
 
 /** TC-01 is the whole dialog here: there is nothing to choose first, unlike the role change. */
@@ -156,5 +167,55 @@ describe("ResetKeysDialog on TC-01", () => {
     // the same -- leaving it stale would have the next attempt mint over the same wrong number and
     // fail in exactly the same way (the reasoning keys-plate.tsx spells out for its own re-read).
     expect(refresh).toHaveBeenCalledOnce();
+  });
+});
+
+// Fix round 1, Critical 1. A member resetting their own keys deletes every key they have, leaves
+// `status` untouched, and closes every way back in -- no key to sign in with, no re-invite (any
+// member row that is not 'removed' is refused), no re-enrolment, and for a console's only Owner no
+// fresh first-Owner link either. The drawn hint on that row would meanwhile promise "two new keys
+// at next sign-in". So it is refused outright, here and in
+// 20260922120000_console_reset_keys_blocks_self.sql, and the notice has its own words: dlg_owner's
+// are about Owners and this rule is about anyone.
+describe("ResetKeysDialog on your own row", () => {
+  function expectOwnKeysNotice(): void {
+    expect(screen.getByRole("alertdialog", { name: "Resetting your own keys would lock you out" })).toBeInTheDocument();
+    expect(screen.getByText("Add a new key under My keys and remove the old one instead.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "OK" })).toBeInTheDocument();
+    // No TC-01 behind it, so there is no reason field and no tap to take.
+    expect(screen.queryByLabelText("Reason")).toBeNull();
+    expect(screen.queryByText("Form TC-01")).toBeNull();
+    expect(runTap).not.toHaveBeenCalled();
+    expect(resetKeys).not.toHaveBeenCalled();
+  }
+
+  it("answers with its own notice instead of TC-01", async () => {
+    open(OWNER);
+    await screen.findByRole("alertdialog");
+    expectOwnKeysNotice();
+  });
+
+  // Not dlg_owner's words. This refusal is not about Owners or about the console's floor -- a
+  // Viewer resetting their own keys locks themselves out just as completely.
+  it("does not borrow the last-Owner notice's words", async () => {
+    open(OWNER);
+    await screen.findByRole("alertdialog");
+    expect(screen.queryByText("A console needs at least one Owner")).toBeNull();
+    expect(screen.queryByText("Make someone else Owner first.")).toBeNull();
+  });
+
+  it("closes on OK", async () => {
+    open(OWNER);
+    await userEvent.setup().click(await screen.findByRole("button", { name: "OK" }));
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  // The refusal is about whose row it is, and nothing else: there is no Owner floor here, because
+  // console_reset_keys never touches role or status and so cannot leave a console short of an
+  // Owner. A sole Owner resetting somebody else's keys goes through.
+  it("never holds back a reset on somebody else's row, whoever they are", async () => {
+    open({ ...KIRAN, role: "owner" });
+    expect(await screen.findByText("Reset Kiran Das's keys")).toBeInTheDocument();
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
   });
 });

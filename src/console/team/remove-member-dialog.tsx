@@ -5,7 +5,7 @@ import { useState } from "react";
 import { notify } from "@/components/ui/toast";
 import { ConfirmItsYou } from "@/console/components/confirm-its-you";
 import { consoleMessages } from "@/console/messages";
-import { LastOwnerNotice } from "@/console/team/last-owner-notice";
+import { LastOwnerNotice } from "@/console/team/notice-dialog";
 import { needsAnotherOwner } from "@/console/team/role-change";
 import type { TeamMember } from "@/console/team/team";
 import { removeMember } from "@/console/team/team-client";

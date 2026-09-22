@@ -5,6 +5,7 @@ import { useState } from "react";
 import { notify } from "@/components/ui/toast";
 import { ConfirmItsYou } from "@/console/components/confirm-its-you";
 import { consoleMessages } from "@/console/messages";
+import { NoticeDialog } from "@/console/team/notice-dialog";
 import type { TeamMember } from "@/console/team/team";
 import { resetKeys } from "@/console/team/team-client";
 
@@ -23,13 +24,27 @@ const RESET_ACTION = "Reset a member's keys";
  * it, because nothing is being chosen, and no Change row inside it, because there is no
  * before-and-after pair to show (task-6-addendum.md §1).
  *
- * **No last-Owner guard and no self-check, deliberately.** `console_reset_keys` has neither
- * (:218-257): an Owner may reset their own keys, which signs them out everywhere and has them enrol
- * two new ones at next sign-in. That is recoverable, and it is consistent with My keys letting a
- * member remove their own keys, so it is implemented as the database has it (task-6-addendum.md
- * §4). Task 5 already draws this row's menu on the signed-in Owner's own row -- it answers Change
- * role and Remove there with dlg_owner rather than hiding the menu -- so Reset keys simply works
- * there, which is the consistent reading of what Task 5 built rather than a divergence from it.
+ * **No Owner floor, but a hard self-check.** The two are separate rules and only one of them
+ * exists. There is no last-Owner guard: `console_reset_keys` never touches `status` or `role`, so
+ * resetting someone else's keys cannot leave the console short of an Owner, and a sole Owner may
+ * reset any other member's keys freely.
+ *
+ * A member resetting their OWN keys is refused outright, here and in the database
+ * (20260922120000_console_reset_keys_blocks_self.sql). Task 6 first shipped this unguarded on the
+ * addendum's stated reasoning that a self-reset was "recoverable, and consistent with My keys
+ * letting a member remove their own keys". Both halves are false, and the second is inverted: My
+ * keys refuses to remove a key below a floor of two (`console_remove_key`,
+ * 20260921100000_console_my_keys.sql:113) *precisely so a member can never reach zero*. A self-reset
+ * deletes every key, leaves `status` untouched, and closes every way back -- no key to sign in
+ * with, no re-invite (console_invite_member refuses any member row that is not 'removed'), no
+ * re-enrolment, and for a console's only Owner no fresh first-Owner link either, because
+ * `has_owner()` still counts them. The migration carries the full trace.
+ *
+ * So on the signed-in member's own row this answers with a notice instead of TC-01 -- the shape
+ * Change role and Remove already use there, with its own words, because dlg_owner's are about
+ * Owners and this rule is not. The menu stays whole and the console says no, rather than the
+ * sheet's drawn hint promising "two new keys at next sign-in" on the one row where there is no
+ * next sign-in.
  *
  * The `value` the tap is minted over is the key count this page rendered. That is a real race and
  * the correct one: the database recounts inside the transaction that deletes them, so a key added
@@ -42,11 +57,14 @@ const RESET_ACTION = "Reset a member's keys";
  */
 export function ResetKeysDialog({
   member,
+  signedInId,
   open,
   onClose,
   onFailed,
 }: {
   readonly member: TeamMember;
+  /** Who is reading the page -- `requireConsoleMember()`'s own `userId`, which the page already has. */
+  readonly signedInId: string;
   readonly open: boolean;
   readonly onClose: () => void;
   /**
@@ -59,6 +77,12 @@ export function ResetKeysDialog({
   readonly onFailed: (message: string) => void;
 }) {
   const router = useRouter();
+  // The whole guard, and deliberately not `needsAnotherOwner`: that predicate carries an Owner
+  // floor this action has no business applying, and it would answer "no" here for a reason that is
+  // not the reason. This mirrors one line of the migration and nothing else --
+  // `if p_member = v_member.user_id then raise` -- which is unconditional, checked before the
+  // target row is read, and true for every role.
+  const blocked = member.userId === signedInId;
   const [reason, setReason] = useState("");
 
   // Adjusting state when a prop changes, during render rather than in an effect -- react.dev's own
@@ -98,24 +122,27 @@ export function ResetKeysDialog({
   }
 
   return (
-    <ConfirmItsYou
-      open={open}
-      action={RESET_ACTION}
-      // The member's id as text, never their name or email: two members cannot share an id, and
-      // 20260921100300_console_remove_key_binds_id.sql is the review that settled it. It goes out
-      // exactly as console_team returned it -- Postgres's own uuid, rendered lowercase canonical --
-      // which is byte for byte what `p_member::text` re-digests inside console_reset_keys.
-      target={member.userId}
-      // The count console_team put on this row, which is what console_reset_keys recounts and
-      // re-digests. Never a constant: the sheet's "two new keys" is about the floor at next
-      // sign-in, not about how many this member holds now.
-      value={String(member.keyCount)}
-      reason={reason}
-      summary={r.title(member.name)}
-      hint={r.hint(member.name)}
-      onReasonChange={setReason}
-      onCancel={onClose}
-      onConfirmed={() => void onConfirmed()}
-    />
+    <>
+      <ConfirmItsYou
+        open={open && !blocked}
+        action={RESET_ACTION}
+        // The member's id as text, never their name or email: two members cannot share an id, and
+        // 20260921100300_console_remove_key_binds_id.sql is the review that settled it. It goes out
+        // exactly as console_team returned it -- Postgres's own uuid, rendered lowercase canonical
+        // -- which is byte for byte what `p_member::text` re-digests inside console_reset_keys.
+        target={member.userId}
+        // The count console_team put on this row, which is what console_reset_keys recounts and
+        // re-digests. Never a constant: the sheet's "two new keys" is about the floor at next
+        // sign-in, not about how many this member holds now.
+        value={String(member.keyCount)}
+        reason={reason}
+        summary={r.title(member.name)}
+        hint={r.hint(member.name)}
+        onReasonChange={setReason}
+        onCancel={onClose}
+        onConfirmed={() => void onConfirmed()}
+      />
+      <NoticeDialog open={open && blocked} title={r.ownKeys.title} detail={r.ownKeys.detail} ok={r.ownKeys.ok} onClose={onClose} />
+    </>
   );
 }
