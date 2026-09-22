@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  AUDIT_ENVIRONMENT_MAX,
   AUDIT_EXPORT_MAX,
   AUDIT_RESULTS,
   auditExportFileName,
@@ -82,7 +83,7 @@ export interface AuditPage {
 const rowShape = z.object({
   id: z.guid(),
   at: z.iso.datetime({ offset: true }),
-  environment: z.string().min(1).max(20),
+  environment: z.string().min(1).max(AUDIT_ENVIRONMENT_MAX),
   actor_id: z.guid().nullable(),
   actor_name: z.string().min(1).max(120),
   actor_role: z.enum(["owner", "admin", "support", "viewer"]).nullable(),

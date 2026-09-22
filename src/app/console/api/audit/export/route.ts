@@ -4,6 +4,7 @@ import { requireConsoleMember } from "@/console/auth/guard";
 import { consoleEnvironment } from "@/console/auth/session";
 import { assertConsoleAvailable } from "@/console/availability";
 import { tapReason } from "@/console/keys/tap";
+import { TAP_VALUE_MAX } from "@/console/keys/tap-schema";
 import { consoleMessages } from "@/console/messages";
 import { assertSameOrigin } from "@/console/same-origin";
 import { jsonError, jsonOk } from "@/services/api-response";
@@ -23,15 +24,19 @@ export const dynamic = "force-dynamic";
 // about their access.
 const RANGE = /^(\d{4}-\d{2}-\d{2}T[\d:.]+Z)?\/(\d{4}-\d{2}-\d{2}T[\d:.]+Z)?$/;
 
-// Long enough for five filters including a search box the member filled, and short enough that a
-// hand-made body cannot make the database parse a megabyte of JSON.
+// The canonical filter object's limit, which is **not this route's to choose**: the same string is
+// digested by `POST /api/tap/options` when the tap is minted, and that route's own cap is what
+// actually binds. It used to be 200 there and 2000 here, so a 117-character search made an export
+// impossible and told the member so in zod's words (branch review, Important 1). Imported now, so
+// the two cannot drift again.
 //
-// It is unreachable by typing, and that is now held rather than hoped: the search is the only
-// free-text filter, `AUDIT_SEARCH_MAX` caps it at 200, and the other four are a uuid, a category of
-// at most 40, an environment of at most 20 and one of three result labels -- so the canonical object
-// cannot exceed about 350 characters. tests/unit/console/audit/export.test.ts pins that arithmetic,
-// because the failure it prevents lands *after* a member has tapped their key.
-const FILTERS_MAX = 2_000;
+// It is unreachable by typing, and that is held rather than hoped: the search is the only free-text
+// filter and `AUDIT_SEARCH_MAX` caps it at 200; `category` is capped at 40 and `environment` at 20
+// by `parseAuditFilters`; `member` is a uuid, `result` is one of three labels and `deployment` is
+// one of three deployments -- so the worst object a member can produce is a few hundred characters.
+// tests/unit/console/audit/export.test.ts pins that arithmetic against this same constant, because
+// the failure it prevents is one a member meets inside TC-01.
+const FILTERS_MAX = TAP_VALUE_MAX;
 
 // Every constraint below names its own message. `readBody` puts a failed schema's own message in
 // front of whoever sent it, and zod's are developer strings -- "Too big: expected string to have
@@ -97,9 +102,14 @@ const exportBody = z
  * `console_audit_export` re-checks `console.require_role('admin')` itself, and that -- not this
  * line -- is the boundary.
  *
- * Unlike the GET, this writes an audit row: an export reads personal data in bulk and is an action,
- * so it records itself. That row is written inside the function, beside the tap it spends, and is
- * the only write this phase's append-only constraint allows.
+ * Unlike the GET, this writes an audit row -- and what the ceremony gates is the **file**, not bulk
+ * reading. `GET /api/audit` pages the whole log 50 rows at a time behind one "Opened the audit log"
+ * row and no tap at all, deliberately (Ruling 2: a row per keystroke in an append-only table is the
+ * worse failure). An Admin who pages through two years of history reaches the same data. What they
+ * do not get is a file: a CSV is portable, forwardable and leakable in a way a paged table is not,
+ * and it is the artefact the plan's own hazard names. That is what takes a tap and records itself.
+ * The row is written inside the function, beside the tap it spends, and is the only write this
+ * phase's append-only constraint allows.
  */
 export async function POST(req: Request): Promise<Response> {
   try {

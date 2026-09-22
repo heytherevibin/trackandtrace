@@ -247,7 +247,7 @@ export function EntriesPlate({
   const rangeLabel = m.filters.ranges[filters.range];
 
   return (
-    <AuditExportProvider filters={filters} total={page.total}>
+    <AuditExportProvider filters={filters} environment={environment} total={page.total}>
       <div className="flex flex-col gap-8">
         {/*
           AuditLog.dc.html:90 draws `Export CSV` in the page header's `ph-actions`, behind the

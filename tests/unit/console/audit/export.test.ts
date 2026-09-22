@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { auditCsv, exportAuditLog, type AuditEntry } from "@/console/audit/audit";
 import {
+  AUDIT_DEPLOYMENTS,
+  AUDIT_ENVIRONMENT_MAX,
   AUDIT_EXPORT_ACTION,
   AUDIT_EXPORT_MAX,
   AUDIT_SEARCH_MAX,
@@ -11,6 +13,7 @@ import {
   parseAuditFilters,
   type AuditFilters,
 } from "@/console/audit/filters";
+import { TAP_VALUE_MAX } from "@/console/keys/tap-schema";
 import type { ConsoleDb } from "@/console/auth/db";
 
 // 19 September 2026, 13:30 IST -- the day AuditLog.dc.html's ready row is drawn on
@@ -75,9 +78,11 @@ describe("the canonical strings a tap is taken over", () => {
   });
 
   it("puts the other five filters in one object, always the same keys in always the same order", () => {
-    expect(auditExportFilters(BASE)).toBe('{"category":null,"environment":"production","member":null,"result":null,"search":null}');
-    expect(auditExportFilters({ ...BASE, category: "team", result: "refused", search: "maintenance", member: "b0000000-0000-4000-8000-000000000002", environment: null })).toBe(
-      '{"category":"team","environment":null,"member":"b0000000-0000-4000-8000-000000000002","result":"refused","search":"maintenance"}',
+    expect(auditExportFilters(BASE, "production")).toBe(
+      '{"category":null,"deployment":"production","environment":"production","member":null,"result":null,"search":null}',
+    );
+    expect(auditExportFilters({ ...BASE, category: "team", result: "refused", search: "maintenance", member: "b0000000-0000-4000-8000-000000000002", environment: null }, "production")).toBe(
+      '{"category":"team","deployment":"production","environment":null,"member":"b0000000-0000-4000-8000-000000000002","result":"refused","search":"maintenance"}',
     );
   });
 
@@ -85,7 +90,7 @@ describe("the canonical strings a tap is taken over", () => {
   // empty string means *match nothing* and would hand a member an empty CSV with nothing to
   // explain it.
   it("sends null for an empty search, never an empty string", () => {
-    expect(auditExportFilters({ ...BASE, search: "" })).toContain('"search":null');
+    expect(auditExportFilters({ ...BASE, search: "" }, "production")).toContain('"search":null');
   });
 
   // Change any filter and the string changes, so the digest changes, so the tap in hand is not
@@ -93,26 +98,40 @@ describe("the canonical strings a tap is taken over", () => {
   it("gives two different exports two different pairs of strings", () => {
     const narrow = { ...BASE, result: "refused" as const };
     const wide: AuditFilters = { ...BASE, range: "custom", from: "2024-09-19", to: "2026-09-19" };
-    expect(auditExportFilters(narrow)).not.toBe(auditExportFilters(wide));
+    expect(auditExportFilters(narrow, "production")).not.toBe(auditExportFilters(wide, "production"));
     expect(auditExportRange(wide, NOW)).not.toBe(auditExportRange(BASE, NOW));
   });
 
 
-  // The search is the only free-text filter, so it is the only one that can make this string grow --
-  // and it grows it into the export route's own FILTERS_MAX, where the failure lands *after* the
-  // member has written a reason and tapped their key. The arithmetic is pinned rather than trusted.
-  it("cannot be made to overflow the export route's own limit by anything a member can type", () => {
-    const worst = auditExportFilters({
-      ...BASE,
-      search: "x".repeat(AUDIT_SEARCH_MAX),
-      category: "c".repeat(40), // console.audit_log.category's own check constraint
-      environment: "e".repeat(20), // and environment's
-      member: "b0000000-0000-4000-8000-000000000002",
-      result: "refused",
-    });
-    // FILTERS_MAX in src/app/console/api/audit/export/route.ts. Restated rather than imported,
-    // because importing a route into a unit test drags next/headers in behind it.
-    expect(worst.length).toBeLessThan(2_000);
+  // THE BOUND THAT ACTUALLY BINDS (branch review, Important 1).
+  //
+  // This canonical object is `value` in the tap the export is digested over, so the cap that decides
+  // whether an export is possible at all is `POST /api/tap/options`'s, not the export route's. The
+  // first version of this test asserted `< 2_000` -- the export route's own number -- and passed
+  // while the real limit upstream was 200: a search of 117 characters made the export impossible
+  // and showed the member zod's "Too big: expected string to have <=200 characters" inside TC-01.
+  //
+  // `TAP_VALUE_MAX` is imported, not restated, so this can never again pin a number that is not the
+  // one in force. And the case is the *combined* one, because the whole point is that one filter's
+  // room depends on every other: a search that fits alone stops fitting once a Member, a Category
+  // and a Result are set.
+  it("cannot be made to overflow the bound the tap is minted under, by anything a member can set at once", () => {
+    const worst = auditExportFilters(
+      {
+        ...BASE,
+        search: "x".repeat(AUDIT_SEARCH_MAX),
+        category: "c".repeat(40), // console.audit_log.category's own check constraint
+        environment: "e".repeat(AUDIT_ENVIRONMENT_MAX),
+        member: "b0000000-0000-4000-8000-000000000002",
+        result: "refused",
+      },
+      // The longest of the three deployments a console can be.
+      [...AUDIT_DEPLOYMENTS].sort((a, b) => b.length - a.length)[0] ?? "development",
+    );
+    expect(worst.length).toBeLessThan(TAP_VALUE_MAX);
+    // And the headroom is real rather than a rounding away from the edge: if this ever gets tight,
+    // it should be a decision, not a surprise inside a dialog.
+    expect(worst.length).toBeLessThan(TAP_VALUE_MAX / 2);
   });
 
   // The other half of the same bound: an address nobody typed. parseAuditFilters refuses nothing --
@@ -126,6 +145,21 @@ describe("the canonical strings a tap is taken over", () => {
 
   it("holds the same search bound the box holds", () => {
     expect(AUDIT_SEARCH_MAX).toBe(200);
+  });
+
+  // The one filter that had no bound at all. It reaches the same canonical object from the address
+  // side, so an unbounded `?env=` was the search overflow arriving by the other door.
+  it("drops an environment longer than the column could hold", () => {
+    expect(parseAuditFilters({ env: "e".repeat(AUDIT_ENVIRONMENT_MAX) }, "production").environment).toHaveLength(AUDIT_ENVIRONMENT_MAX);
+    expect(parseAuditFilters({ env: "e".repeat(AUDIT_ENVIRONMENT_MAX + 1) }, "production").environment).toBe("production");
+  });
+
+  // The deployment is in the digested object so that console.use_tap covers it. Before it was, an
+  // Admin could spend a tap the dialog minted for them with any p_environment at all and file the
+  // record of a bulk export where no Environment picker would ever look.
+  it("carries the deployment the export's own record will be written against", () => {
+    expect(auditExportFilters(BASE, "preview")).toContain('"deployment":"preview"');
+    expect(auditExportFilters(BASE, "production")).not.toBe(auditExportFilters(BASE, "preview"));
   });
 
   it("names the action the database spends the tap under", () => {
@@ -222,7 +256,7 @@ describe("exportAuditLog", () => {
 
   // `environment` is the deployment the row is written against, decided by the route and never by
   // a caller -- the same shape every other console writer takes (src/console/team/team.ts).
-  const ask = { range: auditExportRange(BASE, NOW), filters: auditExportFilters(BASE), reason: "Monthly access review for September.", environment: "test" };
+  const ask = { range: auditExportRange(BASE, NOW), filters: auditExportFilters(BASE, "production"), reason: "Monthly access review for September.", environment: "test" };
 
   it("hands the database the two canonical strings verbatim", async () => {
     const calls: unknown[] = [];

@@ -1,7 +1,7 @@
 "use client";
 
 import { z } from "zod";
-import { AUDIT_RESULTS, auditFiltersToSearch, type AuditFilters } from "@/console/audit/filters";
+import { AUDIT_ENVIRONMENT_MAX, AUDIT_RESULTS, auditFiltersToSearch, type AuditFilters } from "@/console/audit/filters";
 import { apiRequest, type ApiResult } from "@/services/api-client";
 
 // The browser half of module 14: re-read a page, and prepare an export.
@@ -22,7 +22,9 @@ const rowShape = z.object({
   // An offset, never a "Z", and no fractional part at zero microseconds -- the shape the database
   // really produces (task-2-addendum.md §2).
   at: z.iso.datetime({ offset: true }),
-  environment: z.string().min(1),
+  // The column's own constraint, imported rather than the third place "20" is written down or
+  // forgotten -- `audit.ts`'s server-side twin held it and this one did not.
+  environment: z.string().min(1).max(AUDIT_ENVIRONMENT_MAX),
   actorId: z.guid().nullable(),
   actorName: z.string().min(1),
   actorRole: z.enum(["owner", "admin", "support", "viewer"]).nullable(),

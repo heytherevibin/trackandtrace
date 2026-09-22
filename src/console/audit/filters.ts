@@ -34,6 +34,24 @@ export const AUDIT_PAGE_SIZE = 50;
 export const AUDIT_ENVIRONMENT_ALL = "all";
 
 /**
+ * The deployments a console row can have been written by: `VERCEL_ENV` on Vercel, `NODE_ENV`
+ * locally, and nothing else (`consoleEnvironment()` is `VERCEL_ENV ?? NODE_ENV`).
+ *
+ * It is a closed set in the database as of
+ * `20260923090000_console_audit_environment_closed.sql`, and it is closed for one reason: until it
+ * was, `console.audit_log.environment` was checked for length alone, so an export could be recorded
+ * under `Production` -- capital P -- which no value this picker offers will ever match. The audited
+ * party could hide their own entry from every view the console draws. Every member of this set is
+ * reachable from the Environment picker, which is what makes a row written under any of them
+ * findable.
+ */
+export const AUDIT_DEPLOYMENTS = ["production", "preview", "development"] as const;
+export type AuditDeployment = (typeof AUDIT_DEPLOYMENTS)[number];
+
+/** `console.audit_log.environment`'s own check constraint, stated once and imported everywhere. */
+export const AUDIT_ENVIRONMENT_MAX = 20;
+
+/**
  * One actor the Member picker can offer.
  *
  * It lives here rather than beside the picker because it now crosses the server/client line:
@@ -119,6 +137,17 @@ function day(value: string | null): string | null {
   return dayKey.format(at) === value ? value : null;
 }
 
+/**
+ * The environment filter an address asks for: absent is this deployment's own, `all` is every one,
+ * and anything longer than the column itself could hold is read as absent rather than refused --
+ * the same fallback `category` and `search` already take.
+ */
+function environmentFrom(raw: string | null, fallback: string): string | null {
+  if (raw === null) return fallback;
+  if (raw === AUDIT_ENVIRONMENT_ALL) return null;
+  return raw.length <= AUDIT_ENVIRONMENT_MAX ? raw : fallback;
+}
+
 export function defaultAuditFilters(environment: string): AuditFilters {
   return { range: "today", from: null, to: null, member: null, category: null, result: null, environment, search: "", page: 1 };
 }
@@ -157,7 +186,10 @@ export function parseAuditFilters(params: AuditSearchParams, environment: string
     member: rawMember && UUID.test(rawMember) ? rawMember.toLowerCase() : null,
     category: rawCategory && rawCategory.length <= CATEGORY_MAX ? rawCategory : null,
     result: AUDIT_RESULTS.find((r) => r === rawResult) ?? null,
-    environment: rawEnvironment === null ? fallback.environment : rawEnvironment === AUDIT_ENVIRONMENT_ALL ? null : rawEnvironment,
+    // Bounded like every other filter, and by the column's own constraint. It was the one that was
+    // not, which put an unbounded string into the export's canonical object from the address side
+    // -- the same overflow the search box was bounded to prevent, arriving by the other door.
+    environment: environmentFrom(rawEnvironment, environment),
     // Dropped when it is longer than the box could ever have produced, exactly as an over-long
     // `category` is dropped above and for the same reason: nothing in this function refuses, and an
     // address a member edited by hand falls back to the default view rather than showing them a
@@ -308,17 +340,27 @@ export function auditExportRange(filters: AuditFilters, now: Date): string {
 }
 
 /**
- * The export's `value` digest field: every filter the range does not already carry, as one object.
+ * The export's `value` digest field: everything the range does not already carry, as one object.
  *
- * Always the same five keys in always the same order, and explicit `null` for each absent one --
+ * Always the same six keys in always the same order, and explicit `null` for each absent one --
  * two exports that ask for the same rows must produce byte-identical strings, or a tap minted on
  * one page could not be spent from another. `search` is normalised to `null` for the same reason
  * `auditQueryFor` does it: `p_category`, `p_result` and `p_environment` are plain equalities in
  * SQL, so `""` means *match nothing*.
+ *
+ * **`deployment` is not a filter.** It is which deployment the export's own audit row is written
+ * against, and it is in here so that `console.action_digest` covers it -- `console.use_tap` takes
+ * only four fields and all four were already spoken for. Until it was covered, a tap minted through
+ * the console's own dialog could be spent with any `p_environment` at all, and the record of a bulk
+ * export could be written under a value no reader would ever look at. `console_audit_export`
+ * re-reads it from here, refuses it if it is not one of `AUDIT_DEPLOYMENTS`, and refuses it again
+ * if it disagrees with the `p_environment` the route sent -- so the value that reaches the audit
+ * row is the one the member's own ceremony approved.
  */
-export function auditExportFilters(filters: AuditFilters): string {
+export function auditExportFilters(filters: AuditFilters, deployment: string): string {
   return JSON.stringify({
     category: filters.category,
+    deployment,
     environment: filters.environment,
     member: filters.member,
     result: filters.result,

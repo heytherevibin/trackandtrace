@@ -51,7 +51,7 @@ import { AUDIT_EXPORT_ACTION, AUDIT_EXPORT_MAX, defaultAuditFilters, type AuditF
 const NOW = new Date("2026-09-19T08:00:00.000Z");
 const BASE: AuditFilters = defaultAuditFilters("production");
 const RANGE = "2026-09-18T18:30:00.000Z/2026-09-19T18:30:00.000Z";
-const FILTERS = '{"category":null,"environment":"production","member":null,"result":null,"search":null}';
+const FILTERS = '{"category":null,"deployment":"production","environment":"production","member":null,"result":null,"search":null}';
 const REASON = "Monthly access review for September.";
 const READY = { csv: "﻿id,at\r\n1,2", count: 14, fileName: "audit-2026-09-19.csv" };
 
@@ -66,7 +66,7 @@ const READY = { csv: "﻿id,at\r\n1,2", count: 14, fileName: "audit-2026-09-19.c
  */
 function board(total = 14, filters: AuditFilters = BASE, strict = false) {
   const tree = (
-    <AuditExportProvider filters={filters} total={total}>
+    <AuditExportProvider filters={filters} environment="production" total={total}>
       <AuditExportButton />
       <AuditExportStatus />
     </AuditExportProvider>

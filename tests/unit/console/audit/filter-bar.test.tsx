@@ -126,10 +126,17 @@ describe("changing a filter", () => {
 });
 
 describe("the active-filter row", () => {
-  it("is absent until something is filtered", () => {
+  // Clear filters is what is absent until something is filtered, not the row. The row carries the
+  // environment chip from the first paint (see below), and `clearAuditFilters` returns to the
+  // default view -- so beside that chip alone the button would visibly do nothing.
+  it("offers nothing to clear until something is filtered", () => {
     bar();
-    expect(screen.queryByText(m.filters.active)).toBeNull();
     expect(screen.queryByRole("button", { name: m.filters.clear })).toBeNull();
+  });
+
+  it("offers it as soon as something is", () => {
+    bar({ ...defaultAuditFilters(ENVIRONMENT), category: "messages" });
+    expect(screen.getByRole("button", { name: m.filters.clear })).toBeInTheDocument();
   });
 
   it("names each active filter the way the sheet names it, and offers to remove it", () => {
@@ -149,11 +156,30 @@ describe("the active-filter row", () => {
   // task-2-addendum.md §4: the environment filter defaults to this deployment's own and the member
   // can clear it -- "did a preview deployment write to production?" is answerable only from preview
   // rows. It is a chip only once it stops being the default.
-  it("chips the environment only when it is not this deployment's own", () => {
+  /**
+   * The environment is chipped at its default, unlike every other filter, and that is the branch
+   * review's Critical showing through into the reader.
+   *
+   * A board opens scoped to its own deployment, so "no export rows" would otherwise be
+   * indistinguishable from "no export rows *in production*" -- which is precisely the state an
+   * Admin could put an Owner in by filing their own export against a different deployment. The chip
+   * is what makes the scope visible instead of inferred.
+   */
+  it("chips the environment even at its default, so the scope is never inferred", () => {
     bar();
-    expect(screen.queryByText(m.filters.chip(m.filters.environment, ENVIRONMENT))).toBeNull();
-    render(<FilterBar filters={{ ...defaultAuditFilters(ENVIRONMENT), environment: null }} environment={ENVIRONMENT} members={[]} onChange={vi.fn()} />);
-    expect(screen.getByText(m.filters.chip(m.filters.environment, m.filters.all))).toBeInTheDocument();
+    expect(screen.getByText(m.filters.chip(m.filters.environment, ENVIRONMENT))).toBeInTheDocument();
+  });
+
+  it("removes that chip by widening to every environment, not by swapping in another", async () => {
+    const onChange = bar();
+    await userEvent.click(screen.getByRole("button", { name: m.filters.remove(m.filters.chip(m.filters.environment, ENVIRONMENT)) }));
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ environment: null }));
+  });
+
+  // "Environment: All" is not a filter: nothing is being left out, so there is nothing to remove.
+  it("drops the chip once the view is every environment", () => {
+    bar({ ...defaultAuditFilters(ENVIRONMENT), environment: null });
+    expect(screen.queryByText(m.filters.chip(m.filters.environment, m.filters.all))).toBeNull();
   });
 
   it("clears everything at once", async () => {

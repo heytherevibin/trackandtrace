@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(47);
+select plan(53);
 
 -- public.console_audit_export: the one console function that reads the audit
 -- log in bulk. It is not a second reader -- it is the export, which is an
@@ -174,7 +174,7 @@ create or replace function pg_temp.day17() returns text language sql immutable a
   select '2019-03-17T00:00:00.000Z/2019-03-18T00:00:00.000Z';
 $$;
 create or replace function pg_temp.no_filters() returns text language sql immutable as $$
-  select '{"category":null,"environment":null,"member":null,"result":null,"search":null}';
+  select '{"category":null,"deployment":"development","environment":null,"member":null,"result":null,"search":null}';
 $$;
 
 -- console.challenges.challenge is checked at 16..512 characters (the real one
@@ -248,7 +248,7 @@ select is((select used_at from console.challenges where challenge = pg_temp.ch('
 select pg_temp.tap('wrong-range', '2019-03-01T00:00:00.000Z/2019-03-18T00:00:00.000Z', pg_temp.no_filters());
 select throws_ok($$ select pg_temp.exp(pg_temp.day17(), pg_temp.no_filters()) $$, '42501', 'no tap for this action', 'a tap taken for a wider range cannot be spent on a narrower one');
 
-select pg_temp.tap('wrong-filters', pg_temp.day17(), '{"category":null,"environment":null,"member":null,"result":"refused","search":null}');
+select pg_temp.tap('wrong-filters', pg_temp.day17(), '{"category":null,"deployment":"development","environment":null,"member":null,"result":"refused","search":null}');
 select throws_ok($$ select pg_temp.exp(pg_temp.day17(), pg_temp.no_filters()) $$, '42501', 'no tap for this action', 'nor a tap taken for "refused only" spent on everything');
 
 select pg_temp.tap('wrong-reason', pg_temp.day17(), pg_temp.no_filters(), 'A different reason entirely.');
@@ -308,30 +308,30 @@ select is(
 
 -- Each filter means exactly what it means in console_audit, or the CSV is not
 -- the table the member was looking at.
-select pg_temp.tap('f-result', pg_temp.day17(), '{"category":null,"environment":null,"member":null,"result":"refused","search":null}');
+select pg_temp.tap('f-result', pg_temp.day17(), '{"category":null,"deployment":"development","environment":null,"member":null,"result":"refused","search":null}');
 select is(
-  pg_temp.targets(pg_temp.exp(pg_temp.day17(), '{"category":null,"environment":null,"member":null,"result":"refused","search":null}')),
+  pg_temp.targets(pg_temp.exp(pg_temp.day17(), '{"category":null,"deployment":"development","environment":null,"member":null,"result":"refused","search":null}')),
   array['Audit log'],
   'result narrows the export, compared as text and never cast to the enum'
 );
 
-select pg_temp.tap('f-env', pg_temp.day17(), '{"category":null,"environment":"preview","member":null,"result":null,"search":null}');
+select pg_temp.tap('f-env', pg_temp.day17(), '{"category":null,"deployment":"development","environment":"preview","member":null,"result":null,"search":null}');
 select is(
-  pg_temp.targets(pg_temp.exp(pg_temp.day17(), '{"category":null,"environment":"preview","member":null,"result":null,"search":null}')),
+  pg_temp.targets(pg_temp.exp(pg_temp.day17(), '{"category":null,"deployment":"development","environment":"preview","member":null,"result":null,"search":null}')),
   array['Slow PNR checks', 'Live budget'],
   'environment narrows it to the deployment that wrote the rows'
 );
 
-select pg_temp.tap('f-member', pg_temp.day17(), '{"category":null,"environment":null,"member":"b0000000-0000-4000-8000-000000000002","result":null,"search":null}');
+select pg_temp.tap('f-member', pg_temp.day17(), '{"category":null,"deployment":"development","environment":null,"member":"b0000000-0000-4000-8000-000000000002","result":null,"search":null}');
 select is(
-  pg_temp.targets(pg_temp.exp(pg_temp.day17(), '{"category":null,"environment":null,"member":"b0000000-0000-4000-8000-000000000002","result":null,"search":null}')),
+  pg_temp.targets(pg_temp.exp(pg_temp.day17(), '{"category":null,"deployment":"development","environment":null,"member":"b0000000-0000-4000-8000-000000000002","result":null,"search":null}')),
   array['Site notice', 'Confirm it''s you', 'Slow PNR checks', 'Live budget'],
   'member narrows it to one actor'
 );
 
-select pg_temp.tap('f-category', pg_temp.day17(), '{"category":"provider_keys","environment":null,"member":null,"result":null,"search":null}');
+select pg_temp.tap('f-category', pg_temp.day17(), '{"category":"provider_keys","deployment":"development","environment":null,"member":null,"result":null,"search":null}');
 select is(
-  pg_temp.targets(pg_temp.exp(pg_temp.day17(), '{"category":"provider_keys","environment":null,"member":null,"result":null,"search":null}')),
+  pg_temp.targets(pg_temp.exp(pg_temp.day17(), '{"category":"provider_keys","deployment":"development","environment":null,"member":null,"result":null,"search":null}')),
   array['RailKit key •••• 4F2A'],
   'category narrows it, as free text and not as an enum'
 );
@@ -339,21 +339,21 @@ select is(
 -- Search is the one filter with a shape of its own: reason and target only,
 -- never actor_name, with % and _ escaped. Asha is the actor on five of these
 -- rows and the target of none.
-select pg_temp.tap('f-search', pg_temp.day17(), '{"category":null,"environment":null,"member":null,"result":null,"search":"maintenance"}');
+select pg_temp.tap('f-search', pg_temp.day17(), '{"category":null,"deployment":"development","environment":null,"member":null,"result":null,"search":"maintenance"}');
 select is(
-  pg_temp.targets(pg_temp.exp(pg_temp.day17(), '{"category":null,"environment":null,"member":null,"result":null,"search":"maintenance"}')),
+  pg_temp.targets(pg_temp.exp(pg_temp.day17(), '{"category":null,"deployment":"development","environment":null,"member":null,"result":null,"search":"maintenance"}')),
   array['Traveller notice', 'PNR checks'],
   'search matches reasons as well as targets'
 );
-select pg_temp.tap('f-actor', pg_temp.day17(), '{"category":null,"environment":null,"member":null,"result":null,"search":"Asha"}');
+select pg_temp.tap('f-actor', pg_temp.day17(), '{"category":null,"deployment":"development","environment":null,"member":null,"result":null,"search":"Asha"}');
 select is(
-  (pg_temp.exp(pg_temp.day17(), '{"category":null,"environment":null,"member":null,"result":null,"search":"Asha"}') ->> 'count')::integer,
+  (pg_temp.exp(pg_temp.day17(), '{"category":null,"deployment":"development","environment":null,"member":null,"result":null,"search":"Asha"}') ->> 'count')::integer,
   0,
   'and never the actor''s name, though Asha wrote five of these rows'
 );
-select pg_temp.tap('f-wild', pg_temp.day17(), '{"category":null,"environment":null,"member":null,"result":null,"search":"100%"}');
+select pg_temp.tap('f-wild', pg_temp.day17(), '{"category":null,"deployment":"development","environment":null,"member":null,"result":null,"search":"100%"}');
 select is(
-  pg_temp.targets(pg_temp.exp(pg_temp.day17(), '{"category":null,"environment":null,"member":null,"result":null,"search":"100%"}')),
+  pg_temp.targets(pg_temp.exp(pg_temp.day17(), '{"category":null,"deployment":"development","environment":null,"member":null,"result":null,"search":"100%"}')),
   array['Live budget'],
   'and a member searching for "100%" gets what they typed, not a wildcard'
 );
@@ -362,15 +362,15 @@ select is(
 -- table the member was looking at. The predicate is written out twice -- once
 -- in console_audit, once in console.audit_matching -- so the two are compared
 -- directly, on real rows, rather than by reading them side by side.
-select pg_temp.tap('parity-1', pg_temp.day17(), '{"category":null,"environment":null,"member":null,"result":null,"search":"maintenance"}');
+select pg_temp.tap('parity-1', pg_temp.day17(), '{"category":null,"deployment":"development","environment":null,"member":null,"result":null,"search":"maintenance"}');
 select is(
-  (pg_temp.exp(pg_temp.day17(), '{"category":null,"environment":null,"member":null,"result":null,"search":"maintenance"}') ->> 'count')::integer,
+  (pg_temp.exp(pg_temp.day17(), '{"category":null,"deployment":"development","environment":null,"member":null,"result":null,"search":"maintenance"}') ->> 'count')::integer,
   (public.console_audit('2019-03-17T00:00:00.000Z', '2019-03-18T00:00:00.000Z', null, null, null, 'maintenance', null, 200, 0) ->> 'total')::integer,
   'the export and the list agree on the size of a searched set'
 );
-select pg_temp.tap('parity-2', pg_temp.day17(), '{"category":"configure","environment":"preview","member":"b0000000-0000-4000-8000-000000000002","result":"done","search":null}');
+select pg_temp.tap('parity-2', pg_temp.day17(), '{"category":"configure","deployment":"development","environment":"preview","member":"b0000000-0000-4000-8000-000000000002","result":"done","search":null}');
 select is(
-  (pg_temp.exp(pg_temp.day17(), '{"category":"configure","environment":"preview","member":"b0000000-0000-4000-8000-000000000002","result":"done","search":null}') ->> 'count')::integer,
+  (pg_temp.exp(pg_temp.day17(), '{"category":"configure","deployment":"development","environment":"preview","member":"b0000000-0000-4000-8000-000000000002","result":"done","search":null}') ->> 'count')::integer,
   (public.console_audit('2019-03-17T00:00:00.000Z', '2019-03-18T00:00:00.000Z', 'b0000000-0000-4000-8000-000000000002', 'configure', 'done', null, 'preview', 200, 0) ->> 'total')::integer,
   'and on one narrowed by every other filter at once'
 );
@@ -393,9 +393,9 @@ select is((pg_temp.exp('2019-03-17T00:00:00.000Z/2019-03-17T14:02:31.256374Z', p
 -- Meera's uuid is this file's own and is inserted inside this transaction, so
 -- p_member names exactly the two rows the fixture above wrote and nothing any
 -- other run ever wrote. The fifth instance of this class on this branch.
-select pg_temp.tap('open-end', '2019-03-17T00:00:00.000Z/', '{"category":null,"environment":null,"member":"d0000000-0000-4000-8000-000000000004","result":"refused","search":null}');
+select pg_temp.tap('open-end', '2019-03-17T00:00:00.000Z/', '{"category":null,"deployment":"development","environment":null,"member":"d0000000-0000-4000-8000-000000000004","result":"refused","search":null}');
 select is(
-  (pg_temp.exp('2019-03-17T00:00:00.000Z/', '{"category":null,"environment":null,"member":"d0000000-0000-4000-8000-000000000004","result":"refused","search":null}') ->> 'count')::integer,
+  (pg_temp.exp('2019-03-17T00:00:00.000Z/', '{"category":null,"deployment":"development","environment":null,"member":"d0000000-0000-4000-8000-000000000004","result":"refused","search":null}') ->> 'count')::integer,
   2,
   'a range with only a start reaches past the window it starts in'
 );
@@ -432,6 +432,68 @@ select pg_temp.tap('cap', '2019-03-19T00:00:00.000Z/2019-03-20T00:00:00.000Z', p
 select throws_ok($$ select pg_temp.exp('2019-03-19T00:00:00.000Z/2019-03-20T00:00:00.000Z', pg_temp.no_filters()) $$, '42501', 'too many entries to export', 'an export larger than the cap is refused');
 select is((select used_at from console.challenges where challenge = pg_temp.ch('cap')), null, 'and it spends no tap -- the refusal aborts the call, so nothing it had already done stands');
 
+
+-- THE FORGED DEPLOYMENT (branch review, Critical 1).
+--
+-- Until 20260923090000, console.use_tap digested four fields and p_environment
+-- was none of them, and console.audit_log.environment was checked for length
+-- alone. So an Admin holding a tap the console's own dialog had minted for them
+-- could call this function with p_environment => 'Production' -- capital P --
+-- take every production row, and file the record of it under a value no
+-- Environment picker will ever match. Measured before the fix: five of five
+-- rows left, the row read `environment=Production`, and every picker value
+-- showed nothing.
+--
+-- Four ways in, all closed, each named separately because they fail for
+-- different reasons and a single assertion would pass on whichever fired.
+select pg_temp.tap('forge-absent', pg_temp.day17(), '{"category":null,"environment":null,"member":null,"result":null,"search":null}');
+select throws_ok(
+  format($$ select public.console_audit_export(%L, %L, %L, 'development') $$,
+         pg_temp.day17(), '{"category":null,"environment":null,"member":null,"result":null,"search":null}', pg_temp.why()),
+  '42501', 'the export names a deployment this console is not',
+  'a filter object with no deployment at all is refused -- the shape that shipped before the fix'
+);
+select pg_temp.tap('forge-case', pg_temp.day17(), '{"category":null,"deployment":"Production","environment":null,"member":null,"result":null,"search":null}');
+select throws_ok(
+  format($$ select public.console_audit_export(%L, %L, %L, 'Production') $$,
+         pg_temp.day17(), '{"category":null,"deployment":"Production","environment":null,"member":null,"result":null,"search":null}', pg_temp.why()),
+  '42501', 'the export names a deployment this console is not',
+  'nor a capital P, though the caller digested it and passed it consistently'
+);
+select pg_temp.tap('forge-mismatch', pg_temp.day17(), '{"category":null,"deployment":"development","environment":null,"member":null,"result":null,"search":null}');
+select throws_ok(
+  format($$ select public.console_audit_export(%L, %L, %L, 'Production') $$,
+         pg_temp.day17(), '{"category":null,"deployment":"development","environment":null,"member":null,"result":null,"search":null}', pg_temp.why()),
+  '42501', 'the export names a deployment this console is not',
+  'nor an argument that disagrees with the one the ceremony covered'
+);
+-- The redirect: a tap minted honestly, for this deployment, spent to file the
+-- record against another. This is the one the digest closes on its own -- the
+-- closed set would let it through, because 'preview' is in the set.
+select pg_temp.tap('forge-redirect', pg_temp.day17(), '{"category":null,"deployment":"development","environment":null,"member":null,"result":null,"search":null}');
+select throws_ok(
+  format($$ select public.console_audit_export(%L, %L, %L, 'preview') $$,
+         pg_temp.day17(), '{"category":null,"deployment":"development","environment":null,"member":null,"result":null,"search":null}', pg_temp.why()),
+  '42501', 'the export names a deployment this console is not',
+  'nor a tap taken for this deployment spent to file the record under another'
+);
+-- And the other half, on its own: the column refuses a value outside the set
+-- however it is reached, so a writer that never went through this function
+-- cannot put a row where the Environment picker cannot look. console.write_audit
+-- is revoked from authenticated, so this is belt to the function's braces.
+select throws_ok(
+  $$ insert into console.audit_log (environment, actor_name, category, action, result)
+     values ('Production', 'Forged', 'record', 'Exported the audit log', 'done') $$,
+  '23514', null,
+  'and the column itself refuses an environment the picker cannot reach'
+);
+select is(
+  (select count(*)::integer from pg_catalog.pg_constraint
+    where conname = 'console_audit_log_environment_known' and convalidated),
+  1,
+  'the constraint is validated, not merely recorded -- every row already in the table satisfies it'
+);
+
 -- The audit row. Scoped by this file's own reason marker, never by a bare count
 -- over an action name: console.audit_log survives every reset by design, and a
 -- shipped console writes 'Exported the audit log' rows of its own.
@@ -450,11 +512,11 @@ select is(
 
 -- One export with a reason of its own, so the record it leaves can be read back
 -- without picking arbitrarily among fifteen rows that share a timestamp.
-select pg_temp.tap('record-probe', pg_temp.day17(), '{"category":null,"environment":"preview","member":null,"result":null,"search":null}', 'Range record check, audit-export-probe-one.');
-select pg_temp.exp(pg_temp.day17(), '{"category":null,"environment":"preview","member":null,"result":null,"search":null}', 'Range record check, audit-export-probe-one.');
+select pg_temp.tap('record-probe', pg_temp.day17(), '{"category":null,"deployment":"development","environment":"preview","member":null,"result":null,"search":null}', 'Range record check, audit-export-probe-one.');
+select pg_temp.exp(pg_temp.day17(), '{"category":null,"deployment":"development","environment":"preview","member":null,"result":null,"search":null}', 'Range record check, audit-export-probe-one.');
 select is(
   (select after from console.audit_log where reason = 'Range record check, audit-export-probe-one.'),
-  jsonb_build_object('count', 2, 'range', pg_temp.day17(), 'filters', '{"category":null,"environment":"preview","member":null,"result":null,"search":null}'::jsonb),
+  jsonb_build_object('count', 2, 'range', pg_temp.day17(), 'filters', '{"category":null,"deployment":"development","environment":"preview","member":null,"result":null,"search":null}'::jsonb),
   'the row records how many entries left the console, over what range, under which filters -- the export is reconstructable from its own record'
 );
 

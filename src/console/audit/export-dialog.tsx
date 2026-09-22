@@ -105,10 +105,20 @@ function useExport(): ExportContext {
  */
 export function AuditExportProvider({
   filters,
+  environment,
   total,
   children,
 }: {
   readonly filters: AuditFilters;
+  /**
+   * Which deployment this console is, `consoleEnvironment()`'s own answer relayed through the page.
+   *
+   * It is not a filter -- `filters.environment` is that -- it is what the export's audit row is
+   * written against, and it is here so it can go inside the digested filter object. A tap that did
+   * not cover it could be spent against any environment at all, which is how the audited party used
+   * to be able to file their own export where nobody looks.
+   */
+  readonly environment: string;
   readonly total: number;
   readonly children: ReactNode;
 }) {
@@ -128,7 +138,7 @@ export function AuditExportProvider({
 
   // The filters moving under a prepared export makes it stale: it describes a set the board no
   // longer shows. Pressing Export again is the whole recovery, and it is one press.
-  const key = `${filters.range}|${filters.from}|${filters.to}|${auditExportFilters(filters)}`;
+  const key = `${filters.range}|${filters.from}|${filters.to}|${auditExportFilters(filters, environment)}`;
   const [keySeen, setKeySeen] = useState(key);
   if (key !== keySeen) {
     setKeySeen(key);
@@ -151,13 +161,13 @@ export function AuditExportProvider({
       kind: "confirm",
       ask: {
         range: auditExportRange(filters, new Date()),
-        filters: auditExportFilters(filters),
+        filters: auditExportFilters(filters, environment),
         reason: "",
         count: total,
         rangeWord: m.export.ranges[filters.range],
       },
     });
-  }, [filters, total]);
+  }, [filters, environment, total]);
 
   /**
    * Both of the callbacks below read `stage` and call `setStage` with a plain value, and neither

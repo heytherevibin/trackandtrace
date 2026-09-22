@@ -272,10 +272,19 @@ export function FilterBar({
     ...(filters.member ? [{ label: m.filters.chip(m.filters.member, memberName), clear: { member: null } }] : []),
     ...(filters.category ? [{ label: m.filters.chip(m.filters.category, auditCategoryLabel(filters.category)), clear: { category: null } }] : []),
     ...(filters.result ? [{ label: m.filters.chip(m.filters.result, m.results[filters.result]), clear: { result: null } }] : []),
-    // The environment is a chip only once it stops being this deployment's own: it always has a
-    // value, and chipping the default would put a chip on every unfiltered page.
-    ...(filters.environment !== environment
-      ? [{ label: m.filters.chip(m.filters.environment, filters.environment ?? m.filters.all), clear: { environment } }]
+    // The environment IS chipped at its default, unlike every filter above it, and that is a branch
+    // review finding rather than a preference. This filter always has a value -- a board opens
+    // scoped to its own deployment -- so without a chip a member cannot tell a log with no exports
+    // in it from a log whose exports were filed against a different deployment. "No export rows"
+    // must never be silently "no export rows *in production*": an Owner running an access review
+    // has to be able to see what they are looking through rather than infer it.
+    //
+    // Chipped whenever the view is scoped to one deployment, and not when it is already every one:
+    // "Environment: All" is not a filter, and a chip whose removal does nothing is worse than none.
+    // Removing it widens to All, exactly as removing any other chip removes a filter rather than
+    // swapping it for a different one.
+    ...(filters.environment !== null
+      ? [{ label: m.filters.chip(m.filters.environment, filters.environment), clear: { environment: null } }]
       : []),
   ];
 
@@ -397,7 +406,13 @@ export function FilterBar({
         </DialogContent>
       </DialogRoot>
 
-      {active ? (
+      {/*
+        The row shows whenever there is a chip in it, which -- since the environment is chipped
+        while the view is scoped -- is the ordinary case rather than the filtered one. Clear filters
+        keeps its old condition: `clearAuditFilters` returns to the default view, so beside only the
+        environment chip it would be a button that visibly does nothing.
+      */}
+      {chips.length > 0 ? (
         <div className="flex flex-wrap items-center gap-2.5 max-sm:gap-x-2.5 max-sm:gap-y-2">
           {/*
             `max-sm:hidden`: AuditLog.dc.html:130 draws the word "Filters" in front of the chips and
@@ -410,9 +425,11 @@ export function FilterBar({
             <Chip key={chip.label} label={chip.label} onRemove={() => apply(chip.clear)} />
           ))}
           {/* :93's `btn-lg`. */}
-          <Button variant="ghost" className="max-sm:h-11" onClick={() => onChange(clearAuditFilters(filters, environment))}>
-            {m.filters.clear}
-          </Button>
+          {active ? (
+            <Button variant="ghost" className="max-sm:h-11" onClick={() => onChange(clearAuditFilters(filters, environment))}>
+              {m.filters.clear}
+            </Button>
+          ) : null}
         </div>
       ) : null}
     </div>
