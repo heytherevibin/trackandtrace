@@ -1,6 +1,13 @@
 import type { MessageTree } from "@/messages/types";
 import { signIn } from "./sign-in";
 
+// ConsoleTeam.dc.html's three team confirmations name the member twice and differently: the bold
+// line takes the full name ("Change Kiran Das's role", :265) and the hint below it the first name
+// alone ("Kiran is signed out everywhere at once…", :267, and the same at :291 and :316). The rule
+// lives here, with the strings it governs, rather than at each call site -- the sheet is where it
+// comes from, and a caller passing the wrong half is not a thing a type can catch.
+const firstName = (name: string) => name.split(" ")[0];
+
 // Word for word from docs/design/sheets/console/ConsoleTeam.dc.html, with corrections recorded in
 // task-3-report.md:
 //
@@ -151,5 +158,60 @@ export const team = {
     // logged"), and a mutation that succeeds with no visible confirmation is a defect
     // (task-4-addendum.md §6).
     sentToast: "Invite sent · logged",
+  },
+
+  // The row menu (ConsoleTeam.dc.html:145 and :193-199) and Change role, which is TC-01 itself
+  // (:259-283) -- there is no bespoke dialog for it (task-5-addendum.md §1). Transcribed except
+  // where marked; task-5-report.md lists every authored line here.
+  changeRole: {
+    // :145's own `aria-label` on the row's trigger, and :194's own on the menu it opens -- the
+    // sheet gives both the identical string, so both read it from here.
+    menu: (name: string) => `Actions for ${name}`,
+    // :196-198's three items, in the sheet's own order. Reset keys and Remove are Task 6's; the
+    // menu draws all three from the start so it is transcribed once rather than rebuilt around
+    // them later (task-5-addendum.md §5).
+    trigger: "Change role",
+    resetKeys: "Reset keys",
+    remove: "Remove",
+    // :265's own bold line -- TC-01's `summary`, and the picker's own title, which is the same act.
+    title: (name: string) => `Change ${name}'s role`,
+    // :266, drawn by ConfirmItsYou as `${label}: ${before} → ${after}` ("Role: Support → Admin").
+    changeLabel: "Role",
+    // :267, word for word. The one place the console tells an Owner that a role change signs the
+    // member out everywhere, which is why TC-01 grew an optional hint rather than dropping it.
+    hint: (name: string) => `${firstName(name)} is signed out everywhere at once and signs in again with the new role.`,
+
+    // Not drawn. The sheet's `dialog` enum goes straight from Row menu to TC-01 with
+    // "Support → Admin" already decided, so nothing draws how the new role is chosen
+    // (task-5-addendum.md §2). These three are the picker that stands in for it, reusing the
+    // invite's own radiogroup and the four descriptions above. "New role", not the invite's plain
+    // "Role", because this list leaves the member's current one out.
+    newRoleLabel: "New role",
+    continue: "Continue",
+    // Not drawn: ConsoleTeam.dc.html passes no `toast` to frame() at any call site, and a mutation
+    // that succeeds with no visible confirmation is a defect. ConsoleMyKeys' own "Key removed ·
+    // logged" is the shape.
+    changedToast: "Role changed · logged",
+    // Not drawn. console.use_tap's own 'no tap for this action' -- the four fields the database
+    // re-digests differ from the ones the tap was minted over. Same shape as invite.tapMismatch and
+    // myKeys.tapMismatch, and for the same reason: it is not an outage, so it must not read as one.
+    tapMismatch: "That confirmation no longer matches this change. Try again.",
+    // Not drawn. Every console refusal raises SQLSTATE 42501 and a developer string nobody wrote
+    // for a member: 'a console needs at least one owner' (decided in the browser before any request
+    // goes out, task-5-addendum.md §3), 'no access' for a member removed a moment ago, and
+    // require_role's own for an Owner who was demoted in another tab. Through this console's own UI
+    // every one of them means the same thing -- the roster moved underneath this page -- and this
+    // says that without restating any rule, so no wording here can drift from a rule elsewhere.
+    refused: "The team has changed since this page loaded. Reload it and try again.",
+  },
+
+  // dlg_owner (:334-346), a `role="alertdialog"` with a single primary button. Word for word. It is
+  // drawn from the roster the page already holds, never from the database's refusal: that message
+  // is a developer string, and it arrives with the same 42501 as every other refusal, so there is
+  // nothing in it to tell the two apart by (task-5-addendum.md §3).
+  lastOwner: {
+    title: "A console needs at least one Owner",
+    detail: "Make someone else Owner first.",
+    ok: "OK",
   },
 } as const satisfies MessageTree;

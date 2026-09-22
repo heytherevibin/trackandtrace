@@ -80,3 +80,40 @@ export async function inviteMember(email: string, role: ConsoleRole, reason: str
   const message = consoleApiMessage(result.error);
   return { kind: "failed", message, boundToAddress: ADDRESS_BOUND.has(message) };
 }
+
+// PATCH /api/team/member answers `{ ok: true }` and nothing more: there is nothing to report back
+// about a role change that the refreshed roster will not show, and `.strict()` is what keeps a
+// later route from quietly growing a field nobody here has read.
+const changedSchema = z.object({ ok: z.literal(true) }).strict();
+
+/**
+ * There is no `boundToAddress` counterpart here, deliberately. That flag exists because the invite
+ * dialog has a field a member can edit, and three of its refusals can only ever be fixed by editing
+ * it. This dialog has a radiogroup and a reason, and no refusal it can receive is about either --
+ * a stale tap and a roster that moved both want the same change tried again, unchanged. One shape
+ * for every refusal is the honest one.
+ */
+export type RoleChangeOutcome = { readonly kind: "done" } | { readonly kind: "failed"; readonly message: string };
+
+/**
+ * Changes one member's role (task-5, ConsoleTeam.dc.html's dlg_role). Called only after
+ * ConfirmItsYou's `onConfirmed` fires -- a completed tap -- never before.
+ *
+ * `member` is the id `console_team` returned, passed through untouched: the tap was minted over
+ * this exact string and `console.use_tap` re-digests `p_member::text`, Postgres's own lowercase
+ * canonical uuid. `role` and `reason` go out as the dialog holds them, the same two the tap was
+ * minted with -- only the route's own `tapReason` import trims and digests the reason, so a second
+ * trim here would risk the two disagreeing.
+ *
+ * Every refusal comes back as a message already written for a member to read: the route's mapper
+ * translates `console_change_role`'s developer strings, and `consoleApiMessage` answers the two
+ * codes that carry a failing layer's own wording with the console's own sentence instead.
+ */
+export async function changeRole(member: string, role: ConsoleRole, reason: string): Promise<RoleChangeOutcome> {
+  const result = await apiRequest(
+    "/api/team/member",
+    { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ member, role, reason }) },
+    changedSchema,
+  );
+  return result.ok ? { kind: "done" } : { kind: "failed", message: consoleApiMessage(result.error) };
+}

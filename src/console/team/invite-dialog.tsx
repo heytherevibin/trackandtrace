@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useId, useRef, useState } from "react";
+import { useId, useState } from "react";
 import { z } from "zod";
 import { Button, type ButtonVariant } from "@/components/ui/button";
 import { DialogClose, DialogContent, DialogRoot } from "@/components/ui/dialog";
@@ -11,8 +11,9 @@ import { notify } from "@/components/ui/toast";
 import type { ConsoleRole } from "@/console/auth/member";
 import { ConfirmItsYou } from "@/console/components/confirm-its-you";
 import { consoleMessages } from "@/console/messages";
+import { CONSOLE_ROLES } from "@/console/team/role-change";
+import { RolePicker } from "@/console/team/role-picker";
 import { inviteMember } from "@/console/team/team-client";
-import { cn } from "@/utils/cn";
 
 const m = consoleMessages.team.invite;
 const f = consoleMessages.frame;
@@ -24,74 +25,14 @@ const t = consoleMessages.tap;
 // place keys-plate.tsx keeps its own REMOVE_ACTION.
 const INVITE_ACTION = "Invited a member";
 
-// The sheet's own order, top to bottom (ConsoleTeam.dc.html:215-218), and its own default:
-// Support is the only choice drawn with aria-checked="true" (:217).
-const ROLES = ["owner", "admin", "support", "viewer"] as const satisfies readonly ConsoleRole[];
+// The sheet's own default: Support is the only choice drawn with aria-checked="true" (:217). The
+// four choices themselves, and the radiogroup that draws them, moved to @/console/team/role-picker
+// in Task 5 -- the change-role picker is the same control with the member's current role left out,
+// and a second radiogroup would have been a second set of arrow-key rules to keep in step
+// (task-5-addendum.md §2).
 const DEFAULT_ROLE: ConsoleRole = "support";
 
 const EMAIL = z.email();
-
-/**
- * The sheet's role picker: `role="radiogroup"` labelled by the "Role" legend, four `role="radio"`
- * choices, each a name over a description (:214-219).
- *
- * The sheet draws each choice as a `<div role="radio" tabindex="-1">`. A div cannot be operated
- * from the keyboard and is not a button to assistive technology's activation model, so these are
- * `<button type="button" role="radio">` instead -- the accessible choice where the transcription
- * would otherwise conflict, and the line departed from is quoted above. The roving tabindex the
- * sheet draws (0 on the checked choice, -1 on the rest) is kept exactly, and arrow keys move the
- * selection the way the radiogroup pattern requires.
- *
- * The four descriptions are imported, never restated: task-3 authored them once at
- * consoleMessages.team.roleDescription precisely so this dialog and the setup page could share one
- * copy (task-3-report.md, task-4-addendum.md §1).
- */
-function RolePicker({ value, labelId, onChange }: { readonly value: ConsoleRole; readonly labelId: string; readonly onChange: (role: ConsoleRole) => void }) {
-  const buttons = useRef<(HTMLButtonElement | null)[]>([]);
-
-  function move(delta: number): void {
-    const next = ROLES[(ROLES.indexOf(value) + delta + ROLES.length) % ROLES.length];
-    onChange(next);
-    buttons.current[ROLES.indexOf(next)]?.focus();
-  }
-
-  return (
-    <div role="radiogroup" aria-labelledby={labelId} className="flex flex-col">
-      {ROLES.map((role, index) => (
-        <button
-          key={role}
-          ref={(node) => {
-            buttons.current[index] = node;
-          }}
-          type="button"
-          role="radio"
-          aria-checked={value === role}
-          tabIndex={value === role ? 0 : -1}
-          onClick={() => onChange(role)}
-          onKeyDown={(event) => {
-            if (event.key === "ArrowDown" || event.key === "ArrowRight") {
-              event.preventDefault();
-              move(1);
-            } else if (event.key === "ArrowUp" || event.key === "ArrowLeft") {
-              event.preventDefault();
-              move(-1);
-            }
-          }}
-          className="press flex cursor-pointer items-start gap-2.5 border-b border-line px-1 py-2.5 text-left last:border-b-0 hover:bg-ink-1/5"
-        >
-          <span
-            aria-hidden="true"
-            className={cn("mt-1 size-3.5 shrink-0 border", value === role ? "border-accent-strong bg-accent-strong" : "border-line-strong bg-surface-1")}
-          />
-          <span className="flex min-w-0 flex-col">
-            <span className="text-sm font-medium leading-5">{f.roleLabel[role]}</span>
-            <span className="text-label leading-5 text-ink-3">{consoleMessages.team.roleDescription[role]}</span>
-          </span>
-        </button>
-      ))}
-    </div>
-  );
-}
 
 /** Closed, on TC-04, on TC-01, or between the two with a send in flight. */
 type Stage = { readonly kind: "closed" } | { readonly kind: "form" } | { readonly kind: "confirming" } | { readonly kind: "sending" };
@@ -232,7 +173,7 @@ export function InviteDialog({ variant = "primary" }: { readonly variant?: Butto
               <span id={roleLabelId} className="legend-md text-accent-text">
                 {m.roleLabel}
               </span>
-              <RolePicker value={role} labelId={roleLabelId} onChange={setRole} />
+              <RolePicker value={role} roles={CONSOLE_ROLES} labelId={roleLabelId} onChange={setRole} />
             </div>
             <p className="text-label text-ink-3">{m.hint}</p>
             {/* Deliberately outside <Field>: role="alert" is announced when it appears, and

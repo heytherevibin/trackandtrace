@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ConsoleDb } from "@/console/auth/db";
-import { getTeam, inviteTeamMember } from "@/console/team/team";
+import { changeMemberRole, getTeam, inviteTeamMember } from "@/console/team/team";
 
 // console_team() itself (supabase/migrations/20260922090000_console_team.sql): both halves, one
 // call, never a token_hash. Dates arrive from Postgres with an offset ("+00:00"), not "Z" -- the
@@ -213,6 +213,63 @@ describe("inviteTeamMember", () => {
   it("answers anything else with the console's own unavailable line, never the database's words", async () => {
     const db = dbAnswering({ error: { message: 'relation "console.invites" does not exist' } });
     await expect(inviteTeamMember("priya@example.com", "support", REASON, "production", db)).rejects.toMatchObject({
+      code: "SOURCE_UNAVAILABLE",
+      message: "The console could not be reached. Try again.",
+    });
+  });
+});
+
+describe("changeMemberRole", () => {
+  const MEMBER = "d1111111-1111-1111-1111-111111111111";
+  const WHY = "Covering switches for the weekend on-call.";
+
+  // Never an enum-typed argument to a public.console_* function: PostgREST casts it in the caller's
+  // context, before `security definer` applies, and the call dies with "permission denied for
+  // schema console" (20260921000000_console_enum_args_as_text.sql is the whole phase that cost).
+  it("passes the member as a uuid and the role, reason and environment as text", async () => {
+    const { db, rpc } = dbSpy({});
+    await expect(changeMemberRole(MEMBER, "admin", WHY, "production", db)).resolves.toBeUndefined();
+    expect(rpc).toHaveBeenCalledWith("console_change_role", {
+      p_member: MEMBER,
+      p_role: "admin",
+      p_reason: WHY,
+      p_environment: "production",
+    });
+  });
+
+  it("translates console.use_tap's own 'no tap for this action'", async () => {
+    const db = dbAnswering({ error: { message: "no tap for this action", code: "42501" } });
+    await expect(changeMemberRole(MEMBER, "admin", WHY, "production", db)).rejects.toMatchObject({
+      code: "INVALID_INPUT",
+      message: "That confirmation no longer matches this change. Try again.",
+    });
+  });
+
+  // task-5-addendum.md §3. The last-Owner refusal is decided in the browser, from the roster the
+  // page already has, so it never reaches here through the console's own UI -- only a race or a
+  // hostile caller gets this far. What must never happen is the database's developer string
+  // reaching a screen, and what must not happen either is this mapper deciding what that refusal
+  // *means* by reading its words (confirm-its-you.tsx's own note explains why). So it is answered
+  // by its SQLSTATE, with one sentence that is true of every console refusal alike.
+  it("answers the last-Owner refusal by its errcode, in the console's own words, never the database's", async () => {
+    const db = dbAnswering({ error: { message: "a console needs at least one owner", code: "42501" } });
+    await expect(changeMemberRole(MEMBER, "admin", WHY, "production", db)).rejects.toMatchObject({
+      code: "INVALID_INPUT",
+      message: "The team has changed since this page loaded. Reload it and try again.",
+    });
+  });
+
+  it("answers a vanished or removed target the same way", async () => {
+    const db = dbAnswering({ error: { message: "no access", code: "42501" } });
+    await expect(changeMemberRole(MEMBER, "admin", WHY, "production", db)).rejects.toMatchObject({
+      code: "INVALID_INPUT",
+      message: "The team has changed since this page loaded. Reload it and try again.",
+    });
+  });
+
+  it("answers anything else with the console's own unavailable line, never the database's words", async () => {
+    const db = dbAnswering({ error: { message: 'relation "console.members" does not exist', code: "42P01" } });
+    await expect(changeMemberRole(MEMBER, "admin", WHY, "production", db)).rejects.toMatchObject({
       code: "SOURCE_UNAVAILABLE",
       message: "The console could not be reached. Try again.",
     });

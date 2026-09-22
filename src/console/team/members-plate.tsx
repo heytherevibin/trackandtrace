@@ -4,6 +4,7 @@ import { Led } from "@/components/ui/led";
 import { Plate } from "@/components/ui/plate";
 import { consoleMessages } from "@/console/messages";
 import { InviteDialog } from "@/console/team/invite-dialog";
+import { MemberRowMenu } from "@/console/team/member-row-menu";
 import type { TeamMember } from "@/console/team/team";
 import { formatRelative, formatTime, TIME_ZONE } from "@/utils/datetime";
 
@@ -31,9 +32,18 @@ function formatLastActive(value: string | null, now: Date): string {
 
 /**
  * The Members plate (ConsoleTeam.dc.html): who is in this console, in the order console_team
- * already returns them (by role rank, then name). Row actions -- Change role, Reset keys, Remove --
- * sit behind a Row menu Tasks 5 and 6 build (task-3-addendum.md §4); the Actions column exists so
- * the table's shape does not change under them, but every cell is empty here.
+ * already returns them (by role rank, then name). Every row carries the sheet's own Actions trigger
+ * and the menu behind it (:145, :193-199); Task 5 wires its first item, Task 6 the other two.
+ *
+ * Still a server component. Only the menu inside each Actions cell is "use client", the same split
+ * the only-you row's InviteDialog already draws, so the roster this plate renders is the roster the
+ * server read -- and `router.refresh()` after a change re-runs `getTeam()` rather than patching a
+ * client-side copy that could disagree with it (task-4-addendum.md §5, Ruling 14).
+ *
+ * `signedInId` and the active-Owner count are what the row menu's last-Owner guard reads
+ * (task-5-addendum.md §3). Both are facts about the roster as a whole, so they are worked out here,
+ * once, rather than by each row: `activeOwners` counts what console.require_another_active_owner()
+ * counts -- every member who is an Owner *and* active -- and not "is this row the only Owner".
  *
  * The sheet draws a distinct Only-you state for a console with exactly one member
  * (task-3-addendum.md §1): the same single-row table this component always renders, plus a note
@@ -41,8 +51,9 @@ function formatLastActive(value: string | null, now: Date): string {
  * zero members (the database refuses to demote or remove a console's last Owner), so that is the
  * only extra case there is.
  */
-export function MembersPlate({ members }: { readonly members: readonly TeamMember[] }) {
+export function MembersPlate({ members, signedInId }: { readonly members: readonly TeamMember[]; readonly signedInId: string }) {
   const now = new Date();
+  const activeOwners = members.filter((row) => row.role === "owner" && row.status === "active").length;
 
   const columns: readonly Column<TeamMember>[] = [
     { key: "name", header: m.columns.name, cell: (row) => <span className="font-medium">{row.name}</span> },
@@ -63,10 +74,14 @@ export function MembersPlate({ members }: { readonly members: readonly TeamMembe
     // Visually hidden, matching ConsoleTeam.dc.html:112's own <span style="position: absolute; …">
     // for this header. Through `hideHeader` rather than a wrapped element, so the header stays a
     // plain string: DataTable also prints it as the stacked phone layout's row label, and a DOM
-    // attribute can only carry a string (src/components/ui/data-table.tsx's own note). Empty cells:
-    // this task leaves the row menu for Tasks 5 and 6 rather than building three buttons someone
-    // will move (task-3-addendum.md §4).
-    { key: "actions", header: m.columns.actions, hideHeader: true, cell: () => null, align: "end" },
+    // attribute can only carry a string (src/components/ui/data-table.tsx's own note).
+    {
+      key: "actions",
+      header: m.columns.actions,
+      hideHeader: true,
+      cell: (row) => <MemberRowMenu member={row} signedInId={signedInId} activeOwners={activeOwners} />,
+      align: "end",
+    },
   ];
 
   return (

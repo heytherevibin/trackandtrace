@@ -62,7 +62,13 @@ export default async function TeamPage() {
           beside the only-you note.
         */}
         <PageHeader kicker={m.kicker} title={m.title} lead={m.lead} actions={<InviteDialog variant="primary" />} />
-        <MembersPlate members={team.members} />
+        {/*
+          The signed-in Owner's own id goes down with the roster: the row menu's last-Owner guard
+          refuses a member acting on their own row, which is a fact about who is reading the page
+          and not about the row (task-5-addendum.md §3). `member` is already in hand from the guard
+          above, so nothing extra is read for it.
+        */}
+        <MembersPlate members={team.members} signedInId={member.userId} />
         <InvitesPlate invites={team.invites} />
         <RolesPlate />
       </div>

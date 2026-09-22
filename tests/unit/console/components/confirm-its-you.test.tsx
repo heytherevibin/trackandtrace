@@ -29,7 +29,7 @@ const VALID_REASON = "Left at the old office; replaced.";
 // A realistic controlled harness: reason and open both live here, exactly as a real caller would
 // own them, so "leaves the dialog open" and "starts nothing" are assertions about ConfirmItsYou's
 // own behaviour rather than something the test fakes by construction.
-function Harness({ onCancel, onConfirmed }: { readonly onCancel: () => void; readonly onConfirmed: () => void }) {
+function Harness({ onCancel, onConfirmed, hint }: { readonly onCancel: () => void; readonly onConfirmed: () => void; readonly hint?: string }) {
   const [open, setOpen] = useState(true);
   const [reason, setReason] = useState("");
   return (
@@ -41,6 +41,7 @@ function Harness({ onCancel, onConfirmed }: { readonly onCancel: () => void; rea
       reason={reason}
       summary={SUMMARY}
       change={CHANGE}
+      hint={hint}
       onReasonChange={setReason}
       onCancel={() => {
         setOpen(false);
@@ -81,6 +82,18 @@ describe("ConfirmItsYou", () => {
     await userEvent.click(screen.getByRole("button", { name: "Tap your key" }));
     await waitFor(() => expect(onConfirmed).toHaveBeenCalledTimes(1));
     expect(runTap).toHaveBeenCalledWith({ action: ACTION, target: TARGET, value: VALUE, reason: VALID_REASON });
+  });
+
+  // Main.dc.html's own TC-01 (:213-231) has no consequence line -- it carries a bespoke "Message to
+  // travellers" field there instead. ConsoleTeam.dc.html's three team actions all draw one, in the
+  // same column as the summary and the Change line (:267, :291, :316), and the only way to keep one
+  // TC-01 rather than fork it is an optional prop (task-5-addendum.md §1). Optional, not required,
+  // because the sheet's own first caller genuinely has none.
+  it("draws an optional hint under the change line, and nothing at all without one", () => {
+    const { rerender } = render(<Harness onCancel={vi.fn()} onConfirmed={vi.fn()} />);
+    expect(screen.queryByText(/signed out everywhere/)).toBeNull();
+    rerender(<Harness onCancel={vi.fn()} onConfirmed={vi.fn()} hint="Kiran is signed out everywhere at once." />);
+    expect(screen.getByText("Kiran is signed out everywhere at once.")).toBeVisible();
   });
 
   it("refuses a reason under 10 characters, without starting a ceremony", async () => {
