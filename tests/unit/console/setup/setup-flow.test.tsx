@@ -30,6 +30,7 @@ describe("Setup", () => {
 
   it("moves to step 2 once the first key is added", async () => {
     render(<SetupFlow keyCount={0} />);
+    await userEvent.click(screen.getByRole("radio", { name: /Security key/ }));
     await userEvent.type(screen.getByLabelText("Name this key"), "YubiKey 5C");
     await userEvent.click(screen.getByRole("button", { name: "Add key" }));
     expect(await screen.findByRole("heading", { name: "Add a second key" })).toBeVisible();
@@ -45,6 +46,7 @@ describe("Setup", () => {
   it("reaches step 3 and offers the console", async () => {
     addKey.mockResolvedValue({ kind: "done", keyCount: 2, activated: true });
     render(<SetupFlow keyCount={1} />);
+    await userEvent.click(screen.getByRole("radio", { name: /Security key/ }));
     await userEvent.type(screen.getByLabelText("Name this key"), "iPhone");
     await userEvent.click(screen.getByRole("button", { name: "Add key" }));
     expect(await screen.findByRole("heading", { name: "You're set up" })).toBeVisible();
@@ -53,13 +55,57 @@ describe("Setup", () => {
 
   it("refuses to add a key with no name", async () => {
     render(<SetupFlow keyCount={0} />);
+    await userEvent.click(screen.getByRole("radio", { name: /Security key/ }));
     await userEvent.click(screen.getByRole("button", { name: "Add key" }));
     expect(addKey).not.toHaveBeenCalled();
+  });
+
+  // The shipped defect, at the step it was reported on: Safari's own sheet never offers the
+  // security-key path, so the owner's second key had to be added in Chrome. Setup is where every
+  // member's two keys start, so the choice belongs on both of its steps, not only My keys'.
+  it("offers the kind on step 1 and passes on what was chosen", async () => {
+    render(<SetupFlow keyCount={0} />);
+    await userEvent.click(screen.getByRole("radio", { name: /Security key/ }));
+    await userEvent.type(screen.getByLabelText("Name this key"), "YubiKey 5C");
+    await userEvent.click(screen.getByRole("button", { name: "Add key" }));
+    await vi.waitFor(() => expect(addKey).toHaveBeenCalledExactlyOnceWith("YubiKey 5C", "securityKey"));
+  });
+
+  it("offers it on step 2 as well, where a second key of the other kind is the usual answer", async () => {
+    render(<SetupFlow keyCount={1} />);
+    await userEvent.click(screen.getByRole("radio", { name: /This device/ }));
+    await userEvent.type(screen.getByLabelText("Name this key"), "MacBook Pro");
+    await userEvent.click(screen.getByRole("button", { name: "Add key" }));
+    await vi.waitFor(() => expect(addKey).toHaveBeenCalledExactlyOnceWith("MacBook Pro", "thisDevice"));
+  });
+
+  it("will not start a ceremony until the member has chosen a kind", async () => {
+    render(<SetupFlow keyCount={0} />);
+    await userEvent.type(screen.getByLabelText("Name this key"), "YubiKey 5C");
+    expect(screen.getByRole("button", { name: "Add key" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "Add key" }));
+    expect(addKey).not.toHaveBeenCalled();
+  });
+
+  // Spec §D asks for two keys and says nothing about them being two different kinds. Deciding for
+  // the member -- "you already hold a passkey, so this one must be a security key" -- would be
+  // policy this console has no mandate to invent, and two passkeys in different places is a
+  // legitimate answer to "keep your keys in different places".
+  it("still offers both kinds on step 2, whatever the first key was", async () => {
+    render(<SetupFlow keyCount={0} />);
+    await userEvent.click(screen.getByRole("radio", { name: /This device/ }));
+    await userEvent.type(screen.getByLabelText("Name this key"), "MacBook Pro");
+    await userEvent.click(screen.getByRole("button", { name: "Add key" }));
+    await screen.findByRole("heading", { name: "Add a second key" });
+    expect(screen.getByRole("radio", { name: /Security key/ })).toBeEnabled();
+    expect(screen.getByRole("radio", { name: /This device/ })).toBeEnabled();
+    for (const choice of screen.getAllByRole("radio")) expect(choice).toHaveAttribute("aria-checked", "false");
   });
 
   it("shows the same-key refusal where the sheet shows it", async () => {
     addKey.mockResolvedValue({ kind: "failed", message: "That key is already added. Use a different one." });
     render(<SetupFlow keyCount={1} />);
+    await userEvent.click(screen.getByRole("radio", { name: /Security key/ }));
     await userEvent.type(screen.getByLabelText("Name this key"), "YubiKey 5C");
     await userEvent.click(screen.getByRole("button", { name: "Add key" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("That key is already added. Use a different one.");
@@ -68,6 +114,7 @@ describe("Setup", () => {
   it("says nothing new when the member dismisses the prompt themselves, and does not advance", async () => {
     addKey.mockResolvedValue({ kind: "cancelled" });
     render(<SetupFlow keyCount={0} />);
+    await userEvent.click(screen.getByRole("radio", { name: /Security key/ }));
     await userEvent.type(screen.getByLabelText("Name this key"), "YubiKey 5C");
     await userEvent.click(screen.getByRole("button", { name: "Add key" }));
     expect(screen.queryByRole("alert")).toBeNull();
@@ -79,6 +126,7 @@ describe("Setup", () => {
     let resolveAdd: ((outcome: AddKeyOutcome) => void) | undefined;
     addKey.mockImplementation(() => new Promise<AddKeyOutcome>((resolve) => (resolveAdd = resolve)));
     render(<SetupFlow keyCount={0} />);
+    await userEvent.click(screen.getByRole("radio", { name: /Security key/ }));
     await userEvent.type(screen.getByLabelText("Name this key"), "YubiKey 5C");
     await userEvent.click(screen.getByRole("button", { name: "Add key" }));
     expect(await screen.findByRole("button", { name: "Touch your key…" })).toBeDisabled();
@@ -101,11 +149,13 @@ describe("Setup", () => {
     // initial render uses -- is what lets this member ever reach "You're set up" at all.
     addKey.mockResolvedValueOnce({ kind: "done", keyCount: 1, activated: false });
     render(<SetupFlow keyCount={0} />);
+    await userEvent.click(screen.getByRole("radio", { name: /Security key/ }));
     await userEvent.type(screen.getByLabelText("Name this key"), "YubiKey 5C");
     await userEvent.click(screen.getByRole("button", { name: "Add key" }));
     expect(await screen.findByRole("heading", { name: "Add a second key" })).toBeVisible();
 
     addKey.mockResolvedValueOnce({ kind: "done", keyCount: 2, activated: false });
+    await userEvent.click(screen.getByRole("radio", { name: /Security key/ }));
     await userEvent.type(screen.getByLabelText("Name this key"), "iPhone");
     await userEvent.click(screen.getByRole("button", { name: "Add key" }));
     expect(await screen.findByRole("heading", { name: "You're set up" })).toBeVisible();

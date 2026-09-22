@@ -91,7 +91,7 @@ describe("addKey", () => {
       .mockResolvedValueOnce(answer({ ok: true, step: "register", options: { challenge: "r" } }))
       .mockResolvedValueOnce(answer({ ok: true, keyCount: 1, activated: false, next: null }));
     vi.stubGlobal("fetch", fetchSpy);
-    await expect(addKey("Blue key")).resolves.toEqual({ kind: "done", keyCount: 1, activated: false });
+    await expect(addKey("Blue key", "securityKey")).resolves.toEqual({ kind: "done", keyCount: 1, activated: false });
     expect(startRegistration).toHaveBeenCalledOnce();
     expect(startAuthentication).not.toHaveBeenCalled();
   });
@@ -103,9 +103,56 @@ describe("addKey", () => {
       .mockResolvedValueOnce(answer({ ok: true, step: "register", options: { challenge: "r" } }))
       .mockResolvedValueOnce(answer({ ok: true, keyCount: 2, activated: true, next: "/" }));
     vi.stubGlobal("fetch", fetchSpy);
-    await expect(addKey("iPhone")).resolves.toEqual({ kind: "done", keyCount: 2, activated: true });
+    await expect(addKey("iPhone", "securityKey")).resolves.toEqual({ kind: "done", keyCount: 2, activated: true });
     expect(startAuthentication).toHaveBeenCalledWith({ optionsJSON: { challenge: "t" } });
     expect(startRegistration).toHaveBeenCalledWith({ optionsJSON: { challenge: "r" } });
+  });
+
+  it("tells the options route which kind the member chose", async () => {
+    const fetchSpy = vi
+      .fn()
+      .mockResolvedValueOnce(answer({ ok: true, step: "register", options: { challenge: "r" } }))
+      .mockResolvedValueOnce(answer({ ok: true, keyCount: 1, activated: false, next: null }));
+    vi.stubGlobal("fetch", fetchSpy);
+    await addKey("MacBook Pro", "thisDevice");
+    expect(JSON.parse(String(fetchSpy.mock.calls[0]?.[1]?.body))).toEqual({ intent: "add_key", kind: "thisDevice" });
+  });
+
+  // Every key after the first is registered with the options the *tap* route mints, not the
+  // options route's -- so a kind sent only to the first of the two would be dropped on exactly the
+  // path the defect was reported on (an owner who already holds one key).
+  it("tells the tap route too, which is what mints the options for every key after the first", async () => {
+    const fetchSpy = vi
+      .fn()
+      .mockResolvedValueOnce(answer({ ok: true, step: "tap", options: { challenge: "t" } }))
+      .mockResolvedValueOnce(answer({ ok: true, step: "register", options: { challenge: "r" } }))
+      .mockResolvedValueOnce(answer({ ok: true, keyCount: 2, activated: true, next: "/" }));
+    vi.stubGlobal("fetch", fetchSpy);
+    await addKey("YubiKey 5 NFC", "securityKey");
+    expect(JSON.parse(String(fetchSpy.mock.calls[1]?.[1]?.body))).toEqual({
+      intent: "add_key",
+      step: "tap",
+      kind: "securityKey",
+      response: { id: "Y3JlZA" },
+    });
+  });
+
+  // The register step names the key and hands over the attestation; the type the row stores is
+  // read off that attestation on the server. Sending the kind here as well would offer the server
+  // a second, client-chosen answer to a question only the credential can answer.
+  it("does not send the kind again when the new key is recorded", async () => {
+    const fetchSpy = vi
+      .fn()
+      .mockResolvedValueOnce(answer({ ok: true, step: "register", options: { challenge: "r" } }))
+      .mockResolvedValueOnce(answer({ ok: true, keyCount: 1, activated: false, next: null }));
+    vi.stubGlobal("fetch", fetchSpy);
+    await addKey("Blue key", "securityKey");
+    expect(JSON.parse(String(fetchSpy.mock.calls[1]?.[1]?.body))).toEqual({
+      intent: "add_key",
+      step: "register",
+      name: "Blue key",
+      response: { id: "bmV3" },
+    });
   });
 
   it("surfaces the same-key refusal as the sheet words it", async () => {
@@ -114,7 +161,7 @@ describe("addKey", () => {
       .mockResolvedValueOnce(answer({ ok: true, step: "register", options: {} }))
       .mockResolvedValueOnce(answer({ ok: false, code: "INVALID_INPUT", message: "That key is already added. Use a different one." }, 409));
     vi.stubGlobal("fetch", fetchSpy);
-    await expect(addKey("Blue key")).resolves.toEqual({ kind: "failed", message: "That key is already added. Use a different one." });
+    await expect(addKey("Blue key", "securityKey")).resolves.toEqual({ kind: "failed", message: "That key is already added. Use a different one." });
   });
 
   // excludeCredentials makes the browser itself refuse a duplicate credential before any request
@@ -125,24 +172,24 @@ describe("addKey", () => {
   it("maps the browser's own duplicate-credential refusal to the sheet's already-added line, not its own text", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(answer({ ok: true, step: "register", options: {} })));
     startRegistration.mockRejectedValue(Object.assign(new Error("The authenticator was previously registered"), { name: "InvalidStateError", code: "ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED" }));
-    await expect(addKey("YubiKey 5C again")).resolves.toEqual({ kind: "failed", message: "That key is already added. Use a different one." });
+    await expect(addKey("YubiKey 5C again", "securityKey")).resolves.toEqual({ kind: "failed", message: "That key is already added. Use a different one." });
   });
 
   it("still recognises a bare InvalidStateError with no wrapper code", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(answer({ ok: true, step: "register", options: {} })));
     startRegistration.mockRejectedValue(Object.assign(new Error("previously registered"), { name: "InvalidStateError" }));
-    await expect(addKey("YubiKey 5C again")).resolves.toEqual({ kind: "failed", message: "That key is already added. Use a different one." });
+    await expect(addKey("YubiKey 5C again", "securityKey")).resolves.toEqual({ kind: "failed", message: "That key is already added. Use a different one." });
   });
 
   it("still recognises the wrapper's own code even if its name were ever something else", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(answer({ ok: true, step: "register", options: {} })));
     startRegistration.mockRejectedValue(Object.assign(new Error("The authenticator was previously registered"), { name: "SomeOtherName", code: "ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED" }));
-    await expect(addKey("YubiKey 5C again")).resolves.toEqual({ kind: "failed", message: "That key is already added. Use a different one." });
+    await expect(addKey("YubiKey 5C again", "securityKey")).resolves.toEqual({ kind: "failed", message: "That key is already added. Use a different one." });
   });
 
   it("falls back to the console's own didn't-answer line for any other browser failure during registration", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(answer({ ok: true, step: "register", options: {} })));
     startRegistration.mockRejectedValue(Object.assign(new Error("The authenticator was unable to process the specified options."), { name: "UnknownError" }));
-    await expect(addKey("YubiKey 5C")).resolves.toEqual({ kind: "failed", message: "That key didn't answer. Try again." });
+    await expect(addKey("YubiKey 5C", "securityKey")).resolves.toEqual({ kind: "failed", message: "That key didn't answer. Try again." });
   });
 });

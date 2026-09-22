@@ -1,4 +1,4 @@
-import { consoleSql, expect, expectSignedInAs, readOutbox, resetConsole, setUpFirstOwner, swapAuthenticatorAfterTap, test, type VirtualKey } from "./fixtures";
+import { chooseKeyKind, consoleSql, expect, expectSignedInAs, readOutbox, resetConsole, setUpFirstOwner, swapAuthenticatorAfterTap, test, type VirtualKey } from "./fixtures";
 import { gotoReady } from "../helpers";
 
 const BASE = "http://admin.localhost:4211";
@@ -58,6 +58,7 @@ test.describe("My keys", () => {
     await page.getByRole("button", { name: "Add a key" }).click();
     const addDialog = page.getByRole("dialog", { name: "Add a key" });
     await expect(addDialog).toBeVisible();
+    await chooseKeyKind(addDialog, "usb");
     await addDialog.getByLabel("Name this key").fill("YubiKey 5 NFC");
     await swapAuthenticatorAfterTap(page, owner.secondKey, "usb", (next) => {
       thirdKey = next;
@@ -155,6 +156,7 @@ test.describe("My keys", () => {
     await page.getByRole("button", { name: "Add a key" }).click();
     const addDialog = page.getByRole("dialog", { name: "Add a key" });
     await expect(addDialog).toBeVisible();
+    await chooseKeyKind(addDialog, "usb");
     await addDialog.getByLabel("Name this key").fill("YubiKey 5 NFC");
     await swapAuthenticatorAfterTap(page, owner.secondKey, "usb", (next) => {
       thirdKey = next;

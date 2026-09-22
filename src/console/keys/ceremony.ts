@@ -8,6 +8,7 @@ import { AppError } from "@/services/errors";
 import { log } from "@/services/log";
 import { clientIp } from "@/services/rate-limit";
 import { base64ToBase64url, base64urlToByteaLiteral } from "./encoding";
+import type { ConsoleKeyKind } from "./kind";
 import { relyingParty } from "./rp";
 import {
   authenticationOptionsFor,
@@ -131,7 +132,15 @@ function challengeFrom(response: { readonly response?: { readonly clientDataJSON
   }
 }
 
-export async function beginCeremony(args: { readonly intent: "sign_in" | "add_key"; readonly req: Request } & Deps): Promise<{
+/**
+ * Signing in picks among keys the member already holds, so there is nothing to prefer; adding one
+ * registers a new credential, so the kind the member chose comes with it. Written as a union rather
+ * than an optional field so the compiler asks for a kind exactly where one is used, and refuses one
+ * where it would be read by nothing.
+ */
+type BeginIntent = { readonly intent: "sign_in" } | { readonly intent: "add_key"; readonly kind: ConsoleKeyKind };
+
+export async function beginCeremony(args: BeginIntent & { readonly req: Request } & Deps): Promise<{
   readonly step: "tap" | "register";
   readonly options: unknown;
 }> {
@@ -157,6 +166,7 @@ export async function beginCeremony(args: { readonly intent: "sign_in" | "add_ke
     rp,
     member: { userId: session.memberId, email: session.email, name: session.name },
     existing: keys,
+    kind: args.kind,
   });
   await mint(service, session, "add_key", options.challenge);
   return { step: "register", options };
@@ -225,8 +235,16 @@ export async function completeSignIn(args: { readonly req: Request; readonly res
   });
 }
 
-/** The tap that unlocks adding another key: it spends an `add_key_tap` and mints an `add_key`. */
-export async function completeTap(args: { readonly req: Request; readonly response: AuthenticationResponseJSON } & Deps): Promise<{ readonly options: unknown }> {
+/**
+ * The tap that unlocks adding another key: it spends an `add_key_tap` and mints an `add_key`.
+ *
+ * This is where every key after the first gets its registration options -- beginCeremony only ever
+ * mints them for a member who holds none -- so the kind the member chose has to arrive here too,
+ * not only at the options route. It is the path the reported defect was actually on.
+ */
+export async function completeTap(
+  args: { readonly req: Request; readonly response: AuthenticationResponseJSON; readonly kind: ConsoleKeyKind } & Deps,
+): Promise<{ readonly options: unknown }> {
   const service = args.service ?? createConsoleServiceDb();
   const session = await requireLinkSession({ db: args.db, service });
   const rp = relyingParty(args.req.headers.get("host"));
@@ -248,6 +266,7 @@ export async function completeTap(args: { readonly req: Request; readonly respon
     rp,
     member: { userId: session.memberId, email: session.email, name: session.name },
     existing: keys,
+    kind: args.kind,
   });
   await mint(service, session, "add_key", options.challenge);
   return { options };

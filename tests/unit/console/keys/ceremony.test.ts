@@ -90,14 +90,14 @@ describe("requireLinkSession", () => {
 describe("beginCeremony", () => {
   it("gives a member with no keys a registration challenge straight away", async () => {
     const { service, member, rpc } = fakes();
-    const begun = await beginCeremony({ intent: "add_key", req: REQUEST, db: member, service });
+    const begun = await beginCeremony({ intent: "add_key", kind: "securityKey", req: REQUEST, db: member, service });
     expect(begun.step).toBe("register");
     expect(rpc).toHaveBeenCalledWith("console_auth_new_challenge", expect.objectContaining({ p_purpose: "add_key" }));
   });
 
   it("makes a member who already holds a key tap it first", async () => {
     const { service, member, rpc } = fakes({ console_auth_session: { ...SESSION, key_count: 1 }, console_auth_keys_for_member: [KEY_ROW] });
-    const begun = await beginCeremony({ intent: "add_key", req: REQUEST, db: member, service });
+    const begun = await beginCeremony({ intent: "add_key", kind: "securityKey", req: REQUEST, db: member, service });
     expect(begun.step).toBe("tap");
     expect(rpc).toHaveBeenCalledWith("console_auth_new_challenge", expect.objectContaining({ p_purpose: "add_key_tap" }));
   });
@@ -120,6 +120,35 @@ describe("beginCeremony", () => {
     expect(JSON.stringify(begun.options)).not.toContain("a+b/c9");
   });
 
+  // Not a mock: registrationOptionsFor and the real @simplewebauthn/server run here, so this reads
+  // the options the browser is actually handed. `authenticatorAttachment` is the half that fixes
+  // the reported defect -- `hints` is WebAuthn L3 and browsers may ignore it, while the attachment
+  // has been honoured for years and is what moves Safari off its iCloud Keychain sheet.
+  it("hands a member adding their first key options that name the kind they chose", async () => {
+    const { service, member } = fakes();
+    const begun = await beginCeremony({ intent: "add_key", kind: "securityKey", req: REQUEST, db: member, service });
+    expect(begun.options).toMatchObject({
+      authenticatorSelection: { authenticatorAttachment: "cross-platform", residentKey: "discouraged", userVerification: "preferred" },
+      hints: ["security-key"],
+    });
+  });
+
+  it("names this device's own passkey when that is the kind chosen instead", async () => {
+    const { service, member } = fakes();
+    const begun = await beginCeremony({ intent: "add_key", kind: "thisDevice", req: REQUEST, db: member, service });
+    expect(begun.options).toMatchObject({ authenticatorSelection: { authenticatorAttachment: "platform" }, hints: ["client-device"] });
+  });
+
+  // generateRegistrationOptions writes authenticatorAttachment onto the authenticatorSelection
+  // object it is handed, in place. A shared literal would carry one member's choice into the next
+  // call, so registrationOptionsFor builds a fresh one each time.
+  it("never carries one ceremony's chosen kind into the next", async () => {
+    const { service, member } = fakes();
+    await beginCeremony({ intent: "add_key", kind: "securityKey", req: REQUEST, db: member, service });
+    const second = await beginCeremony({ intent: "add_key", kind: "thisDevice", req: REQUEST, db: member, service });
+    expect(second.options).toMatchObject({ authenticatorSelection: { authenticatorAttachment: "platform" } });
+  });
+
   it("fails closed when a key row does not parse, rather than reading it as no keys", async () => {
     const { service, member } = fakes({
       console_auth_session: { ...SESSION, key_count: 1, status: "active" },
@@ -128,7 +157,7 @@ describe("beginCeremony", () => {
     // A member the session says holds one key, but whose actual row is unreadable, must not be
     // routed onto "register your first key" (step: "register") -- that would let a key be added
     // with no tap of the one already on file.
-    await expect(beginCeremony({ intent: "add_key", req: REQUEST, db: member, service })).rejects.toMatchObject({ status: 401 });
+    await expect(beginCeremony({ intent: "add_key", kind: "securityKey", req: REQUEST, db: member, service })).rejects.toMatchObject({ status: 401 });
   });
 });
 
@@ -185,7 +214,7 @@ describe("completeTap", () => {
       console_auth_take_challenge: { challenge: "c", session_id: SESSION.session_id, purpose: "add_key_tap" },
     });
     verifyAuthentication.mockResolvedValueOnce({ credentialId: KEY_ROW.credential_id, newCounter: KEY_ROW.counter + 1 });
-    await completeTap({ req: REQUEST, response: responseWithChallenge("Y3JlZA") as never, db: member, service });
+    await completeTap({ req: REQUEST, kind: "securityKey", response: responseWithChallenge("Y3JlZA") as never, db: member, service });
     expect(rpc).toHaveBeenCalledWith("console_auth_take_challenge", expect.objectContaining({ p_purpose: "add_key_tap" }));
     expect(rpc).not.toHaveBeenCalledWith("console_auth_take_challenge", expect.objectContaining({ p_purpose: "add_key" }));
   });
@@ -197,8 +226,11 @@ describe("completeTap", () => {
       console_auth_take_challenge: { challenge: "c", session_id: SESSION.session_id, purpose: "add_key_tap" },
     });
     verifyAuthentication.mockResolvedValueOnce({ credentialId: KEY_ROW.credential_id, newCounter: KEY_ROW.counter + 1 });
-    const begun = await completeTap({ req: REQUEST, response: responseWithChallenge("Y3JlZA") as never, db: member, service });
+    const begun = await completeTap({ req: REQUEST, kind: "securityKey", response: responseWithChallenge("Y3JlZA") as never, db: member, service });
     expect(begun.options).toBeTruthy();
+    // The tap route is where every key after the first gets its registration options, so the kind
+    // has to survive this step -- not only beginCeremony's.
+    expect(begun.options).toMatchObject({ authenticatorSelection: { authenticatorAttachment: "cross-platform" } });
     expect(rpc).toHaveBeenCalledWith("console_auth_new_challenge", expect.objectContaining({ p_purpose: "add_key" }));
     // The touch is the proof the assertion verified: it must have already happened by the time
     // the registration challenge is minted.
@@ -212,7 +244,7 @@ describe("completeTap", () => {
       console_auth_take_challenge: { challenge: "c", session_id: SESSION.session_id, purpose: "add_key_tap" },
     });
     verifyAuthentication.mockRejectedValueOnce(new Error("bad signature"));
-    await expect(completeTap({ req: REQUEST, response: responseWithChallenge("Y3JlZA") as never, db: member, service })).rejects.toThrow();
+    await expect(completeTap({ req: REQUEST, kind: "securityKey", response: responseWithChallenge("Y3JlZA") as never, db: member, service })).rejects.toThrow();
     expect(rpc).toHaveBeenCalledWith("console_auth_write_audit", expect.objectContaining({ p_action: "Key tap failed", p_result: "failed" }));
     expect(rpc).not.toHaveBeenCalledWith("console_auth_new_challenge", expect.objectContaining({ p_purpose: "add_key" }));
   });
@@ -226,7 +258,7 @@ describe("completeTap", () => {
       console_auth_keys_for_member: [KEY_ROW],
       console_auth_take_challenge: { challenge: "c", session_id: SESSION.session_id, purpose: "add_key_tap" },
     });
-    await expect(completeTap({ req: REQUEST, response: { id: "Y3JlZA" } as never, db: member, service })).rejects.toMatchObject({ status: 400 });
+    await expect(completeTap({ req: REQUEST, kind: "securityKey", response: { id: "Y3JlZA" } as never, db: member, service })).rejects.toMatchObject({ status: 400 });
     expect(rpc).toHaveBeenCalledWith("console_auth_write_audit", expect.objectContaining({ p_action: "Key tap failed", p_result: "failed" }));
     expect(rpc).not.toHaveBeenCalledWith("console_auth_take_challenge", expect.anything());
   });
@@ -252,6 +284,27 @@ describe("completeRegistration", () => {
     expect(rpc).toHaveBeenCalledWith("console_auth_record_key", expect.objectContaining({ p_name: "iPhone", p_type: "passkey" }));
     expect(rpc).toHaveBeenCalledWith("console_auth_verify_session", expect.objectContaining({ p_session_id: SESSION.session_id }));
     expect(rpc).toHaveBeenCalledWith("console_auth_write_audit", expect.objectContaining({ p_action: "Added a key", p_target: "iPhone" }));
+  });
+
+  // The kind is a hint about which browser sheet to open and nothing else. A member can ask for the
+  // security-key sheet and still have a platform passkey answer it (they picked the phone in the
+  // cross-platform sheet, say) -- the row must say what actually answered. completeRegistration
+  // takes no kind at all, which is what makes that impossible to get wrong here.
+  it("stores the type the credential reported, even when the member asked for the other kind", async () => {
+    const { service, rpc, member } = fakes({
+      console_auth_take_challenge: { challenge: "c", session_id: SESSION.session_id, purpose: "add_key" },
+    });
+    await beginCeremony({ intent: "add_key", kind: "securityKey", req: REQUEST, db: member, service });
+    await completeRegistration({
+      req: REQUEST,
+      response: responseWithChallenge("bmV3", { type: "webauthn.create" }) as never,
+      name: "iPhone",
+      db: member,
+      service,
+      verified: { credentialId: "bmV3", publicKey: "cHVia2V5", counter: 0, transports: ["hybrid"], keyType: "passkey" },
+    });
+    expect(rpc).toHaveBeenCalledWith("console_auth_record_key", expect.objectContaining({ p_type: "passkey" }));
+    expect(rpc).not.toHaveBeenCalledWith("console_auth_record_key", expect.objectContaining({ p_type: "security_key" }));
   });
 
   it("leaves a member with one key in setup, and does not verify the session", async () => {

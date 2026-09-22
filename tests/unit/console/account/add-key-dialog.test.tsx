@@ -18,7 +18,14 @@ import { AddKeyDialog } from "@/console/account/add-key-dialog";
 // own pattern).
 function Harness({ onAdded }: { readonly onAdded: () => void }) {
   const [open, setOpen] = useState(true);
-  return <AddKeyDialog open={open} onClose={() => setOpen(false)} onAdded={onAdded} />;
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)}>
+        Reopen
+      </button>
+      <AddKeyDialog open={open} onClose={() => setOpen(false)} onAdded={onAdded} />
+    </>
+  );
 }
 
 beforeEach(() => {
@@ -43,6 +50,7 @@ describe("AddKeyDialog", () => {
     let resolveAdd: ((outcome: AddKeyOutcome) => void) | undefined;
     addKey.mockImplementation(() => new Promise<AddKeyOutcome>((resolve) => (resolveAdd = resolve)));
     render(<AddKeyDialog open onClose={vi.fn()} onAdded={vi.fn()} />);
+    await userEvent.click(screen.getByRole("radio", { name: /Security key/ }));
     await userEvent.type(screen.getByLabelText("Name this key"), "YubiKey 5 NFC");
     await userEvent.click(screen.getByRole("button", { name: "Add a key" }));
 
@@ -59,16 +67,44 @@ describe("AddKeyDialog", () => {
   it("calls onAdded with the trimmed name once addKey succeeds", async () => {
     const onAdded = vi.fn();
     render(<AddKeyDialog open onClose={vi.fn()} onAdded={onAdded} />);
+    await userEvent.click(screen.getByRole("radio", { name: /Security key/ }));
     await userEvent.type(screen.getByLabelText("Name this key"), "  YubiKey 5 NFC  ");
     await userEvent.click(screen.getByRole("button", { name: "Add a key" }));
     await vi.waitFor(() => expect(onAdded).toHaveBeenCalledOnce());
-    expect(addKey).toHaveBeenCalledExactlyOnceWith("YubiKey 5 NFC");
+    expect(addKey).toHaveBeenCalledExactlyOnceWith("YubiKey 5 NFC", "securityKey");
+  });
+
+  it("offers the choice the sheet does not draw, and passes it on", async () => {
+    render(<AddKeyDialog open onClose={vi.fn()} onAdded={vi.fn()} />);
+    await userEvent.click(screen.getByRole("radio", { name: /This device/ }));
+    await userEvent.type(screen.getByLabelText("Name this key"), "MacBook Pro");
+    await userEvent.click(screen.getByRole("button", { name: "Add a key" }));
+    await vi.waitFor(() => expect(addKey).toHaveBeenCalledExactlyOnceWith("MacBook Pro", "thisDevice"));
+  });
+
+  // Nothing is pre-chosen, so the ceremony cannot start until the member says which sheet they
+  // want -- the whole point of the change.
+  it("will not start a ceremony until the member has chosen a kind", async () => {
+    render(<AddKeyDialog open onClose={vi.fn()} onAdded={vi.fn()} />);
+    await userEvent.type(screen.getByLabelText("Name this key"), "YubiKey 5C");
+    expect(screen.getByRole("button", { name: "Add a key" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "Add a key" }));
+    expect(addKey).not.toHaveBeenCalled();
+  });
+
+  it("forgets the kind between openings, the same way it forgets the name", async () => {
+    render(<Harness onAdded={vi.fn()} />);
+    await userEvent.click(screen.getByRole("radio", { name: /This device/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await userEvent.click(screen.getByRole("button", { name: "Reopen" }));
+    for (const choice of screen.getAllByRole("radio")) expect(choice).toHaveAttribute("aria-checked", "false");
   });
 
   it("says nothing new when the member dismisses the prompt themselves, and does not call onAdded", async () => {
     addKey.mockResolvedValue({ kind: "cancelled" });
     const onAdded = vi.fn();
     render(<AddKeyDialog open onClose={vi.fn()} onAdded={onAdded} />);
+    await userEvent.click(screen.getByRole("radio", { name: /Security key/ }));
     await userEvent.type(screen.getByLabelText("Name this key"), "YubiKey 5 NFC");
     await userEvent.click(screen.getByRole("button", { name: "Add a key" }));
     await screen.findByRole("button", { name: "Add a key" });
@@ -79,6 +115,7 @@ describe("AddKeyDialog", () => {
   it("shows the same-key refusal where the sheet shows it", async () => {
     addKey.mockResolvedValue({ kind: "failed", message: "That key is already added. Use a different one." });
     render(<AddKeyDialog open onClose={vi.fn()} onAdded={vi.fn()} />);
+    await userEvent.click(screen.getByRole("radio", { name: /Security key/ }));
     await userEvent.type(screen.getByLabelText("Name this key"), "YubiKey 5C");
     await userEvent.click(screen.getByRole("button", { name: "Add a key" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("That key is already added. Use a different one.");

@@ -30,6 +30,7 @@ vi.mock("@simplewebauthn/server", () => ({
 import { registrationOptionsFor, verifyAuthentication, verifyRegistration } from "@/console/keys/webauthn";
 
 const RP = { id: "admin.localhost", origin: "http://admin.localhost:4210", name: "Trakline Console" };
+const MEMBER = { email: "asha@trakline.in", name: "Asha Rao", userId: "11111111-1111-1111-1111-111111111111" };
 const STORED = { id: "key-row-id", credentialId: "Y3JlZA", publicKey: "cHVia2V5", counter: 7, transports: ["usb"] };
 
 beforeEach(() => {
@@ -41,7 +42,7 @@ beforeEach(() => {
 
 describe("registrationOptionsFor", () => {
   it("asks for no attestation, discourages resident keys and only prefers verification", async () => {
-    await registrationOptionsFor({ rp: RP, member: { email: "asha@trakline.in", name: "Asha Rao", userId: "11111111-1111-1111-1111-111111111111" }, existing: [] });
+    await registrationOptionsFor({ rp: RP, member: MEMBER, existing: [], kind: "securityKey" });
     expect(generateRegistrationOptions).toHaveBeenCalledWith(
       expect.objectContaining({
         rpID: "admin.localhost",
@@ -52,8 +53,36 @@ describe("registrationOptionsFor", () => {
   });
 
   it("excludes the keys the member already has, so the same key is refused by the browser", async () => {
-    await registrationOptionsFor({ rp: RP, member: { email: "a@b.in", name: "A", userId: "11111111-1111-1111-1111-111111111111" }, existing: [STORED] });
+    await registrationOptionsFor({ rp: RP, member: MEMBER, existing: [STORED], kind: "securityKey" });
     expect(generateRegistrationOptions.mock.calls[0]?.[0]).toMatchObject({ excludeCredentials: [{ id: "Y3JlZA", transports: ["usb"] }] });
+  });
+
+  // The shipped defect: with no preference at all, Safari's own sheet offers iCloud Keychain and
+  // never the security-key path, so an owner holding one passkey could not add a YubiKey as their
+  // second key. generateRegistrationOptions turns 'securityKey' into both hints: ['security-key']
+  // and authenticatorSelection.authenticatorAttachment: 'cross-platform'
+  // (node_modules/@simplewebauthn/server/esm/registration/generateRegistrationOptions.js) -- the
+  // attachment is the half Safari has honoured for years, and the half that moves it off that sheet.
+  it("asks the browser for a security key when that is what the member said they are adding", async () => {
+    await registrationOptionsFor({ rp: RP, member: MEMBER, existing: [], kind: "securityKey" });
+    expect(generateRegistrationOptions.mock.calls[0]?.[0]).toMatchObject({ preferredAuthenticatorType: "securityKey" });
+  });
+
+  it("asks for this device's own passkey when that is what the member said instead", async () => {
+    await registrationOptionsFor({ rp: RP, member: MEMBER, existing: [], kind: "thisDevice" });
+    expect(generateRegistrationOptions.mock.calls[0]?.[0]).toMatchObject({ preferredAuthenticatorType: "localDevice" });
+  });
+
+  // The console's own two words are not the library's three: "thisDevice" is 'localDevice' there,
+  // and 'remoteDevice' (a passkey on another device, over hybrid) is a kind this console does not
+  // offer. Mapping rather than passing the member's word straight through is what keeps the wire
+  // vocabulary ours and the closed set closed.
+  it("never hands the library a preference the console does not offer", async () => {
+    for (const kind of ["securityKey", "thisDevice"] as const) {
+      generateRegistrationOptions.mockClear();
+      await registrationOptionsFor({ rp: RP, member: MEMBER, existing: [], kind });
+      expect(generateRegistrationOptions.mock.calls[0]?.[0]?.preferredAuthenticatorType).not.toBe("remoteDevice");
+    }
   });
 });
 

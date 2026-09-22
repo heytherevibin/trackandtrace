@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogContent, DialogRoot } from "@/components/ui/dialog";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Led } from "@/components/ui/led";
 import { addKey } from "@/console/keys/client";
+import { KeyKindPicker } from "@/console/keys/key-kind-picker";
+import type { ConsoleKeyKind } from "@/console/keys/kind";
 import { KEY_NAME_MAX } from "@/console/account/key-name";
 import { consoleMessages } from "@/console/messages";
 
@@ -40,7 +42,11 @@ export interface AddKeyDialogProps {
  */
 export function AddKeyDialog({ open, onClose, onAdded }: AddKeyDialogProps) {
   const [name, setName] = useState("");
+  // Which kind of key this is, which decides which sheet the browser opens (@/console/keys/kind).
+  // Undrawn, and deliberately unset until the member says: see KeyKindPicker's own note.
+  const [keyKind, setKeyKind] = useState<ConsoleKeyKind | null>(null);
   const [stage, setStage] = useState<Stage>({ kind: "idle", error: null });
+  const kindLabelId = useId();
 
   // The sheet's own dialog always opens on an empty field with no error -- reset during render on a
   // genuine closed -> open edge (react.dev's recommended shape for adjusting state from a prop),
@@ -51,6 +57,7 @@ export function AddKeyDialog({ open, onClose, onAdded }: AddKeyDialogProps) {
     setOpenSeen(open);
     if (open) {
       setName("");
+      setKeyKind(null);
       setStage({ kind: "idle", error: null });
     }
   }
@@ -58,9 +65,12 @@ export function AddKeyDialog({ open, onClose, onAdded }: AddKeyDialogProps) {
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     const trimmed = name.trim();
-    if (!trimmed) return;
+    // Both guards read the same way: the submit is already disabled without them, so neither is a
+    // refusal the member can see -- they are what keeps a stray Enter from starting a ceremony the
+    // form is not ready for.
+    if (!trimmed || keyKind === null) return;
     setStage({ kind: "adding" });
-    const outcome = await addKey(trimmed);
+    const outcome = await addKey(trimmed, keyKind);
     if (outcome.kind === "done") {
       // Reset here rather than only relying on the parent to unmount or re-hide this dialog on
       // `onAdded`: a caller that keeps it mounted (or is merely slow to react) must never find a
@@ -89,13 +99,19 @@ export function AddKeyDialog({ open, onClose, onAdded }: AddKeyDialogProps) {
         footer={
           <>
             <DialogClose render={<Button variant="secondary">{t.cancel}</Button>} />
-            <Button type="submit" form="add-key-form" variant="primary" disabled={adding}>
+            <Button type="submit" form="add-key-form" variant="primary" disabled={adding || keyKind === null}>
               {adding ? k.waiting : m.addTitle}
             </Button>
           </>
         }
       >
         <form id="add-key-form" noValidate onSubmit={(event) => void submit(event)} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <span id={kindLabelId} className="legend-md text-accent-text">
+              {k.kindLabel}
+            </span>
+            <KeyKindPicker value={keyKind} labelId={kindLabelId} disabled={adding} onChange={setKeyKind} />
+          </div>
           <Field invalid={error !== null}>
             <FieldLabel>{k.nameLabel}</FieldLabel>
             <Input value={name} maxLength={KEY_NAME_MAX} disabled={adding} onChange={(event) => setName(event.currentTarget.value)} />

@@ -13,6 +13,7 @@ import type {
 import { consoleMessages } from "@/console/messages";
 import { AppError } from "@/services/errors";
 import { base64urlToBytes, bytesToBase64url } from "./encoding";
+import type { ConsoleKeyKind } from "./kind";
 import type { RelyingParty } from "./rp";
 
 export type ConsoleKeyType = "passkey" | "security_key";
@@ -32,10 +33,31 @@ function didNotAnswer(): AppError {
   return new AppError("INVALID_INPUT", consoleMessages.keys.didNotAnswer, { status: 400 });
 }
 
+/**
+ * The console's two kinds in the library's own three-value vocabulary. 'securityKey' sets
+ * `hints: ['security-key']` *and* `authenticatorSelection.authenticatorAttachment: 'cross-platform'`;
+ * 'localDevice' sets `hints: ['client-device']` and `'platform'`
+ * (@simplewebauthn/server/esm/registration/generateRegistrationOptions.js). The attachment is the
+ * half that matters: `hints` is WebAuthn L3 and a browser may ignore it, while attachment has been
+ * honoured for years and is what moves Safari off its iCloud Keychain sheet. The library's third
+ * value, 'remoteDevice' (a passkey on another device, over hybrid), is reachable from
+ * 'securityKey''s own cross-platform sheet and so is not offered as a kind of its own.
+ */
+const PREFERRED_AUTHENTICATOR: Readonly<Record<ConsoleKeyKind, "securityKey" | "localDevice">> = {
+  securityKey: "securityKey",
+  thisDevice: "localDevice",
+};
+
 export function registrationOptionsFor(args: {
   readonly rp: RelyingParty;
   readonly member: { readonly userId: string; readonly email: string; readonly name: string };
   readonly existing: readonly StoredKey[];
+  /**
+   * What the member said they are about to present. It decides which browser sheet opens and
+   * nothing else -- in particular it never decides the type the row stores, which verifyRegistration
+   * below reads off the credential that actually answered.
+   */
+  readonly kind: ConsoleKeyKind;
 }): Promise<PublicKeyCredentialCreationOptionsJSON> {
   return generateRegistrationOptions({
     rpName: args.rp.name,
@@ -46,7 +68,11 @@ export function registrationOptionsFor(args: {
     attestationType: "none",
     // Spec §D: resident keys are discouraged (the email link has already said who is signing in,
     // and a security key's slots are few); user verification is preferred, so a touch is enough.
+    // Built fresh on every call, never hoisted to a shared literal: generateRegistrationOptions
+    // writes authenticatorAttachment onto this very object, so a shared one would carry one
+    // member's chosen kind into the next member's ceremony.
     authenticatorSelection: { residentKey: "discouraged", userVerification: "preferred" },
+    preferredAuthenticatorType: PREFERRED_AUTHENTICATOR[args.kind],
     excludeCredentials: args.existing.map((key) => ({ id: key.credentialId, transports: [...key.transports] })),
   });
 }
