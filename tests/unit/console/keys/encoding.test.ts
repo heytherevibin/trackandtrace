@@ -13,9 +13,28 @@ describe("the encodings either side of the database", () => {
     expect(base64urlToBase64("AAAA")).toBe("AAAA");
   });
 
-  it("round-trips every byte value", () => {
+  // Verified against the database rather than assumed:
+  //   select encode(decode(repeat('ab',60),'hex'),'base64');
+  // answers 76 characters, a newline, then the rest. Every fixture below wraps the way that does.
+  const wrap = (base64: string): string => (base64.match(/.{1,76}/g) ?? []).join("\n");
+
+  it("strips the newlines encode() wraps its output with", () => {
+    // A security key's credential id is long enough to wrap; a platform passkey's is not, which is
+    // why this shipped and was only found on the first production sign-in that offered a YubiKey.
+    const id = Buffer.from(Array.from({ length: 64 }, (_, i) => i * 3)).toString("base64");
+    expect(id.length).toBeGreaterThan(76);
+    const wrapped = wrap(id);
+    expect(wrapped).toContain("\n");
+    expect(base64ToBase64url(wrapped)).toBe(base64ToBase64url(id));
+    expect(base64ToBase64url(wrapped)).not.toMatch(/\s/);
+  });
+
+  it("round-trips every byte value, wrapped as the database wraps it", () => {
     const all = Buffer.from(Array.from({ length: 256 }, (_, i) => i));
-    expect(base64urlToBase64(base64ToBase64url(all.toString("base64")))).toBe(all.toString("base64"));
+    // The old fixture was `all.toString("base64")`, which Node does not wrap -- a format the
+    // source of this data never produces. That is precisely why the suite stayed green while
+    // production could not build an allowCredentials entry.
+    expect(base64urlToBase64(base64ToBase64url(wrap(all.toString("base64"))))).toBe(all.toString("base64"));
   });
 
   it("writes a bytea literal PostgREST will take", () => {
