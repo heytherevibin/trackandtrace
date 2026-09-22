@@ -1,14 +1,16 @@
-import { render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuditEntry, AuditEntryDetail, AuditPage } from "@/console/audit/audit";
 import { defaultAuditFilters } from "@/console/audit/filters";
 import { consoleMessages } from "@/console/messages";
 
-// The one thing stood in for: the browser-side re-read the filter bar and the pager drive. Everything
-// else -- the real DataTable, the real Plate, the real filter bar -- runs.
-const { apiRequest } = vi.hoisted(() => ({ apiRequest: vi.fn() }));
+// The two things stood in for: the browser-side re-read the filter bar and the pager drive, and the
+// key ceremony the export spends. Everything else -- the real DataTable, the real Plate, the real
+// filter bar, the real export provider and the real TC-01 -- runs.
+const { apiRequest, runTap } = vi.hoisted(() => ({ apiRequest: vi.fn(), runTap: vi.fn() }));
 vi.mock("@/services/api-client", () => ({ apiRequest }));
+vi.mock("@/console/keys/tap-client", () => ({ runTap }));
 
 import { EntriesPlate } from "@/console/audit/entries-plate";
 
@@ -78,7 +80,16 @@ const cardsLayout = () => layout("cards");
 
 beforeEach(() => {
   apiRequest.mockReset().mockResolvedValue({ ok: true, data: { ok: true, rows: [], total: 0 } });
+  runTap.mockReset().mockResolvedValue({ kind: "done" });
 });
+
+/** The export's own answer, for the one case that drives a real export through the real provider. */
+const PREPARED = { ok: true, csv: "﻿id,at\r\n1,2", count: 2, fileName: "audit-2026-09-19.csv" };
+
+/** The `max-sm:hidden` ancestor of an element, if it has one. `null` is "nothing gates this". */
+function phoneGateAround(el: HTMLElement): Element | null {
+  return el.closest(".max-sm\\:hidden");
+}
 
 describe("the Entries table", () => {
   // The sheet's eight drawn columns keep their own relative order -- Open last, as the sheet draws
@@ -299,12 +310,77 @@ describe("the export, at phone width", () => {
     expect(control.parentElement?.className).toContain("max-sm:hidden");
   });
 
-  // The line belongs to the states the sheet draws it in: `showMeta` is `stRows || Empty` (:239),
-  // so a page that failed to load says what went wrong and does not also advertise an export of
-  // rows it has not got.
+  /**
+   * The line belongs to exactly the states the sheet draws it in. `showMeta`
+   * (AuditLogPhone.dc.html:62, `stRows || state === 'Empty'`) is true for Ready and Empty and false
+   * for Loading, Error and No access -- and in this component Ready and Empty are one status, since
+   * an empty page is a read that succeeded and returned nothing.
+   *
+   * The cost of transcribing it rather than softening it is real and is accepted: `status` here
+   * goes to `loading` on every filter change and every page turn, not only on a first paint as the
+   * sheet's own Loading state does, so the line leaves and returns each time. The plate below it is
+   * swapping to a four-card skeleton in the same moment, so it is not the only thing moving -- and
+   * a sentence that renders in a state the sheet's own flag excludes is a transcription error,
+   * where a blink is a design question for the sheet.
+   */
+  it("draws the line for a page that has rows and for one that has none", () => {
+    render(plate());
+    expect(screen.getByText(m.exportOnLargerScreen)).toBeInTheDocument();
+    cleanup();
+    render(plate({ rows: [], total: 0 }));
+    expect(screen.getByText(m.exportOnLargerScreen), "the sheet's Empty state").toBeInTheDocument();
+  });
+
   it("says nothing about exporting on a page that failed to load", () => {
     render(plate(null));
     expect(screen.queryByText(m.exportOnLargerScreen)).toBeNull();
+  });
+
+  it("says nothing about exporting while a read is in flight", async () => {
+    apiRequest.mockReturnValue(new Promise(() => {}));
+    render(plate());
+    await userEvent.click(screen.getByRole("button", { name: m.filters.ranges["7d"] }));
+    // Two, one per layout: the table's eight rows of five bars (AuditLog.dc.html:184-191) and the
+    // phone's four card-shaped blocks (AuditLogPhone.dc.html:121-127). Both are in the tree and CSS
+    // picks one, so a browser only ever announces one of them.
+    await waitFor(() => expect(screen.getAllByRole("status", { name: m.entries.loading })).toHaveLength(2));
+    expect(screen.queryByText(m.exportOnLargerScreen)).toBeNull();
+  });
+});
+
+/**
+ * **The Download is deliberately not gated, and this is the test that says so.**
+ *
+ * Every other export control is hidden below sm, because AuditLogPhone.dc.html draws none of them
+ * and replaces them with one line. The Ready row is the exception, and the exception is the point:
+ * it can only exist because someone started an export on a wide screen, and the single way to see
+ * it at 390px is to narrow that screen afterwards. Hiding it there would take away a single-use
+ * export that has **already spent a tap and already written its own audit row** -- leaving a
+ * permanent record, in a table with no update and no delete, of an export nobody received. That is
+ * the exact harm Task 4 built this state to avoid.
+ *
+ * So the asymmetry is intended: the control that *starts* an export is gated, the control that
+ * *finishes* one already begun is not. Anyone reading entries-plate.tsx and reaching for a
+ * `max-sm:hidden` around `AuditExportStatus` should be stopped here, by this test, rather than by a
+ * reviewer three phases later.
+ */
+describe("the Download, once an export is prepared", () => {
+  it("stays reachable at phone width, unlike the control that starts one", async () => {
+    apiRequest.mockImplementation((url: string) =>
+      Promise.resolve(url.includes("/api/audit/export") ? { ok: true, data: PREPARED } : { ok: true, data: { ok: true, rows: [], total: 0 } }),
+    );
+    render(plate());
+
+    // The whole confirm step, as a member performs it: TC-01, a reason, a real tap.
+    await userEvent.click(screen.getByRole("button", { name: m.export.action }));
+    await userEvent.type(screen.getByLabelText("Reason"), "Monthly access review for September.");
+    await userEvent.click(screen.getByRole("button", { name: "Tap your key" }));
+
+    const download = await screen.findByRole("button", { name: m.export.download });
+    expect(screen.getByText(m.export.works)).toBeInTheDocument();
+    expect(phoneGateAround(download), "the Download must stay reachable after a narrow").toBeNull();
+    // The paired half, in the same case, so the asymmetry is the assertion rather than a coincidence.
+    expect(phoneGateAround(screen.getByRole("button", { name: m.export.action })), "the control that starts an export").not.toBeNull();
   });
 });
 

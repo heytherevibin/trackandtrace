@@ -334,6 +334,30 @@ test.describe("the Audit log", () => {
     await expect(ready.getByText(`audit-${today}.csv`)).toBeVisible();
     await expectAxeClean(page);
 
+    /**
+     * **The Ready row is the one export control a phone may reach, and that is deliberate.**
+     *
+     * Task 5 hides every other one below sm, because AuditLogPhone.dc.html draws none of them and
+     * replaces them with a single line (:64). This row is the exception: it can only exist because
+     * an export was started on a wide screen, and the only way to see it at 390px is to narrow that
+     * screen afterwards -- a rotate, or a window dragged in. Hiding it there would take away a
+     * single-use export that has **already spent a tap and already written its own audit row**,
+     * leaving a permanent record, in a table with no update and no delete, of an export nobody
+     * received. That is the harm this whole state was built to avoid.
+     *
+     * Pinned here rather than in the 390px scan because the ceremony already ran: the scan's own
+     * note is that a scan which spends a minute on WebAuthn is a scan people stop running. This
+     * costs two resizes on an export that is already prepared.
+     */
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(ready, "a prepared export must survive a narrow to a phone").toBeVisible();
+    await expect(ready.getByRole("button", { name: m.export.download })).toBeVisible();
+    // And the asymmetry, in the same breath: what a phone may not do is *start* one.
+    await expect(page.getByRole("button", { name: m.export.action }), "the control that starts an export").toHaveCount(0);
+    await expect(page.getByText(m.exportOnLargerScreen)).toBeVisible();
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await expect(ready).toBeVisible();
+
     const [download] = await Promise.all([page.waitForEvent("download"), ready.getByRole("button", { name: m.export.download }).click()]);
     expect(download.suggestedFilename()).toBe(`audit-${today}.csv`);
     const saved = await download.path();

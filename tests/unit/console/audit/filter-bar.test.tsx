@@ -1,6 +1,6 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { FilterBar } from "@/console/audit/filter-bar";
 import { AUDIT_SEARCH_MAX, auditRangeAsDays, defaultAuditFilters, type AuditFilters } from "@/console/audit/filters";
 import { consoleMessages } from "@/console/messages";
@@ -207,7 +207,7 @@ describe("the phone's Search and filters dialog", () => {
 
   // :79-84 -- `tabs tabs-lg`, so every tab is 44px and they share the row's width. Kept as
   // `aria-pressed` buttons in a `role="group"`, which is what both sheets draw and what a tablist
-  // would wrongly promise a panel underneath.
+  // would wrongly promise a tabpanel underneath.
   it("gives every date tab a 44px target on a phone", () => {
     bar();
     const group = screen.getByRole("group", { name: m.filters.rangeLabel });
@@ -215,5 +215,67 @@ describe("the phone's Search and filters dialog", () => {
       expect(tab.className, tab.textContent ?? "").toContain("max-sm:h-11");
       expect(tab).toHaveAttribute("aria-pressed");
     }
+  });
+});
+
+/**
+ * A rotate, or a window dragged wider, while the phone's filter dialog is open.
+ *
+ * Everything else on this page picks its layout in CSS and needs no width read at all. This one
+ * cannot: closing a modal is behaviour, not layout, and no stylesheet can do it. Left open past sm
+ * the dialog is a phone sheet sitting on a desktop-width page, over a bar that is now drawing the
+ * very same search box and the very same four pickers behind it -- two live copies of one control,
+ * and the modal traps focus in the copy the member cannot see the page around.
+ *
+ * The listener is the whole mechanism: the trigger is `sm:hidden`, so the dialog can never be
+ * *opened* while wide, and nothing needs to be read on mount.
+ */
+describe("the filters dialog when the viewport crosses sm", () => {
+  const real = Object.getOwnPropertyDescriptor(window, "matchMedia");
+
+  /** A matchMedia that starts narrow and can be told, once, that the page is now wide. */
+  function widenLater(): () => void {
+    const listeners: ((event: MediaQueryListEvent) => void)[] = [];
+    Object.defineProperty(window, "matchMedia", {
+      writable: true,
+      configurable: true,
+      value: (query: string) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addEventListener: (_: string, fn: (event: MediaQueryListEvent) => void) => void listeners.push(fn),
+        removeEventListener: () => undefined,
+        addListener: () => undefined,
+        removeListener: () => undefined,
+        dispatchEvent: () => false,
+      }),
+    });
+    return () => {
+      for (const fn of listeners) fn({ matches: true } as MediaQueryListEvent);
+    };
+  }
+
+  afterEach(() => {
+    // Restored by hand: tests/setup.ts only installs its stub when there is none, so a fake left
+    // behind here would quietly serve every later case in this file.
+    if (real) Object.defineProperty(window, "matchMedia", real);
+    else Reflect.deleteProperty(window, "matchMedia");
+  });
+
+  it("closes itself, rather than leaving a phone sheet over a desktop page", async () => {
+    const widen = widenLater();
+    bar();
+    await userEvent.click(screen.getByRole("button", { name: m.filters.phoneTrigger }));
+    expect(await screen.findByRole("dialog", { name: m.filters.phoneTrigger })).toBeInTheDocument();
+
+    await act(async () => widen());
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: m.filters.phoneTrigger })).toBeNull());
+  });
+
+  it("leaves it open while the page is still narrow", async () => {
+    widenLater();
+    bar();
+    await userEvent.click(screen.getByRole("button", { name: m.filters.phoneTrigger }));
+    expect(await screen.findByRole("dialog", { name: m.filters.phoneTrigger })).toBeInTheDocument();
   });
 });

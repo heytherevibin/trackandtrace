@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { DialogContent, DialogRoot } from "@/components/ui/dialog";
 import { IconButton } from "@/components/ui/icon-button";
@@ -20,6 +20,17 @@ import { consoleMessages } from "@/console/messages";
 import { cn } from "@/utils/cn";
 
 const m = consoleMessages.audit;
+
+/**
+ * Tailwind's own `sm`, as a query this file can listen to.
+ *
+ * The literal is duplicated from CSS deliberately and it is the third copy in this codebase
+ * (`src/styles/base.css:69`, `src/styles/utilities.css:236`), because there is nothing to import:
+ * Tailwind v4 keeps its breakpoints in the stylesheet, not in a config module. Everything else on
+ * this page picks its layout in CSS and never reads a width at all; this is the one thing CSS
+ * cannot do, and it is behaviour rather than layout (see the effect that uses it).
+ */
+const SM_UP = "(min-width: 40rem)";
 
 /** An actor the Member picker can offer, as the loaded rows name them. */
 export interface AuditMemberOption {
@@ -209,6 +220,30 @@ export function FilterBar({
   // open (Base UI portals nothing otherwise), which is also what keeps the search box and the four
   // pickers from existing twice in the accessibility tree at once.
   const [sheetOpen, setSheetOpen] = useState(false);
+
+  /**
+   * A rotate, or a window dragged wider, while the dialog is open.
+   *
+   * The only width this file reads, and it reads it for behaviour rather than layout: closing a
+   * modal is not something a stylesheet can do. Left open past sm, the dialog is a phone sheet
+   * sitting on a desktop-width page -- over a bar that is by then drawing the very same search box
+   * and the very same four pickers behind it. Two live copies of one control, with focus trapped in
+   * the copy the member cannot see the page around.
+   *
+   * A listener and nothing else: the trigger is `sm:hidden`, so the dialog can never be *opened*
+   * while wide, and there is no state to reconcile on mount. `addEventListener` is guarded because
+   * a `matchMedia` stub need not implement it (tests/setup.ts ships one that does not).
+   */
+  useEffect(() => {
+    if (!sheetOpen || typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    const wide = window.matchMedia(SM_UP);
+    if (typeof wide.addEventListener !== "function") return;
+    const onChange = (event: MediaQueryListEvent) => {
+      if (event.matches) setSheetOpen(false);
+    };
+    wide.addEventListener("change", onChange);
+    return () => wide.removeEventListener("change", onChange);
+  }, [sheetOpen]);
 
   // Every change goes back to page one: a narrower set has fewer pages, and page 7 of 2 is an
   // empty table with no explanation.

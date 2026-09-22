@@ -253,11 +253,23 @@ export function EntriesPlate({
 
         {/*
           AuditLogPhone.dc.html:64, word for word, in the place the sheet puts it: under the page
-          lead, where the desktop draws the control. It sits inside the phone sheet's own `showMeta`
-          (:62-65), which is `stRows || Empty` -- so a page whose read failed says what went wrong
-          and does not also advertise an export of rows it has not got.
+          lead, where the desktop draws the control.
+
+          Gated on `status === "ready"`, which is the sheet's own `showMeta` (:62) exactly:
+          `stRows || state === 'Empty'`, true for Ready and Empty and false for Loading, Error and
+          No access. Ready and Empty are one status here, because an empty page is a read that
+          succeeded and returned nothing; No access never reaches this component at all.
+
+          The first cut of this said `status !== "error"` under a comment claiming `showMeta`, which
+          is a third thing neither the sheet nor the comment described -- it rendered through
+          Loading. Corrected, and the cost taken rather than softened: `status` goes to `loading` on
+          every filter change and every page turn here, not only on a first paint as the sheet's own
+          Loading state does, so the line leaves and returns each time. The plate below is swapping
+          to a four-card skeleton in the same moment, so it is not the only thing moving -- and a
+          sentence rendered in a state the sheet's own flag excludes is a transcription error, where
+          a blink is a design question for the sheet to answer.
         */}
-        {status === "error" ? null : <p className="text-label text-ink-3 sm:hidden">{m.exportOnLargerScreen}</p>}
+        {status === "ready" ? <p className="text-label text-ink-3 sm:hidden">{m.exportOnLargerScreen}</p> : null}
 
         <div className="flex flex-col gap-4">
           <FilterBar filters={filters} environment={environment} members={members} onChange={apply} />

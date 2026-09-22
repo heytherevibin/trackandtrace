@@ -258,9 +258,26 @@ test.describe("the signed-in frame at 390px", () => {
     await entry.getByRole("button", { name: "Close" }).click();
     await expect(entry).toBeHidden();
 
+    /**
+     * A rotate with the filters dialog open -- the one thing on this page that CSS cannot handle by
+     * itself, because closing a modal is behaviour and not layout.
+     *
+     * Left open past sm it would be a phone sheet on a desktop-width page, over a bar drawing the
+     * same search box and the same four pickers behind it: two live copies of one control, with
+     * focus trapped in the copy the member cannot see the page around.
+     */
+    await trigger.click();
+    await expect(sheet).toBeVisible();
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await expect(sheet, "the phone's filter dialog must not survive a rotate past sm").toBeHidden();
+    // And the filters it was holding are still applied -- it closed, it did not clear.
+    await expect(page.getByRole("combobox", { name: "Result" })).toHaveValue("done");
+    await expect.poll(() => new URL(page.url()).searchParams.get("result")).toBe("done");
+    await page.getByRole("button", { name: "Clear filters" }).click();
+    await expect.poll(() => new URL(page.url()).searchParams.get("result")).toBeNull();
+
     // The control, and the thing that makes every count above mean "below sm" rather than "gone":
     // the same page at the width the rest of this suite runs at.
-    await page.setViewportSize({ width: 1280, height: 800 });
     await expect(page.getByText("Open on a larger screen to export.")).toBeHidden();
     await expect(page.getByRole("button", { name: "Export CSV" })).toBeVisible();
     await expect(page.getByRole("table")).toBeVisible();
