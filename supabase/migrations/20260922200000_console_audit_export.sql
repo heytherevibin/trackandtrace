@@ -153,8 +153,12 @@ declare
   v_filters jsonb;
   v_from    timestamptz;
   v_to      timestamptz;
-  v_total   integer;
-  v_rows    jsonb;
+  -- The set as it was when the cap was checked, and the set that actually left.
+  -- They are two snapshots; see where v_total is assigned for why only one of
+  -- them may be recorded.
+  v_estimate integer;
+  v_total    integer;
+  v_rows     jsonb;
 begin
   -- The two canonical strings, read and never rewritten. A malformed one is a
   -- hand-made request -- src/console/audit/filters.ts cannot produce one -- and
@@ -200,7 +204,7 @@ begin
   -- instead would spend the tap and write the row for an export that never
   -- happened. The `when invalid_datetime_format …` block above is deliberately
   -- the only handler in this function, and it sits before either of them.
-  select count(*) into v_total
+  select count(*) into v_estimate
     from console.audit_matching(
       v_from, v_to,
       (v_filters ->> 'member')::uuid,
@@ -209,7 +213,7 @@ begin
       v_filters ->> 'search',
       v_filters ->> 'environment');
 
-  if v_total > console.audit_export_max() then
+  if v_estimate > console.audit_export_max() then
     raise exception 'too many entries to export' using errcode = '42501';
   end if;
 
@@ -233,6 +237,20 @@ begin
       v_filters ->> 'result',
       v_filters ->> 'search',
       v_filters ->> 'environment') a;
+
+  -- The count comes from the rows that actually left, never from the count above
+  -- it. READ COMMITTED gives each statement its own snapshot, so a row another
+  -- transaction commits between the two is in one and not the other -- and this
+  -- number is what the audit row records and what the member is told. A record
+  -- of an export must describe the export, not a set that was true a moment
+  -- before it.
+  --
+  -- The cap keeps the earlier count, deliberately: it is a guard, not a fact,
+  -- and its whole job is to refuse before the bulk read happens. A concurrent
+  -- insert can carry the real total a few rows past it; on a console where
+  -- every writer is a person pressing a button, a few rows past 10 000 is not
+  -- a number worth a second scan to be exact about.
+  v_total := jsonb_array_length(v_rows);
 
   -- The export's own row, through console.write_audit like every other console
   -- action -- the one write this phase's append-only constraint allows. `after`

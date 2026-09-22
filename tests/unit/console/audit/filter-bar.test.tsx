@@ -2,7 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { FilterBar } from "@/console/audit/filter-bar";
-import { auditRangeAsDays, defaultAuditFilters, type AuditFilters } from "@/console/audit/filters";
+import { AUDIT_SEARCH_MAX, auditRangeAsDays, defaultAuditFilters, type AuditFilters } from "@/console/audit/filters";
 import { consoleMessages } from "@/console/messages";
 
 const m = consoleMessages.audit;
@@ -19,6 +19,15 @@ describe("the filter bar, as the sheet draws it", () => {
   it("is one search landmark, named", () => {
     bar();
     expect(screen.getByRole("search", { name: m.filters.regionLabel })).toBeInTheDocument();
+  });
+
+  // Where the bound belongs: the search is the only free-text filter and it travels inside the
+  // export's canonical filter object, so an unbounded one makes the export fail *after* the member
+  // has typed a reason and tapped their key. Stopping the field is what keeps a ceremony from being
+  // spent on a request that could not have succeeded. The same shape the Reason field already has.
+  it("stops the search where parseAuditFilters stops", () => {
+    bar();
+    expect(screen.getByRole("searchbox", { name: m.filters.search })).toHaveAttribute("maxlength", String(AUDIT_SEARCH_MAX));
   });
 
   it("draws the search box with the sheet's own label and placeholder", () => {

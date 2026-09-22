@@ -47,11 +47,16 @@ const EXPORT_TTL_MS = 10 * 60_000;
  */
 const REVOKE_AFTER_MS = 1_000;
 
+/** Whether a prepared export is still inside the ten minutes the sheet promises. */
+function live(expiresAt: number): boolean {
+  return Date.now() < expiresAt;
+}
+
 type Stage =
   | { readonly kind: "idle" }
   | { readonly kind: "confirm"; readonly ask: Ask }
   | { readonly kind: "preparing"; readonly ask: Ask }
-  | { readonly kind: "ready"; readonly file: PreparedAuditExport }
+  | { readonly kind: "ready"; readonly file: PreparedAuditExport; readonly expiresAt: number }
   | { readonly kind: "failed"; readonly message: string };
 
 /**
@@ -183,7 +188,9 @@ export function AuditExportProvider({
       if (!mounted.current) return;
       setStage(
         answer.ok
-          ? { kind: "ready", file: answer.data }
+          ? // The ten minutes start when the file exists, not when the press happened: the tap and
+            // the round trip are the member's time, not the export's.
+            { kind: "ready", file: answer.data, expiresAt: Date.now() + EXPORT_TTL_MS }
           : // consoleApiMessage is the one thing that decides what a failed console request says:
             // a real refusal already carries this module's copy, and a fetch that never arrived
             // gets the console's own line instead of a technical one.
@@ -194,6 +201,15 @@ export function AuditExportProvider({
 
   const download = useCallback(() => {
     if (stage.kind !== "ready") return;
+    // The deadline, re-read at the press rather than trusted to the timer below. A setTimeout is
+    // not a deadline: a background tab is throttled, and a machine that slept does not run it at
+    // all -- so a tab left open overnight would still have handed the file over in the morning,
+    // which is not what "for 10 minutes" says. The timer keeps the row honest on screen; this
+    // keeps the promise.
+    if (!live(stage.expiresAt)) {
+      setStage({ kind: "idle" });
+      return;
+    }
     const url = URL.createObjectURL(new Blob([stage.file.csv], { type: "text/csv;charset=utf-8" }));
     const link = document.createElement("a");
     link.href = url;
@@ -215,7 +231,7 @@ export function AuditExportProvider({
   // is all it takes -- there is nothing on a server to expire.
   useEffect(() => {
     if (stage.kind !== "ready") return;
-    const timer = setTimeout(() => setStage({ kind: "idle" }), EXPORT_TTL_MS);
+    const timer = setTimeout(() => setStage({ kind: "idle" }), Math.max(stage.expiresAt - Date.now(), 0));
     return () => clearTimeout(timer);
   }, [stage]);
 

@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(46);
+select plan(47);
 
 -- public.console_audit_export: the one console function that reads the audit
 -- log in bulk. It is not a second reader -- it is the export, which is an
@@ -128,7 +128,12 @@ say so twice.', 'done', '51cd…07aa', null, null),
    'configure', 'Paused PNR checks', 'PNR checks', 'Provider maintenance window, 14:00–15:00 IST.', 'done', 'a3f9…c2c1',
    '{"pnr_checks": "on"}'::jsonb, '{"pnr_checks": "paused"}'::jsonb),
   ('c7000000-0000-4000-8000-00000000000b', '2019-03-17 14:02:31.256374+00', 'production', 'a0000000-0000-4000-8000-000000000001', 'Asha Rao', 'owner', null, 'Chrome on macOS',
-   'configure', 'Paused PNR checks', 'Traveller notice', 'Provider maintenance window, 14:00–15:00 IST.', 'done', 'a3f9…c2c1', null, null);
+   'configure', 'Paused PNR checks', 'Traveller notice', 'Provider maintenance window, 14:00–15:00 IST.', 'done', 'a3f9…c2c1', null, null),
+  -- Outside every window above, and the only reason it exists: the open-ended range below has to
+  -- reach past 17 March to find it, so "a range with only a start is exported as asked" is a
+  -- statement about the missing upper bound rather than about the rows that happen to precede it.
+  ('c7000000-0000-4000-8000-00000000000c', '2019-03-20 06:00:00+00', 'production', 'd0000000-0000-4000-8000-000000000004', 'Meera Nair', 'viewer', null, 'Edge on Windows',
+   'record', 'Opened the audit log', 'Audit log', null, 'refused', 'e18a…3b56', null, null);
 
 -- 250 rows on 18 March: more than console_audit's p_limit clamp of 200, so an
 -- export that quietly went through the list function would come back short.
@@ -265,11 +270,30 @@ select throws_ok($$ select pg_temp.exp(pg_temp.day17(), pg_temp.no_filters()) $$
 -- microsecond, so `at desc` alone is not a total order and the CSV would be
 -- free to shuffle them between two exports of the same range.
 select pg_temp.tap('good-2', pg_temp.day17(), pg_temp.no_filters());
+select pg_temp.tap('good-2b', pg_temp.day17(), pg_temp.no_filters());
 select is(
   pg_temp.targets(pg_temp.exp(pg_temp.day17(), pg_temp.no_filters())),
   array['Traveller notice', 'PNR checks', '=HYPERLINK("http://x","click")', 'Site notice', 'Confirm it''s you',
         'RailKit key •••• 4F2A', 'Audit log', '9c41…d2e7', 'Slow PNR checks', 'Live budget', '12 records'],
-  'newest first, and equal timestamps broken on id desc exactly as the list breaks them'
+  'newest first, and equal timestamps broken on id desc'
+);
+-- The same eleven, in the same order, out of the list. `at` is not a total order
+-- -- the last two fixture rows share it to the microsecond -- and no assertion
+-- can pin a tie-break against a planner that is free to return equal rows in
+-- any order it likes: dropping `id desc` from BOTH functions leaves the array
+-- above green, because nothing then forces a different answer. What this does
+-- catch is the realistic edit, to one of the two order clauses and not the
+-- other, which would make the CSV and the table disagree about the same rows.
+--
+-- It also matters less here than it does for the list: an export returns the
+-- whole set, so a shuffle within a tie cannot drop a row or repeat one the way
+-- a page boundary can (console_audit_read.test.sql pins that).
+select is(
+  pg_temp.targets(pg_temp.exp(pg_temp.day17(), pg_temp.no_filters())),
+  (select array_agg(r ->> 'target' order by n)
+     from jsonb_array_elements(public.console_audit('2019-03-17T00:00:00.000Z', '2019-03-18T00:00:00.000Z', null, null, null, null, null, 200, 0) -> 'rows')
+          with ordinality as t(r, n)),
+  'and in the same order the table put them in'
 );
 
 -- The sixteen keys, from console.audit_row -- the same shape the list returns,
@@ -360,11 +384,20 @@ select is((pg_temp.exp('2019-03-17T00:00:00.000Z/2019-03-17T14:02:31.256374Z', p
 
 -- An open side is a real choice the Custom range can produce -- one day picked
 -- and not the other -- so it is asked for and not refused.
-select pg_temp.tap('open-end', '2019-03-17T00:00:00.000Z/', '{"category":null,"environment":null,"member":null,"result":"refused","search":null}');
+--
+-- SCOPED BY ACTOR, and it has to be. An unbounded right side reaches now(), so
+-- this is the one assertion in this file that can see rows no window excludes:
+-- the first cut asked for every refusal since 17 March 2019 and expected 1, and
+-- an e2e run that had left a single Refused row in console.audit_log turned it
+-- into 'have: 2, want: 1'. It passed only because db:reset runs before db:test.
+-- Meera's uuid is this file's own and is inserted inside this transaction, so
+-- p_member names exactly the two rows the fixture above wrote and nothing any
+-- other run ever wrote. The fifth instance of this class on this branch.
+select pg_temp.tap('open-end', '2019-03-17T00:00:00.000Z/', '{"category":null,"environment":null,"member":"d0000000-0000-4000-8000-000000000004","result":"refused","search":null}');
 select is(
-  (pg_temp.exp('2019-03-17T00:00:00.000Z/', '{"category":null,"environment":null,"member":null,"result":"refused","search":null}') ->> 'count')::integer,
-  1,
-  'a range with only a start is exported as asked'
+  (pg_temp.exp('2019-03-17T00:00:00.000Z/', '{"category":null,"environment":null,"member":"d0000000-0000-4000-8000-000000000004","result":"refused","search":null}') ->> 'count')::integer,
+  2,
+  'a range with only a start reaches past the window it starts in'
 );
 
 -- Both sides open is not a range at all: it is a count(*) and a CSV over two
@@ -404,14 +437,14 @@ select is((select used_at from console.challenges where challenge = pg_temp.ch('
 -- shipped console writes 'Exported the audit log' rows of its own.
 select is(
   (select count(*)::integer from console.audit_log where action = 'Exported the audit log' and reason = pg_temp.why()),
-  17,
+  18,
   'one audit row per export that went through, and none for any that did not'
 );
 select is(
   (select count(*)::integer from console.audit_log
     where reason = pg_temp.why() and category = 'record' and target = 'Audit log' and result = 'done'
       and actor_name = 'Asha Rao' and actor_role = 'owner' and environment = 'development'),
-  17,
+  18,
   'each in the Record category, against the log itself, as the member who exported and the deployment they used'
 );
 
@@ -442,7 +475,7 @@ select is(
 select is(
   (select count(*)::integer from console.audit_log where at >= '2019-03-17 00:00:00+00' and at < '2019-03-18 00:00:00+00'),
   11,
-  'exporting the log nineteen times added nothing to the range it exported'
+  'exporting the log twenty times added nothing to the range it exported'
 );
 
 select * from finish();

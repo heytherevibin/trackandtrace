@@ -123,6 +123,22 @@ describe("POST /api/audit/export", () => {
     }
   });
 
+  // readBody puts a failed schema's own message in front of whoever sent it. A member cannot reach
+  // any of these by using the page -- the search box stops at AUDIT_SEARCH_MAX and every other
+  // filter is a picker -- but "Too big: expected string to have <=2000 characters" is a developer
+  // string, and this console has never let one through.
+  it("answers a malformed body with a sentence written for a member, never with zod's", async () => {
+    const tooLong = `{"search":"${"x".repeat(3_000)}"}`;
+    for (const body of [{ ...GOOD, filters: tooLong }, { ...GOOD, filters: "[]" }, { ...GOOD, range: "not-a-range" }]) {
+      const response = await POST(post(body));
+      const answer = (await response.json()) as { readonly message: string };
+      expect(answer.message).toBe("The console couldn't read that export request. Reload the page and try again.");
+      // The sentence, and only the sentence. `INVALID_INPUT` is the error *code* every console
+      // refusal carries and is never rendered; the message is what a member reads.
+      expect(answer.message).not.toMatch(/expected|Too big|string|character/i);
+    }
+  });
+
   // No `environment` and no `count` in the body, and no fourth field of any kind: the deployment is
   // always the server's to decide, and the number of rows is the database's to discover. A caller
   // asserting either would be asserting a fact the server is about to establish for itself.

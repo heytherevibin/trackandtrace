@@ -131,6 +131,7 @@ export function parseAuditFilters(params: AuditSearchParams, environment: string
   const rawMember = one(params, KEYS.member);
   const rawCategory = one(params, KEYS.category)?.trim() ?? null;
   const rawEnvironment = one(params, KEYS.environment);
+  const rawSearch = one(params, KEYS.search)?.trim() ?? "";
   const rawPage = Number(one(params, KEYS.page) ?? "1");
 
   return {
@@ -141,7 +142,12 @@ export function parseAuditFilters(params: AuditSearchParams, environment: string
     category: rawCategory && rawCategory.length <= CATEGORY_MAX ? rawCategory : null,
     result: AUDIT_RESULTS.find((r) => r === rawResult) ?? null,
     environment: rawEnvironment === null ? fallback.environment : rawEnvironment === AUDIT_ENVIRONMENT_ALL ? null : rawEnvironment,
-    search: one(params, KEYS.search)?.trim() ?? "",
+    // Dropped when it is longer than the box could ever have produced, exactly as an over-long
+    // `category` is dropped above and for the same reason: nothing in this function refuses, and an
+    // address a member edited by hand falls back to the default view rather than showing them a
+    // refusal for a filter. Truncating instead would silently search for something they did not ask
+    // for, which is worse than not searching.
+    search: rawSearch && rawSearch.length <= AUDIT_SEARCH_MAX ? rawSearch : "",
     page: Number.isInteger(rawPage) && rawPage >= 1 ? rawPage : 1,
   };
 }
@@ -223,6 +229,22 @@ export function auditRangeBounds(filters: AuditFilters, now: Date): { readonly f
   const span = filters.range === "custom" ? "today" : filters.range;
   return { from: istDayStart(shiftDay(today, 1 - SPAN[span])), to: istDayStart(shiftDay(today, 1)) };
 }
+
+/**
+ * The longest thing a member may search the audit log for.
+ *
+ * Bounded where it is typed, and again where an address is read, because the cost of an unbounded
+ * one lands in the worst possible place: the search is part of the export's canonical filter object,
+ * so a long enough one overflows the route's own `FILTERS_MAX` and the export fails **after** the
+ * member has written a reason and tapped their key -- and what they would have seen was zod's
+ * "Too big: expected string to have <=2000 characters", a developer string with no refusal to
+ * translate. A ceremony must never be spent on a request that cannot succeed.
+ *
+ * 200 is the same bound `TAP_REASON_MAX` puts on the reason field beside it, and far past any
+ * substring a member types into a search box; `console.audit_log.target` and `.reason` are the only
+ * two columns the search reaches, and it is a substring match, not an equality.
+ */
+export const AUDIT_SEARCH_MAX = 200;
 
 /**
  * The most rows one export will carry.

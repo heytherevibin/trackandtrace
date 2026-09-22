@@ -1,15 +1,47 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { StrictMode } from "react";
+import { StrictMode, type ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // vi.mock's factory is hoisted above every import and above any ordinary top-level const, so both
 // mocks are declared with vi.hoisted (the same trap tests/unit/console/components/confirm-its-you
 // .test.tsx records). runTap is mocked rather than ConfirmItsYou itself: the dialog under test must
 // really be TC-01, or "no Change line" and "the drawn summary" would be assertions about a stub.
-const { runTap, prepareAuditExport } = vi.hoisted(() => ({ runTap: vi.fn(), prepareAuditExport: vi.fn() }));
+const { runTap, prepareAuditExport, twice } = vi.hoisted(() => ({
+  runTap: vi.fn(),
+  prepareAuditExport: vi.fn(),
+  // Off for every case but the one that turns it on. See `confirmedTwice` below.
+  twice: { on: false },
+}));
 vi.mock("@/console/keys/tap-client", () => ({ runTap }));
 vi.mock("@/console/audit/audit-client", () => ({ prepareAuditExport }));
+
+/**
+ * The real TC-01, with one thing changed: when `twice.on`, its `onConfirmed` fires twice in the
+ * same tick.
+ *
+ * That is not something a member can do today -- ConfirmItsYou's own `attemptRef` collapses two
+ * rapid presses into one call -- and that is exactly why the provider's `inFlight` guard had no
+ * test and could be deleted with all seventeen cases still green. The guard is not about
+ * ConfirmItsYou's current internals: it is the provider saying "one export per confirmation,
+ * however my `onConfirmed` is called", and ConfirmItsYou is a shared component that four more
+ * modules will keep editing. So the contract is tested at the seam it is a contract about, rather
+ * than through whichever collapsing logic the caller happens to have this month.
+ */
+vi.mock("@/console/components/confirm-its-you", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/console/components/confirm-its-you")>();
+  return {
+    ConfirmItsYou: (props: ComponentProps<typeof real.ConfirmItsYou>) => (
+      <real.ConfirmItsYou
+        {...props}
+        onConfirmed={() => {
+          props.onConfirmed();
+          if (twice.on) props.onConfirmed();
+        }}
+      />
+    ),
+  };
+});
 
 import { AuditExportButton, AuditExportProvider, AuditExportStatus } from "@/console/audit/export-dialog";
 import { AUDIT_EXPORT_ACTION, AUDIT_EXPORT_MAX, defaultAuditFilters, type AuditFilters } from "@/console/audit/filters";
@@ -61,6 +93,7 @@ beforeEach(() => {
   vi.setSystemTime(NOW);
   runTap.mockReset().mockResolvedValue({ kind: "done" });
   prepareAuditExport.mockReset().mockResolvedValue({ ok: true, data: READY });
+  twice.on = false;
   clicked = [];
   revoked = [];
   // jsdom has no object URLs and no download of any kind; the two halves of the press are recorded
@@ -231,6 +264,20 @@ describe("the prepared export itself", () => {
     expect(prepareAuditExport).toHaveBeenCalledTimes(1);
   });
 
+
+  // The `inFlight` guard, at the seam it is a contract about. Without it both calls read the same
+  // `stage.kind === "confirm"` -- the render they were made in has not committed yet -- and both
+  // POST: two taps' worth of work from one ceremony, two audit rows, and the second answer (a
+  // refusal for a tap that is already spent) is the one the member is left reading.
+  it("prepares one export per confirmation, however many times its confirmation fires", async () => {
+    twice.on = true;
+    const user = userEvent.setup();
+    board();
+    await confirm(user);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Download" })).toBeInTheDocument());
+    expect(prepareAuditExport).toHaveBeenCalledTimes(1);
+  });
+
   it("hands the file over once per press, under the same conditions", async () => {
     const user = userEvent.setup();
     board(14, BASE, true);
@@ -238,6 +285,22 @@ describe("the prepared export itself", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Download" })).toBeInTheDocument());
     await user.click(screen.getByRole("button", { name: "Download" }));
     expect(clicked).toEqual(["audit-2026-09-19.csv"]);
+  });
+
+
+  // The throttled tab, and the machine that slept. A setTimeout is not a deadline: the clock moves
+  // here without the timer ever running, which is exactly what a background tab or a lid closed for
+  // an hour does to it. Ten minutes has to mean ten minutes on both.
+  it("hands nothing over once the ten minutes have passed, even if the timer never fired", async () => {
+    const user = userEvent.setup();
+    board();
+    await confirm(user);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Download" })).toBeInTheDocument());
+    // The clock only -- no advanceTimersByTime, so the expiry timeout is still pending.
+    vi.setSystemTime(new Date(NOW.getTime() + 11 * 60_000));
+    await user.click(screen.getByRole("button", { name: "Download" }));
+    expect(clicked).toEqual([]);
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Download" })).not.toBeInTheDocument());
   });
 
   it("and for ten minutes -- an untouched one is let go when they run out", async () => {

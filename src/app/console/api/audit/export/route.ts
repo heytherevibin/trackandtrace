@@ -4,6 +4,7 @@ import { requireConsoleMember } from "@/console/auth/guard";
 import { consoleEnvironment } from "@/console/auth/session";
 import { assertConsoleAvailable } from "@/console/availability";
 import { tapReason } from "@/console/keys/tap";
+import { consoleMessages } from "@/console/messages";
 import { assertSameOrigin } from "@/console/same-origin";
 import { jsonError, jsonOk } from "@/services/api-response";
 import { readBody } from "@/services/request-body";
@@ -22,9 +23,20 @@ export const dynamic = "force-dynamic";
 // about their access.
 const RANGE = /^(\d{4}-\d{2}-\d{2}T[\d:.]+Z)?\/(\d{4}-\d{2}-\d{2}T[\d:.]+Z)?$/;
 
-// Long enough for five filters including a search box the member filled -- `p_search` is free text
-// -- and short enough that a hand-made body cannot make the database parse a megabyte of JSON.
+// Long enough for five filters including a search box the member filled, and short enough that a
+// hand-made body cannot make the database parse a megabyte of JSON.
+//
+// It is unreachable by typing, and that is now held rather than hoped: the search is the only
+// free-text filter, `AUDIT_SEARCH_MAX` caps it at 200, and the other four are a uuid, a category of
+// at most 40, an environment of at most 20 and one of three result labels -- so the canonical object
+// cannot exceed about 350 characters. tests/unit/console/audit/export.test.ts pins that arithmetic,
+// because the failure it prevents lands *after* a member has tapped their key.
 const FILTERS_MAX = 2_000;
+
+// Every constraint below names its own message. `readBody` puts a failed schema's own message in
+// front of whoever sent it, and zod's are developer strings -- "Too big: expected string to have
+// <=2000 characters" is what a member used to get for a search that was too long.
+const m = consoleMessages.audit;
 
 /**
  * Three fields, and deliberately no fourth.
@@ -41,21 +53,24 @@ const FILTERS_MAX = 2_000;
  */
 const exportBody = z
   .object({
-    range: z.string().regex(RANGE),
+    range: z.string().regex(RANGE, m.export.malformed),
     filters: z
       .string()
-      .max(FILTERS_MAX)
+      .max(FILTERS_MAX, m.export.malformed)
       // An object, and only an object. `console_audit_export` reads its five filters off it with
       // `->>`, so a JSON array, string or null would read as "every filter absent" -- an export far
       // wider than the one the member confirmed, under a tap whose digest still matched.
-      .refine((value) => {
-        try {
-          const parsed: unknown = JSON.parse(value);
-          return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed);
-        } catch {
-          return false;
-        }
-      }),
+      .refine(
+        (value) => {
+          try {
+            const parsed: unknown = JSON.parse(value);
+            return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed);
+          } catch {
+            return false;
+          }
+        },
+        { message: m.export.malformed },
+      ),
     reason: tapReason,
   })
   .strict();

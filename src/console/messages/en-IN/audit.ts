@@ -257,6 +257,15 @@ export const audit = {
     // Every other 42501: a role that changed in another tab, or a request that never went through
     // the filter bar. Both are answered by reloading, which is also what re-reads the role.
     refused: "The console wouldn't export that. Reload the page and try again.",
+
+    // **Not drawn**, and the route's own shape checks rather than the database's.
+    //
+    // A member cannot reach this by using the page: the search box stops at AUDIT_SEARCH_MAX and
+    // every other filter is a picker. So a body that fails the route's schema is hand-made -- but
+    // it still needs a sentence, because `readBody` puts a failed schema's *own* message in front
+    // of whoever sent it, and zod's is "Too big: expected string to have <=2000 characters". That
+    // is a developer string, and the one thing this console has never allowed to reach a member.
+    malformed: "The console couldn't read that export request. Reload the page and try again.",
   },
 
   empty: {

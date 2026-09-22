@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { NativeSelect, type NativeSelectOption } from "@/components/ui/native-select";
 import {
   AUDIT_CATEGORIES,
+  AUDIT_SEARCH_MAX,
   AUDIT_RANGES,
   AUDIT_RESULTS,
   auditRangeAsDays,
@@ -180,6 +181,12 @@ export function FilterBar({
             className="well h-10 w-full pl-8 pr-2.5 placeholder:text-ink-3"
             aria-label={m.filters.search}
             placeholder={m.filters.search}
+            // Stops where parseAuditFilters stops, the same way the Reason field stops where
+            // tapReason stops. Not a nicety: the search is part of the export's canonical filter
+            // object, so an unbounded one overflows the export route's own FILTERS_MAX and the
+            // export fails *after* the member has typed a reason and tapped their key. A ceremony
+            // must never be spent on a request that could not have succeeded.
+            maxLength={AUDIT_SEARCH_MAX}
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             onBlur={() => submitSearch()}

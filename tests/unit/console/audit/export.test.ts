@@ -3,10 +3,12 @@ import { auditCsv, exportAuditLog, type AuditEntry } from "@/console/audit/audit
 import {
   AUDIT_EXPORT_ACTION,
   AUDIT_EXPORT_MAX,
+  AUDIT_SEARCH_MAX,
   auditExportFileName,
   auditExportFilters,
   auditExportRange,
   defaultAuditFilters,
+  parseAuditFilters,
   type AuditFilters,
 } from "@/console/audit/filters";
 import type { ConsoleDb } from "@/console/auth/db";
@@ -93,6 +95,37 @@ describe("the canonical strings a tap is taken over", () => {
     const wide: AuditFilters = { ...BASE, range: "custom", from: "2024-09-19", to: "2026-09-19" };
     expect(auditExportFilters(narrow)).not.toBe(auditExportFilters(wide));
     expect(auditExportRange(wide, NOW)).not.toBe(auditExportRange(BASE, NOW));
+  });
+
+
+  // The search is the only free-text filter, so it is the only one that can make this string grow --
+  // and it grows it into the export route's own FILTERS_MAX, where the failure lands *after* the
+  // member has written a reason and tapped their key. The arithmetic is pinned rather than trusted.
+  it("cannot be made to overflow the export route's own limit by anything a member can type", () => {
+    const worst = auditExportFilters({
+      ...BASE,
+      search: "x".repeat(AUDIT_SEARCH_MAX),
+      category: "c".repeat(40), // console.audit_log.category's own check constraint
+      environment: "e".repeat(20), // and environment's
+      member: "b0000000-0000-4000-8000-000000000002",
+      result: "refused",
+    });
+    // FILTERS_MAX in src/app/console/api/audit/export/route.ts. Restated rather than imported,
+    // because importing a route into a unit test drags next/headers in behind it.
+    expect(worst.length).toBeLessThan(2_000);
+  });
+
+  // The other half of the same bound: an address nobody typed. parseAuditFilters refuses nothing --
+  // a hand-edited query string falls back to the default view -- so an over-long search is dropped
+  // exactly as an over-long category is, and never truncated into a search the member did not ask
+  // for.
+  it("drops a search longer than the box could have produced, rather than truncating it", () => {
+    expect(parseAuditFilters({ q: "x".repeat(AUDIT_SEARCH_MAX) }, "production").search).toHaveLength(AUDIT_SEARCH_MAX);
+    expect(parseAuditFilters({ q: "x".repeat(AUDIT_SEARCH_MAX + 1) }, "production").search).toBe("");
+  });
+
+  it("holds the same search bound the box holds", () => {
+    expect(AUDIT_SEARCH_MAX).toBe(200);
   });
 
   it("names the action the database spends the tap under", () => {
