@@ -13,6 +13,7 @@ export function StateBlock({
   role,
   live,
   headingLevel = 2,
+  bare = false,
   className,
 }: {
   /** Kept for call-site compatibility; the mono world marks state with words, not colour. */
@@ -24,12 +25,19 @@ export function StateBlock({
   readonly role?: "status" | "alert";
   readonly live?: "polite" | "assertive";
   readonly headingLevel?: 1 | 2 | 3;
+  /**
+   * Drops the hairline and its registration marks: the anatomy alone, for a state that sits inside
+   * a plate rather than being one. The sheets draw both shapes — a `.plate.state` standing on its
+   * own (AuditLog.dc.html:101) and a plain `.state` inside a plate's body (:193, :201) — and the
+   * two always travel together, because a blueprint object is its border and its marks at once.
+   */
+  readonly bare?: boolean;
   readonly className?: string;
 }) {
   const Heading = headingLevel === 1 ? "h1" : headingLevel === 3 ? "h3" : "h2";
   return (
-    <section className={cn("blueprint p-6", className)} role={role} aria-live={live} data-tone={tone}>
-      <Corners />
+    <section className={cn(bare ? "relative" : "blueprint", "p-6", className)} role={role} aria-live={live} data-tone={tone}>
+      {bare ? null : <Corners />}
       <Heading className="text-3xl tracking-head">{title}</Heading>
       {detail ? <p className="mt-2.5 max-w-[64ch] text-body text-ink-2">{detail}</p> : null}
       {children ? <div className="seam mt-[18px] pt-3.5">{children}</div> : null}

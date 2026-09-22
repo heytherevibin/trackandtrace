@@ -9,7 +9,16 @@ export interface ConsoleAuditRow {
   readonly actorRole: ConsoleRole | null;
   readonly keyId?: string | null;
   readonly sessionLabel?: string | null;
-  readonly category: "session" | "team" | "configure" | "messages" | "provider_keys" | "leads";
+  /**
+   * `console.audit_log.category` is free text with a 1..40 length check, not an enum -- these are
+   * the names this console writes. "record" arrived with module 14 (the rail's own group for it,
+   * src/console/nav.ts): reading the audit log is itself an audited action
+   * (docs/design/sheets/console/AuditLog.dc.html:312, task-2-addendum.md §5), and it is neither a
+   * session event nor a configuration change. The database also already holds 'system' rows, from
+   * console.purge_audit and its kin, which nothing in TypeScript writes -- which is why the reader
+   * (src/console/audit/audit.ts) parses this column as a plain string and never as an enum.
+   */
+  readonly category: "session" | "team" | "configure" | "messages" | "provider_keys" | "leads" | "record";
   readonly action: string;
   readonly target: string | null;
   readonly reason?: string | null;

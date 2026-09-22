@@ -49,23 +49,30 @@ describe("railFor: role filtering (fixture)", () => {
 
 describe("railFor against today's real CONSOLE_MODULES", () => {
   // 2d-1 shipped every module with built: false -- a rail of fourteen links that all lead nowhere is
-  // worse than a short one. 2d-2 task-8 flips the first of them: 13 Team has a page now
-  // (src/app/console/team/page.tsx), so the rail renders for the first time, for one role and with
-  // one module in it. The Audit log is still to come.
+  // worse than a short one. 2d-2 task-8 flipped the first of them (13 Team) and 2d-2b task-2 flips
+  // the second (14 Audit log, src/app/console/audit-log/page.tsx). Two modules, two groups, and --
+  // because the Audit log is Owner+Admin where Team is Owner-only -- the first role other than the
+  // Owner to get a rail at all.
   const TEAM = CONSOLE_MODULES.find((m) => m.num === "13");
+  const AUDIT = CONSOLE_MODULES.find((m) => m.num === "14");
 
-  it("gives an Owner the Configure group with Team in it", () => {
+  it("gives an Owner both built modules, each in its own group, in the sheet's order", () => {
     expect(TEAM).toBeDefined();
-    expect(railFor("owner")).toEqual([{ group: "configure", modules: [TEAM] }]);
+    expect(AUDIT).toBeDefined();
+    expect(railFor("owner")).toEqual([
+      { group: "configure", modules: [TEAM] },
+      { group: "record", modules: [AUDIT] },
+    ]);
   });
 
   // Main.dc.html:293-298's own access.Admin list has no '13' -- Team is Owner-only, whatever the
-  // plan's table said (task-4-addendum.md §5, re-checked for task-8 in task-7-addendum.md §6).
-  it("still gives an Admin nothing, because Team is Owner-only", () => {
-    expect(railFor("admin")).toEqual([]);
+  // plan's table said (task-4-addendum.md §5, re-checked for task-8 in task-7-addendum.md §6) --
+  // but it does have '14'.
+  it("gives an Admin the Audit log alone, because Team is Owner-only", () => {
+    expect(railFor("admin")).toEqual([{ group: "record", modules: [AUDIT] }]);
   });
 
-  it("gives Support and a Viewer nothing either", () => {
+  it("gives Support and a Viewer nothing, because neither built module is theirs", () => {
     expect(railFor("support")).toEqual([]);
     expect(railFor("viewer")).toEqual([]);
   });
@@ -106,11 +113,11 @@ describe("CONSOLE_MODULES", () => {
     });
   });
 
-  // A module's flag flips to true in the same PR that adds its page, and exactly one page exists:
-  // 13 Team (2d-2 task-8). Pinned as a list rather than a count so the day 11 Switches or 14 Audit
-  // log arrives, this test names what changed instead of merely counting one more.
-  it("builds 13 Team and nothing else yet", () => {
-    expect(CONSOLE_MODULES.filter((m) => m.built).map((m) => m.num)).toEqual(["13"]);
+  // A module's flag flips to true in the same PR that adds its page, and two pages exist: 13 Team
+  // (2d-2 task-8) and 14 Audit log (2d-2b task-2). Pinned as a list rather than a count so the day
+  // 11 Switches or 01 Overview arrives, this test names what changed instead of counting one more.
+  it("builds 13 Team and 14 Audit log, and nothing else yet", () => {
+    expect(CONSOLE_MODULES.filter((m) => m.built).map((m) => m.num)).toEqual(["13", "14"]);
   });
 
   it("gives every module a distinct, non-empty label and a console href", () => {
