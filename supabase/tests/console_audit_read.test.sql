@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(72);
+select plan(92);
 
 -- The READ side of the audit log (module 14). The write side, the append-only
 -- triggers and console.purge_audit are console_audit.test.sql's business and
@@ -18,12 +18,23 @@ select plan(72);
 -- Grants: authenticated yes, anon and service_role no, for both. Supabase's
 -- default privileges auto-grant EXECUTE on a new public-schema function to all
 -- three, so all three are checked, not only the one the revoke names.
-select is(has_function_privilege('authenticated', 'public.console_audit(timestamptz, timestamptz, uuid, text, text, text, integer, integer)', 'execute')::text, 'true', 'a member can read the audit log');
-select is(has_function_privilege('anon', 'public.console_audit(timestamptz, timestamptz, uuid, text, text, text, integer, integer)', 'execute')::text, 'false', 'anon cannot');
-select is(has_function_privilege('service_role', 'public.console_audit(timestamptz, timestamptz, uuid, text, text, text, integer, integer)', 'execute')::text, 'false', 'nor the service role');
+select is(has_function_privilege('authenticated', 'public.console_audit(timestamptz, timestamptz, uuid, text, text, text, text, integer, integer)', 'execute')::text, 'true', 'a member can read the audit log');
+select is(has_function_privilege('anon', 'public.console_audit(timestamptz, timestamptz, uuid, text, text, text, text, integer, integer)', 'execute')::text, 'false', 'anon cannot');
+select is(has_function_privilege('service_role', 'public.console_audit(timestamptz, timestamptz, uuid, text, text, text, text, integer, integer)', 'execute')::text, 'false', 'nor the service role');
 select is(has_function_privilege('authenticated', 'public.console_audit_entry(uuid)', 'execute')::text, 'true', 'a member can open one entry');
 select is(has_function_privilege('anon', 'public.console_audit_entry(uuid)', 'execute')::text, 'false', 'anon cannot');
 select is(has_function_privilege('service_role', 'public.console_audit_entry(uuid)', 'execute')::text, 'false', 'nor the service role');
+
+-- One console_audit, not two. p_environment could not be added by CREATE OR
+-- REPLACE -- a different argument list is a different function -- so
+-- 20260922140100 drops the eight-argument version. Left standing it would keep
+-- the old fifteen-key row shape alive behind a positional call.
+select is(
+  (select count(*)::integer from pg_catalog.pg_proc p join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'console_audit'),
+  1,
+  'the eight-argument console_audit is gone, not left standing as an overload'
+);
 
 select is(
   (select p.prosecdef from pg_catalog.pg_proc p join pg_catalog.pg_namespace n on n.oid = p.pronamespace
@@ -90,9 +101,12 @@ insert into console.audit_log
 values
   ('5a000000-0000-4000-8000-000000000001', '2019-03-14 02:00:00+00', 'production', null, 'System', null, null, null,
    'system', 'Purged unconfirmed sign-ups', '12 records', 'Retention rule: 7 days.', 'done', null, null, null),
-  (gen_random_uuid(), '2019-03-14 06:00:00+00', 'production', 'b0000000-0000-4000-8000-000000000002', 'Rohan Iyer', 'admin', null, 'Safari on iPhone',
+  -- These two are not 'production'. A preview deployment pointed at the
+  -- production database writes rows exactly like the first, and the module has
+  -- to be able to say so -- which is the whole of the environment ruling.
+  (gen_random_uuid(), '2019-03-14 06:00:00+00', 'preview', 'b0000000-0000-4000-8000-000000000002', 'Rohan Iyer', 'admin', null, 'Safari on iPhone',
    'configure', 'Changed a switch', 'Live budget', 'Raised the daily cap to 100% of plan.', 'done', '51cd…07aa', null, null),
-  (gen_random_uuid(), '2019-03-14 07:55:00+00', 'production', 'b0000000-0000-4000-8000-000000000002', 'Rohan Iyer', 'admin', null, 'Safari on iPhone',
+  (gen_random_uuid(), '2019-03-14 07:55:00+00', 'development', 'b0000000-0000-4000-8000-000000000002', 'Rohan Iyer', 'admin', null, 'Safari on iPhone',
    'messages', 'Posted an incident', 'Slow PNR checks', null, 'done', '51cd…07aa', null, null),
   (gen_random_uuid(), '2019-03-14 08:30:00+00', 'production', 'a0000000-0000-4000-8000-000000000001', 'Asha Rao', 'owner', null, 'Chrome on macOS',
    'configure', 'Blocked an address', '9c41…d2e7', 'Scripted checks from one network.', 'done', 'a3f9…c2c1', null, null),
@@ -139,12 +153,13 @@ $$;
 -- by a row another run left behind.
 create or replace function pg_temp.audit(
   p_member uuid default null, p_category text default null, p_result text default null,
-  p_search text default null, p_limit integer default null, p_offset integer default null
+  p_search text default null, p_environment text default null,
+  p_limit integer default null, p_offset integer default null
 ) returns jsonb
 language sql as $$
   select public.console_audit(
     '2019-03-14 00:00:00+00', '2019-03-15 00:00:00+00',
-    p_member, p_category, p_result, p_search, p_limit, p_offset);
+    p_member, p_category, p_result, p_search, p_environment, p_limit, p_offset);
 $$;
 
 create or replace function pg_temp.targets(p_page jsonb) returns text[]
@@ -178,8 +193,8 @@ select is(jsonb_typeof(pg_temp.audit() -> 'total'), 'number', 'total is a number
 select is(
   (select array_agg(k order by k) from jsonb_object_keys(pg_temp.audit() -> 'rows' -> 0) as t(k)),
   array['action', 'actor_id', 'actor_name', 'actor_role', 'address_hash', 'after', 'at', 'before',
-        'category', 'id', 'key_id', 'reason', 'result', 'session_label', 'target'],
-  'a row carries exactly the fifteen columns the brief names -- and never environment'
+        'category', 'environment', 'id', 'key_id', 'reason', 'result', 'session_label', 'target'],
+  'a row carries the brief''s fifteen columns and environment -- sixteen'
 );
 select is(pg_temp.audit() -> 'rows' -> 0 ->> 'action', 'Paused PNR checks', 'newest first: the 14:02 entry leads the page');
 
@@ -227,6 +242,21 @@ select is(
   'an enum column comes back as a plain string'
 );
 
+-- environment, the sixteenth key. The first cut of these two functions left it
+-- off and still returned every row whatever its value, so a preview
+-- deployment's rows were shown as if they were production's own. The entry
+-- carries it too -- both read their shape from console.audit_row.
+select is(
+  public.console_audit_entry('5a000000-0000-4000-8000-000000000001') ->> 'environment',
+  'production',
+  'an entry names the environment its row was written in'
+);
+select is(
+  pg_temp.audit(p_search => 'Live budget') -> 'rows' -> 0 ->> 'environment',
+  'preview',
+  'and a row a preview deployment wrote says so, instead of passing for production'
+);
+
 -- Every filter narrows.
 select is((pg_temp.audit(p_member => 'a0000000-0000-4000-8000-000000000001') ->> 'total')::integer, 8, 'the member filter narrows to that member''s entries');
 select is((pg_temp.audit(p_category => 'configure') ->> 'total')::integer, 5, 'the category filter narrows');
@@ -245,12 +275,36 @@ select is((public.console_audit('2019-03-14 02:00:00.000001+00', '2019-03-15 00:
 select is((public.console_audit('2019-03-14 00:00:00+00', '2019-03-14 14:02:31.256374+00') ->> 'total')::integer, 16, 'p_to is exclusive -- a row at exactly p_to is out');
 select is((public.console_audit('2019-03-14 00:00:00+00', '2019-03-14 14:02:31.256375+00') ->> 'total')::integer, 17, 'and one microsecond later it is in');
 
+-- environment is a filter, never a boundary. Unfiltered, a production Owner
+-- sees the preview and development rows too: "did a preview deployment write to
+-- production?" is answerable only from preview rows, so hard-scoping the read
+-- to the caller's own environment would have deleted the evidence of the one
+-- incident the rule was meant to catch. A member picks this argument and a
+-- member can forge it; what keeps one console out of another's history is the
+-- database it is pointed at.
+select is((pg_temp.audit() ->> 'total')::integer, 17, 'unfiltered, every environment comes back -- the log never drops a row silently');
+select is((pg_temp.audit(p_environment => 'production') ->> 'total')::integer, 15, 'the environment filter narrows to production');
+select is((pg_temp.audit(p_environment => 'preview') ->> 'total')::integer, 1, 'and to preview');
+select is((pg_temp.audit(p_environment => 'development') ->> 'total')::integer, 1, 'and to development');
+
 -- An unknown result is not a member-visible error. Comparing result::text to
 -- the argument rather than casting the argument to console.audit_result keeps a
 -- hand-made request from raising a raw 22P02 "invalid input value for enum" --
 -- a developer string that would reach a member unchanged.
 select lives_ok($$ select pg_temp.audit(p_result => 'nonsense') $$, 'an unknown result filter does not raise');
 select is((pg_temp.audit(p_result => 'nonsense') ->> 'total')::integer, 0, 'it simply matches nothing');
+
+-- An empty string does not mean the same thing to every filter, and that is
+-- worth pinning rather than smoothing over. p_search normalises '' (and a run
+-- of spaces) away to "no filter"; p_category, p_result and p_environment are
+-- plain equalities, so '' matches nothing. Both fail closed -- neither widens a
+-- filter the caller did not ask to widen -- so this is a contract to state, not
+-- a defect: Task 2 sends null for "no filter" and never ''.
+select is((pg_temp.audit(p_search => '') ->> 'total')::integer, 17, 'an empty p_search means no filter');
+select is((pg_temp.audit(p_search => '   ') ->> 'total')::integer, 17, 'and so does a p_search of nothing but spaces');
+select is((pg_temp.audit(p_category => '') ->> 'total')::integer, 0, 'while an empty p_category matches nothing at all');
+select is((pg_temp.audit(p_result => '') ->> 'total')::integer, 0, 'and so does an empty p_result');
+select is((pg_temp.audit(p_environment => '') ->> 'total')::integer, 0, 'and an empty p_environment');
 
 -- Search matches reason and target, and nothing else. Never actor_name: a
 -- search that matched the actor would let someone filtering for a word see who
@@ -296,6 +350,61 @@ select is(
   pg_temp.audit(p_offset => -5) -> 'rows' -> 0 ->> 'action',
   'Paused PNR checks',
   'a negative p_offset is clamped to zero rather than raising'
+);
+
+-- A page that matched nothing. jsonb_agg over no rows is null, so this needs
+-- the coalesce in console_audit and an assertion of its own: every other
+-- rows-is-an-array assertion above runs on a page that has rows in it, and
+-- would stay green with the coalesce deleted. Searching for something that is
+-- not there is an ordinary thing for a member to do, and Task 2 parses rows
+-- with z.array().
+select is(
+  jsonb_typeof(pg_temp.audit(p_search => 'nothing in this log says this') -> 'rows'),
+  'array',
+  'a page that matched nothing is an empty array, never JSON null'
+);
+select is(jsonb_array_length(pg_temp.audit(p_search => 'nothing in this log says this') -> 'rows'), 0, 'and it is empty');
+select is((pg_temp.audit(p_search => 'nothing in this log says this') ->> 'total')::integer, 0, 'with a total of zero');
+select is(
+  jsonb_typeof(pg_temp.audit(p_offset => 999) -> 'rows'),
+  'array',
+  'and so is a page asked for past the end of the set'
+);
+
+-- 250 more entries, on the next day. The default page size and the upper clamp
+-- cannot be reached through a seventeen-row day, and the upper clamp is what
+-- stops a caller being handed two years of log in one response. A separate
+-- window deliberately: every count above is taken through 14 March and must not
+-- move. Half-open, and the first of these lands at 00:00:01, so the two windows
+-- cannot overlap from either side.
+insert into console.audit_log (at, environment, actor_id, actor_name, actor_role, category, action, target, result)
+-- The anchor is cast explicitly: an untyped literal beside an interval
+-- resolves to interval + interval, and the insert dies on "invalid input
+-- syntax for type interval".
+select '2019-03-15 00:00:00+00'::timestamptz + (n || ' seconds')::interval, 'production',
+       'a0000000-0000-4000-8000-000000000001', 'Asha Rao', 'owner',
+       'system', 'Purged unconfirmed sign-ups', n || ' records', 'done'
+  from generate_series(1, 250) as g(n);
+
+select is(
+  (public.console_audit('2019-03-15 00:00:00+00', '2019-03-16 00:00:00+00') ->> 'total')::integer,
+  250,
+  'the second day holds 250 entries'
+);
+select is(
+  jsonb_array_length(public.console_audit('2019-03-15 00:00:00+00', '2019-03-16 00:00:00+00') -> 'rows'),
+  50,
+  'a caller that names no p_limit gets a page of fifty, not the whole log'
+);
+select is(
+  jsonb_array_length(public.console_audit('2019-03-15 00:00:00+00', '2019-03-16 00:00:00+00', p_limit => 1000) -> 'rows'),
+  200,
+  'and one that asks for a thousand is clamped down to two hundred'
+);
+select is(
+  (public.console_audit('2019-03-15 00:00:00+00', '2019-03-16 00:00:00+00', p_limit => 1000) ->> 'total')::integer,
+  250,
+  'the clamp caps the page, never the total'
 );
 
 -- Paging over rows that share a timestamp. `at` alone is not a total order --
