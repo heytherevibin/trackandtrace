@@ -9,6 +9,7 @@ import { ConfirmItsYou } from "@/console/components/confirm-its-you";
 import { consoleMessages } from "@/console/messages";
 import type { TeamInvite } from "@/console/team/team";
 import { resendInvite, revokeInvite } from "@/console/team/team-client";
+import { cn } from "@/utils/cn";
 
 const s = consoleMessages.team.resendInvite;
 const v = consoleMessages.team.revokeInvite;
@@ -161,14 +162,22 @@ export function InviteRowActions({ invite }: { readonly invite: TeamInvite }) {
         onCancel={() => setOpened("none")}
         onConfirmed={() => void onRevokeConfirmed()}
       />
-      {error ? (
-        // Capped and left-aligned inside this end-aligned cell, exactly as member-row-menu.tsx's
-        // own alert is: the Actions column is the narrowest on the table, and a refusal running its
-        // full width would stretch the column rather than wrap.
-        <p role="alert" className="ml-auto mt-1.5 max-w-[34ch] text-pretty text-left text-label font-medium text-ink-alert">
-          {error}
-        </p>
-      ) : null}
+      {/*
+        Always rendered, empty while there is nothing to say -- the shape member-row-menu.tsx took
+        in `37aba03`, and the same reason: a `role="alert"` region inserted already carrying its
+        message relies on node-insertion announcement, which current screen readers do handle but
+        is the less reliable of the two; a region that is present and then *changes* is the robust
+        one. This component drew the conditional shape for a week because it was written from the
+        version of member-row-menu.tsx that had the same defect, twenty lines away.
+
+        Capped and left-aligned inside this end-aligned cell: the Actions column is the narrowest on
+        the table, and a refusal running its full width would stretch the column rather than wrap.
+        `text-pretty` keeps the last line from being one orphaned word. The top margin is
+        conditional so an empty region takes no space at all.
+      */}
+      <p role="alert" className={cn("ml-auto max-w-[34ch] text-pretty text-left text-label font-medium text-ink-alert", error && "mt-1.5")}>
+        {error}
+      </p>
     </>
   );
 }

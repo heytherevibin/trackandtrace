@@ -21,6 +21,9 @@ import { InviteRowActions } from "@/console/team/invite-row-actions";
 import type { TeamInvite } from "@/console/team/team";
 
 const REASON = "Sent it to the wrong address entirely.";
+/** The roster-moved refusal both actions share, named once so the two alert tests cannot drift. */
+const MOVED = "The team has changed since this page loaded. Reload it and try again.";
+const STALE_TAP = "That confirmation no longer matches this invite. Try again.";
 
 const PRIYA: TeamInvite = {
   id: "bbbbbbbb-0000-0000-0000-000000000001",
@@ -132,27 +135,61 @@ describe("Resend", () => {
   // member row actions, so it lands in the row's own alert rather than a toast -- a notice that
   // goes away is the wrong shape for something a member has to act on (member-row-menu.tsx's own
   // note).
+  //
+  // The live region is rendered from the start and empty while there is nothing to say, so this
+  // waits for its *text* to arrive rather than for the element, which was there all along. The
+  // same correction `37aba03` made to member-row-menu.test.tsx.
   it("shows a refusal in the row rather than toasting it, and re-reads the list", async () => {
-    resendInvite.mockResolvedValue({ kind: "failed", message: "The team has changed since this page loaded. Reload it and try again." });
+    resendInvite.mockResolvedValue({ kind: "failed", message: MOVED });
     const user = userEvent.setup();
     open();
     await user.click(screen.getByRole("button", { name: "Resend" }));
     await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Resend" }));
-    const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("The team has changed since this page loaded. Reload it and try again.");
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(MOVED));
     expect(notifySuccess).not.toHaveBeenCalled();
     expect(refresh).toHaveBeenCalledOnce();
   });
 
-  it("clears a refusal the moment either dialog is opened again", async () => {
-    resendInvite.mockResolvedValue({ kind: "failed", message: "The team has changed since this page loaded. Reload it and try again." });
+  it("mounts that live region empty rather than inserting it with its message", () => {
+    open();
+    const region = screen.getByRole("alert");
+    expect(region).toBeInTheDocument();
+    expect(region).toBeEmptyDOMElement();
+  });
+
+  /**
+   * Asserted on the TEXT, not on `queryByRole("alert")`. The first version of this test used the
+   * role and could not fail: it ran while the next dialog was open, and Base UI marks the page
+   * behind a modal `inert`/`aria-hidden`, so *every* role query returns null there whether the
+   * refusal was cleared or not -- deleting `setError(null)` from invite-row-actions.tsx left the
+   * whole suite green. This is the identical defect the task-6 review found in
+   * member-row-menu.test.tsx and `37aba03` fixed; it was reproduced here because this component
+   * was written from that file before the fix landed.
+   *
+   * `queryByText` does not filter by accessibility, so it sees through the inert page, and the
+   * re-check after the dialog closes means the assertion cannot be satisfied by inerting from
+   * either side. Confirmed by deleting `setError(null)` and watching this fail -- see the fix-round
+   * section of task-7-report.md.
+   */
+  it("drops a previous refusal the moment either dialog is opened again", async () => {
+    resendInvite.mockResolvedValue({ kind: "failed", message: MOVED });
     const user = userEvent.setup();
     open();
     await user.click(screen.getByRole("button", { name: "Resend" }));
     await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Resend" }));
-    expect(await screen.findByRole("alert")).toBeVisible();
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(MOVED));
+
+    // Revoke opens TC-01, which inerts the page behind it -- the very state the old assertion was
+    // blind in.
     await user.click(screen.getByRole("button", { name: "Revoke" }));
-    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+    await screen.findByText("Revoke the invite?");
+    expect(screen.queryByText(MOVED)).toBeNull();
+
+    // And still gone once the dialog that was hiding the page closes, so this is not merely the
+    // modal's inerting seen from the other side.
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByText(MOVED)).toBeNull();
+    expect(screen.getByRole("alert")).toBeEmptyDOMElement();
   });
 });
 
@@ -225,12 +262,13 @@ describe("Revoke", () => {
     expect(revokeInvite).not.toHaveBeenCalled();
   });
 
+  // Waits for the region's text, not for the region: it is rendered from the start and empty until
+  // there is something to say (see the Resend block's own note).
   it("shows a refusal in the row rather than toasting it, and re-reads the list", async () => {
     runTap.mockResolvedValue({ kind: "done" });
-    revokeInvite.mockResolvedValue({ kind: "failed", message: "That confirmation no longer matches this invite. Try again." });
+    revokeInvite.mockResolvedValue({ kind: "failed", message: STALE_TAP });
     await confirm(userEvent.setup());
-    const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("That confirmation no longer matches this invite. Try again.");
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(STALE_TAP));
     expect(notifySuccess).not.toHaveBeenCalled();
     expect(refresh).toHaveBeenCalledOnce();
   });
