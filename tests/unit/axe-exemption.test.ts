@@ -11,7 +11,7 @@ const pair = (fgColor: string, bgColor: string) => node({ fgColor, bgColor });
 describe("isDesignLockedAccent", () => {
   it.each([
     ["pale words on the steel fill by day", "#f2f2f3", "#5980a6"],
-    ["dark words on the steel fill by night", "#1d2d3d", "#5980a6"],
+    ["dark words on the steel fill by night", "#000000", "#5980a6"],
     ["pale words on the fill's hover step", "#f2f2f3", "#597ea3"],
   ])("exempts %s", (_name, fg, bg) => {
     expect(isDesignLockedAccent(pair(fg, bg))).toBe(true);
@@ -19,7 +19,7 @@ describe("isDesignLockedAccent", () => {
 
   it.each([
     ["steel text on the day ground", "#5980a6", "#f2f2f3"],
-    ["steel text on the night ground", "#5980a6", "#1d2d3d"],
+    ["steel text on the night ground", "#5980a6", "#000000"],
     ["the hover step as text", "#597ea3", "#f2f2f3"],
     ["an unrelated pair", "#777777", "#ffffff"],
   ])("does not exempt %s", (_name, fg, bg) => {
