@@ -24,18 +24,25 @@ const noticeOk = "OK";
 // Word for word from docs/design/sheets/console/ConsoleTeam.dc.html, with corrections recorded in
 // task-3-report.md:
 //
-// - The brief quoted the page kicker as "Console" and the title as "Console team". The sheet draws
-//   neither: its kicker is "13 · Team" (ConsoleTeam.dc.html:99), the same "NN · Module" shape every
-//   other numbered module already uses (ConsoleOverview.dc.html "01 · Overview",
-//   ConsoleSwitches.dc.html "11 · Switches & settings", AuditLog.dc.html "14 · Audit log"), and its
-//   title is plainly "Team" (:100). "Console" is the masthead's own tag (frame.consoleTag), already
-//   shown on every console page's header -- not this page's kicker.
+// - The brief quoted the page kicker as "Console". The sheet draws no such kicker: its kicker is
+//   "13 · Team" (ConsoleTeam.dc.html:99), the same "NN · Module" shape every other numbered module
+//   already uses (ConsoleOverview.dc.html "01 · Overview", ConsoleSwitches.dc.html
+//   "11 · Switches & settings", AuditLog.dc.html "14 · Audit log"), and its `h1` is plainly "Team"
+//   (:100). "Console" is the masthead's own tag (frame.consoleTag), already shown on every console
+//   page's header -- not this page's kicker.
+// - The brief's other half was right and the comment that used to stand here was wrong: the sheet
+//   *does* draw "Console team", at :5, as the document's own `<title>` -- the browser tab, not the
+//   page heading. task-3-report.md said so in as many words while this file shipped `pageTitle:
+//   "Team"` anyway, and `pageTitle` is consumed at src/app/console/team/page.tsx as
+//   `metadata = { title: … }`, which is exactly that slot. Transcribed now, the way
+//   ConsoleMyKeys.dc.html's own `<title>` is (my-keys.ts:11); setup.ts and sign-in.ts shorten
+//   theirs and both say so with a "Not on a drawn sheet" note, which this needed and did not have.
 // - The brief's copy list never quotes the page's lead line. It exists (:101) and is included here.
 // - The Members table also carries a Status column (:112) the brief's column list omits, even
 //   though it separately quotes the two status values ("statuses Active and Setup incomplete") --
 //   both are carried below.
 export const team = {
-  pageTitle: "Team",
+  pageTitle: "Console team",
   kicker: "13 · Team",
   title: "Team",
   lead: "Who can use the console, and with which role.",

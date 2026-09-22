@@ -23,10 +23,16 @@ export const dynamic = "force-dynamic";
  * (src/app/console/api/keys/mine/route.ts's own comment).
  *
  * Task 3's comment here promised a client re-fetch from this route "once Tasks 4-7 exist to mutate
- * what it shows". Task 4 does not take it up: the three plates stay server components and an invite
- * refreshes them with `router.refresh()`, so the page re-runs `getTeam()` server-side and the
- * refreshed list cannot disagree with the first paint (task-4-addendum.md §5). The promise moves to
- * Tasks 5-7, which need the client-plate conversion for their own row actions.
+ * what it shows", and Task 4's own note then moved that promise on to Tasks 5-7. **Nobody took it
+ * up, and nobody should have.** All four mutating tasks landed with the three plates still server
+ * components: only the row menu and the row actions inside each Actions cell are "use client", and
+ * every one of them refreshes with `router.refresh()` so the page re-runs `getTeam()` server-side
+ * and the refreshed list cannot disagree with the first paint (task-4-addendum.md §5, Ruling 14;
+ * src/console/team/team-client.ts:13-18 records the tasks declining it).
+ *
+ * So this route has one caller shape and it is not the browser: anything server-side that wants
+ * the roster in one round trip. Leaving it as a promise about the next task made it read as
+ * half-finished work for three tasks after the decision was taken.
  */
 export async function GET(): Promise<Response> {
   try {
