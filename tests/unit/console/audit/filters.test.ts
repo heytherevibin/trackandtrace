@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   auditFiltersToSearch,
   auditQueryFor,
+  auditRangeAsDays,
   auditRangeBounds,
   AUDIT_PAGE_SIZE,
   clearAuditFilters,
@@ -88,9 +89,55 @@ describe("the query string", () => {
     expect(parseAuditFilters(fromSearch("q=%20pnr%20"), ENVIRONMENT).search).toBe("pnr");
   });
 
+  // Both days unreadable is the same as both absent: nothing was chosen, so it is not a custom
+  // range (see the block below).
   it("drops a from/to that is not a calendar day", () => {
-    const parsed = parseAuditFilters(fromSearch("range=custom&from=2026-13-40&to=yesterday"), ENVIRONMENT);
-    expect(parsed).toMatchObject({ range: "custom", from: null, to: null });
+    expect(parseAuditFilters(fromSearch("range=custom&from=2026-13-40&to=yesterday"), ENVIRONMENT)).toMatchObject({ range: "today", from: null, to: null });
+    expect(parseAuditFilters(fromSearch("range=custom&from=2026-02-31&to=2026-09-03"), ENVIRONMENT)).toMatchObject({ range: "custom", from: null, to: "2026-09-03" });
+  });
+});
+
+// A `custom` range with neither day chosen used to reach console_audit as `from: null, to: null` --
+// an unbounded scan and a `count(*)` over two years of history, under a caption reading "for the
+// chosen dates". Nothing was chosen, so it is not a custom range.
+describe("custom with no days chosen", () => {
+  it("is read as the default range, not as the whole log", () => {
+    expect(parseAuditFilters(fromSearch("range=custom"), ENVIRONMENT)).toEqual(defaultAuditFilters(ENVIRONMENT));
+  });
+
+  it("is still bounded even when the filters were built by hand rather than parsed", () => {
+    const byHand: AuditFilters = { ...defaultAuditFilters(ENVIRONMENT), range: "custom", from: null, to: null };
+    const bounds = auditRangeBounds(byHand, new Date("2026-09-23T02:00:00+05:30"));
+    expect(bounds).toEqual({ from: "2026-09-22T18:30:00.000Z", to: "2026-09-23T18:30:00.000Z" });
+    expect(auditQueryFor(byHand, new Date("2026-09-23T02:00:00+05:30")).from).not.toBeNull();
+  });
+
+  // One day and not the other is a real choice, and the copy ("for the chosen dates") is true of it.
+  it("leaves a half-chosen custom range exactly as it was asked for", () => {
+    const halfOpen: AuditFilters = { ...defaultAuditFilters(ENVIRONMENT), range: "custom", from: null, to: "2026-09-03" };
+    expect(auditRangeBounds(halfOpen, new Date("2026-09-23T02:00:00+05:30"))).toEqual({ from: null, to: "2026-09-03T18:30:00.000Z" });
+  });
+});
+
+describe("auditRangeAsDays", () => {
+  const NOW = new Date("2026-09-23T02:00:00+05:30");
+
+  // What the filter bar seeds the two Custom boxes with, so picking Custom refines the range already
+  // on screen instead of emptying it. Inclusive IST calendar days, the shape the day boxes take.
+  it("gives each fixed range its own inclusive IST days", () => {
+    expect(auditRangeAsDays("today", NOW)).toEqual({ from: "2026-09-23", to: "2026-09-23" });
+    expect(auditRangeAsDays("7d", NOW)).toEqual({ from: "2026-09-17", to: "2026-09-23" });
+    expect(auditRangeAsDays("30d", NOW)).toEqual({ from: "2026-08-25", to: "2026-09-23" });
+  });
+
+  // The seeded days and the range they came from must describe the same interval, or picking Custom
+  // would silently move the range.
+  it("describes the same interval the range itself does", () => {
+    for (const range of ["today", "7d", "30d"] as const) {
+      const days = auditRangeAsDays(range, NOW);
+      const asCustom: AuditFilters = { ...defaultAuditFilters(ENVIRONMENT), range: "custom", ...days };
+      expect(auditRangeBounds(asCustom, NOW), range).toEqual(auditRangeBounds({ ...defaultAuditFilters(ENVIRONMENT), range }, NOW));
+    }
   });
 });
 
@@ -154,9 +201,9 @@ describe("auditRangeBounds", () => {
     });
   });
 
-  it("leaves an unset half of a custom range unbounded rather than guessing at it", () => {
-    expect(auditRangeBounds({ ...defaultAuditFilters(ENVIRONMENT), range: "custom", from: null, to: null }, AFTER_IST_MIDNIGHT)).toEqual({
-      from: null,
+  it("leaves the unset half of a half-chosen custom range unbounded rather than guessing at it", () => {
+    expect(auditRangeBounds({ ...defaultAuditFilters(ENVIRONMENT), range: "custom", from: "2026-09-01", to: null }, AFTER_IST_MIDNIGHT)).toEqual({
+      from: "2026-08-31T18:30:00.000Z",
       to: null,
     });
   });

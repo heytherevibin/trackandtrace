@@ -3,7 +3,16 @@
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { NativeSelect, type NativeSelectOption } from "@/components/ui/native-select";
-import { AUDIT_CATEGORIES, AUDIT_RANGES, AUDIT_RESULTS, clearAuditFilters, hasActiveAuditFilters, type AuditFilters, type AuditRange } from "@/console/audit/filters";
+import {
+  AUDIT_CATEGORIES,
+  AUDIT_RANGES,
+  AUDIT_RESULTS,
+  auditRangeAsDays,
+  clearAuditFilters,
+  hasActiveAuditFilters,
+  type AuditFilters,
+  type AuditRange,
+} from "@/console/audit/filters";
 import { consoleMessages } from "@/console/messages";
 import { cn } from "@/utils/cn";
 
@@ -115,6 +124,20 @@ export function FilterBar({
     if (draft.trim() !== filters.search) apply({ search: draft.trim() });
   };
 
+  /**
+   * Picking `Custom` seeds the two day boxes with the range already on screen, rather than emptying
+   * them: a custom range with neither day chosen is not a range at all -- it would have asked
+   * `console_audit` for an unbounded scan and a `count(*)` over two years of history, under a
+   * caption reading "for the chosen dates". Seeded, `Custom` refines what the member is looking at,
+   * which is what the word means beside Today / 7 days / 30 days. Every other range clears them,
+   * so a stale pair cannot ride along in the address behind a fixed range.
+   */
+  const pickRange = (next: AuditRange) => {
+    if (next !== "custom") return apply({ range: next, from: null, to: null });
+    const seeded = filters.range === "custom" ? { from: filters.from, to: filters.to } : auditRangeAsDays(filters.range, new Date());
+    apply({ range: next, ...seeded });
+  };
+
   const active = hasActiveAuditFilters(filters, environment);
   const memberName = members.find((one) => one.id === filters.member)?.name ?? filters.member ?? "";
 
@@ -192,7 +215,7 @@ export function FilterBar({
 
         <div className="inline-flex border border-line" role="group" aria-label={m.filters.rangeLabel}>
           {AUDIT_RANGES.map((range) => (
-            <RangeTab key={range} range={range} current={filters.range} onPick={(next) => apply({ range: next, from: null, to: null })} />
+            <RangeTab key={range} range={range} current={filters.range} onPick={pickRange} />
           ))}
         </div>
 

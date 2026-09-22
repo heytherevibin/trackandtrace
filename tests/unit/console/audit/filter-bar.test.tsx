@@ -2,7 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { FilterBar } from "@/console/audit/filter-bar";
-import { defaultAuditFilters, type AuditFilters } from "@/console/audit/filters";
+import { auditRangeAsDays, defaultAuditFilters, type AuditFilters } from "@/console/audit/filters";
 import { consoleMessages } from "@/console/messages";
 
 const m = consoleMessages.audit;
@@ -84,9 +84,28 @@ describe("changing a filter", () => {
   it("offers the two day boxes only once the range is Custom", async () => {
     bar();
     expect(screen.queryByLabelText(m.filters.customFrom)).toBeNull();
-    render(<FilterBar filters={{ ...defaultAuditFilters(ENVIRONMENT), range: "custom" }} environment={ENVIRONMENT} members={[]} onChange={vi.fn()} />);
+    render(<FilterBar filters={{ ...defaultAuditFilters(ENVIRONMENT), range: "custom", from: "2026-09-01", to: "2026-09-03" }} environment={ENVIRONMENT} members={[]} onChange={vi.fn()} />);
     expect(screen.getByLabelText(m.filters.customFrom)).toBeInTheDocument();
     expect(screen.getByLabelText(m.filters.customTo)).toBeInTheDocument();
+  });
+
+  // Custom with neither day chosen is not a range: it would ask console_audit for an unbounded scan
+  // and a count(*) over two years, under a caption reading "for the chosen dates". Seeding it with
+  // the range already on screen is what makes "Custom" mean "refine this".
+  it("seeds the two day boxes from the range already on screen when Custom is picked", async () => {
+    const onChange = bar({ ...defaultAuditFilters(ENVIRONMENT), range: "7d" });
+    await userEvent.click(screen.getByRole("button", { name: m.filters.ranges.custom }));
+    const next = onChange.mock.calls[0]?.[0];
+    expect(next).toMatchObject({ range: "custom" });
+    expect(next?.from).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(next?.to).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(auditRangeAsDays("7d", new Date())).toEqual({ from: next?.from, to: next?.to });
+  });
+
+  it("clears the day boxes again when a fixed range is picked, so a stale pair cannot ride along", async () => {
+    const onChange = bar({ ...defaultAuditFilters(ENVIRONMENT), range: "custom", from: "2026-09-01", to: "2026-09-03" });
+    await userEvent.click(screen.getByRole("button", { name: m.filters.ranges["30d"] }));
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ range: "30d", from: null, to: null }));
   });
 });
 

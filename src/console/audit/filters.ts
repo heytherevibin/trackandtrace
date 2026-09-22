@@ -117,7 +117,16 @@ export function defaultAuditFilters(environment: string): AuditFilters {
 export function parseAuditFilters(params: AuditSearchParams, environment: string): AuditFilters {
   const fallback = defaultAuditFilters(environment);
   const rawRange = one(params, KEYS.range);
-  const range = AUDIT_RANGES.find((r) => r === rawRange) ?? fallback.range;
+  const asked = AUDIT_RANGES.find((r) => r === rawRange) ?? fallback.range;
+  // A day box only means anything for the Custom range; a stale from/to behind Today would
+  // otherwise round-trip into an address that reads as filtered and is not.
+  const from = asked === "custom" ? day(one(params, KEYS.from)) : null;
+  const to = asked === "custom" ? day(one(params, KEYS.to)) : null;
+  // `?range=custom` with neither day chosen is not a custom range -- nothing was chosen. It used to
+  // fall through to `from: null, to: null`, which asked `console_audit` for an unbounded scan and a
+  // `count(*)` over two years of history, under a caption reading "for the chosen dates". Today is
+  // what the page opens on, and it is what "no range" means here.
+  const range = asked === "custom" && !from && !to ? fallback.range : asked;
   const rawResult = one(params, KEYS.result);
   const rawMember = one(params, KEYS.member);
   const rawCategory = one(params, KEYS.category)?.trim() ?? null;
@@ -126,10 +135,8 @@ export function parseAuditFilters(params: AuditSearchParams, environment: string
 
   return {
     range,
-    // A day box only means anything for the Custom range; a stale from/to behind Today would
-    // otherwise round-trip into an address that reads as filtered and is not.
-    from: range === "custom" ? day(one(params, KEYS.from)) : null,
-    to: range === "custom" ? day(one(params, KEYS.to)) : null,
+    from,
+    to,
     member: rawMember && UUID.test(rawMember) ? rawMember.toLowerCase() : null,
     category: rawCategory && rawCategory.length <= CATEGORY_MAX ? rawCategory : null,
     result: AUDIT_RESULTS.find((r) => r === rawResult) ?? null,
@@ -181,15 +188,31 @@ export function clearAuditFilters(_filters: AuditFilters, environment: string): 
 const SPAN: Readonly<Record<"today" | "7d" | "30d", number>> = { today: 1, "7d": 7, "30d": 30 };
 
 /**
+ * The inclusive IST calendar days a fixed range covers, for seeding the Custom boxes with the range
+ * a member was already looking at -- so picking `Custom` refines what is on screen instead of
+ * emptying it.
+ */
+export function auditRangeAsDays(range: Exclude<AuditRange, "custom">, now: Date): { readonly from: string; readonly to: string } {
+  const today = dayKey.format(now);
+  return { from: shiftDay(today, 1 - SPAN[range]), to: today };
+}
+
+/**
  * The half-open interval the range means: `from` inclusive, `to` **exclusive**, which is Task 1's
  * own contract (task-2-addendum.md §3) -- the start of the next day, never 23:59:59.999, so two
  * adjacent ranges partition a day instead of both claiming the row on the seam.
  *
  * "7 days" is today and the six before it, not the last 168 hours: the control sits beside "Today",
  * which is a calendar day, and a member asking for a week means seven of those.
+ *
+ * A `custom` range with neither day chosen is read as the default range, not as "everything":
+ * `parseAuditFilters` already normalises it away, and this repeats the rule so that a filters object
+ * built by hand cannot ask `console_audit` for an unbounded scan and a `count(*)` over two years
+ * either. One day chosen and not the other is a real choice and is left as asked -- the copy says
+ * "for the chosen dates", and one of them is.
  */
 export function auditRangeBounds(filters: AuditFilters, now: Date): { readonly from: string | null; readonly to: string | null } {
-  if (filters.range === "custom") {
+  if (filters.range === "custom" && (filters.from || filters.to)) {
     return {
       from: filters.from ? istDayStart(filters.from) : null,
       // The member picks an inclusive day; the database is asked for the morning after it.
@@ -197,7 +220,8 @@ export function auditRangeBounds(filters: AuditFilters, now: Date): { readonly f
     };
   }
   const today = dayKey.format(now);
-  return { from: istDayStart(shiftDay(today, 1 - SPAN[filters.range])), to: istDayStart(shiftDay(today, 1)) };
+  const span = filters.range === "custom" ? "today" : filters.range;
+  return { from: istDayStart(shiftDay(today, 1 - SPAN[span])), to: istDayStart(shiftDay(today, 1)) };
 }
 
 /**
