@@ -186,6 +186,23 @@ describe("ChangeRoleDialog on TC-01", () => {
     await waitFor(() => expect(notifySuccess).toHaveBeenCalledWith("Role changed · logged"));
     expect(changeRole).toHaveBeenCalledTimes(2);
   });
+
+  // The refusal's own comment says it is cleared by the next attempt, and Continue is where an
+  // attempt starts -- from there a tap is minted. Without that, a member who pressed Continue and
+  // then thought better of the tap came back to a picker still carrying a sentence about an attempt
+  // they had already replaced. Found by the task-5 review.
+  it("drops a previous refusal the moment a new attempt starts, even if that attempt is cancelled", async () => {
+    runTap.mockResolvedValue({ kind: "done" });
+    changeRole.mockResolvedValue({ kind: "failed", message: "That confirmation no longer matches this change. Try again." });
+    open(KIRAN);
+    const user = userEvent.setup();
+    await confirm(user, "Admin");
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await user.click(await screen.findByRole("button", { name: "Cancel" }));
+    expect(await screen.findByRole("radiogroup", { name: "New role" })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
 });
 
 // task-5-addendum.md §3. console_change_role raises one developer string ('a console needs at least

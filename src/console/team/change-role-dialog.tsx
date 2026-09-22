@@ -133,6 +133,18 @@ export function ChangeRoleDialog({
   }
 
   /**
+   * The picker's Continue, and the start of an attempt: from here a tap is minted, so the previous
+   * attempt's refusal stops being true of what is on screen and goes. Clearing it here rather than
+   * where the next one is set is what makes the difference visible in the one place it matters --
+   * a member who cancels TC-01 comes back to a clean picker, not to a sentence about an attempt
+   * they have already replaced. The same place invite-dialog.tsx's own onContinue clears its.
+   */
+  function onContinue(next: ConsoleRole): void {
+    setAttemptError(null);
+    setStage({ kind: "confirming", role: next });
+  }
+
+  /**
    * spec §D step 3, and only step 3: ConfirmItsYou calls this once /api/tap/verify has answered
    * `{ ok: true }` for a challenge minted over these exact four fields. The tap stays unspent until
    * console_change_role's own console.use_tap(), inside the same transaction as the role update,
@@ -165,7 +177,7 @@ export function ChangeRoleDialog({
           footer={
             <>
               <DialogClose render={<Button variant="secondary">{t.cancel}</Button>} />
-              <Button variant="primary" disabled={role === null} onClick={() => role && setStage({ kind: "confirming", role })}>
+              <Button variant="primary" disabled={role === null} onClick={() => role && onContinue(role)}>
                 {c.continue}
               </Button>
             </>

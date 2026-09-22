@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // The only-you row carries InviteDialog and every row now carries MemberRowMenu, both "use client"
@@ -51,6 +52,28 @@ const NEVER_ACTIVE: TeamMember = {
   email: "kiran@trakline.in",
   name: "Kiran Das",
   role: "support",
+  status: "setup",
+  keyCount: 0,
+  lastActiveAt: null,
+};
+
+// A second Owner, and a second Owner who has accepted an invite but never finished adding keys.
+// console_team returns both as Owners; only the first is `active`, and only `active` ones count
+// towards the floor console.require_another_active_owner() enforces.
+const SECOND_OWNER: TeamMember = {
+  userId: "aaaaaaaa-0000-0000-0000-000000000005",
+  email: "devi@trakline.in",
+  name: "Devi Menon",
+  role: "owner",
+  status: "active",
+  keyCount: 2,
+  lastActiveAt: "2026-09-21T08:32:00Z",
+};
+const SETUP_OWNER: TeamMember = {
+  userId: "aaaaaaaa-0000-0000-0000-000000000006",
+  email: "nadia@trakline.in",
+  name: "Nadia Shah",
+  role: "owner",
   status: "setup",
   keyCount: 0,
   lastActiveAt: null,
@@ -157,5 +180,53 @@ describe("MembersPlate", () => {
   it("draws the only-you row's own secondary Invite trigger beside the note", () => {
     render(<MembersPlate members={[OWNER]} signedInId={OWNER.userId} />);
     expect(screen.getByRole("button", { name: "Invite a member" })).toBeInTheDocument();
+  });
+});
+
+/**
+ * What the last-Owner guard is actually fed. `needsAnotherOwner` is exercised directly in
+ * tests/unit/console/team/role-change.test.ts and through the dialog in change-role-dialog.test.tsx,
+ * but both of those receive `activeOwners` and `signedInId` already worked out. This plate is where
+ * `activeOwners` is *derived* from a roster, and the task-5 review proved that seam was unheld: it
+ * dropped `&& row.status === "active"` from the count and all 203 console tests stayed green.
+ *
+ * These go through the menu on purpose. Getting the count wrong does not break a render -- it lets
+ * an Owner pick a role, type a reason, tap their key, and only then read "The team has changed
+ * since this page loaded", which is the exact failure the client-side guard exists to prevent.
+ */
+describe("MembersPlate's last-Owner guard inputs", () => {
+  /** Opens one row's menu and takes its first item, the way an Owner reaches the change-role flow. */
+  async function changeRoleOn(name: string): Promise<void> {
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: `Actions for ${name}` }));
+    await user.click(await screen.findByRole("menuitem", { name: "Change role" }));
+  }
+
+  // One active Owner (the reader) and one Owner still in setup. console.require_another_active_owner()
+  // counts `role = 'owner' and status = 'active'`, so the count here is 1 and demoting the setup
+  // Owner would leave the console without one.
+  it("counts only active Owners, so an Owner still in setup cannot stand in for one", async () => {
+    render(<MembersPlate members={[OWNER, SETUP_OWNER]} signedInId={OWNER.userId} />);
+    await changeRoleOn("Nadia Shah");
+    expect(await screen.findByRole("alertdialog", { name: "A console needs at least one Owner" })).toBeInTheDocument();
+    expect(screen.queryByRole("radiogroup")).not.toBeInTheDocument();
+  });
+
+  // The control for the assertion above: with a second *active* Owner the same row is changeable,
+  // so the refusal is about the count and not about "any Owner row is refused".
+  it("lets an Owner be demoted once a second active Owner stands", async () => {
+    render(<MembersPlate members={[OWNER, SECOND_OWNER]} signedInId={OWNER.userId} />);
+    await changeRoleOn("Devi Menon");
+    expect(await screen.findByRole("radiogroup", { name: "New role" })).toBeInTheDocument();
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  });
+
+  // The other unheld input: the signed-in member's own id, which the guard refuses unconditionally.
+  // Two active Owners here deliberately, so the floor above cannot account for the refusal -- the
+  // only thing that can is this row being the reader's own.
+  it("hands each row the signed-in member's own id, so their own row is refused as self", async () => {
+    render(<MembersPlate members={[OWNER, SECOND_OWNER]} signedInId={OWNER.userId} />);
+    await changeRoleOn("Asha Rao");
+    expect(await screen.findByRole("alertdialog", { name: "A console needs at least one Owner" })).toBeInTheDocument();
   });
 });
