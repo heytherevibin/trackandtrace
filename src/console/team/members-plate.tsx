@@ -3,6 +3,7 @@ import { DataTable, type Column } from "@/components/ui/data-table";
 import { Led } from "@/components/ui/led";
 import { Plate } from "@/components/ui/plate";
 import { consoleMessages } from "@/console/messages";
+import { InviteDialog } from "@/console/team/invite-dialog";
 import type { TeamMember } from "@/console/team/team";
 import { formatRelative, formatTime, TIME_ZONE } from "@/utils/datetime";
 
@@ -72,8 +73,14 @@ export function MembersPlate({ members }: { readonly members: readonly TeamMembe
     <Plate as="section" title={m.title} titleId="team-members" headingLevel={2} meta={[m.count(members.length)]} padding="none">
       <DataTable columns={columns} rows={members} rowKey={(row) => row.userId} caption={m.tableCaption} />
       {members.length === 1 ? (
-        <div className="border-t border-line px-5 py-3.5">
-          <p className="text-sm text-ink-2">{m.onlyYouNote}</p>
+        // ConsoleTeam.dc.html:157: the note and a *secondary* "Invite a member" on one row, the
+        // note taking the space the button does not. The primary trigger with the same words is in
+        // the page header (:106); both open the one InviteDialog, which owns its own open state, so
+        // two instances here and there is simpler than lifting a flag into the page
+        // (task-4-addendum.md §5).
+        <div className="flex items-center gap-4 border-t border-line px-5 pb-4 pt-3.5">
+          <p className="grow text-sm text-ink-2">{m.onlyYouNote}</p>
+          <InviteDialog variant="secondary" />
         </div>
       ) : null}
     </Plate>

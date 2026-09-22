@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(75);
+select plan(78);
 
 -- What an Owner may do to the team: list it, invite someone, change a role,
 -- reset a member's keys, remove a member, and resend or revoke an invite.
@@ -41,11 +41,16 @@ select is(has_function_privilege('service_role', 'public.console_revoke_invite(u
 -- spare, not only a lone Owner), a Support member (so "not an Owner" is
 -- tested against someone who really exists), and a Viewer still in setup (so
 -- console_team's 'setup' status is proven, not merely 'active').
+-- The last row is a traveller and nothing else: an auth.users row with no
+-- console.members row behind it, which is exactly the shape spec §E line 103
+-- ("An address that already has a traveller account can't be invited") is
+-- about, and the one ConsoleTeam.dc.html's dlg_refused draws.
 insert into auth.users (id, email) values
   ('a1111111-1111-1111-1111-111111111111', 'asha@trakline.in'),
   ('b1111111-1111-1111-1111-111111111111', 'rohan@trakline.in'),
   ('d1111111-1111-1111-1111-111111111111', 'devi@trakline.in'),
-  ('e1111111-1111-1111-1111-111111111111', 'meera@trakline.in');
+  ('e1111111-1111-1111-1111-111111111111', 'meera@trakline.in'),
+  ('f1111111-1111-1111-1111-111111111111', 'priya.shah@example.com');
 
 insert into console.members (user_id, email, name, role, status) values
   ('a1111111-1111-1111-1111-111111111111', 'asha@trakline.in', 'Asha Rao', 'owner', 'active'),
@@ -137,6 +142,25 @@ select throws_ok(
 select throws_ok(
   $$ select public.console_invite_member('meera@trakline.in', 'support', 'Trying to re-invite a half-set-up member.', 'development') $$,
   '42501', 'that address already belongs to a member', 'nor one who is still finishing setup -- they are a member already'
+);
+
+-- Spec §E line 103: "An address that already has a traveller account can't be invited." Priya Shah
+-- has an auth.users row and no console.members row -- a traveller, nothing more -- which is the one
+-- state ConsoleTeam.dc.html's dlg_refused draws an alert for.
+--
+-- The two assertions above double as this check's ordering proof: Devi and Meera both have
+-- auth.users rows too, so if the traveller check ran before the membership one, both would come
+-- back with this message instead and fail on it. The more specific refusal has to keep winning.
+select throws_ok(
+  $$ select public.console_invite_member('priya.shah@example.com', 'support', 'Trying to invite a traveller.', 'development') $$,
+  '42501', 'that address already has a Trakline account', 'an address that already has a traveller account is refused'
+);
+-- The same address in a different case. console_invite_member lower-cases p_email into v_email
+-- before every check, so the traveller check has to compare against a lower-cased auth.users email
+-- too -- otherwise an Owner who typed a capital could invite a traveller straight past the rule.
+select throws_ok(
+  $$ select public.console_invite_member('Priya.Shah@Example.com', 'support', 'Trying to invite a traveller, shouting.', 'development') $$,
+  '42501', 'that address already has a Trakline account', 'and so is the same address typed in a different case'
 );
 
 select pg_temp.tap(
@@ -398,6 +422,16 @@ select throws_ok(
   '42501', null, 'the guard still refuses -- Priya''s removal did not somehow create a spare'
 );
 select is(jsonb_array_length(public.console_team() -> 'members'), 4, 'a removed member no longer appears in the roster');
+
+-- ...and cannot be invited back. Removal clears the console.members check (status = 'removed' is
+-- not a member any more) but never touches auth.users, so the traveller check catches them on the
+-- way past. That is spec §E line 103 applied literally, and it is a real consequence rather than an
+-- oversight: task-4-report.md states it plainly instead of quietly carving out an exemption that
+-- this task has no authority to invent.
+select throws_ok(
+  $$ select public.console_invite_member('priya@trakline.in', 'support', 'Priya is coming back.', 'development') $$,
+  '42501', 'that address already has a Trakline account', 'a removed member keeps their auth.users row, so they cannot be re-invited'
+);
 
 select * from finish();
 rollback;

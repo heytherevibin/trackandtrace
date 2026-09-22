@@ -1,5 +1,13 @@
 import { render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+// The only-you row now carries InviteDialog, a "use client" unit that calls useRouter for its
+// post-invite router.refresh(). Outside an app router there is no router to find, so the hook is
+// stood in for here; the dialog's own behaviour is tested in
+// tests/unit/console/team/invite-dialog.test.tsx, and what this file proves is only that the
+// sheet's second trigger is rendered where the sheet draws it.
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+
 import { MembersPlate } from "@/console/team/members-plate";
 import type { TeamMember } from "@/console/team/team";
 
@@ -126,5 +134,13 @@ describe("MembersPlate", () => {
     expect(screen.getByText("You're the only member.")).toBeInTheDocument();
     rerender(<MembersPlate members={ALL} />);
     expect(screen.queryByText("You're the only member.")).not.toBeInTheDocument();
+  });
+
+  // ConsoleTeam.dc.html:157 draws a second "Invite a member" beside that note -- a secondary
+  // button, unlike the primary one in the page header (:106). Task 3 built neither on purpose,
+  // because the string and the dialog behind it are Task 4's (task-3-report.md).
+  it("draws the only-you row's own secondary Invite trigger beside the note", () => {
+    render(<MembersPlate members={[OWNER]} />);
+    expect(screen.getByRole("button", { name: "Invite a member" })).toBeInTheDocument();
   });
 });

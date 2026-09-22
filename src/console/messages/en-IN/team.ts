@@ -1,4 +1,5 @@
 import type { MessageTree } from "@/messages/types";
+import { signIn } from "./sign-in";
 
 // Word for word from docs/design/sheets/console/ConsoleTeam.dc.html, with corrections recorded in
 // task-3-report.md:
@@ -102,5 +103,53 @@ export const team = {
     admin: "Everything except the team and provider keys.",
     support: "Overview, Leads, Privacy requests and Wrong-status reports.",
     viewer: "Counts and service status only, never personal data.",
+  },
+
+  // Form TC-04, the Invite dialog (ConsoleTeam.dc.html:203-259, task-4). Transcribed except where
+  // marked: task-4-report.md lists every authored line here, so nothing below pretends to be drawn.
+  invite: {
+    // The same words on two buttons: a primary in the page header's ph-actions (:106, behind
+    // canManage) and a secondary beside the Only-you note (:157). Both open this dialog. Also the
+    // dialog's own h2 (:205, :234).
+    trigger: "Invite a member",
+    form: "Form TC-04",
+    emailLabel: "Email",
+    roleLabel: "Role",
+    hint: "The invite lasts 7 days. It can't go to an address that already has a Trakline account.",
+    continue: "Continue",
+    // :237, dlg_refused's alert -- the one refusal the sheet draws. It had no reachable state
+    // behind it until 20260922110000_console_invite_blocks_traveller.sql added the auth.users
+    // check console_invite_member was missing (task-4-addendum.md §2).
+    travellerAccount: "This address already has a Trakline account. Invite a dedicated console address.",
+
+    // Not drawn. `console_invite_member` raises three further developer strings a member must never
+    // read as sent, and the sheet gives dlg_refused only the one alert above. These three fill the
+    // same slot, in the same voice.
+    alreadyMember: "This address already belongs to a console member.",
+    // Also what a concurrent double-invite of a brand-new address lands on: both callers clear the
+    // console.invites pre-check and the loser hits the live-email unique index instead
+    // (task-4-addendum.md §3). One refusal, whichever way the console noticed.
+    alreadyInvited: "This address already has an invite open. Resend or revoke that one instead.",
+    // console.use_tap's own 'no tap for this action' -- the four fields the database re-digests
+    // differ from the ones the tap was minted over. Same shape as myKeys.tapMismatch, and for the
+    // same reason: it is not an outage, so it must not read as one.
+    tapMismatch: "That confirmation no longer matches this invite. Try inviting them again.",
+    // Referenced, not restated: the console already has one sentence for an address that is not an
+    // address, and this dialog refuses one before any request goes out.
+    invalidEmail: signIn.invalid,
+
+    // Not drawn. ConsoleTeam.dc.html draws TC-01 for Change role, Reset keys and Remove (:263,
+    // :288, :313) but never for the invite itself, so the confirmation's bold line and Change
+    // triple are authored here in the shape those three use ("Change Kiran Das's role",
+    // "Role: Support → Admin"). `before` is what the invited address has today.
+    confirmSummary: (email: string) => `Invite ${email}`,
+    confirmChangeLabel: "Role",
+    confirmNoRole: "None",
+
+    // Not drawn: ConsoleTeam.dc.html passes no `toast` to frame() at any call site. ConsoleMyKeys
+    // and ConsoleSwitches do, in this exact shape ("Key removed · logged", "PNR checks paused ·
+    // logged"), and a mutation that succeeds with no visible confirmation is a defect
+    // (task-4-addendum.md §6).
+    sentToast: "Invite sent · logged",
   },
 } as const satisfies MessageTree;

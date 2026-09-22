@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ConsoleDb } from "@/console/auth/db";
-import { getTeam } from "@/console/team/team";
+import { getTeam, inviteTeamMember } from "@/console/team/team";
 
 // console_team() itself (supabase/migrations/20260922090000_console_team.sql): both halves, one
 // call, never a token_hash. Dates arrive from Postgres with an offset ("+00:00"), not "Z" -- the
@@ -39,8 +39,14 @@ const RPC_RESPONSE = {
   ],
 };
 
-function dbAnswering(result: { data?: unknown; error?: { message: string } }): ConsoleDb {
+function dbAnswering(result: { data?: unknown; error?: { message: string; code?: string } }): ConsoleDb {
   return { rpc: vi.fn(() => Promise.resolve({ data: result.data ?? null, error: result.error ?? null })) } as unknown as ConsoleDb;
+}
+
+/** The db mock plus the spy on it, for the calls that also assert on the arguments sent. */
+function dbSpy(result: { data?: unknown; error?: { message: string; code?: string } }): { readonly db: ConsoleDb; readonly rpc: ReturnType<typeof vi.fn> } {
+  const rpc = vi.fn(() => Promise.resolve({ data: result.data ?? null, error: result.error ?? null }));
+  return { db: { rpc } as unknown as ConsoleDb, rpc };
 }
 
 describe("getTeam", () => {
@@ -130,5 +136,85 @@ describe("getTeam", () => {
 
   it("refuses a response with no invites half at all", async () => {
     await expect(getTeam(dbAnswering({ data: { members: [] } }))).rejects.toMatchObject({ code: "SOURCE_UNAVAILABLE" });
+  });
+});
+
+// console_invite_member (supabase/migrations/20260922090000_console_team.sql, extended by
+// 20260922110000_console_invite_blocks_traveller.sql). Every one of its refusals is a developer
+// string a member must never read as sent, so the mapping below is the whole point of this wrapper.
+describe("inviteTeamMember", () => {
+  const TOKEN = "a".repeat(64);
+  const RESULT = { invite_id: "bbbbbbbb-0000-0000-0000-000000000001", token: TOKEN };
+  const REASON = "Covering weekend leads.";
+
+  it("passes all four arguments as text and returns the invite id and its raw token", async () => {
+    const { db, rpc } = dbSpy({ data: RESULT });
+    await expect(inviteTeamMember("priya@example.com", "support", REASON, "production", db)).resolves.toEqual({
+      inviteId: "bbbbbbbb-0000-0000-0000-000000000001",
+      token: TOKEN,
+    });
+    expect(rpc).toHaveBeenCalledWith("console_invite_member", {
+      p_email: "priya@example.com",
+      p_role: "support",
+      p_reason: REASON,
+      p_environment: "production",
+    });
+  });
+
+  it("refuses a result that is not the shape console_invite_member returns", async () => {
+    const db = dbAnswering({ data: { invite_id: "not-a-uuid", token: TOKEN } });
+    await expect(inviteTeamMember("priya@example.com", "support", REASON, "production", db)).rejects.toMatchObject({ code: "SOURCE_UNAVAILABLE" });
+  });
+
+  it("translates 'that address already belongs to a member'", async () => {
+    const db = dbAnswering({ error: { message: "that address already belongs to a member" } });
+    await expect(inviteTeamMember("devi@trakline.in", "support", REASON, "production", db)).rejects.toMatchObject({
+      code: "INVALID_INPUT",
+      message: "This address already belongs to a console member.",
+    });
+  });
+
+  it("translates 'an invite is already open for that address'", async () => {
+    const db = dbAnswering({ error: { message: "an invite is already open for that address" } });
+    await expect(inviteTeamMember("nadia@trakline.in", "support", REASON, "production", db)).rejects.toMatchObject({
+      code: "INVALID_INPUT",
+      message: "This address already has an invite open. Resend or revoke that one instead.",
+    });
+  });
+
+  it("translates 'that address already has a Trakline account' into the alert the sheet draws", async () => {
+    const db = dbAnswering({ error: { message: "that address already has a Trakline account" } });
+    await expect(inviteTeamMember("priya.shah@example.com", "support", REASON, "production", db)).rejects.toMatchObject({
+      code: "INVALID_INPUT",
+      message: "This address already has a Trakline account. Invite a dedicated console address.",
+    });
+  });
+
+  // task-4-addendum.md §3 (Task 2 review finding M2): two Owners inviting the same brand-new
+  // address at once both clear the console.invites pre-check, and the second lands on the live-email
+  // unique index instead. A member must read the refusal the pre-check would have given, never a
+  // raw Postgres constraint string.
+  it("reads the live-email unique violation as the same refusal the pre-check would have given", async () => {
+    const db = dbAnswering({ error: { message: 'duplicate key value violates unique constraint "console_invites_live_email_idx"', code: "23505" } });
+    await expect(inviteTeamMember("nadia@trakline.in", "support", REASON, "production", db)).rejects.toMatchObject({
+      code: "INVALID_INPUT",
+      message: "This address already has an invite open. Resend or revoke that one instead.",
+    });
+  });
+
+  it("translates console.use_tap's own 'no tap for this action'", async () => {
+    const db = dbAnswering({ error: { message: "no tap for this action" } });
+    await expect(inviteTeamMember("priya@example.com", "support", REASON, "production", db)).rejects.toMatchObject({
+      code: "INVALID_INPUT",
+      message: "That confirmation no longer matches this invite. Try inviting them again.",
+    });
+  });
+
+  it("answers anything else with the console's own unavailable line, never the database's words", async () => {
+    const db = dbAnswering({ error: { message: 'relation "console.invites" does not exist' } });
+    await expect(inviteTeamMember("priya@example.com", "support", REASON, "production", db)).rejects.toMatchObject({
+      code: "SOURCE_UNAVAILABLE",
+      message: "The console could not be reached. Try again.",
+    });
   });
 });

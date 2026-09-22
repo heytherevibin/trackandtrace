@@ -69,6 +69,22 @@ const teamShape = z.object({
   invites: z.array(inviteShape),
 });
 
+// console_invite_member's own return: `jsonb_build_object('invite_id', v_id, 'token', v_token)`,
+// where the token is 32 random bytes hex-encoded. Parsed like everything else here -- a token that
+// came back the wrong shape is a token that would be mailed to someone as a console-access link.
+const newInviteShape = z.object({ invite_id: z.guid(), token: z.string().regex(/^[0-9a-f]{64}$/) });
+
+export interface NewInvite {
+  readonly inviteId: string;
+  /**
+   * The raw invite token, exactly once. It is a console-access credential: the route consumes it
+   * server-side for `sendInviteLetter` and never echoes it into the JSON the inviting Owner's
+   * browser receives (task-4-addendum.md §3, carried from the Task 2 review's finding I3). A raw
+   * token in a response body is a credential sitting in someone's network log.
+   */
+  readonly token: string;
+}
+
 function unavailable(): AppError {
   return new AppError("SOURCE_UNAVAILABLE", consoleMessages.session.unavailable, { status: 503 });
 }
@@ -109,4 +125,76 @@ export async function getTeam(db?: ConsoleDb): Promise<Team> {
       expiresAt: i.expires_at,
     })),
   };
+}
+
+/**
+ * `console_invite_member` raises four developer strings a member must never read as sent, and one
+ * failure it cannot phrase at all:
+ *
+ * - 'that address already belongs to a member' -- a console.members row that is not 'removed'.
+ * - 'an invite is already open for that address' -- a live console.invites row.
+ * - 'that address already has a Trakline account' -- an auth.users row, spec §E line 103, added by
+ *   20260922110000_console_invite_blocks_traveller.sql (task-4-addendum.md §2). This is the one
+ *   refusal ConsoleTeam.dc.html actually draws (dlg_refused), and the only one that gets its words.
+ * - console.use_tap's own 'no tap for this action' -- the four fields the database re-digests differ
+ *   from the ones the tap was minted over. Not an outage, so it must not read as one.
+ * - a raw 23505 from console_invites_live_email_idx, which is where a concurrent double-invite of a
+ *   brand-new address lands: both callers clear the console.invites pre-check and the loser hits the
+ *   unique index instead (task-4-addendum.md §3, from the Task 2 review's finding M2). It is the
+ *   same fact the pre-check would have reported, so it gets the same sentence rather than a
+ *   Postgres constraint name.
+ *
+ * Anything else is the console's own unavailable line: a driver string, a missing relation, a
+ * provider's wording -- none of it written for a member to read.
+ */
+function fromInviteError(error: { readonly message: string; readonly code?: string }): AppError {
+  const m = consoleMessages.team.invite;
+  if (error.message.includes("that address already belongs to a member")) return new AppError("INVALID_INPUT", m.alreadyMember, { status: 403 });
+  if (error.message.includes("an invite is already open for that address")) return new AppError("INVALID_INPUT", m.alreadyInvited, { status: 403 });
+  if (error.message.includes("that address already has a Trakline account")) return new AppError("INVALID_INPUT", m.travellerAccount, { status: 403 });
+  if (error.message.includes("no tap for this action")) return new AppError("INVALID_INPUT", m.tapMismatch, { status: 403 });
+  // Both the SQLSTATE and the index name, so this keeps holding if PostgREST ever stops forwarding
+  // one of them.
+  if (error.code === "23505" || error.message.includes("console_invites_live_email_idx")) {
+    return new AppError("INVALID_INPUT", m.alreadyInvited, { status: 403 });
+  }
+  return unavailable();
+}
+
+/**
+ * A thin typed wrapper over `console_invite_member` (spec §E, Task 4): one invite, written and
+ * audited inside the function's own transaction, in exchange for a completed tap.
+ *
+ * All four arguments go as `text`. Never pass an enum-typed argument to a `public.console_*`
+ * function: PostgREST casts it in the caller's context, before `security definer` applies, and the
+ * call fails with "permission denied for schema console" (20260921000000_console_enum_args_as_text.sql
+ * is the whole phase that cost). `role` is a ConsoleRole here only so a caller cannot pass a string
+ * the enum has never heard of; it crosses the wire as its own text.
+ *
+ * `email` must already be lower-cased by the caller. The database lower-cases it again for its own
+ * checks (`v_email := lower(p_email)`) and digests the lower-cased form in `console.use_tap`, so a
+ * tap minted over a capital never matches and the invite fails with "no tap for this action" with
+ * nothing on screen to say why (task-4-addendum.md §4). The route lower-cases once, before the mint
+ * and before this call, so the two can never disagree.
+ *
+ * `reason` arrives exactly as the shared `tapReason` schema trimmed it at the route boundary and is
+ * never re-scrubbed here: `console.write_audit` scrubs at the moment of storage, and scrubbing twice
+ * in TypeScript would digest one string while `console.use_tap` recomputes over another.
+ *
+ * Makes no access check of its own -- the POST route calls `requireConsoleMember("owner")` first,
+ * and `console_invite_member` re-checks `console.require_role('owner')` itself regardless.
+ */
+export async function inviteTeamMember(
+  email: string,
+  role: ConsoleRole,
+  reason: string,
+  environment: string,
+  db?: ConsoleDb,
+): Promise<NewInvite> {
+  const client = db ?? (await createConsoleDb());
+  const { data, error } = await client.rpc("console_invite_member", { p_email: email, p_role: role, p_reason: reason, p_environment: environment });
+  if (error) throw fromInviteError(error);
+  const parsed = newInviteShape.safeParse(data);
+  if (!parsed.success) throw unavailable();
+  return { inviteId: parsed.data.invite_id, token: parsed.data.token };
 }

@@ -6,6 +6,7 @@ import { ConsoleFrame } from "@/console/components/console-frame";
 import { NoAccessState } from "@/console/components/frame-states";
 import { consoleHref } from "@/console/href";
 import { consoleMessages } from "@/console/messages";
+import { InviteDialog } from "@/console/team/invite-dialog";
 import { InvitesPlate } from "@/console/team/invites-plate";
 import { MembersPlate } from "@/console/team/members-plate";
 import { RolesPlate } from "@/console/team/roles-plate";
@@ -52,7 +53,15 @@ export default async function TeamPage() {
   return (
     <ConsoleFrame member={member}>
       <div className="flex flex-col gap-8">
-        <PageHeader kicker={m.kicker} title={m.title} lead={m.lead} />
+        {/*
+          ConsoleTeam.dc.html:106 draws this primary trigger in the page header's `ph-actions`,
+          behind `canManage`. There is no prop for that here because there is nothing for it to
+          decide: a non-Owner never reaches this line at all -- they were answered with
+          NoAccessState above -- so on this page `canManage` is the same fact as "an Owner is
+          reading it". The second, secondary trigger the sheet draws (:157) is inside MembersPlate,
+          beside the only-you note.
+        */}
+        <PageHeader kicker={m.kicker} title={m.title} lead={m.lead} actions={<InviteDialog variant="primary" />} />
         <MembersPlate members={team.members} />
         <InvitesPlate invites={team.invites} />
         <RolesPlate />
