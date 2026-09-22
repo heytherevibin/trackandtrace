@@ -90,7 +90,8 @@ export const audit = {
       address: "Address",
       // Not drawn -- see the note at the top of this file.
       environment: "Environment",
-      // Drawn (:160, inside a visually-hidden span) and not used yet: Task 3 owns the drawer.
+      // :160, inside a visually-hidden span: the column has a header for a screen reader and none
+      // on screen, because every cell in it is the same word.
       open: "Open",
     },
     rangeCell,
@@ -104,6 +105,80 @@ export const audit = {
     pageRange: (first: number, last: number, total: number) => `${first}–${last} of ${total}`,
     previous: "Previous",
     next: "Next",
+    // :168's own `openLabel`, byte for byte -- "Open the entry: Paused PNR checks at 14:02 IST".
+    // The sheet composes it from the row's action and the row's time (the table's own cell, not
+    // the drawer's, so minutes and no seconds); "IST" comes from the caller for the same reason
+    // the table's Time cell takes it from there (frameSignedIn.clock.ist).
+    open: (action: string, time: string) => `Open the entry: ${action} at ${time}`,
+  },
+
+  // The drawer: one entry in full (AuditLog.dc.html:215-228).
+  entry: {
+    // :219's own title cell. The `#58213` beside it is a numeric id this database does not have --
+    // console.audit_log.id is a uuid -- so the id is drawn bare rather than behind a `#` that
+    // would read as "number" over something that is not one. Flagged in task-3-report.md.
+    title: "Audit entry",
+
+    // :229-238's own nine `dt` labels, in the sheet's own order, with Environment inserted second.
+    labels: {
+      time: "Time",
+      // Not drawn: the sheet predates task-2-addendum.md §4. Second, beside the time, exactly
+      // where the table puts it and for the same reason -- the drawer is the half of this module a
+      // member screenshots into a ticket, and a record that will not say which deployment wrote it
+      // lies by omission.
+      environment: "Environment",
+      member: "Member",
+      action: "Action",
+      target: "Target",
+      reason: "Reason",
+      result: "Result",
+      address: "Address",
+      session: "Session",
+      change: "Before → after",
+    },
+
+    // :230's own Member value: "Asha Rao · Owner · key “YubiKey 5C”". The parts are joined rather
+    // than templated because two of the three are genuinely absent on real rows -- the System row
+    // has no role and no key at all (task-3-addendum.md §2).
+    memberLine: (parts: readonly string[]) => parts.join(" · "),
+    keyNamed: (name: string) => `key “${name}”`,
+    // **Not drawn.** The sheet only ever draws a key that still resolves, and the database's
+    // ordinary case is the other one: console.audit_log holds no foreign key, so an entry outlives
+    // the key it names and `key_name` comes back null once that key is removed or reset away. The
+    // entry still happened and the clause has to say so -- dropping it would claim the action was
+    // taken with no key, which is a different and untrue thing.
+    keyGone: "key since removed",
+
+    // :238 composes the two jsonb columns into a sentence: "PNR checks: On → Paused. Message to
+    // travellers: none → “Checks are paused…”." The **shape** is transcribed -- one clause per
+    // field, `before → after`, `none` for the side a field is missing from, a full stop after each
+    // -- and the sheet's prettified field names are not, because they cannot be: the columns hold
+    // jsonb whose keys are whatever the writer stored (`pnr_checks`), and inventing a display name
+    // per key would mean guessing. Flagged in task-3-report.md.
+    changed: (field: string, before: string, after: string) => `${field}: ${before} → ${after}.`,
+    // Not drawn: a before/after that is not an object of fields (jsonb also permits a scalar or an
+    // array) has no field name to put in front of it, and dropping it would hide a real change.
+    changedWhole: (before: string, after: string) => `${before} → ${after}.`,
+    // :238's own word for the side a field is missing from.
+    changeNone: "none",
+
+    // :227, word for word. Both halves are true of the shipped database: the append-only trigger
+    // refuses update and delete (20260920090300_console_audit.sql), and console.purge_audit()
+    // removes rows older than two years.
+    retention: "Entries can't be edited. They're deleted automatically after 2 years.",
+
+    // Not drawn: the sheet draws the drawer open and full, and never in flight.
+    loading: "Loading the entry",
+
+    // Not drawn. console_audit_entry answers SQL NULL for an id that is not there -- no error, no
+    // refusal, no database message to translate (task-3-addendum.md §3) -- and an empty panel is
+    // not an answer. Kept to what is certainly true: the id is not in this log. Why it is not is
+    // left to the retention line directly below it, which already says entries are deleted after
+    // two years.
+    missing: {
+      title: "No such entry",
+      detail: "Nothing in this log has that id.",
+    },
   },
 
   // :323's own two words for console.audit_result, plus the third label the enum carries.

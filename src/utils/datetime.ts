@@ -15,6 +15,7 @@ const timeFormat = new Intl.DateTimeFormat(LOCALE, { hour: "2-digit", minute: "2
 const shortDateFormat = new Intl.DateTimeFormat(LOCALE, { weekday: "short", day: "2-digit", month: "short", timeZone: TIME_ZONE });
 const mediumDateFormat = new Intl.DateTimeFormat(LOCALE, { day: "2-digit", month: "short", year: "numeric", timeZone: TIME_ZONE });
 const dateTimeFormat = new Intl.DateTimeFormat(LOCALE, { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: TIME_ZONE });
+const dateTimeSecondsFormat = new Intl.DateTimeFormat(LOCALE, { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false, timeZone: TIME_ZONE });
 const relativeFormat = new Intl.RelativeTimeFormat(LOCALE, { numeric: "auto" });
 const countFormat = new Intl.NumberFormat(LOCALE);
 
@@ -31,6 +32,17 @@ export function formatDate(value: string | Date, style: "short" | "medium" = "me
 /** "15 Jun 2026, 10:35" */
 export function formatDateTime(value: string | Date): string {
   return dateTimeFormat.format(toDate(value));
+}
+
+/**
+ * "15 Jun 2026, 10:35:12" -- the same moment to the second.
+ *
+ * For a record rather than a schedule: the audit log's drawer draws seconds
+ * (AuditLog.dc.html:229) while its table stops at the minute, because two entries a few seconds
+ * apart are two different actions and the order between them is the thing being read.
+ */
+export function formatDateTimeSeconds(value: string | Date): string {
+  return dateTimeSecondsFormat.format(toDate(value));
 }
 
 /** "3 min ago", "in 2 hr", "yesterday". Floors at one minute. */

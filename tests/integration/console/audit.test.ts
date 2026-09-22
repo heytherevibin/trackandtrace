@@ -1,20 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { AuditPage, AuditQuery } from "@/console/audit/audit";
+import type { AuditEntryDetail, AuditPage, AuditQuery } from "@/console/audit/audit";
 import type { ConsoleMember } from "@/console/auth/member";
 import { AppError } from "@/services/errors";
 
 // vi.mock's factory is hoisted above every import and above any ordinary top-level `const`, so the
 // mocks it returns are declared with vi.hoisted and typed explicitly (the same note
 // tests/integration/console/team.test.ts carries).
-const { requireConsoleMember, getAuditLog, writeConsoleAudit, consoleEnvironment } = vi.hoisted(() => ({
+const { requireConsoleMember, getAuditLog, getAuditEntry, writeConsoleAudit, consoleEnvironment } = vi.hoisted(() => ({
   requireConsoleMember: vi.fn<(least?: string) => Promise<ConsoleMember>>(),
   getAuditLog: vi.fn<(query: AuditQuery) => Promise<AuditPage>>(),
+  getAuditEntry: vi.fn<(id: string) => Promise<AuditEntryDetail | null>>(),
   writeConsoleAudit: vi.fn<() => Promise<void>>(),
   consoleEnvironment: vi.fn<() => string>(() => "production"),
 }));
 
 vi.mock("@/console/auth/guard", () => ({ requireConsoleMember }));
-vi.mock("@/console/audit/audit", async (importOriginal) => ({ ...(await importOriginal<object>()), getAuditLog }));
+vi.mock("@/console/audit/audit", async (importOriginal) => ({ ...(await importOriginal<object>()), getAuditLog, getAuditEntry }));
 vi.mock("@/console/auth/audit", () => ({ writeConsoleAudit }));
 vi.mock("@/console/auth/session", () => ({ consoleEnvironment }));
 vi.mock("@/console/availability", () => ({ assertConsoleAvailable: () => {} }));
@@ -32,9 +33,30 @@ function get(search = ""): Request {
   return new Request(`http://admin.localhost:4210/console/api/audit${search}`, { method: "GET", headers: { host: "admin.localhost:4210" } });
 }
 
+const ENTRY: AuditEntryDetail = {
+  id: "5a000000-0000-4000-8000-000000000013",
+  at: "2019-03-14T14:02:31.256374+00:00",
+  environment: "production",
+  actorId: OWNER.userId,
+  actorName: "Asha Rao",
+  actorRole: "owner",
+  keyId: "f0000000-0000-4000-8000-00000000000f",
+  keyName: "YubiKey 5C",
+  sessionLabel: "Chrome on macOS",
+  category: "configure",
+  action: "Paused PNR checks",
+  target: "PNR checks",
+  reason: "Provider maintenance window, 14:00-15:00 IST.",
+  result: "done",
+  addressHash: "a3f9…c2c1",
+  before: { pnr_checks: "on" },
+  after: { pnr_checks: "paused" },
+};
+
 beforeEach(() => {
   requireConsoleMember.mockReset().mockResolvedValue(OWNER);
   getAuditLog.mockReset().mockResolvedValue(EMPTY);
+  getAuditEntry.mockReset().mockResolvedValue(ENTRY);
   writeConsoleAudit.mockReset().mockResolvedValue();
   consoleEnvironment.mockReset().mockReturnValue("production");
 });
@@ -93,6 +115,61 @@ describe("GET /api/audit", () => {
   it("answers a failed read with the console's own sentence and a 503", async () => {
     getAuditLog.mockRejectedValue(new AppError("SOURCE_UNAVAILABLE", "The console could not be reached. Try again.", { status: 503 }));
     const response = await GET(get());
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ message: "The console could not be reached. Try again." });
+  });
+});
+
+// One entry, for the drawer. The same route rather than one of its own: same resource, same role
+// floor, same "writes nothing" rule -- and the brief's own file list (task-3-brief.md) names this
+// route and no other.
+describe("GET /api/audit?id=", () => {
+  it("answers with the one entry, and never reads a page as well", async () => {
+    const response = await GET(get(`?id=${ENTRY.id}`));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, entry: ENTRY });
+    expect(getAuditEntry).toHaveBeenCalledExactlyOnceWith(ENTRY.id);
+    expect(getAuditLog).not.toHaveBeenCalled();
+  });
+
+  // console_audit_entry answers SQL NULL for an id that is not there -- not an error and not a
+  // refusal (task-3-addendum.md §3), so neither is this. The drawer says "no such entry"; a 404
+  // would make the client translate a status into the same sentence for no gain.
+  it("answers an id that is not there with a null entry and a 200, not an error", async () => {
+    getAuditEntry.mockResolvedValue(null);
+    const response = await GET(get("?id=00000000-0000-4000-8000-00000000dead"));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, entry: null });
+  });
+
+  // Validated at the boundary: a p_id that is not a uuid raises a raw 22P02 "invalid input syntax
+  // for type uuid" at PostgREST, and that developer string has no business reaching a member. It
+  // is also not a different answer -- there is no entry with that id either way.
+  it("never hands the database an id that is not a uuid", async () => {
+    const response = await GET(get("?id=not-a-uuid"));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, entry: null });
+    expect(getAuditEntry).not.toHaveBeenCalled();
+  });
+
+  it("carries the module's role floor here too", async () => {
+    requireConsoleMember.mockRejectedValue(new AppError("INVALID_INPUT", "You don't have access to this.", { status: 403 }));
+    const response = await GET(get(`?id=${ENTRY.id}`));
+    expect(response.status).toBe(403);
+    expect(getAuditEntry).not.toHaveBeenCalled();
+  });
+
+  // The audit log is append-only and this phase adds exactly one writer, the page's own "Opened the
+  // log" row. Opening a drawer is not opening the log.
+  it("writes no audit row of its own, however often a drawer is opened", async () => {
+    await GET(get(`?id=${ENTRY.id}`));
+    await GET(get(`?id=${ENTRY.id}`));
+    expect(writeConsoleAudit).not.toHaveBeenCalled();
+  });
+
+  it("answers a failed entry read with the console's own sentence and a 503", async () => {
+    getAuditEntry.mockRejectedValue(new AppError("SOURCE_UNAVAILABLE", "The console could not be reached. Try again.", { status: 503 }));
+    const response = await GET(get(`?id=${ENTRY.id}`));
     expect(response.status).toBe(503);
     expect(await response.json()).toMatchObject({ message: "The console could not be reached. Try again." });
   });

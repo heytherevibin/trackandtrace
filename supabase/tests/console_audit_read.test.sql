@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(92);
+select plan(98);
 
 -- The READ side of the audit log (module 14). The write side, the append-only
 -- triggers and console.purge_audit are console_audit.test.sql's business and
@@ -426,10 +426,67 @@ select is(
 select is(public.console_audit_entry('7a000000-0000-4000-8000-000000000001') ->> 'target', 'tie-a@trakline.in', 'the entry comes back by id');
 select is(
   (select array_agg(k order by k) from jsonb_object_keys(public.console_audit_entry('7a000000-0000-4000-8000-000000000001')) as t(k)),
-  (select array_agg(k order by k) from jsonb_object_keys(pg_temp.audit() -> 'rows' -> 0) as t(k)),
-  'and carries exactly the keys a list row carries'
+  (select array_agg(k order by k) from (
+     select k from jsonb_object_keys(pg_temp.audit() -> 'rows' -> 0) as t(k)
+     union all select 'key_name'
+   ) as u(k)),
+  'and carries a list row''s sixteen keys plus key_name -- seventeen'
 );
 select ok(public.console_audit_entry('00000000-0000-4000-8000-00000000dead') is null, 'an id that is not there comes back as null, not an error');
+
+-- key_name, the drawer's Member line (task-3-addendum.md §2). console.audit_log
+-- holds key_id and no key name on purpose -- the record outlives the key and
+-- must never be rewritten when one is removed -- so the entry resolves the name
+-- through a LEFT join on console.keys, and the join lives here and nowhere
+-- else: nothing in the table draws a key, and a join per row on every page
+-- would be a cost with no reader.
+insert into console.keys (id, member_id, credential_id, public_key, name, type) values
+  ('f0000000-0000-4000-8000-00000000000f', 'b0000000-0000-4000-8000-000000000002',
+   '\x01'::bytea, '\x02'::bytea, 'YubiKey 5C', 'security_key');
+
+-- A third day, outside both windows above, so no count taken through 14 or
+-- 15 March moves. Three rows, one per state a key_id can be in.
+insert into console.audit_log
+  (id, at, environment, actor_id, actor_name, actor_role, key_id, session_label, category, action, target, reason, result, address_hash, before, after)
+values
+  ('9a000000-0000-4000-8000-00000000000a', '2019-03-16 09:00:00+00', 'production', 'b0000000-0000-4000-8000-000000000002', 'Rohan Iyer', 'admin',
+   'f0000000-0000-4000-8000-00000000000f', 'Safari on iPhone', 'session', 'Signed in', 'Console', null, 'done', '51cd…07aa', null, null),
+  -- A key that has since been removed or reset away. This is the normal,
+  -- intended state of an old entry, not an edge case.
+  ('9a000000-0000-4000-8000-00000000000b', '2019-03-16 09:01:00+00', 'production', 'b0000000-0000-4000-8000-000000000002', 'Rohan Iyer', 'admin',
+   'e0000000-0000-4000-8000-00000000dead', 'Safari on iPhone', 'session', 'Key tap failed', 'Confirm it''s you', null, 'failed', '51cd…07aa', null, null),
+  ('9a000000-0000-4000-8000-00000000000c', '2019-03-16 09:02:00+00', 'production', null, 'System', null,
+   null, null, 'system', 'Purged unconfirmed sign-ups', '3 records', null, 'done', null, null, null);
+
+select is(
+  public.console_audit_entry('9a000000-0000-4000-8000-00000000000a') ->> 'key_name',
+  'YubiKey 5C',
+  'a key id that still resolves gives the drawer the key''s name'
+);
+select is(
+  public.console_audit_entry('9a000000-0000-4000-8000-00000000000b') -> 'key_name',
+  'null'::jsonb,
+  'a key id that no longer resolves gives JSON null, not a missing key'
+);
+select is(
+  public.console_audit_entry('9a000000-0000-4000-8000-00000000000b') ->> 'action',
+  'Key tap failed',
+  'and the entry itself still comes back -- a LEFT join, never an inner one'
+);
+select is(
+  public.console_audit_entry('9a000000-0000-4000-8000-00000000000c') -> 'key_name',
+  'null'::jsonb,
+  'and a row with no key_id at all has a null key_name rather than no key'
+);
+select ok(
+  not (pg_temp.audit() -> 'rows' -> 0 ? 'key_name'),
+  'the list rows carry no key_name -- the join is the entry''s alone'
+);
+select is(
+  (select count(*)::integer from console.audit_log where at >= '2019-03-16 00:00:00+00' and at < '2019-03-17 00:00:00+00'),
+  3,
+  'and resolving a key name wrote nothing to the log either'
+);
 
 -- The fixture above is hand-written, so the format it claims is proven here
 -- against the writer that really produces these rows. No window: the probe

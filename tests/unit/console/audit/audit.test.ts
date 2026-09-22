@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { getAuditLog, parseAuditPage, type AuditQuery } from "@/console/audit/audit";
+import { getAuditEntry, getAuditLog, parseAuditEntry, parseAuditPage, type AuditQuery } from "@/console/audit/audit";
 import type { ConsoleDb } from "@/console/auth/db";
 
 // The two shapes console_audit actually returns, copied from task-1-report.md's own captured output
@@ -201,5 +201,83 @@ describe("getAuditLog", () => {
   it("answers any other database error with the console's own unavailable line", async () => {
     const { db } = dbAnswering({ error: { message: 'relation "console.audit_log" does not exist', code: "42P01" } });
     await expect(getAuditLog(EVERY_FILTER, db)).rejects.toMatchObject({ code: "SOURCE_UNAVAILABLE" });
+  });
+});
+
+// One entry: a list row's sixteen keys plus `key_name`, resolved through a LEFT join on
+// console.keys that lives on this function alone (task-3-addendum.md §2). Both awkward timestamp
+// forms are carried again here rather than assumed from the page's fixtures -- the entry is a
+// different function and could drift on its own.
+const ENTRY = { ...FULL, key_name: "YubiKey 5C" };
+// The same entry after the key was removed or reset away. Not an edge case: this is the normal
+// state of an old row, because the log holds no foreign key and is never rewritten when a key goes.
+const ENTRY_KEY_GONE = { ...FULL, key_name: null };
+// The System row, whole-second `at` and all: no actor, no key, and therefore no key name either.
+const ENTRY_SYSTEM = { ...SYSTEM, key_name: null };
+
+describe("parseAuditEntry", () => {
+  it("camelCases the sixteen keys and the key name beside them", () => {
+    expect(parseAuditEntry(ENTRY)).toMatchObject({
+      id: "5a000000-0000-4000-8000-000000000013",
+      at: "2019-03-14T14:02:31.256374+00:00",
+      environment: "production",
+      keyId: "f0000000-0000-4000-8000-00000000000f",
+      keyName: "YubiKey 5C",
+      sessionLabel: "Chrome on macOS",
+      before: { pnr_checks: "on" },
+      after: { pnr_checks: "paused" },
+    });
+  });
+
+  // console_audit_entry answers SQL NULL for an id that is not there -- not an error, not a
+  // refusal (task-3-addendum.md §3). `null` is therefore data, and must never read as drift.
+  it("takes a SQL NULL as 'no such entry' rather than as a shape that failed to parse", () => {
+    expect(parseAuditEntry(null)).toBeNull();
+  });
+
+  it("takes a key that no longer resolves: the entry still happened, the name is simply gone", () => {
+    expect(parseAuditEntry(ENTRY_KEY_GONE)).toMatchObject({ keyId: "f0000000-0000-4000-8000-00000000000f", keyName: null });
+  });
+
+  it("takes the System row: a whole-second timestamp, no key id and no key name", () => {
+    expect(parseAuditEntry(ENTRY_SYSTEM)).toMatchObject({ at: "2019-03-14T02:00:00+00:00", keyId: null, keyName: null, actorRole: null });
+  });
+
+  // `.nullable()`, never `.optional()`: jsonb_build_object keeps the key, so a missing key_name is
+  // drift -- an older console_audit_entry that never learned to join -- and not a key that is gone.
+  it("refuses an entry whose key_name arrived missing rather than null", () => {
+    expect(() => parseAuditEntry(FULL)).toThrow();
+  });
+
+  it("refuses an entry whose shape drifted anywhere else", () => {
+    expect(() => parseAuditEntry({ ...ENTRY, at: "yesterday" })).toThrow();
+    expect(() => parseAuditEntry({ ...ENTRY, result: "nonsense" })).toThrow();
+  });
+});
+
+describe("getAuditEntry", () => {
+  it("asks console_audit_entry for the one id, under the name the function gave it", async () => {
+    const { db, rpc } = dbAnswering({ data: ENTRY });
+    const entry = await getAuditEntry("5a000000-0000-4000-8000-000000000013", db);
+    expect(rpc).toHaveBeenCalledWith("console_audit_entry", { p_id: "5a000000-0000-4000-8000-000000000013" });
+    expect(entry?.keyName).toBe("YubiKey 5C");
+  });
+
+  it("answers null for an id that is not there, without raising", async () => {
+    const { db } = dbAnswering({ data: null });
+    await expect(getAuditEntry("00000000-0000-4000-8000-00000000dead", db)).resolves.toBeNull();
+  });
+
+  it("answers a database refusal with the console's own no-access line, never Postgres's", async () => {
+    const { db } = dbAnswering({ error: { message: "no access", code: "42501" } });
+    await expect(getAuditEntry("5a000000-0000-4000-8000-000000000013", db)).rejects.toMatchObject({
+      code: "INVALID_INPUT",
+      message: "You don't have access to this.",
+    });
+  });
+
+  it("fails closed on a shape console_audit_entry never produces", async () => {
+    const { db } = dbAnswering({ data: { ...ENTRY, environment: null } });
+    await expect(getAuditEntry("5a000000-0000-4000-8000-000000000013", db)).rejects.toMatchObject({ code: "SOURCE_UNAVAILABLE" });
   });
 });

@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { AuditEntry, AuditPage } from "@/console/audit/audit";
+import type { AuditEntry, AuditEntryDetail, AuditPage } from "@/console/audit/audit";
 import { defaultAuditFilters } from "@/console/audit/filters";
 import { consoleMessages } from "@/console/messages";
 
@@ -63,9 +63,10 @@ beforeEach(() => {
 });
 
 describe("the Entries table", () => {
-  // The sheet's seven drawn columns keep their own relative order; Environment, which the sheet
-  // predates, sits second so the column that must always be readable is never the one that scrolls
-  // out of view (task-2-addendum.md §4, and task-2-report.md on where the e2e screenshot put it).
+  // The sheet's eight drawn columns keep their own relative order -- Open last, as the sheet draws
+  // it (:160) -- and Environment, which the sheet predates, sits second so the column that must
+  // always be readable is never the one that scrolls out of view (task-2-addendum.md §4, and
+  // task-2-report.md on where the e2e screenshot put it).
   it("draws every column the sheet draws, in the sheet's own order", () => {
     render(plate());
     const headers = screen.getAllByRole("columnheader").map((cell) => cell.textContent);
@@ -78,6 +79,7 @@ describe("the Entries table", () => {
       m.entries.columns.reason,
       m.entries.columns.result,
       m.entries.columns.address,
+      m.entries.columns.open,
     ]);
   });
 
@@ -125,6 +127,38 @@ describe("the Entries table", () => {
   it("counts the filtered set in the plate's own header cell", () => {
     render(<EntriesPlate initial={{ rows: [ASHA], total: 137 }} filters={defaultAuditFilters("production")} environment="production" />);
     expect(screen.getByText(m.entries.rangeCell(m.filters.ranges.today, 137))).toBeInTheDocument();
+  });
+});
+
+// The sheet's ninth column (:160): a visually-hidden "Open" header over a control per row, whose
+// accessible name is the sheet's own -- "Open the entry: <action> at <time> IST". Task 2 left the
+// column out deliberately, because a hidden header over empty cells announces a control that is not
+// there; this is the task that fills it.
+describe("the Open column", () => {
+  it("hides the Open header from the screen but not from a screen reader", () => {
+    render(plate());
+    const header = screen.getByRole("columnheader", { name: m.entries.columns.open });
+    expect(header).toBeInTheDocument();
+    expect(header.querySelector(".sr-only")).not.toBeNull();
+  });
+
+  it("names each row's control as the sheet names it", () => {
+    render(plate());
+    expect(screen.getByRole("button", { name: `Open the entry: Paused PNR checks at 14:02 ${consoleMessages.frameSignedIn.clock.ist}` })).toBeInTheDocument();
+    // The System row is an entry like any other and gets a control of its own, named after its own
+    // action and its own time -- 02:00 IST, the row the sheet draws at the bottom of its table.
+    expect(screen.getByRole("button", { name: `Open the entry: Purged unconfirmed sign-ups at 02:00 ${consoleMessages.frameSignedIn.clock.ist}` })).toBeInTheDocument();
+  });
+
+  it("opens the drawer on the row that was pressed, and no other", async () => {
+    const detail: AuditEntryDetail = { ...ASHA, keyName: "YubiKey 5C" };
+    apiRequest.mockResolvedValue({ ok: true, data: { ok: true, entry: detail } });
+    render(plate());
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: `Open the entry: Paused PNR checks at 14:02 ${consoleMessages.frameSignedIn.clock.ist}` }));
+    const dialog = await screen.findByRole("dialog", { name: m.entry.title });
+    expect(within(dialog).getByText(ASHA.id)).toBeInTheDocument();
+    expect(apiRequest).toHaveBeenCalledWith(expect.stringContaining(`id=${ASHA.id}`), expect.objectContaining({ method: "GET" }), expect.anything());
   });
 });
 

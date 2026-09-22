@@ -1,6 +1,11 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const PORT = 4211;
+// 4211 by default, overridable with CONSOLE_E2E_PORT. `reuseExistingServer` is what makes the
+// override necessary rather than merely convenient: a second worktree, pointed at its own Supabase
+// stack, running this suite on 4211 would silently reuse whichever `next dev` got there first and
+// test the wrong checkout against the wrong database. One port per worktree, named at the command
+// line, is the only thing that keeps the two apart.
+const PORT = Number(process.env.CONSOLE_E2E_PORT ?? 4211);
 const baseURL = `http://admin.localhost:${PORT}`;
 
 // The console's end-to-end run, against a real local Supabase stack -- the opposite of

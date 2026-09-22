@@ -29,6 +29,24 @@ export interface AuditEntry {
   readonly after: unknown;
 }
 
+/**
+ * One entry as `console_audit_entry` serialises it: a list row's sixteen keys plus the key's name,
+ * resolved through a LEFT join on `console.keys` that lives on that function alone
+ * (task-3-addendum.md §2).
+ */
+export interface AuditEntryDetail extends AuditEntry {
+  /**
+   * The name of the key `keyId` points at, **today** -- or null when it points at nothing.
+   *
+   * Null is not an edge case. `console.audit_log` holds no foreign key on purpose: the record
+   * outlives the key and must never be rewritten when one is removed or reset away, so an old
+   * entry whose key is gone is the ordinary case. `keyId` null and `keyName` null mean different
+   * things -- no key was used, against a key that is no longer there -- and the drawer says each
+   * of them differently.
+   */
+  readonly keyName: string | null;
+}
+
 export interface AuditPage {
   readonly rows: readonly AuditEntry[];
   /** The **filtered** set, not the page: a filter that narrows 200 rows to 3 returns 3, whatever the limit was. */
@@ -77,6 +95,34 @@ const rowShape = z.object({
 // in 20260922140100_console_audit_environment.sql, so z.array() is safe here.
 const pageShape = z.object({ rows: z.array(rowShape), total: z.number().int().nonnegative() });
 
+// `.nullable()` and not `.optional()`, for the same reason every other nullable column here is:
+// the `||` in 20260922190000_console_audit_entry_key_name.sql merges a jsonb_build_object that
+// keeps the key whatever k.name is, so a *missing* key_name is drift -- an older
+// console_audit_entry that never learned to join -- and not a key that has gone. 1..60 is
+// console.keys.name's own check constraint.
+const entryShape = rowShape.extend({ key_name: z.string().min(1).max(60).nullable() });
+
+function toEntry(row: z.infer<typeof rowShape>): AuditEntry {
+  return {
+    id: row.id,
+    at: row.at,
+    environment: row.environment,
+    actorId: row.actor_id,
+    actorName: row.actor_name,
+    actorRole: row.actor_role,
+    keyId: row.key_id,
+    sessionLabel: row.session_label,
+    category: row.category,
+    action: row.action,
+    target: row.target,
+    reason: row.reason,
+    result: row.result,
+    addressHash: row.address_hash,
+    before: row.before,
+    after: row.after,
+  };
+}
+
 function unavailable(): AppError {
   return new AppError("SOURCE_UNAVAILABLE", consoleMessages.session.unavailable, { status: 503 });
 }
@@ -89,27 +135,22 @@ function unavailable(): AppError {
 export function parseAuditPage(data: unknown): AuditPage {
   const parsed = pageShape.safeParse(data);
   if (!parsed.success) throw unavailable();
-  return {
-    total: parsed.data.total,
-    rows: parsed.data.rows.map((row) => ({
-      id: row.id,
-      at: row.at,
-      environment: row.environment,
-      actorId: row.actor_id,
-      actorName: row.actor_name,
-      actorRole: row.actor_role,
-      keyId: row.key_id,
-      sessionLabel: row.session_label,
-      category: row.category,
-      action: row.action,
-      target: row.target,
-      reason: row.reason,
-      result: row.result,
-      addressHash: row.address_hash,
-      before: row.before,
-      after: row.after,
-    })),
-  };
+  return { total: parsed.data.total, rows: parsed.data.rows.map(toEntry) };
+}
+
+/**
+ * One entry, or `null` for an id that is not there.
+ *
+ * **`null` is data, not drift.** `console_audit_entry` answers SQL NULL for an unknown id -- not an
+ * error, not a refusal, and with no database message for anyone to translate (task-3-addendum.md
+ * §3). It is separated from a shape that failed to parse here, at the only point where the two are
+ * still distinguishable, so the drawer can say "no such entry" without also swallowing drift.
+ */
+export function parseAuditEntry(data: unknown): AuditEntryDetail | null {
+  if (data === null) return null;
+  const parsed = entryShape.safeParse(data);
+  if (!parsed.success) throw unavailable();
+  return { ...toEntry(parsed.data), keyName: parsed.data.key_name };
 }
 
 /**
@@ -153,4 +194,25 @@ export async function getAuditLog(query: AuditQuery, db?: ConsoleDb): Promise<Au
   });
   if (error) throw fromAuditError(error);
   return parseAuditPage(data);
+}
+
+/**
+ * One entry for the drawer (Task 3), from `console_audit_entry`.
+ *
+ * Makes no access check of its own, exactly as `getAuditLog` makes none: the route above guards,
+ * and the function re-checks `console.require_role('admin')` itself -- a floor, so Owner and Admin
+ * both pass. It is deliberately **not** scoped by environment either: an entry another deployment
+ * wrote opens normally and the drawer shows its `environment` like any other field. Scoping would
+ * answer null on a shared link and give a member an empty drawer with nothing to explain it
+ * (task-3-addendum.md §3).
+ *
+ * `id` must already be a uuid. The route narrows it, because `p_id` is uuid-typed and PostgREST
+ * raises a raw 22P02 "invalid input syntax for type uuid" on anything else -- a developer string
+ * that would reach a member unchanged.
+ */
+export async function getAuditEntry(id: string, db?: ConsoleDb): Promise<AuditEntryDetail | null> {
+  const client = db ?? (await createConsoleDb());
+  const { data, error } = await client.rpc("console_audit_entry", { p_id: id });
+  if (error) throw fromAuditError(error);
+  return parseAuditEntry(data);
 }

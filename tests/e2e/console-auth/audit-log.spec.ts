@@ -66,7 +66,9 @@ test.describe("the Audit log", () => {
     // always readable rather than the first thing to scroll out of a wide table.
     const table = page.getByRole("table");
     await expect(table).toBeVisible();
-    await expect(table.getByRole("columnheader")).toHaveText(["Time ↓", "Environment", "Member", "Action", "Target", "Reason", "Result", "Address"]);
+    // "Open" last, in a visually-hidden span: the header is there for a screen reader and not on
+    // screen, because every cell under it says the same word (:160).
+    await expect(table.getByRole("columnheader")).toHaveText(["Time ↓", "Environment", "Member", "Action", "Target", "Reason", "Result", "Address", "Open"]);
 
     // The page's own row, read back out through console_audit, the real zod and the real table.
     // `after()` writes it once the response has gone out, so the first paint may not carry it -- a
@@ -95,12 +97,31 @@ test.describe("the Audit log", () => {
 
     // Everything except the entries table's own sideways scroll, which is what DataTable is built to
     // do with a wide table ("Scrolls sideways on wide screens; stacks into labelled rows below md",
-    // src/components/ui/data-table.tsx) and which layoutBreaks -- a *phone* layout tool -- reports as
-    // a break on principle. The page-level check it makes is kept: `page scrolls sideways` is not
-    // filtered out, so a table that escaped its own scroller would still be caught. Everything
-    // outside the table -- the header, the filter bar, the chip row, the pager -- is held exactly.
-    const breaks = (await layoutBreaks(page)).filter((line) => !/: (table|thead|tbody|tr|th|td)\b/.test(line) && !line.includes('div "Audit entries'));
+    // src/components/ui/data-table.tsx) and which layoutBreaks -- a *phone* layout tool reading
+    // getBoundingClientRect, which knows nothing about clipping -- reports as a break on principle.
+    //
+    // The table is hidden for the measurement rather than filtered out of it by element name. The
+    // name filter this replaces (`td|th|tr|...`) let a `span "Done"` through the moment Task 3's
+    // ninth column pushed a Badge past 1280, which is a false alarm about a cell that is merely
+    // scrolled out of view -- and the next such cell would have been a different tag again.
+    const entries = page.locator('[role="region"][aria-label^="Audit entries"]');
+    await entries.evaluate((el: HTMLElement) => (el.style.display = "none"));
+    const breaks = await layoutBreaks(page);
+    await entries.evaluate((el: HTMLElement) => (el.style.display = ""));
     expect(breaks, "the Audit log at 1280px, outside the entries table's own scroller").toEqual([]);
+
+    // And with the table back, what a member would actually feel: the page does not scroll
+    // sideways. Measured rather than inferred, because `documentElement.scrollWidth` cannot be
+    // trusted here -- Chrome folds a nested scroller's overflow into every ancestor's scrollWidth
+    // (1412px in a 1280px viewport on this page) while still clipping it and refusing to scroll.
+    // `window.scrollX` is the property that does not lie.
+    const scrolledBy = await page.evaluate(() => {
+      window.scrollTo(3000, 0);
+      const x = window.scrollX;
+      window.scrollTo(0, 0);
+      return x;
+    });
+    expect(scrolledBy, "the Audit log must not scroll sideways at 1280px").toBe(0);
     await expectAxeClean(page);
 
     // Clear filters takes the address back to the page's own, which is what "the default view
@@ -172,6 +193,87 @@ test.describe("the Audit log", () => {
     expect(full.ok()).toBe(true);
     expect(await full.text(), "a full-payload fetch does render the page").toContain(m.entries.title);
     await expect.poll(opens, { message: "a full-payload fetch is indistinguishable from an open, and is recorded as one" }).toBe(before + 1);
+  });
+
+  /**
+   * The drawer (Task 3), on a row the console really wrote. Two things only this run can show:
+   *
+   * 1. **The key's name comes from a LEFT join on `console.keys`, at read time.** The "Added a key"
+   *    row the first-Owner setup writes carries a real `key_id`; the drawer resolves it to the name
+   *    that ceremony was given. Then the key is removed -- an ordinary thing an Owner does -- and
+   *    the same row, which nothing may rewrite, says the key is gone rather than pretending the
+   *    action was taken without one (task-3-addendum.md §2).
+   * 2. **Opening an entry records nothing.** One row per server render of the page, and none from
+   *    the GET route -- opening a drawer is not opening the log.
+   */
+  test("opens one entry in full, and names the key that was tapped until it is gone", async ({ page, baseURL }) => {
+    const owner = await setUpFirstOwner(page, baseURL ?? BASE);
+
+    // Scoped to this owner's own rows. console.audit_log survives resetConsole() by design, so a
+    // bare count would be counting every earlier run on this machine as well -- the trap this
+    // branch has now fallen into four times, most recently in Task 2's own e2e.
+    const mine = () => Number(consoleSql(`select count(*) from console.audit_log where actor_name = '${owner.name}'`));
+    const settled = async (): Promise<number> => {
+      let previous = -1;
+      await expect
+        .poll(() => {
+          const now = mine();
+          const stopped = now > 0 && now === previous;
+          previous = now;
+          return stopped;
+        })
+        .toBe(true);
+      return previous;
+    };
+
+    await gotoReady(page, "/audit-log");
+    const before = await settled();
+
+    // The setup journey writes two "Added a key" rows; this is the first key's. Scoped to this
+    // owner, for the same reason the count above is: the log survives resetConsole(), so every
+    // earlier run's "Added a key / YubiKey 5C" row is still in this table -- twelve of them, the
+    // first time this was written without the owner's name in the filter.
+    const row = page.getByRole("row").filter({ hasText: owner.name }).filter({ hasText: "Added a key" }).filter({ hasText: "YubiKey 5C" });
+    await expect(row).toHaveCount(1);
+    const openControl = row.getByRole("button", { name: /^Open the entry: Added a key at \d\d:\d\d IST$/ });
+    await openControl.click();
+
+    const drawer = page.getByRole("dialog", { name: m.entry.title });
+    await expect(drawer).toBeVisible();
+    // The sheet's nine labels and Environment second (AuditLog.dc.html:229-238).
+    await expect(drawer.locator("dt")).toHaveText([
+      m.entry.labels.time,
+      m.entry.labels.environment,
+      m.entry.labels.member,
+      m.entry.labels.action,
+      m.entry.labels.target,
+      m.entry.labels.reason,
+      m.entry.labels.result,
+      m.entry.labels.address,
+      m.entry.labels.session,
+      m.entry.labels.change,
+    ]);
+    await expect(drawer.getByText(m.entry.retention)).toBeVisible();
+    // The key the ceremony really recorded, through the join rather than through anything the
+    // table handed over -- no row the list returns carries a key name at all.
+    await expect(drawer.getByText(`${owner.name} · Owner · ${m.entry.keyNamed("YubiKey 5C")}`)).toBeVisible();
+    // "Added a key" writes an `after` and no `before`: one of the three shapes the sheet composes.
+    await expect(drawer.locator("dt", { hasText: m.entry.labels.change }).locator("+ dd")).toHaveText(/^type: none → “(security_key|passkey)”\.$/);
+    await expectAxeClean(page);
+
+    expect(mine(), "opening an entry must not record anything").toBe(before);
+
+    // The key goes. The entry does not, and cannot: the log holds no foreign key and nothing may
+    // rewrite a row in it. `console.sessions.key_id` is `on delete set null` and the session's
+    // `key_verified_at` stands, so the member stays signed in throughout.
+    await drawer.getByRole("button", { name: "Close" }).click();
+    await expect(drawer).toHaveCount(0);
+    consoleSql(`delete from console.keys where name = 'YubiKey 5C' and member_id = (select user_id from console.members where email = '${owner.email}')`);
+
+    await openControl.click();
+    await expect(drawer.getByText(`${owner.name} · Owner · ${m.entry.keyGone}`)).toBeVisible();
+    await expect(drawer.getByText("YubiKey 5C")).toHaveCount(1); // the target, and no longer the key clause
+    expect(mine(), "and neither must re-opening it").toBe(before);
   });
 
   // The other half of the sheet's own no-access row: a Viewer opening module 14 gets the state, not

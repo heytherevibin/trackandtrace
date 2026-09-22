@@ -10,12 +10,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { StateBlock } from "@/components/ui/state-block";
 import { consoleApiMessage } from "@/console/api-message";
 import type { AuditEntry, AuditPage } from "@/console/audit/audit";
+import { EntryDrawer } from "@/console/audit/entry-drawer";
 import { FilterBar, type AuditMemberOption } from "@/console/audit/filter-bar";
 import { AUDIT_PAGE_SIZE, AUDIT_RESULTS, auditFiltersToSearch, clearAuditFilters, type AuditFilters } from "@/console/audit/filters";
 import { consoleMessages } from "@/console/messages";
 import { apiRequest } from "@/services/api-client";
 import { log } from "@/services/log";
-import { formatDateTime } from "@/utils/datetime";
+import { formatDateTime, formatTime } from "@/utils/datetime";
 
 const m = consoleMessages.audit;
 const f = consoleMessages.frame;
@@ -74,15 +75,11 @@ function withActors(known: readonly AuditMemberOption[], rows: readonly AuditEnt
   return [...merged.values()];
 }
 
-function columns(): readonly Column<AuditEntry>[] {
+function columns(onOpen: (row: AuditEntry) => void): readonly Column<AuditEntry>[] {
   // AuditLog.dc.html:160's own columns, in the sheet's own relative order, with one undrawn column
   // inserted second (see below). Every `header` is a plain string: DataTable also prints it into
   // `data-label` for the stacked phone layout, where a ReactNode becomes "[object Object]" with no
   // React warning (task-2-addendum.md §6).
-  //
-  // The sheet's ninth column, `Open`, is deliberately not here: Task 3 owns the drawer it opens, and
-  // a visually-hidden header over a column of empty cells announces a control that is not there.
-  // Its copy is transcribed in messages (audit.entries.columns.open) and waiting for it.
   return [
     // `whitespace-nowrap`, because the sheet fixes this column at 168px and one line (:160). With
     // nine columns on a 1280 board behind a 240px rail there is no room to spare, and a wrapped
@@ -121,6 +118,25 @@ function columns(): readonly Column<AuditEntry>[] {
     { key: "reason", header: m.entries.columns.reason, cell: (row) => (row.reason ? m.entries.quoted(row.reason) : m.entries.none) },
     { key: "result", header: m.entries.columns.result, cell: (row) => <Badge variant={row.result === "done" ? "outline" : "neutral"}>{m.results[row.result]}</Badge> },
     { key: "address", header: m.entries.columns.address, cell: (row) => <span className="tnum">{row.addressHash ?? m.entries.none}</span> },
+    // The sheet's ninth column (:160): the header lives in a visually-hidden span, because every
+    // cell under it says the same word, and each control carries the sheet's own accessible name --
+    // "Open the entry: Paused PNR checks at 14:02 IST". The row's time to the minute, as the
+    // sheet's own openLabel composes it from the table's cell rather than the drawer's.
+    //
+    // A button, where the sheet draws `<a href="#">`: the drawer has no address of its own, and a
+    // link to nowhere is a control a keyboard reaches and a screen reader announces wrongly. The
+    // accessible name still begins with the visible word, so a member saying "Open" is understood.
+    {
+      key: "open",
+      header: m.entries.columns.open,
+      hideHeader: true,
+      align: "end",
+      cell: (row) => (
+        <Button variant="ghost" size="sm" aria-label={m.entries.open(row.action, `${formatTime(row.at)} ${consoleMessages.frameSignedIn.clock.ist}`)} onClick={() => onOpen(row)}>
+          {m.entries.columns.open}
+        </Button>
+      ),
+    },
   ];
 }
 
@@ -176,6 +192,10 @@ export function EntriesPlate({
   const [page, setPage] = useState<AuditPage>(initial ?? EMPTY);
   const [status, setStatus] = useState<Status>(initial ? "ready" : "error");
   const [members, setMembers] = useState<readonly AuditMemberOption[]>(() => actorsIn(initial?.rows ?? []));
+  // The id alone, not the row: the drawer reads the entry itself, because the key's *name* is not
+  // in any row the table holds (task-3-addendum.md §2). Holding the row here would invite drawing
+  // the drawer from it and quietly losing the key clause.
+  const [openId, setOpenId] = useState<string | null>(null);
   // Only the newest read may paint: a member who changes two filters quickly would otherwise see
   // whichever request happened to finish last.
   const request = useRef(0);
@@ -234,7 +254,7 @@ export function EntriesPlate({
           <StateBlock bare title={m.empty.title} detail={m.empty.detail} actions={<Button onClick={() => apply(clearAuditFilters(filters, environment))}>{m.empty.action}</Button>} />
         ) : (
           <>
-            <DataTable columns={columns()} rows={page.rows} rowKey={(row) => row.id} caption={m.entries.caption[filters.range]} />
+            <DataTable columns={columns((row) => setOpenId(row.id))} rows={page.rows} rowKey={(row) => row.id} caption={m.entries.caption[filters.range]} />
             <div className="flex items-center gap-2 px-3.5 py-2.5">
               <span className="legend grow">{m.entries.pageRange(first, last, page.total)}</span>
               <Button size="sm" disabled={filters.page <= 1} onClick={() => apply({ ...filters, page: filters.page - 1 })}>
@@ -247,6 +267,10 @@ export function EntriesPlate({
           </>
         )}
       </Plate>
+
+      {/* Outside the plate, as the sheet draws it (:215): the drawer is a plate of its own over the
+          board, not something nested inside the Entries plate -- plates do not nest. */}
+      <EntryDrawer entryId={openId} onClose={() => setOpenId(null)} />
     </div>
   );
 }
