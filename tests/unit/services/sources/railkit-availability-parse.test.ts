@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { messages } from "@/messages";
-import { parseRailkitAvailabilityResponse, splitRawStatus } from "@/services/sources/railkit-availability-parse";
+import { parseRailkitAvailabilityResponse, seatsFromRawStatus, splitRawStatus } from "@/services/sources/railkit-availability-parse";
 import type { AvailabilityRequest } from "@/services/availability-source";
 
 // ---------------------------------------------------------------------------
@@ -76,6 +76,36 @@ describe("splitRawStatus", () => {
   );
 });
 
+describe("seatsFromRawStatus", () => {
+  it.each([
+    ["AVAILABLE 0042", 42],
+    ["AVAILABLE 42", 42],
+    ["AVAILABLE-0042", 42],
+    ["available 0007", 7],
+    ["AVAILABLE 0000", 0],
+  ])("reads %s as a berth count", (raw, seats) => {
+    expect(seatsFromRawStatus(raw)).toBe(seats);
+  });
+
+  it.each(["NOT AVAILABLE", "CURR_AVBL", "REGRET", "GNWL65/WL26", "", "TRAIN DEPARTED"])(
+    "returns null for %s, which carries no berth count -- a normal form, not an error",
+    (raw) => {
+      expect(seatsFromRawStatus(raw)).toBeNull();
+    },
+  );
+
+  // RAC 12 is a position in the RAC queue, not twelve berths. Reading it as a
+  // count would feed a model the wrong number on every RAC row.
+  it("does not read RAC 12 as a berth count", () => {
+    expect(seatsFromRawStatus("RAC 12")).toBeNull();
+  });
+
+  // The word AVAILABLE appears inside NOT AVAILABLE, so the match is anchored.
+  it("never finds a count inside NOT AVAILABLE", () => {
+    expect(seatsFromRawStatus("NOT AVAILABLE 0042")).toBeNull();
+  });
+});
+
 describe("parseRailkitAvailabilityResponse", () => {
   it("reads the measured response into the seam's answer", () => {
     const out = parse(body());
@@ -95,6 +125,12 @@ describe("parseRailkitAvailabilityResponse", () => {
   it("keeps the raw status verbatim and both waitlist numbers beside it", () => {
     const out = parse(body());
     expect(out.ok && out.answer.days[1]).toMatchObject({ rawStatus: "GNWL65/WL26", wlBooking: 65, wlCurrent: 26, availabilityText: "WL 26", canBook: true });
+  });
+
+  it("reads the berth count out of an available day, and leaves it null on a waitlisted one", () => {
+    const out = parse(body({ availability: [{ ...DAYS[0], status: "AVAILABLE", rawStatus: "AVAILABLE 0042", availabilityText: "AVAILABLE 0042", canBook: true }, DAYS[1]] }));
+    expect(out.ok && out.answer.days[0]).toMatchObject({ rawStatus: "AVAILABLE 0042", seats: 42 });
+    expect(out.ok && out.answer.days[1]).toMatchObject({ rawStatus: "GNWL65/WL26", seats: null });
   });
 
   it("keeps the source's own prediction, which the observation store records and no page renders", () => {

@@ -33,6 +33,12 @@ const TRAIN_NO = /^\d{5}$/;
  * because both `…/WL26` and `…/CKWL3` occur.
  */
 const WAITLIST_PAIR = /^[A-Z]{0,6}WL\s*(\d{1,5})\s*\/\s*(?:[A-Z]{0,6}WL)?\s*(\d{1,5})$/i;
+/**
+ * `AVAILABLE 0042` → 42. Anchored at the start on purpose: `NOT AVAILABLE`
+ * contains the word, and a count read out of it would be a berth count on a day
+ * with no berths. The separator is a space or a hyphen, both of which occur.
+ */
+const AVAILABLE_COUNT = /^AVAILABLE[\s-]+(\d{1,5})\b/i;
 
 export interface WaitlistSplit {
   readonly booking: number | null;
@@ -52,6 +58,23 @@ export function splitRawStatus(raw: string): WaitlistSplit {
   const booking = Number(match[1]);
   const current = Number(match[2]);
   return Number.isInteger(booking) && Number.isInteger(current) ? { booking, current } : { booking: null, current: null };
+}
+
+/**
+ * The berth count an `AVAILABLE` day carries, or null.
+ *
+ * Null for every other form, by the same rule as the waitlist split: a form that
+ * holds no count is normal, not an error. Two of those are worth naming because
+ * the mistakes are tempting and silent — **`RAC 12` is a position in the RAC
+ * queue, not twelve berths**, and `NOT AVAILABLE` contains the word `AVAILABLE`.
+ * Either misread would feed a model a confident wrong number on exactly the rows
+ * nearest departure.
+ */
+export function seatsFromRawStatus(raw: string): number | null {
+  const match = AVAILABLE_COUNT.exec(raw.trim());
+  if (!match) return null;
+  const seats = Number(match[1]);
+  return Number.isInteger(seats) && seats >= 0 ? seats : null;
 }
 
 /** Which measured refusal this is. Kept separate from the outcome so the adapter can log our own bug loudly. */
@@ -179,6 +202,7 @@ function dayFrom(raw: unknown): AvailabilityDayRecord | null {
     canBook,
     wlBooking: waitlist.booking,
     wlCurrent: waitlist.current,
+    seats: seatsFromRawStatus(rawStatus),
     prediction: text(raw, ["prediction"]) ?? null,
     predictionPercentage: percent(raw.predictionPercentage),
   };

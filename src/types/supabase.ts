@@ -11,6 +11,7 @@ export type Database = {
     Tables: {
       availability_observations: {
         Row: {
+          can_book: boolean
           days_out: number
           from_code: string
           id: string
@@ -18,7 +19,6 @@ export type Database = {
           observed_at: string
           observed_on: string
           outcome: string | null
-          outcome_at: string | null
           quota: string
           raw_status: string
           seats: number | null
@@ -32,6 +32,7 @@ export type Database = {
           wl_current: number | null
         }
         Insert: {
+          can_book: boolean
           days_out?: number
           from_code: string
           id?: string
@@ -39,7 +40,6 @@ export type Database = {
           observed_at?: string
           observed_on?: string
           outcome?: string | null
-          outcome_at?: string | null
           quota: string
           raw_status: string
           seats?: number | null
@@ -53,6 +53,7 @@ export type Database = {
           wl_current?: number | null
         }
         Update: {
+          can_book?: boolean
           days_out?: number
           from_code?: string
           id?: string
@@ -60,7 +61,6 @@ export type Database = {
           observed_at?: string
           observed_on?: string
           outcome?: string | null
-          outcome_at?: string | null
           quota?: string
           raw_status?: string
           seats?: number | null

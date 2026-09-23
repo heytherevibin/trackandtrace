@@ -45,8 +45,19 @@ create table public.availability_observations (
   journey_date          date not null,
   days_out              integer not null generated always as (journey_date - (observed_at at time zone 'Asia/Kolkata')::date) stored,
   status                text not null,
-  -- Verbatim source text. The split below is a convenience; this is the evidence.
+  -- **`status` alone never says whether a berth can be had.** The day nearest
+  -- departure comes back `status: WAITLIST` with `raw_status: NOT AVAILABLE` and
+  -- `can_book: false` — booking has closed. Those are the rows a clearance model
+  -- most needs to read correctly, and without this column every model would have
+  -- to re-derive the boolean by matching free text the source already gave us.
+  can_book              boolean not null,
+  -- Verbatim source text. The splits below are a convenience; this is the evidence.
   raw_status            text not null,
+  -- The berth count `AVAILABLE 0042` carries, null on every form that holds none.
+  -- Forty-two free and one free are different worlds to a prediction. Null is a
+  -- normal reading: `RAC 12` is a queue position rather than a count, and
+  -- `NOT AVAILABLE`, `REGRET`, `CURR_AVBL` and every waitlist pair carry no
+  -- berths to count.
   seats                 integer,
   -- The two halves of `raw_status`: `GNWL65/WL26` is booking-position waitlist 65
   -- and current waitlist 26 — where the queue started and where it now stands.
@@ -61,19 +72,18 @@ create table public.availability_observations (
   -- be untrue twice over.
   source_prediction     text,
   source_prediction_pct numeric(5,2),
-  -- Derived later from the row whose `days_out` is 0, per design §5.3. Nothing
-  -- writes these yet, and the recorder deliberately leaves them out of its
-  -- payload so a same-day re-observation can never wipe a resolved outcome.
-  outcome               text,
-  outcome_at            timestamptz
+  -- Derived from the row whose `days_out` is 0, per design §5.3. There is no
+  -- resolver pass and no `outcome_at`: the journey date is readable *on* the
+  -- journey date and booking has closed by then, so the last observation **is**
+  -- the outcome. Nothing writes this yet, and the recorder deliberately leaves it
+  -- out of its payload so a same-day re-observation can never wipe a resolved one.
+  outcome               text
 );
 
--- Design §5.1's two indexes.
+-- The outcome join: find every observation of one journey, to read the
+-- `days_out = 0` row and the sequence leading to it.
 create index availability_observations_journey_idx
   on public.availability_observations (train_no, travel_class, quota, journey_date);
-
-create index availability_observations_open_outcome_idx
-  on public.availability_observations (journey_date) where outcome is null;
 
 -- Idempotency, decided here and recorded: **a unique index, with the write as an
 -- upsert**, rather than leaving the crawler to remember what it already wrote.

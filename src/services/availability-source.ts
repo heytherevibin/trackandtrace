@@ -36,14 +36,20 @@ export interface AvailabilityDay {
 }
 
 /**
- * What an adapter actually returns for each day: the day above, plus the four
- * values the observation store records and **no page renders**.
+ * What an adapter actually returns for each day: the day above, plus the five
+ * values the observation store records and no page renders today.
  *
  * `wlBooking` / `wlCurrent` are the two halves of `rawStatus` (`GNWL65/WL26` is
  * booking-position waitlist 65, current waitlist 26) — where the queue started
  * and where it is now, which are the strongest features a clearance model gets
  * and arrive free in every observation. Both are null whenever `rawStatus` is
  * not a pair of waitlist numbers, which is a normal form, not an error.
+ *
+ * `seats` is the berth count `AVAILABLE 0042` carries, read by the same rule:
+ * null whenever the form holds no count, which is normal rather than missing.
+ * Forty-two free and one free are different worlds to a prediction. Unlike
+ * `prediction` below, nothing forbids showing it — it simply has no renderer
+ * yet, and `availabilityText` already carries the source's own words.
  *
  * `prediction` / `predictionPercentage` are the *source's* own guess. They are
  * recorded privately as the baseline a Trakline model has to beat (spec D4/§6)
@@ -54,6 +60,7 @@ export interface AvailabilityDay {
 export interface AvailabilityDayRecord extends AvailabilityDay {
   readonly wlBooking: number | null;
   readonly wlCurrent: number | null;
+  readonly seats: number | null;
   readonly prediction: string | null;
   readonly predictionPercentage: number | null;
 }

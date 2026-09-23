@@ -32,6 +32,7 @@ function day(over: Partial<AvailabilityDayRecord> = {}): AvailabilityDayRecord {
     canBook: true,
     wlBooking: 65,
     wlCurrent: 26,
+    seats: null,
     prediction: "Confirm Chances",
     predictionPercentage: 70.5,
     ...over,
@@ -88,9 +89,22 @@ describe("observationRows", () => {
   });
 
   it("records a day with no waitlist pair as nulls, because that is a normal reading", () => {
-    const free = day({ status: "AVAILABLE", rawStatus: "AVAILABLE 0042", wlBooking: null, wlCurrent: null });
+    const free = day({ status: "AVAILABLE", rawStatus: "AVAILABLE 0042", wlBooking: null, wlCurrent: null, seats: 42 });
     const rows = observationRows(request, answer([free]));
     expect(rows[0]).toMatchObject({ raw_status: "AVAILABLE 0042", wl_booking: null, wl_current: null });
+  });
+
+  it("carries the berth count when the day has one, and null when it does not", () => {
+    expect(observationRows(request, answer([day({ rawStatus: "AVAILABLE 0042", seats: 42 })]))[0]?.seats).toBe(42);
+    expect(observationRows(request, answer([day({ rawStatus: "GNWL65/WL26", seats: null })]))[0]?.seats).toBeNull();
+  });
+
+  // The row this column exists for: status says WAITLIST, booking has closed.
+  it("records whether booking was open, which status alone never says", () => {
+    const closed = day({ status: "WAITLIST", rawStatus: "NOT AVAILABLE", canBook: false, wlBooking: null, wlCurrent: null });
+    const rows = observationRows(request, answer([closed]));
+    expect(rows[0]).toMatchObject({ status: "WAITLIST", can_book: false });
+    expect(observationRows(request, answer([day()]))[0]?.can_book).toBe(true);
   });
 
   it("records the source's own guess as the baseline to beat", () => {
@@ -98,9 +112,14 @@ describe("observationRows", () => {
     expect(rows[0]).toMatchObject({ source_prediction: "Confirm Chances", source_prediction_pct: 70.5 });
   });
 
-  it("writes neither generated column, nor any field an upsert would clobber", () => {
+  // The Supabase type generator lists `days_out` and `observed_on` as ordinary
+  // optional insert columns, so the `Omit` in the module is the only
+  // compile-time guard and this is the runtime one. `outcome` is excluded for a
+  // different reason: an upsert overwrites every column in its payload, so a
+  // re-observation later the same day must not be able to wipe a resolved one.
+  it("writes neither generated column, nor the field an upsert would clobber", () => {
     const rows = observationRows(request, answer([day()]));
-    for (const key of ["id", "days_out", "observed_on", "seats", "outcome", "outcome_at"]) {
+    for (const key of ["id", "days_out", "observed_on", "outcome"]) {
       expect(Object.keys(rows[0] ?? {})).not.toContain(key);
     }
   });
