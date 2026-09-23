@@ -1,5 +1,33 @@
 begin;
 create extension if not exists pgtap with schema extensions;
+
+-- A refusal that comes from a constraint, asserted by the constraint's own name instead of the
+-- sentence Postgres wraps it in. `get stacked diagnostics ... CONSTRAINT_NAME` reads the error's
+-- structured field, which the constraint machinery fills in whatever words the server is built
+-- to print, so these assertions survive a rewording that throws_ok's exact-message form would
+-- not. Detection is unchanged: a renamed or dropped constraint still fails, and so does a
+-- statement that raises nothing. Only errors that carry a constraint belong here -- a not-null
+-- violation and an application `raise` both leave CONSTRAINT_NAME empty, which this reports as
+-- '<no constraint>' rather than passing. Defined per file, like pg_temp.speak_as: every test
+-- file here is self-contained.
+create or replace function pg_temp.throws_constraint(
+  p_sql text, p_errcode text, p_constraint text, p_description text
+) returns text language plpgsql as $tc$
+declare
+  v_code       text;
+  v_constraint text;
+begin
+  execute p_sql;
+  return extensions.is('nothing raised', p_errcode || ' on ' || p_constraint, p_description);
+exception when others then
+  get stacked diagnostics v_code = RETURNED_SQLSTATE, v_constraint = CONSTRAINT_NAME;
+  return extensions.is(
+    v_code || ' on ' || coalesce(nullif(v_constraint, ''), '<no constraint>'),
+    p_errcode || ' on ' || p_constraint,
+    p_description
+  );
+end $tc$;
+
 select plan(21);
 
 select has_table('console', 'keys', 'keys exists');
@@ -22,11 +50,10 @@ insert into console.keys (member_id, credential_id, public_key, counter, name, t
 values ('11111111-1111-1111-1111-111111111111', '\x01'::bytea, '\x02'::bytea, 0, 'Blue key', 'security_key');
 
 -- The same credential can never be registered twice, by anyone.
-select throws_ok(
+select pg_temp.throws_constraint(
   $$insert into console.keys (member_id, credential_id, public_key, counter, name, type)
     values ('11111111-1111-1111-1111-111111111111', '\x01'::bytea, '\x03'::bytea, 0, 'Copy', 'security_key')$$,
-  '23505',
-  'duplicate key value violates unique constraint "console_keys_credential_key"',
+  '23505', 'console_keys_credential_key',
   'the same credential cannot be registered twice'
 );
 
@@ -58,31 +85,28 @@ select is(
 );
 
 -- The same challenge string can never be registered twice.
-select throws_ok(
+select pg_temp.throws_constraint(
   $$insert into console.challenges (member_id, session_id, purpose, challenge, expires_at)
     values ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'sign_in', 'sign-in-challenge-0001', now() + interval '5 minutes')$$,
-  '23505'::char(5),
-  'duplicate key value violates unique constraint "console_challenges_challenge_key"',
+  '23505', 'console_challenges_challenge_key',
   'the same challenge string cannot be registered twice'
 );
 
 -- An action tap is meaningless without the digest of what it approves.
-select throws_ok(
+select pg_temp.throws_constraint(
   $$insert into console.challenges (member_id, session_id, purpose, challenge, expires_at)
     values ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'action', 'action-challenge-0009', now() + interval '5 minutes')$$,
-  '23514'::char(5),
-  'new row for relation "challenges" violates check constraint "console_challenges_action_digest"',
+  '23514', 'console_challenges_action_digest',
   'an action challenge without a digest is refused'
 );
 
 -- §D fixes a challenge's window at five minutes, the same reasoning Task 3
 -- already applied to invites and setup_links: without a CHECK here, a later
 -- function could mint one with an unbounded expiry.
-select throws_ok(
+select pg_temp.throws_constraint(
   $$insert into console.challenges (member_id, session_id, purpose, challenge, expires_at)
     values ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'sign_in', 'ten-minute-challenge', now() + interval '10 minutes')$$,
-  '23514'::char(5),
-  'new row for relation "challenges" violates check constraint "console_challenges_expiry_window"',
+  '23514', 'console_challenges_expiry_window',
   'a challenge more than five minutes out is refused'
 );
 select lives_ok(

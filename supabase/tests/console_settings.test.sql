@@ -1,5 +1,33 @@
 begin;
 create extension if not exists pgtap with schema extensions;
+
+-- A refusal that comes from a constraint, asserted by the constraint's own name instead of the
+-- sentence Postgres wraps it in. `get stacked diagnostics ... CONSTRAINT_NAME` reads the error's
+-- structured field, which the constraint machinery fills in whatever words the server is built
+-- to print, so these assertions survive a rewording that throws_ok's exact-message form would
+-- not. Detection is unchanged: a renamed or dropped constraint still fails, and so does a
+-- statement that raises nothing. Only errors that carry a constraint belong here -- a not-null
+-- violation and an application `raise` both leave CONSTRAINT_NAME empty, which this reports as
+-- '<no constraint>' rather than passing. Defined per file, like pg_temp.speak_as: every test
+-- file here is self-contained.
+create or replace function pg_temp.throws_constraint(
+  p_sql text, p_errcode text, p_constraint text, p_description text
+) returns text language plpgsql as $tc$
+declare
+  v_code       text;
+  v_constraint text;
+begin
+  execute p_sql;
+  return extensions.is('nothing raised', p_errcode || ' on ' || p_constraint, p_description);
+exception when others then
+  get stacked diagnostics v_code = RETURNED_SQLSTATE, v_constraint = CONSTRAINT_NAME;
+  return extensions.is(
+    v_code || ' on ' || coalesce(nullif(v_constraint, ''), '<no constraint>'),
+    p_errcode || ' on ' || p_constraint,
+    p_description
+  );
+end $tc$;
+
 select plan(30);
 
 select has_table('console', 'settings', 'settings exists');
@@ -49,22 +77,19 @@ select is(
 );
 
 -- Column-level constraints bite directly on the table, not only through the save path.
-select throws_ok(
+select pg_temp.throws_constraint(
   $$update console.settings set checks_per_address = 61 where environment = 'production'$$,
-  '23514',
-  'new row for relation "settings" violates check constraint "settings_checks_per_address_check"',
+  '23514', 'settings_checks_per_address_check',
   'checks_per_address outside its 5-60 range is refused'
 );
-select throws_ok(
+select pg_temp.throws_constraint(
   $$update console.settings set primary_source = 'other' where environment = 'production'$$,
-  '23514',
-  'new row for relation "settings" violates check constraint "settings_primary_source_check"',
+  '23514', 'settings_primary_source_check',
   'a primary_source that is neither railkit nor rapidapi is refused'
 );
-select throws_ok(
+select pg_temp.throws_constraint(
   $$insert into console.settings (environment) values ('staging')$$,
-  '23514',
-  'new row for relation "settings" violates check constraint "settings_environment_check"',
+  '23514', 'settings_environment_check',
   'an environment outside the three the table allows is refused'
 );
 

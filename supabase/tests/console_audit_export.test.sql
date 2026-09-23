@@ -1,5 +1,33 @@
 begin;
 create extension if not exists pgtap with schema extensions;
+
+-- A refusal that comes from a constraint, asserted by the constraint's own name instead of the
+-- sentence Postgres wraps it in. `get stacked diagnostics ... CONSTRAINT_NAME` reads the error's
+-- structured field, which the constraint machinery fills in whatever words the server is built
+-- to print, so these assertions survive a rewording that throws_ok's exact-message form would
+-- not. Detection is unchanged: a renamed or dropped constraint still fails, and so does a
+-- statement that raises nothing. Only errors that carry a constraint belong here -- a not-null
+-- violation and an application `raise` both leave CONSTRAINT_NAME empty, which this reports as
+-- '<no constraint>' rather than passing. Defined per file, like pg_temp.speak_as: every test
+-- file here is self-contained.
+create or replace function pg_temp.throws_constraint(
+  p_sql text, p_errcode text, p_constraint text, p_description text
+) returns text language plpgsql as $tc$
+declare
+  v_code       text;
+  v_constraint text;
+begin
+  execute p_sql;
+  return extensions.is('nothing raised', p_errcode || ' on ' || p_constraint, p_description);
+exception when others then
+  get stacked diagnostics v_code = RETURNED_SQLSTATE, v_constraint = CONSTRAINT_NAME;
+  return extensions.is(
+    v_code || ' on ' || coalesce(nullif(v_constraint, ''), '<no constraint>'),
+    p_errcode || ' on ' || p_constraint,
+    p_description
+  );
+end $tc$;
+
 select plan(54);
 
 -- public.console_audit_export: the one console function that reads the audit
@@ -512,16 +540,16 @@ select throws_ok(
 -- file raises one -- but a bare null here is the pattern this branch has been
 -- naming everywhere else, and a constraint added later would inherit the
 -- assertion without earning it.
-select throws_ok(
+select pg_temp.throws_constraint(
   $$ select console.write_audit('Production', null, 'Forged', null, null, null,
        'team', 'Changed a role', 'Someone', null, 'done', null, null, null) $$,
-  '23514', 'new row for relation "audit_log" violates check constraint "console_audit_log_environment_known"',
+  '23514', 'console_audit_log_environment_known',
   'the writer every other console action shares refuses an environment the picker cannot reach'
 );
-select throws_ok(
+select pg_temp.throws_constraint(
   $$ insert into console.audit_log (environment, actor_name, category, action, result)
      values ('Production', 'Forged', 'record', 'Exported the audit log', 'done') $$,
-  '23514', 'new row for relation "audit_log" violates check constraint "console_audit_log_environment_known"',
+  '23514', 'console_audit_log_environment_known',
   'and so does the column itself, for anything that never went through it'
 );
 select is(

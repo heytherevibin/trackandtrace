@@ -1,5 +1,33 @@
 begin;
 create extension if not exists pgtap with schema extensions;
+
+-- A refusal that comes from a constraint, asserted by the constraint's own name instead of the
+-- sentence Postgres wraps it in. `get stacked diagnostics ... CONSTRAINT_NAME` reads the error's
+-- structured field, which the constraint machinery fills in whatever words the server is built
+-- to print, so these assertions survive a rewording that throws_ok's exact-message form would
+-- not. Detection is unchanged: a renamed or dropped constraint still fails, and so does a
+-- statement that raises nothing. Only errors that carry a constraint belong here -- a not-null
+-- violation and an application `raise` both leave CONSTRAINT_NAME empty, which this reports as
+-- '<no constraint>' rather than passing. Defined per file, like pg_temp.speak_as: every test
+-- file here is self-contained.
+create or replace function pg_temp.throws_constraint(
+  p_sql text, p_errcode text, p_constraint text, p_description text
+) returns text language plpgsql as $tc$
+declare
+  v_code       text;
+  v_constraint text;
+begin
+  execute p_sql;
+  return extensions.is('nothing raised', p_errcode || ' on ' || p_constraint, p_description);
+exception when others then
+  get stacked diagnostics v_code = RETURNED_SQLSTATE, v_constraint = CONSTRAINT_NAME;
+  return extensions.is(
+    v_code || ' on ' || coalesce(nullif(v_constraint, ''), '<no constraint>'),
+    p_errcode || ' on ' || p_constraint,
+    p_description
+  );
+end $tc$;
+
 select plan(42);
 
 -- Every function here is service_role's alone: keys, invites and the Owner
@@ -63,10 +91,9 @@ select is(
   1,
   'the key is handed to the ceremony'
 );
-select throws_ok(
+select pg_temp.throws_constraint(
   $$select public.console_auth_record_key('11111111-1111-1111-1111-111111111111', '\x01'::bytea, '\x03'::bytea, 0, array['usb'], 'Same key', 'security_key')$$,
-  '23505',
-  'duplicate key value violates unique constraint "console_keys_credential_key"',
+  '23505', 'console_keys_credential_key',
   'the same key cannot be added twice'
 );
 
@@ -75,10 +102,9 @@ select throws_ok(
 
 -- record_key relies on console.keys' own FK to console.members; a member
 -- that does not exist must raise, not silently create an orphan key.
-select throws_ok(
+select pg_temp.throws_constraint(
   $$select public.console_auth_record_key('00000000-0000-0000-0000-000000000000', '\x0a'::bytea, '\x0b'::bytea, 0, array['usb'], 'Ghost key', 'security_key')$$,
-  '23503',
-  'insert or update on table "keys" violates foreign key constraint "keys_member_id_fkey"',
+  '23503', 'keys_member_id_fkey',
   'a key cannot be registered for a member that does not exist'
 );
 
