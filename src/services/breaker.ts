@@ -80,32 +80,50 @@ export interface Breaker {
   record(outcome: Recordable): Promise<void>;
 }
 
-interface Keys {
+/**
+ * A window, and the probe that outlives it. Every fuse has these two.
+ *
+ * The provider-wide fuse has **only** these two: nothing is ever counted toward
+ * it and it never doubles, because the conditions that open it — a refused key,
+ * a spent plan — are each self-evident on the first sight of them.
+ */
+interface SharedKeys {
   readonly open: string;
-  readonly fails: string;
-  readonly trips: string;
   readonly probe: string;
 }
 
-function keysFor(base: string): Keys {
-  return { open: `${base}:open`, fails: `${base}:fails`, trips: `${base}:trips`, probe: `${base}:probe` };
+/** A caller's own fuse counts as well: failures inside one window, and the trips it has earned. */
+interface CountingKeys extends SharedKeys {
+  readonly fails: string;
+  readonly trips: string;
+}
+
+function sharedKeys(base: string): SharedKeys {
+  return { open: `${base}:open`, probe: `${base}:probe` };
+}
+
+function countingKeys(base: string): CountingKeys {
+  return { ...sharedKeys(base), fails: `${base}:fails`, trips: `${base}:trips` };
 }
 
 export function createBreaker(kv: Kv, scope: BreakerScope, options: { readonly onChange?: (event: BreakerEvent) => void } = {}): Breaker {
-  const provider = keysFor(scope.provider);
-  const endpoint = keysFor(scope.endpoint);
+  const provider = sharedKeys(scope.provider);
+  const endpoint = countingKeys(scope.endpoint);
   const emit = options.onChange ?? (() => {});
 
-  async function openFor(key: Keys, name: BreakerScopeName, ms: number, reason: "failures" | "quota" | "refused"): Promise<void> {
+  /** Rests one fuse, and leaves a probe standing into the grace that follows it. Nothing else: the counters belong to whoever counts. */
+  async function openFor(key: SharedKeys, name: BreakerScopeName, ms: number, reason: "failures" | "quota" | "refused"): Promise<void> {
     await kv.set(key.open, String(ms), ms);
     await kv.set(key.probe, "1", ms + BREAKER.probeGraceMs);
-    await kv.del(key.fails);
     emit({ state: "open", openMs: ms, reason, scope: name });
   }
 
   async function trip(): Promise<void> {
     const trips = await kv.incr(endpoint.trips, BREAKER.tripMemoryMs, true);
     await openFor(endpoint, "endpoint", Math.min(BREAKER.baseOpenMs * 2 ** (trips - 1), BREAKER.maxOpenMs), "failures");
+    // The window that just tripped is spent; the next one counts from zero. After the open, so no
+    // concurrent check can ever read a cleared counter while the fuse still looks closed.
+    await kv.del(endpoint.fails);
   }
 
   /**
@@ -125,18 +143,21 @@ export function createBreaker(kv: Kv, scope: BreakerScope, options: { readonly o
   /**
    * A real answer clears both memories this caller can see. It proves the
    * endpoint works *and* that the key was accepted and the plan had quota, so
-   * the provider-wide escalation has no more reason to stand than this one's.
+   * the provider-wide probe has no more reason to stand than this one's.
    * It cannot reach another caller's endpoint keys, which is the whole point.
+   *
+   * Only the endpoint has trips to forget. The provider-wide fuse never doubled,
+   * so there is nothing there to undo.
    */
   async function recovered(): Promise<void> {
-    let closed = false;
-    for (const key of [provider, endpoint]) {
-      if (!(await kv.get(key.probe))) continue;
-      await kv.del(key.probe);
-      await kv.del(key.trips);
-      closed = true;
+    const [shared, own] = await Promise.all([kv.get(provider.probe), kv.get(endpoint.probe)]);
+    if (!shared && !own) return;
+    if (shared) await kv.del(provider.probe);
+    if (own) {
+      await kv.del(endpoint.probe);
+      await kv.del(endpoint.trips);
     }
-    if (closed) emit({ state: "closed" });
+    emit({ state: "closed" });
   }
 
   /** Inside a window or its grace, one more failure means it has not recovered. Either window counts: both are this caller's own recent trouble. */
@@ -163,7 +184,9 @@ export function createBreaker(kv: Kv, scope: BreakerScope, options: { readonly o
       if (outcome.code === "INVALID") return;
       if (outcome.code !== "SOURCE_UNAVAILABLE") return recovered();
 
-      // A refused key and a spent plan are facts about the provider, not this endpoint: they rest every caller.
+      // A refused key and a spent plan are facts about the provider, not this endpoint: they rest
+      // every caller. They leave this endpoint's own failure count standing — it says nothing about
+      // the key, and it expires within its own 60 s window regardless.
       if (outcome.cause === "refused") return openFor(provider, "provider", BREAKER.refusedOpenMs, "refused");
       if (outcome.cause === "quota") return openFor(provider, "provider", (outcome.retryAfter ?? BREAKER.quotaOpenMs / 1000) * 1000, "quota");
 
