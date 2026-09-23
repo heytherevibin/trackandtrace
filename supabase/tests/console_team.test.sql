@@ -122,10 +122,28 @@ select is(
 -- Every one of the seven refuses a Support member outright -- the page
 -- hiding a button is not a check. Arguments are shaped plausibly, but the
 -- role gate runs first and refuses before any of them could matter.
+--
+-- A live invite, purely so the last two of the seven can reach their role gate. Both
+-- console_resend_invite and console_revoke_invite raise console.require_role's 'no access' AND
+-- their own 'no access' for an invite that is unknown, accepted or revoked -- identical words from
+-- two different guards, so an id that names no row leaves the assertion unable to say which one
+-- refused. Proven both ways: with the rank check deleted from console.require_role, and again with
+-- the unknown-invite check deleted from each function, the two assertions below went on passing
+-- against '00000000-0000-0000-0000-000000000000'. Naming the message does not fix that -- the two
+-- guards say the same thing -- so the call has to reach past the first one, exactly as the
+-- self-demotion assertion further down mints a real tap to reach past use_tap.
+--
+-- Inserted directly, like every other fixture row in this file, and deleted again below: it must
+-- not be live when console_team()'s pending-invite count is next asserted, and the address is used
+-- nowhere else.
+insert into console.invites (id, email, role, invited_by, token_hash, sent_at, expires_at)
+values ('a5555555-0000-0000-0000-000000000001', 'spare@trakline.in', 'viewer',
+        'a1111111-1111-1111-1111-111111111111', '\x99'::bytea, now(), now() + interval '7 days');
+
 select pg_temp.speak_as('d1111111-1111-1111-1111-111111111111', 'd2222222-2222-2222-2222-222222222222');
-select throws_ok($$ select public.console_team() $$, '42501', null, 'a Support member cannot list the team');
--- This one names its message where its six siblings do not, and it has to.
--- console_invite_member now carries a third refusal of its own (the traveller
+select throws_ok($$ select public.console_team() $$, '42501', 'no access', 'a Support member cannot list the team');
+-- This one named its message before its six siblings did, and it had to.
+-- console_invite_member carries a third refusal of its own (the traveller
 -- check, 20260922110000_console_invite_blocks_traveller.sql), and a bare
 -- '42501', null here would pass whether the Owner floor refused or that check
 -- did -- so the assertion would stop being about the role gate it was written
@@ -134,12 +152,16 @@ select throws_ok(
   $$ select public.console_invite_member('new@trakline.in', 'viewer', 'Trying anyway.', 'development') $$,
   '42501', 'no access', 'nor invite someone'
 );
-select throws_ok($$ select public.console_change_role('a1111111-1111-1111-1111-111111111111', 'admin', 'Trying anyway.', 'development') $$, '42501', null, 'nor change a role');
-select throws_ok($$ select public.console_reset_keys('a1111111-1111-1111-1111-111111111111', 'Trying anyway.', 'development') $$, '42501', null, 'nor reset a member''s keys');
-select throws_ok($$ select public.console_remove_member('a1111111-1111-1111-1111-111111111111', 'Trying anyway.', 'development') $$, '42501', null, 'nor remove a member');
-select throws_ok($$ select public.console_resend_invite('00000000-0000-0000-0000-000000000000', 'development') $$, '42501', null, 'nor resend an invite');
-select throws_ok($$ select public.console_revoke_invite('00000000-0000-0000-0000-000000000000', 'Trying anyway.', 'development') $$, '42501', null, 'nor revoke one');
+select throws_ok($$ select public.console_change_role('a1111111-1111-1111-1111-111111111111', 'admin', 'Trying anyway.', 'development') $$, '42501', 'no access', 'nor change a role');
+select throws_ok($$ select public.console_reset_keys('a1111111-1111-1111-1111-111111111111', 'Trying anyway.', 'development') $$, '42501', 'no access', 'nor reset a member''s keys');
+select throws_ok($$ select public.console_remove_member('a1111111-1111-1111-1111-111111111111', 'Trying anyway.', 'development') $$, '42501', 'no access', 'nor remove a member');
+select throws_ok($$ select public.console_resend_invite('a5555555-0000-0000-0000-000000000001', 'development') $$, '42501', 'no access', 'nor resend an invite');
+select throws_ok($$ select public.console_revoke_invite('a5555555-0000-0000-0000-000000000001', 'Trying anyway.', 'development') $$, '42501', 'no access', 'nor revoke one');
 select pg_temp.speak_as('a1111111-1111-1111-1111-111111111111', 'a2222222-2222-2222-2222-222222222222');
+
+-- The spare invite has done its work. Gone rather than revoked, so nothing about it can reach the
+-- pending-invite counts, the live-email index or the audit log that the rest of this file asserts on.
+delete from console.invites where id = 'a5555555-0000-0000-0000-000000000001';
 
 -- Inviting: no tap, no invite. The digest is action/email/role/reason
 -- (Task 4's own spec), so the pre-checks below run before use_tap ever
@@ -147,11 +169,11 @@ select pg_temp.speak_as('a1111111-1111-1111-1111-111111111111', 'a2222222-2222-2
 -- rightly holds for a different, valid call.
 select throws_ok(
   $$ select public.console_invite_member('nadia@trakline.in', 'admin', 'Building out support coverage.', 'development') $$,
-  '42501', null, 'inviting with no tap is refused'
+  '42501', 'no tap for this action', 'inviting with no tap is refused'
 );
 
--- These three name the message they expect, not merely the errcode. Every refusal in this file
--- raises 42501, including "no tap for this action" -- so a bare `'42501', null` here would pass
+-- These three named the message they expect before the rest of the file did. Every refusal in this
+-- file raises 42501, including "no tap for this action" -- so a bare `'42501', null` here would pass
 -- whether the call was refused for the reason under test or simply for want of a tap. Proven, not
 -- assumed: with the membership check narrowed back to `= 'active'`, the null-message version of the
 -- setup-member assertion still passed.
@@ -274,7 +296,7 @@ select ok(
 -- Revoke: takes a tap, because it withdraws access that was granted.
 select throws_ok(
   $$ select public.console_revoke_invite((select id from console.invites where email = 'nadia2@trakline.in'), 'Never should have sent it.', 'development') $$,
-  '42501', null, 'revoking with no tap is refused'
+  '42501', 'no tap for this action', 'revoking with no tap is refused'
 );
 select pg_temp.tap(
   'a1111111-1111-1111-1111-111111111111', 'a2222222-2222-2222-2222-222222222222', 'revoke-nadia2-challenge',
@@ -298,7 +320,7 @@ select is(
 -- Changing a role.
 select throws_ok(
   $$ select public.console_change_role('b1111111-1111-1111-1111-111111111111', 'admin', 'No tap yet.', 'development') $$,
-  '42501', null, 'changing a role with no tap is refused'
+  '42501', 'no tap for this action', 'changing a role with no tap is refused'
 );
 
 -- A tap bound to one member does not spend against another: minted for
@@ -310,7 +332,7 @@ select pg_temp.tap(
 );
 select throws_ok(
   $$ select public.console_change_role('b1111111-1111-1111-1111-111111111111', 'admin', 'Reassigning before travel.', 'development') $$,
-  '42501', null, 'a tap minted for one member does not spend against a different one'
+  '42501', 'no tap for this action', 'a tap minted for one member does not spend against a different one'
 );
 
 -- An Owner cannot demote themselves, even with a spare Owner on hand. A matching tap is minted
@@ -319,13 +341,21 @@ select throws_ok(
 -- in hand, deleting the self-check entirely would let the call fall through to use_tap and keep
 -- this test green. With one, a broken self-check lets the demotion *succeed*, and the assertion
 -- below catches it.
+--
+-- The message named below is the floor's words, not the self-rule's, and that is what
+-- console_change_role really raises here: the two rules deliberately share one string, which
+-- src/console/team/team.ts's own mapper says out loud ("the last-Owner floor, and the self-demotion
+-- rule that shares its words") and refuses to tell apart by reading. So the message pins the
+-- *function*, the tap above pins the *rule*, and neither does the other's job. Where the shared
+-- wording was not wanted it was not used: console_reset_keys gives its own self-check its own
+-- 'a member cannot reset their own keys' (20260922120000, and the assertion further down names it).
 select pg_temp.tap(
   'a1111111-1111-1111-1111-111111111111', 'a2222222-2222-2222-2222-222222222222', 'self-demote-challenge',
   'Changed a role', 'a1111111-1111-1111-1111-111111111111', 'admin', 'Stepping back.'
 );
 select throws_ok(
   $$ select public.console_change_role('a1111111-1111-1111-1111-111111111111', 'admin', 'Stepping back.', 'development') $$,
-  '42501', null, 'an Owner cannot demote themselves while another Owner exists'
+  '42501', 'a console needs at least one owner', 'an Owner cannot demote themselves while another Owner exists'
 );
 select is(
   (select role::text from console.members where user_id = 'a1111111-1111-1111-1111-111111111111'),
@@ -358,13 +388,13 @@ select is(
 -- pinned down on its own in console_first_owner.test.sql.
 select throws_ok(
   $$ select console.require_another_active_owner() $$,
-  '42501', null, 'the shared guard itself refuses once only one active Owner remains'
+  '42501', 'a console needs at least one owner', 'the shared guard itself refuses once only one active Owner remains'
 );
 
 -- Resetting keys.
 select throws_ok(
   $$ select public.console_reset_keys('d1111111-1111-1111-1111-111111111111', 'No tap yet.', 'development') $$,
-  '42501', null, 'resetting keys with no tap is refused'
+  '42501', 'no tap for this action', 'resetting keys with no tap is refused'
 );
 
 -- Resetting your OWN keys is refused outright (20260922120000_console_reset_keys_blocks_self.sql):
@@ -372,12 +402,13 @@ select throws_ok(
 -- way to be re-invited (console_invite_member refuses any non-removed member) and, for a console's
 -- only Owner, no supported way back at all.
 --
--- Two things this assertion does that its neighbours do not, both deliberate. A matching tap is
--- minted first -- Asha holds no keys in this fixture, so the digest's count is '0' -- so deleting
--- the self-check would let this call fall through to use_tap and still raise 42501, and the test
--- would pass over a lockout it was written to prevent. And the expected message is named: every
--- console refusal raises 42501, so a bare `'42501', null` here would pass whatever went wrong,
--- including the missing tap, the Owner floor, or a target that could not be found.
+-- Two things this assertion does, both deliberate. A matching tap is minted first -- Asha holds no
+-- keys in this fixture, so the digest's count is '0' -- so deleting the self-check would let this
+-- call fall through to use_tap and still raise 42501, and the test would pass over a lockout it was
+-- written to prevent. And the expected message is named: every console refusal raises 42501, so a
+-- bare `'42501', null` here would pass whatever went wrong, including the missing tap, the Owner
+-- floor, or a target that could not be found. Unlike the two self-rules above, the message it names
+-- is this rule's own -- console_reset_keys does not borrow the floor's words, and says why.
 select pg_temp.tap(
   'a1111111-1111-1111-1111-111111111111', 'a2222222-2222-2222-2222-222222222222', 'self-reset-challenge',
   'Reset a member''s keys', 'a1111111-1111-1111-1111-111111111111', '0', 'Starting over with fresh keys.'
@@ -431,17 +462,20 @@ select is((select count(*)::int from console.keys where member_id = 'c1111111-11
 
 select throws_ok(
   $$ select public.console_remove_member('c1111111-1111-1111-1111-111111111111', 'No tap yet.', 'development') $$,
-  '42501', null, 'removing a member with no tap is refused'
+  '42501', 'no tap for this action', 'removing a member with no tap is refused'
 );
 -- With a matching tap in hand, for the same reason as the self-demotion test above: without one,
--- deleting the self-check would let this fall through to use_tap and still raise 42501.
+-- deleting the self-check would let this fall through to use_tap and still raise 42501. The named
+-- message is the floor's words for the same reason too -- console_remove_member's self-check
+-- shares them -- so it pins the function while the tap above and the status assertion below pin
+-- the rule.
 select pg_temp.tap(
   'a1111111-1111-1111-1111-111111111111', 'a2222222-2222-2222-2222-222222222222', 'self-remove-challenge',
   'Removed a member', 'a1111111-1111-1111-1111-111111111111', 'owner', 'Stepping back.'
 );
 select throws_ok(
   $$ select public.console_remove_member('a1111111-1111-1111-1111-111111111111', 'Stepping back.', 'development') $$,
-  '42501', null, 'an Owner cannot remove themselves while another Owner exists'
+  '42501', 'a console needs at least one owner', 'an Owner cannot remove themselves while another Owner exists'
 );
 select is(
   (select status::text from console.members where user_id = 'a1111111-1111-1111-1111-111111111111'),
@@ -480,7 +514,7 @@ select is(
 -- the roster entirely rather than lingering with a "removed" status shown.
 select throws_ok(
   $$ select console.require_another_active_owner() $$,
-  '42501', null, 'the guard still refuses -- Priya''s removal did not somehow create a spare'
+  '42501', 'a console needs at least one owner', 'the guard still refuses -- Priya''s removal did not somehow create a spare'
 );
 select is(jsonb_array_length(public.console_team() -> 'members'), 4, 'a removed member no longer appears in the roster');
 

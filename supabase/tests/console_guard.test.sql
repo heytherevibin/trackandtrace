@@ -25,17 +25,27 @@ update console.members set role = 'viewer' where user_id = '11111111-1111-1111-1
 select throws_ok(
   $$select console.require_role('admin')$$,
   '42501',
-  null,
+  'no access',
   'a Viewer fails an admin gate'
 );
 update console.members set role = 'owner' where user_id = '11111111-1111-1111-1111-111111111111';
 
 -- A null rank can never pass: role_rank has no ELSE, so null < null is null,
 -- which plpgsql's IF treats as false unless this is checked explicitly.
+--
+-- What the named message can and cannot prove here, said plainly rather than implied.
+-- console.require_role holds two checks and both raise this same 'no access': the explicit
+-- `p_least is null` one, and the `v_least_rank is null` arm of the rank comparison below it.
+-- role_rank covers all four labels of console.member_role, so a null argument is the only way to
+-- reach either arm -- and with one check deleted the other still refuses, identically. Proven, not
+-- assumed: with `p_least is null` removed from the function, this whole file still passed. So the
+-- assertion pins the behaviour ("a null rank never passes"), never one of the two lines, and no
+-- fixture can change that -- unlike the pair in console_team.test.sql, where a real invite id lets
+-- the call reach past the guard that was shadowing the one under test.
 select throws_ok(
   $$select console.require_role(null)$$,
   '42501',
-  null,
+  'no access',
   'require_role refuses a null rank'
 );
 
@@ -99,7 +109,7 @@ values ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-2222222
 select throws_ok(
   $$select console.use_tap('role.change', 'asha@trakline.in', 'support', 'cover')$$,
   '42501',
-  null,
+  'no tap for this action',
   'a challenge no key answered approves nothing, whatever its digest says'
 );
 
@@ -113,7 +123,7 @@ select lives_ok(
 select throws_ok(
   $$select console.use_tap('role.change', 'asha@trakline.in', 'support', 'cover')$$,
   '42501',
-  null,
+  'no tap for this action',
   'the same tap cannot be used twice'
 );
 
@@ -124,7 +134,7 @@ values ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-2222222
 select throws_ok(
   $$select console.use_tap('role.change', 'asha@trakline.in', 'owner', 'cover')$$,
   '42501',
-  null,
+  'no tap for this action',
   'a tap cannot approve a different value'
 );
 
@@ -136,7 +146,7 @@ values ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-2222222
 select throws_ok(
   $$select console.use_tap('member.remove', 'asha@trakline.in', 'support', 'cover')$$,
   '42501',
-  null,
+  'no tap for this action',
   'a tap made for one action does not approve another'
 );
 
@@ -151,7 +161,7 @@ values ('11111111-1111-1111-1111-111111111111', '33333333-3333-3333-3333-3333333
 select throws_ok(
   $$select console.use_tap('key.reset', 'member@trakline.in', 'reset', 'lost device')$$,
   '42501',
-  null,
+  'no tap for this action',
   'a tap made in another session does not work here'
 );
 
@@ -167,7 +177,7 @@ values ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-2222222
 select throws_ok(
   $$select console.use_tap('key.remove', 'member@trakline.in', 'remove', 'stale')$$,
   '42501',
-  null,
+  'no tap for this action',
   'an expired challenge does not work'
 );
 

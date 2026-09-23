@@ -106,17 +106,28 @@ select is(
   'the result is kept'
 );
 
--- Append-only: nothing may change or remove a row.
+-- Append-only: nothing may change or remove a row. These five assertions -- two here, two for the
+-- purge rule below, one for TRUNCATE at the end of the file -- are the only place anything proves
+-- that, so what they accept matters more here than anywhere else in this suite.
+--
+-- Each names the trigger's own text -- console.audit_refuse_update's for the update and the
+-- TRUNCATE, console.audit_only_purge_old's for the three deletes; two functions, one string on
+-- purpose. A bare '42501' would have been satisfied by any refusal at all, and this table is
+-- revoked from anon, authenticated, service_role and authenticator, so a plain "permission denied
+-- for table audit_log" is precisely the 42501 these would have accepted in the trigger's place --
+-- a privilege that happens to be missing standing in for a guarantee. The named message is what
+-- tells the guarantee from the accident: this suite runs as postgres, which owns the table and
+-- holds every privilege on it, so nothing but the trigger can refuse these statements.
 select throws_ok(
   $$update console.audit_log set reason = 'edited'$$,
   '42501',
-  null,
+  'the audit log is append-only',
   'the audit log refuses updates'
 );
 select throws_ok(
   $$delete from console.audit_log$$,
   '42501',
-  null,
+  'the audit log is append-only',
   'the audit log refuses deletes'
 );
 
@@ -145,7 +156,7 @@ select set_config('console.purging', 'on', true);
 select throws_ok(
   $$delete from console.audit_log where action = 'Recent thing'$$,
   '42501',
-  null,
+  'the audit log is append-only',
   'purging alone does not excuse deleting a row that is not old enough'
 );
 select set_config('console.purging', 'off', true);
@@ -153,7 +164,7 @@ select set_config('console.purging', 'off', true);
 select throws_ok(
   $$delete from console.audit_log where action = 'Another old thing'$$,
   '42501',
-  null,
+  'the audit log is append-only',
   'age alone does not excuse deleting a row without purging set'
 );
 
@@ -178,7 +189,7 @@ select is(
 select throws_ok(
   $$truncate console.audit_log$$,
   '42501',
-  null,
+  'the audit log is append-only',
   'the audit log refuses truncate too, not only row-level updates and deletes'
 );
 
