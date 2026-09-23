@@ -17,7 +17,10 @@
 // the noise. That is the failure this file is written to avoid.
 //
 // What the sampler actually promises per run is one thing, and it is the thing measured here:
-// **each combo is asked once, every run.** So:
+// **every combo is ASKED, every run.** (Since `5d0e949` it is asked twice — the rolling-window ask,
+// plus one pinned at today that supplies the `days_out = 0` outcome row; the two collapse into one
+// on the run a sweep wraps. The count below is of combo-DAYS, not of asks, so one or two makes no
+// difference to it.) So:
 //
 //     a combo is COVERED on an IST day when at least one row landed for it that day;
 //     a GAP is a (combo, IST day) with nothing — a run that did not happen, or a combo the run
@@ -44,7 +47,19 @@
 //   * whether a journey date got its four looks before departure. That is knowable only in
 //     hindsight, and it cannot be told apart from a train that does not run that day.
 //   * a combo listed but never once observed: it is NAMED below, but it has no first observation,
-//     so it has no denominator and cannot enter the fraction.
+//     so it has no denominator and cannot enter the fraction. If EVERY listed combo is unobserved
+//     the check fails regardless — a store nothing has ever been written to is not a young store,
+//     it is a wrong project, a wrong table, or a crawler that has never once succeeded.
+//   * a stretch a combo was deliberately NOT crawled. `routes.json` carries no history, so a combo
+//     taken off the list — which the runbook tells an operator to do for one that keeps refusing —
+//     and put back later is scored as holed for every removed day, and can sit under the threshold
+//     for months of clean running afterwards. The denominator is NOT reset on resumption: that
+//     would hide a real outage, which is the one failure this whole report exists to catch.
+//     `--since <date>` narrows the window by hand instead, and the output says it was narrowed.
+//   * day-bucket jitter around IST midnight. The bucket is `observed_on` and the cadence is a
+//     human's: two runs 24 h 10 m apart that straddle midnight leave a day with nothing, reported
+//     as a missed run; two runs 20 minutes apart across midnight cover two days on one sweep-step.
+//     Run at a stable hour, away from IST midnight.
 //   * dilution. The fraction is over the whole store, so one dead combo of sixteen is 6.25% and
 //     fails a 95% threshold — but one of forty would not. Read the per-combo lines too.
 //
@@ -82,11 +97,11 @@ export const DEFAULT_MAX_ROWS = 200_000;
 /** @typedef {{ trainNo: string, from: string, to: string, travelClass: string, quota: string, journeyDate: string, observedOn: string }} Observation */
 /** @typedef {{ ok: true, rows: Observation[] } | { ok: false, issues: string[] }} ParsedObservations */
 /** @typedef {{ from: string, to: string, days: number }} Range */
-/** @typedef {{ combo: string, firstDay: string, lastDay: string, expectedDays: number, observedDays: number, missing: string[], sawToday: boolean }} ComboCoverage */
+/** @typedef {{ combo: string, firstDay: string, measuredFrom: string, lastDay: string, expectedDays: number, observedDays: number, missing: string[], sawToday: boolean }} ComboCoverage */
 /**
  * @typedef {{
- *   today: string, minCoveragePct: number, rows: number,
- *   combos: ComboCoverage[], unlisted: string[], neverObserved: string[],
+ *   today: string, minCoveragePct: number, since: string | null, rows: number,
+ *   combos: ComboCoverage[], unlisted: string[], neverObserved: string[], nothingObserved: boolean,
  *   expectedDays: number, observedDays: number, coveragePct: number | null, enough: boolean
  * }} Coverage
  */
@@ -196,12 +211,20 @@ export function missingRanges(dates) {
  * nobody crawls any more owes nothing, and a combo on the list that has never landed a row is named
  * rather than scored. Pass `null` to measure whatever the store happens to hold.
  *
- * @param {{ rows: readonly Observation[], today: string, listed?: readonly string[] | null, minCoveragePct?: number }} options
+ * `since` is the escape hatch for the one stretch this reading gets wrong: days a combo was
+ * deliberately not crawled (taken off the route list and put back). It only ever NARROWS the
+ * window — a combo first seen after it keeps its own first day — it is never applied on its own,
+ * and the output names it, because a denominator that shrank quietly would hide the outage this
+ * report exists to find.
+ *
+ * @param {{ rows: readonly Observation[], today: string, listed?: readonly string[] | null, minCoveragePct?: number, since?: string | null }} options
  * @returns {Coverage}
  */
-export function coverageReport({ rows, today, listed = null, minCoveragePct = DEFAULT_MIN_COVERAGE_PCT }) {
+export function coverageReport({ rows, today, listed = null, minCoveragePct = DEFAULT_MIN_COVERAGE_PCT, since = null }) {
   if (!isCalendarDate(today)) throw new RangeError(`not an ISO date: ${today}`);
   if (!Number.isInteger(minCoveragePct) || minCoveragePct < 0 || minCoveragePct > 100) throw new RangeError(`the threshold is a whole percentage, 0 to 100; got ${minCoveragePct}`);
+  if (since !== null && !isCalendarDate(since)) throw new RangeError(`--since is an ISO date; got ${since}`);
+  if (since !== null && since > today) throw new RangeError(`--since ${since} is after today (${today}): that measures an empty window, and an empty window always passes`);
 
   // Yesterday, not today: today's run may not have happened yet, and a check that fails every
   // morning until somebody runs the crawler is a check nobody keeps.
@@ -232,33 +255,46 @@ export function coverageReport({ rows, today, listed = null, minCoveragePct = DE
     const observed = [...days].sort();
     const firstDay = observed[0] ?? today;
     const lastDay = observed[observed.length - 1] ?? today;
-    const span = Math.max(0, daysBetween(firstDay, lastClosedDay) + 1);
+    // `since` narrows and never widens, so it cannot invent days before a combo existed — and a
+    // combo whose every row predates it is scored at zero rather than excused, which is the point:
+    // the hatch is for days nobody was meant to crawl, not for a combo that has quietly died.
+    const measuredFrom = since !== null && since > firstDay ? since : firstDay;
+    const span = Math.max(0, daysBetween(measuredFrom, lastClosedDay) + 1);
 
     /** @type {string[]} */
     const missing = [];
     for (let i = 0; i < span; i += 1) {
-      const day = addDays(firstDay, i);
+      const day = addDays(measuredFrom, i);
       if (!days.has(day)) missing.push(day);
     }
 
-    combos.push({ combo, firstDay, lastDay, expectedDays: span, observedDays: span - missing.length, missing, sawToday: days.has(today) });
+    combos.push({ combo, firstDay, measuredFrom, lastDay, expectedDays: span, observedDays: span - missing.length, missing, sawToday: days.has(today) });
     expectedDays += span;
     observedDays += span - missing.length;
   }
 
+  const neverObserved = expected === null ? [] : [...expected].filter((combo) => !seen.has(combo)).sort();
+  // Nothing on the list has ever landed a row. Without this the arithmetic is `0 * 100 >= 95 * 0`,
+  // which is true, so an empty store — a wrong project, a wrong table, a crawler that has never
+  // once succeeded — passes the gate. A gate that is green on an empty store is a gate that is
+  // failing. One young combo among several is still excused; all of them is not youth.
+  const nothingObserved = expected !== null && expected.size > 0 && neverObserved.length === expected.size;
+
   return {
     today,
     minCoveragePct,
+    since,
     rows: rows.length,
     combos,
     unlisted,
-    neverObserved: expected === null ? [] : [...expected].filter((combo) => !seen.has(combo)).sort(),
+    neverObserved,
+    nothingObserved,
     expectedDays,
     observedDays,
     coveragePct: expectedDays === 0 ? null : Math.floor((observedDays * 100) / expectedDays),
     // Compared as whole numbers so a store that is exactly at the threshold can never fail on a
     // rounding error, and so the printed percentage and the verdict can never disagree.
-    enough: observedDays * 100 >= minCoveragePct * expectedDays,
+    enough: !nothingObserved && observedDays * 100 >= minCoveragePct * expectedDays,
   };
 }
 
@@ -278,9 +314,9 @@ export function summariseCoverage(report) {
     "",
     "Observation coverage — the store, not this run.",
     "",
-    "A combo is covered on an IST day when at least one row landed for it that day: the crawler asks",
-    "each combo once a run, so a day with nothing is a run that did not happen. A journey date missing",
-    "from inside an answered window is not a gap — the provider answers the next days the train runs.",
+    "A combo is covered on an IST day when at least one row landed for it that day: every run asks",
+    "for every combo, so a day with nothing is a run that did not happen. A journey date missing from",
+    "inside an answered window is not a gap — the provider answers the next days the train runs.",
   ];
 
   if (report.combos.length > 0) {
@@ -290,7 +326,11 @@ export function summariseCoverage(report) {
     const ranToday = report.combos.some((one) => one.sawToday);
     lines.push("");
     for (const one of report.combos) {
-      const share = one.expectedDays === 0 ? "first seen today — nothing closed to measure yet" : `${one.observedDays} of ${one.expectedDays} days · ${Math.floor((one.observedDays * 100) / one.expectedDays)}% · first seen ${one.firstDay}`;
+      // Both dates when they differ: the window that was measured, and the day the combo really
+      // began. A narrowed window must never be able to read as a short history.
+      const from = one.measuredFrom === one.firstDay ? `first seen ${one.firstDay}` : `measured from ${one.measuredFrom} by --since · first seen ${one.firstDay}`;
+      const nothing = one.measuredFrom === one.firstDay ? "first seen today — nothing closed to measure yet" : `nothing closed to measure since ${one.measuredFrom} · first seen ${one.firstDay}`;
+      const share = one.expectedDays === 0 ? nothing : `${one.observedDays} of ${one.expectedDays} days · ${Math.floor((one.observedDays * 100) / one.expectedDays)}% · ${from}`;
       const thin = one.expectedDays > 0 && one.observedDays * 100 < report.minCoveragePct * one.expectedDays ? " · below the threshold" : "";
       const missed = ranToday && !one.sawToday ? " · nothing today, though the run reached others" : "";
       lines.push(`  ${one.combo.padEnd(width)}  ${share}${thin}${missed}`);
@@ -312,19 +352,32 @@ export function summariseCoverage(report) {
   }
 
   lines.push("");
+  if (report.nothingObserved) {
+    lines.push(
+      `Not one of the ${report.neverObserved.length} combos on the route list has ever landed a row, so there is no coverage here to`,
+      "compute and this check fails rather than reporting one. A store nothing has ever been written to is",
+      "not a young store: it is the wrong project, the wrong table, or a crawler that has never once run",
+      "successfully. One young combo among several is excused; all of them is not youth.",
+    );
+    return lines;
+  }
   if (report.expectedDays === 0) {
     lines.push("Nothing to measure yet: no combo has a day behind it. Coverage begins the day after a combo's first observation.");
     return lines;
   }
 
   lines.push(
-    `${pad("coverage")} ${report.observedDays} of ${report.expectedDays} combo-days since each combo's first observation, up to ${lastClosedDay} (${report.coveragePct}%)`,
+    `${pad("coverage")} ${report.observedDays} of ${report.expectedDays} combo-days ${report.since === null ? "since each combo's first observation" : `since ${report.since}`}, up to ${lastClosedDay} (${report.coveragePct}%)`,
     `${pad("threshold")} ${report.minCoveragePct}% — one missed run in a ${cycleRuns(DEFAULT_HORIZON_DAYS, DEFAULT_WINDOW_DAYS)}-run sweep of the horizon`,
-    "",
   );
+  // Said as loudly as the threshold is, and for the same reason: a window narrowed by hand must not
+  // be mistakable for a store in better health than it is in.
+  if (report.since !== null) lines.push(`${pad("since")} ${report.since} — earlier days were NOT counted, because --since said so. This excuses days nobody was meant to crawl; it does not excuse an outage inside the window.`);
+  lines.push("");
 
   const holes = report.combos.reduce((count, one) => count + one.missing.length, 0);
-  if (holes === 0) lines.push("No gap: every combo has a row on every day since its first.");
+  // "since its first" would be a lie under --since: the days before it were not looked at.
+  if (holes === 0) lines.push(report.since === null ? "No gap: every combo has a row on every day since its first." : `No gap: every combo has a row on every day counted, which is every day from ${report.since}.`);
   else {
     lines.push(
       `${holes} combo-day${holes === 1 ? "" : "s"} ${holes === 1 ? "is" : "are"} missing, and cannot be backfilled: a past journey date answers 400, so what those runs would have seen is gone.`,
@@ -350,35 +403,48 @@ export function exitCodeFor(report) {
 // ---------------------------------------------------------------------------
 
 /** @typedef {{ data: unknown[] | null, error: { message: string } | null }} Page */
-/** @typedef {{ select: (columns: string) => Chain, order: (column: string, options?: { ascending?: boolean }) => Chain, range: (from: number, to: number) => Promise<Page> }} Chain */
+/** @typedef {{ select: (columns: string) => Chain, order: (column: string, options?: { ascending?: boolean }) => Chain, abortSignal: (signal: AbortSignal) => Chain, range: (from: number, to: number) => Promise<Page> }} Chain */
 /** @typedef {{ from: (table: string) => Chain }} ObservationDb */
 
 /**
  * Every row, a page at a time.
  *
- * **A half-read store is the one failure that would make this report lie**: PostgREST caps a
- * response, and a capped read looks exactly like a store with a hole in it. So the pages are walked
- * to the end, ordered by a unique tiebreak so no row can be skipped or repeated across pages, and
- * anything that cannot be read whole is refused rather than scored.
+ * **A half-read store is the one failure that would make this report lie**: a read that stops early
+ * looks exactly like a store with a hole in it, and because the rows come back `observed_on`
+ * ascending, what an early stop drops is the most RECENT days — the very days the report exists to
+ * check. So the pages are walked to the end, ordered by a unique tiebreak so no row can be skipped
+ * or repeated across pages, and anything that cannot be read whole is refused rather than scored.
+ *
+ * **A short page is not proof of exhaustion.** PostgREST applies its own row cap on top of the
+ * range asked for (Supabase: Settings → API → *Max rows*, default 1000), so a page shorter than
+ * `pageSize` is equally what a capped answer looks like. The loop therefore advances by what came
+ * BACK, never by what was asked for, and stops only on a page with nothing in it — which is correct
+ * under any cap, whatever it is set to, without an operator having to know what it is. (An empty
+ * page is a safe probe here: supabase-js's `range()` sets the `offset`/`limit` query parameters,
+ * not the `Range` header, and PostgREST answers an offset past the end with an empty array.)
  *
  * @param {ObservationDb} db
- * @param {{ table: string, pageSize?: number, maxRows?: number }} options
+ * @param {{ table: string, pageSize?: number, maxRows?: number, signal?: AbortSignal | null }} options
  * @returns {Promise<{ ok: true, rows: unknown[] } | { ok: false, reason: string }>}
  */
-export async function readObservations(db, { table, pageSize = DEFAULT_PAGE_SIZE, maxRows = DEFAULT_MAX_ROWS }) {
+export async function readObservations(db, { table, pageSize = DEFAULT_PAGE_SIZE, maxRows = DEFAULT_MAX_ROWS, signal = null }) {
+  // A page of zero asks for nothing, gets nothing back, and would read as an exhausted store: the
+  // silent truncation again, by the other door.
+  if (!Number.isInteger(pageSize) || pageSize < 1) throw new RangeError(`the page size is a whole number of rows, at least 1; got ${pageSize}`);
   /** @type {unknown[]} */
   const rows = [];
-  for (let from = 0; ; from += pageSize) {
-    if (from >= maxRows) return { ok: false, reason: `the store holds more rows than this report will read (${maxRows}); it was not read whole, and a truncated read invents holes. Raise --max-rows.` };
-    const { data, error } = await db
-      .from(table)
-      .select(OBSERVATION_COLUMNS)
-      .order("observed_on", { ascending: true })
-      .order("id", { ascending: true })
-      .range(from, from + pageSize - 1);
+  for (;;) {
+    const from = rows.length;
+    // One row past the limit, so a store holding EXACTLY `maxRows` is read whole rather than
+    // refused for rows it did in fact hand over.
+    const to = Math.min(from + pageSize, maxRows + 1) - 1;
+    let chain = db.from(table).select(OBSERVATION_COLUMNS).order("observed_on", { ascending: true }).order("id", { ascending: true });
+    if (signal !== null) chain = chain.abortSignal(signal);
+    const { data, error } = await chain.range(from, to);
     if (error) return { ok: false, reason: `the store could not be read: ${error.message}` };
     if (!Array.isArray(data)) return { ok: false, reason: "the store answered without rows, which is not an empty store but an unreadable one" };
+    if (data.length === 0) return { ok: true, rows };
     rows.push(...data);
-    if (data.length < pageSize) return { ok: true, rows };
+    if (rows.length > maxRows) return { ok: false, reason: `the store holds more rows than this report will read (${maxRows}); it was not read whole, and a truncated read invents holes. Raise --max-rows.` };
   }
 }

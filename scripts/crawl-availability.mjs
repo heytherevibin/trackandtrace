@@ -146,6 +146,17 @@ function istToday() {
 }
 
 /**
+ * By the time the coverage read runs, the asks are spent and the cursor is written, so a store read
+ * that never answers costs this run its verdict for nothing. supabase-js sets no request timeout of
+ * its own. This one ABORTS the fetch rather than merely racing it: a race leaves the request in
+ * flight, and a request in flight holds the event loop open, so the process would still never exit.
+ *
+ * Thirty seconds is generous for a read of our own database, and the cost of it firing early is one
+ * missing print, never a wrong verdict — `npm run source:report` does the same read unbounded.
+ */
+const COVERAGE_READ_TIMEOUT_MS = 30_000;
+
+/**
  * What the STORE looks like, after this run has written to it.
  *
  * The report above is about the run: it can say "the run was whole" while the dataset has holes
@@ -158,9 +169,10 @@ function istToday() {
  */
 async function printStoreCoverage({ db, table, today, listed }) {
   try {
-    const read = await readObservations(db, { table });
+    const read = await readObservations(db, { table, signal: AbortSignal.timeout(COVERAGE_READ_TIMEOUT_MS) });
     if (!read.ok) {
       console.error(`[crawl] the store's coverage could not be read: ${read.reason}`);
+      console.error("[crawl] this run is unaffected: its rows are written and its cursor is saved. `npm run source:report` is the check on the store.");
       return;
     }
     const parsed = parseObservationRows(read.rows);
@@ -355,7 +367,11 @@ async function main() {
   }
 
   for (const line of summarise(summary)) console.log(line);
-  await printStoreCoverage({ db, table: OBSERVATION_TABLE, today, listed: routes.map(comboKey) });
+  // The WHOLE route list, never `routes` — that is already cut by `--only`, and a coverage print
+  // told a two-combo list would file the other four under "no longer on the route list" (false) and
+  // drop them from the fraction, ending a `--only` run with a green coverage line over a holed
+  // store. `--only` limits what this run ASKS; it does not limit what the store owes.
+  await printStoreCoverage({ db, table: OBSERVATION_TABLE, today, listed: parsed.routes.map(comboKey) });
   // `process.exitCode`, never `process.exit`. The tail of the summary is where the failed combos,
   // the restarted sweeps and "The run was NOT whole" live — and `console.log` to a pipe is
   // asynchronous in Node, which `process.exit` does not drain. The loudness of a partial run must

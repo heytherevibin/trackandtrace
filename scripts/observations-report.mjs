@@ -7,6 +7,8 @@
 //
 // Flags: --routes <file> --today <yyyy-mm-dd> --min-coverage <percent> --max-rows <n>
 //        --no-routes (measure whatever the store holds, without a list of what is expected)
+//        --since <yyyy-mm-dd> (do not count days before this one; for a combo that was deliberately
+//        off the route list for a stretch. It narrows the window and the output says so)
 //
 // Exit: 0 at or above the threshold · 1 below it · 2 it was asked wrongly, or the store could not
 // be read whole. A check can be wired to it exactly as one can to `npm run source:health`.
@@ -104,6 +106,12 @@ async function main() {
   const minCoveragePct = whole(found, "min-coverage", DEFAULT_MIN_COVERAGE_PCT);
   if (minCoveragePct > 100) fail(`--min-coverage is a percentage, 0 to 100; got ${minCoveragePct}`);
 
+  // The escape hatch for days nobody was meant to crawl. Refused rather than defaulted: a `--since`
+  // that quietly became today would measure an empty window, and an empty window always passes.
+  const since = found.get("since") ?? null;
+  if (since !== null && !isCalendarDate(since)) fail(`--since must be an ISO date; got ${since}`);
+  if (since !== null && since > today) fail(`--since ${since} is after today (${today}): that measures an empty window, and an empty window always passes.`);
+
   /** @type {string[] | null} */
   let listed = null;
   if (!found.has("no-routes")) {
@@ -128,6 +136,7 @@ async function main() {
   console.log(`store          ${new URL(environment.NEXT_PUBLIC_SUPABASE_URL).host} · ${OBSERVATION_TABLE}`);
   console.log(`measured to    ${addDays(today, -1)} (today, ${today}, is still open)`);
   console.log(`expected       ${listed === null ? "whatever the store holds (--no-routes)" : `${listed.length} combo${listed.length === 1 ? "" : "s"} on the route list`}`);
+  if (since !== null) console.log(`since          ${since} — days before this are not counted (--since)`);
 
   const read = await readObservations(db, { table: OBSERVATION_TABLE, maxRows: whole(found, "max-rows", DEFAULT_MAX_ROWS) });
   if (!read.ok) fail(read.reason);
@@ -135,7 +144,7 @@ async function main() {
   const parsed = parseObservationRows(read.ok ? read.rows : []);
   if (!parsed.ok) fail(`the store holds rows this report cannot read:\n  ${parsed.issues.slice(0, 10).join("\n  ")}`);
 
-  const report = coverageReport({ rows: parsed.ok ? parsed.rows : [], today, listed, minCoveragePct });
+  const report = coverageReport({ rows: parsed.ok ? parsed.rows : [], today, listed, minCoveragePct, since });
   console.log(`rows read      ${report.rows}`);
   for (const line of summariseCoverage(report)) console.log(line);
   process.exit(exitCodeFor(report));
