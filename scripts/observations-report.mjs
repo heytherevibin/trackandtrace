@@ -110,7 +110,13 @@ async function main() {
   // that quietly became today would measure an empty window, and an empty window always passes.
   const since = found.get("since") ?? null;
   if (since !== null && !isCalendarDate(since)) fail(`--since must be an ISO date; got ${since}`);
-  if (since !== null && since > today) fail(`--since ${since} is after today (${today}): that measures an empty window, and an empty window always passes.`);
+  // The boundary is the last CLOSED day, not today: coverage runs to today - 1, so `--since <today>`
+  // is already an empty window. `coverageReport` refuses the same thing; this is here so the
+  // operator is told before a store is read rather than after.
+  const lastClosed = addDays(today, -1);
+  if (since !== null && since > lastClosed) {
+    fail(`--since ${since} leaves no closed day to measure: coverage runs to ${lastClosed}, because today (${today}) is still open. An empty window always passes, so it is refused rather than reported.`);
+  }
 
   /** @type {string[] | null} */
   let listed = null;

@@ -224,11 +224,21 @@ export function coverageReport({ rows, today, listed = null, minCoveragePct = DE
   if (!isCalendarDate(today)) throw new RangeError(`not an ISO date: ${today}`);
   if (!Number.isInteger(minCoveragePct) || minCoveragePct < 0 || minCoveragePct > 100) throw new RangeError(`the threshold is a whole percentage, 0 to 100; got ${minCoveragePct}`);
   if (since !== null && !isCalendarDate(since)) throw new RangeError(`--since is an ISO date; got ${since}`);
-  if (since !== null && since > today) throw new RangeError(`--since ${since} is after today (${today}): that measures an empty window, and an empty window always passes`);
 
   // Yesterday, not today: today's run may not have happened yet, and a check that fails every
   // morning until somebody runs the crawler is a check nobody keeps.
   const lastClosedDay = addDays(today, -1);
+
+  // The window is [since, lastClosedDay], so the boundary is the LAST CLOSED DAY and not today.
+  // Refusing only `since > today` let `--since <today>` through, and an empty window does not
+  // report itself as empty -- it reports the whole store as 100%, exit 0, with the disclosure line
+  // suppressed by the `expectedDays === 0` early return. That is the one thing this flag must never
+  // be able to do: launder an outage into a green check on an operator's say-so.
+  if (since !== null && since > lastClosedDay) {
+    throw new RangeError(
+      `--since ${since} leaves no closed day to measure: coverage runs to ${lastClosedDay}, because today (${today}) is still open. An empty window always passes, so it is refused rather than reported.`,
+    );
+  }
   const expected = listed === null ? null : new Set(listed);
 
   /** @type {Map<string, Set<string>>} */
@@ -353,16 +363,21 @@ export function summariseCoverage(report) {
 
   lines.push("");
   if (report.nothingObserved) {
+    const many = report.neverObserved.length === 1 ? "The one combo" : `Not one of the ${report.neverObserved.length} combos`;
     lines.push(
-      `Not one of the ${report.neverObserved.length} combos on the route list has ever landed a row, so there is no coverage here to`,
-      "compute and this check fails rather than reporting one. A store nothing has ever been written to is",
-      "not a young store: it is the wrong project, the wrong table, or a crawler that has never once run",
-      "successfully. One young combo among several is excused; all of them is not youth.",
+      `${many} on the route list has ever landed a row, so there is no coverage here to compute,`,
+      "and this check fails rather than reporting one. One young combo among several is excused; all of them",
+      "is not youth. Four things look identical from here, and the store cannot tell them apart:",
+      "the wrong project, the wrong table, a crawler that has never once run successfully — or a route list",
+      `that was replaced wholesale, in which case the rows above (${report.unlisted.length} combo${report.unlisted.length === 1 ? "" : "s"} no longer listed) are the old one's.`,
     );
     return lines;
   }
   if (report.expectedDays === 0) {
     lines.push("Nothing to measure yet: no combo has a day behind it. Coverage begins the day after a combo's first observation.");
+    // Said here too, not only on the scored path: a narrowed window that produced nothing to measure
+    // is exactly when an operator most needs telling that they narrowed it.
+    if (report.since !== null) lines.push(`--since ${report.since} narrowed the window; without it there may be days here to measure.`);
     return lines;
   }
 

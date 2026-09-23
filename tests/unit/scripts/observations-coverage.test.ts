@@ -236,6 +236,18 @@ describe("--since", () => {
     expect(() => coverage(readded, { since: "2026-09-24" })).toThrow(/since/i);
   });
 
+  // The window is [since, today - 1], because today is still open. So `today` itself is already
+  // empty -- one day earlier than the boundary the first version of this guard checked, and the
+  // whole of the difference between a report that refuses and a report that says 100%.
+  it("refuses today, which measures an empty window just as surely as tomorrow does", () => {
+    expect(() => coverage(readded, { since: TODAY })).toThrow(/since/i);
+  });
+
+  it("accepts the last closed day, which is the narrowest window that still measures something", () => {
+    const report = coverage(readded, { since: "2026-09-22" });
+    expect(only(report).expectedDays).toBe(1);
+  });
+
   it("says in the output that the window was narrowed, and by whose instruction", () => {
     const text = summariseCoverage(coverage(readded, { since: "2026-09-20" })).join("\n");
     expect(text).toContain("2026-09-20");
