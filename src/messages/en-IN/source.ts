@@ -15,4 +15,13 @@ export const source = {
     couldNotAnswer: "The reservation service could not answer for this PNR. Nothing was shown in its place.",
     noRecord: "There is no reservation record for this PNR.",
   },
+  // Seat availability, asked before a ticket exists. Every sentence here means "we could not ask" or
+  // "check what you gave us" — none of them may ever be read as "there are no berths left", because
+  // a traveller acts on that. A real sold-out day is an answer and carries the day's own words.
+  availability: {
+    couldNotAnswer: "The reservation service could not answer for this journey. Nothing was shown in its place.",
+    notOnRoute: "This train does not run between those two stations. Check the stations and try again.",
+    dateNotAccepted: "That journey date could not be read. Nothing was shown in its place.",
+    invalidRequest: "That journey could not be checked. Check the train number, the stations and the date.",
+  },
 } as const satisfies MessageTree;

@@ -53,5 +53,14 @@ supabase/.temp/
 .claude-flow/
 .impeccable/questions/
 
+# where the availability crawler's rolling window got to: this machine's record of what it has
+# asked, not source. Deleting it costs a sweep; committing it would put two operators in conflict.
+scripts/crawl-cursor.json
+
 # agent worktrees
 /.claude/worktrees/
+
+# the subagent-driven-development workspace: ledgers, briefs, reports and review packages for
+# in-flight plans. Scratch for whoever is running the plan, never source. It was untracked rather
+# than ignored until now, so one `git add -A` would have committed every internal review note.
+/.superpowers/

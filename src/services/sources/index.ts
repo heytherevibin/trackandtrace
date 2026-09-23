@@ -52,7 +52,7 @@ function withFallback(primary: PnrDataSource, fallback: PnrDataSource | null): P
 /** The provider's adapter behind its breaker, retry policy and usage counter. */
 function thirdPartySource(source: ThirdPartySource, current: Env): PnrDataSource | null {
   const adapter = providerAdapter(source, current);
-  return adapter ? createGuardedSource(adapter, providerGuard(source, current)) : null;
+  return adapter ? createGuardedSource(adapter, providerGuard(source, "pnr", current)) : null;
 }
 
 function providerAdapter(source: ThirdPartySource, current: Env): PnrDataSource | null {

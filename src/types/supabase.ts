@@ -9,6 +9,72 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      availability_observations: {
+        Row: {
+          can_book: boolean
+          days_out: number
+          from_code: string
+          id: string
+          journey_date: string
+          observed_at: string
+          observed_on: string
+          outcome: string | null
+          quota: string
+          raw_status: string
+          seats: number | null
+          source_prediction: string | null
+          source_prediction_pct: number | null
+          status: string
+          to_code: string
+          train_no: string
+          travel_class: string
+          wl_booking: number | null
+          wl_current: number | null
+        }
+        Insert: {
+          can_book: boolean
+          days_out?: number
+          from_code: string
+          id?: string
+          journey_date: string
+          observed_at?: string
+          observed_on?: string
+          outcome?: string | null
+          quota: string
+          raw_status: string
+          seats?: number | null
+          source_prediction?: string | null
+          source_prediction_pct?: number | null
+          status: string
+          to_code: string
+          train_no: string
+          travel_class: string
+          wl_booking?: number | null
+          wl_current?: number | null
+        }
+        Update: {
+          can_book?: boolean
+          days_out?: number
+          from_code?: string
+          id?: string
+          journey_date?: string
+          observed_at?: string
+          observed_on?: string
+          outcome?: string | null
+          quota?: string
+          raw_status?: string
+          seats?: number | null
+          source_prediction?: string | null
+          source_prediction_pct?: number | null
+          status?: string
+          to_code?: string
+          train_no?: string
+          travel_class?: string
+          wl_booking?: number | null
+          wl_current?: number | null
+        }
+        Relationships: []
+      }
       watchlist_entries: {
         Row: {
           checks: Json

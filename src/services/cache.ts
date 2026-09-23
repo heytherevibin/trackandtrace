@@ -10,8 +10,11 @@ export interface Cache {
 
 export class MemoryCache implements Cache {
   private readonly store = new Map<string, { value: unknown; exp: number }>();
+  private readonly now: () => number;
 
-  constructor(private readonly now: () => number = Date.now) {}
+  constructor(now: () => number = Date.now) {
+    this.now = now;
+  }
 
   async get<T>(key: string): Promise<T | undefined> {
     const hit = this.store.get(key);

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { messages } from "@/messages";
-import type { Admission, Breaker } from "@/services/breaker";
+import type { Admission, Breaker, Recordable } from "@/services/breaker";
+import type { AvailabilityOutcome, AvailabilityRequest, AvailabilitySource } from "@/services/availability-source";
 import type { PnrDataSource } from "@/services/pnr-source";
 import { buildFixtureResult } from "@/services/sources/fixture";
 import { createGuardedSource, isSafeToRetry, retryDelayMs } from "@/services/sources/guarded";
@@ -13,7 +14,7 @@ const OUT = messages.source.outcomes;
 function guard(answers: readonly SourceOutcome[], options: { readonly gate?: Admission; readonly elapsedPerRead?: number } = {}) {
   const calls = { provider: 0, counted: 0 };
   const delays: number[] = [];
-  const recorded: SourceOutcome[] = [];
+  const recorded: Recordable[] = [];
   const clock = { now: 0 };
   const source: PnrDataSource = {
     async check() {
@@ -94,6 +95,46 @@ describe("the guarded source", () => {
     const { guarded, recorded } = guard([first, second]);
     await guarded.check(PNR);
     expect(recorded).toEqual([second]);
+  });
+});
+
+describe("the guarded source, around a source that is not about PNRs", () => {
+  const ASK: AvailabilityRequest = { trainNo: "12951", from: "MMCT", to: "NDLS", journeyDate: "2026-10-01", travelClass: "SL", quota: "GN" };
+  const ANSWER: AvailabilityOutcome = {
+    ok: true,
+    answer: {
+      train: { no: "12951", name: "MMCT NDLS RAJDHANI", fromName: "MUMBAI CENTRAL", toName: "NEW DELHI", distanceKm: 1384 },
+      fare: { base: 1000, reservation: 40, superfast: 45, gst: 0, total: 1085 },
+      days: [],
+      retrievedAt: "2026-09-23T00:00:00.000Z",
+    },
+  };
+
+  function availabilityGuard(answer: AvailabilityOutcome, gate?: Admission) {
+    const asked: AvailabilityRequest[] = [];
+    const recorded: Recordable[] = [];
+    const source: AvailabilitySource = {
+      async check(request) {
+        asked.push(request);
+        return answer;
+      },
+    };
+    const breaker: Breaker = { admit: async () => gate ?? { open: false }, record: async (outcome) => void recorded.push(outcome) };
+    return { guarded: createGuardedSource(source, { breaker, countRequest: async () => {} }), asked, recorded };
+  }
+
+  it("passes the request through and tells the breaker the answer", async () => {
+    const { guarded, asked, recorded } = availabilityGuard(ANSWER);
+    await expect(guarded.check(ASK)).resolves.toEqual(ANSWER);
+    expect(asked).toEqual([ASK]);
+    expect(recorded).toEqual([ANSWER]);
+  });
+
+  it("asks nothing of the provider while its fuse is open, and answers in the shared failure shape", async () => {
+    const { guarded, asked, recorded } = availabilityGuard(ANSWER, { open: true, retryAfterSeconds: 42 });
+    await expect(guarded.check(ASK)).resolves.toEqual({ ok: false, code: "SOURCE_UNAVAILABLE", message: OUT.resting, retryAfter: 42 });
+    expect(asked).toEqual([]);
+    expect(recorded).toEqual([]);
   });
 });
 

@@ -20,8 +20,11 @@ interface Entry {
 
 export class MemoryKv implements Kv {
   private readonly store = new Map<string, Entry>();
+  private readonly now: () => number;
 
-  constructor(private readonly now: () => number = Date.now) {}
+  constructor(now: () => number = Date.now) {
+    this.now = now;
+  }
 
   private live(key: string): Entry | undefined {
     const entry = this.store.get(key);

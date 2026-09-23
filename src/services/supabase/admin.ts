@@ -4,7 +4,7 @@ import { AppError } from "@/services/errors";
 import type { Database } from "@/types/supabase";
 import { isSupabaseConfigured, supabasePublicEnv } from "./public-env";
 
-/** Secret-key client (bypasses RLS). Server only, used solely to delete an account. Never import from client code. */
+/** Secret-key client (bypasses RLS). Server only: account deletion, and the observation store, which no Data API role may touch. Never import from client code. */
 export function createAdminSupabase(): SupabaseClient<Database> {
   if (typeof window !== "undefined") throw new Error("The admin Supabase client must never run in the browser.");
   const key = env().SUPABASE_SECRET_KEY;

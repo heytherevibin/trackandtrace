@@ -1,0 +1,60 @@
+{
+  "_bias": [
+    "THIS LIST IS THE MODEL'S BIAS. Read that before adding to it.",
+    "A confirmation model learns the trains it was shown. Three Rajdhanis give a model that predicts Rajdhanis and is confidently wrong about a branch passenger train, because premium AC stock, sleeper Mail/Express and short-haul seating clear their waitlists on completely different curves. Every entry below was chosen to widen the spread, not to be interesting.",
+    "The spread this list aims at, and why each axis matters: train kind (Rajdhani, Superfast Mail/Express, ordinary Express), class (AC berth, sleeper berth, and a seating class, which is not a berth at all), quota (GN opens 60 days out and drains slowly; TQ opens one day out and drains in minutes, so it is a different process, not a busier version of the same one), leg length, and region (northern, southern and western zones fill differently).",
+    "What is missing, stated so it is not mistaken for a complete sample: no Vande Bharat, no Garib Rath, no festival-season special, no genuinely short branch line, and only one intermediate-station leg. Add those before anyone fits a model to this.",
+    "These entries are UNVERIFIED against the provider. The preflight only checks their shape; the first real run is what checks whether the provider knows them. 12951 is deliberately absent: it answered `Unable to process your request` for every class and date tried on 2026-09-23, which is a bad list entry wearing a failure's clothes. A combo the crawler reports as always-refusing belongs here too — deleted, not retried daily forever."
+  ],
+  "horizonDays": 60,
+  "routes": [
+    {
+      "trainNo": "12301",
+      "from": "HWH",
+      "to": "NDLS",
+      "travelClass": "3A",
+      "quota": "GN",
+      "note": "Howrah Rajdhani — fully AC, premium, books out early and far ahead. The top of the demand curve."
+    },
+    {
+      "trainNo": "12301",
+      "from": "HWH",
+      "to": "NDLS",
+      "travelClass": "2A",
+      "quota": "TQ",
+      "note": "The same train one class up, at Tatkal. Same stock, same day, different queue: the pair is how the model learns that quota is a process and not a busier GN."
+    },
+    {
+      "trainNo": "12621",
+      "from": "MAS",
+      "to": "NDLS",
+      "travelClass": "SL",
+      "quota": "GN",
+      "note": "Tamil Nadu Express — Superfast Mail/Express sleeper, the largest class of long-distance waitlist there is. The one leg already measured against this provider."
+    },
+    {
+      "trainNo": "12627",
+      "from": "SBC",
+      "to": "NDLS",
+      "travelClass": "SL",
+      "quota": "TQ",
+      "note": "Karnataka Express — a second sleeper long-haul, at Tatkal, from a different zone. Guards against the model learning one corridor's calendar."
+    },
+    {
+      "trainNo": "12137",
+      "from": "CSMT",
+      "to": "NDLS",
+      "travelClass": "3A",
+      "quota": "GN",
+      "note": "Punjab Mail — an ordinary Express rather than a premium one, in an AC class. Pairs against 12301 to separate 'AC' from 'Rajdhani'."
+    },
+    {
+      "trainNo": "12051",
+      "from": "DR",
+      "to": "MAO",
+      "travelClass": "2S",
+      "quota": "GN",
+      "note": "Dadar–Madgaon Jan Shatabdi — a day train in a seating class, not a berth. 2S clears on a different curve entirely, and without one the model would only ever have seen overnight berths."
+    }
+  ]
+}
