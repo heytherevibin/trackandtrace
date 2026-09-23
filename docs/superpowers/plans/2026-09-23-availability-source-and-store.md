@@ -76,7 +76,32 @@ Table, indexes and grants exactly as spec §5.1, with two additions the spec lea
 
 ---
 
-### Task 3: The crawler
+### Task 3: Stop the crawler from breaking PNR checks
+
+**Files:** Modify `src/services/breaker.ts`, `src/services/shared-store.ts`, `src/services/sources/guarded.ts`, and their tests.
+
+**Added after Task 1's review, which measured the hazard rather than reasoning about it.** Not live today, because nothing is wired — **Critical the moment Task 4 calls `providerGuard("railkit")`**, so it lands first.
+
+The breaker is keyed by **provider**, not endpoint (`shared-store.ts:118`, `…:breaker:railkit`). So availability and live PNR checks share one fuse. Measured:
+
+- **5 refusals in a fixed 60-second window** (`incr` with `refreshTtl=false`, so it does not slide) opens it for 30 s.
+- While open, a PNR check never reaches the adapter — `asked: 0`, answering "not answering right now". `PNR_FALLBACK` now defaults to `none`, so that is the traveller's final answer.
+- `probeGraceMs` (300 s) then lets **one** further refusal re-trip and double: 60/120/240/480/600 s.
+- And an availability `INVALID` — `not an intermediate station`, routine for a route crawler — hits `breaker.ts:64-71` and **deletes `:probe` and `:trips`**, wiping the escalation memory that exists to protect the provider.
+
+`Unable to process your request` is route-specific: **12951 answers it for every class and date tried.** A crawler list with a few such routes trips this in one run.
+
+**Interfaces — Produces:** a breaker whose key separates the two callers, and `createGuardedSource` generic enough to wrap an `AvailabilitySource`. The review confirmed the generic change is **type-only in production**: `Guardable<Q,O>`, `Breaker.record(outcome: {readonly ok: true} | SourceFailure)`, zero statements changed, 1874/1874 green, one test annotation at `guarded.test.ts:27`.
+
+- [ ] **Step 1: Write the failing tests** — availability refusals do not open the PNR breaker; a PNR refusal does not open the availability one; an availability `INVALID` does not clear the PNR breaker's trip history; the count window behaves as documented.
+- [ ] **Step 2: Run them failing.**
+- [ ] **Step 3: Separate the keys**, and decide whether an `INVALID` should count toward a breaker at all — a wrong route is not a sick provider, and counting it is arguably the deeper bug. Record the decision.
+- [ ] **Step 4: Make the guard generic**, type-only.
+- [ ] **Step 5: Run everything**, then commit — `fix(source): one provider, two fuses`
+
+---
+
+### Task 4: The crawler
 
 **Files:** Create `scripts/crawl-availability.mjs` and `scripts/routes.json`; tests for the route-list shape and the window maths.
 
@@ -92,7 +117,7 @@ The crawler asks once per `(train, class, quota, from, to)` per run. One call re
 
 ---
 
-### Task 4: Make a gap visible
+### Task 5: Make a gap visible
 
 **Files:** Modify `scripts/crawl-availability.mjs`; create `scripts/observations-report.mjs`; docs.
 
