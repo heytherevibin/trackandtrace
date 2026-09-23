@@ -193,8 +193,19 @@ the console already has.
 
 `days_out` is generated, not written: a value computed by two callers is a value that will disagree.
 
-Indexes: `(train_no, travel_class, quota, journey_date)` for the outcome join, and
-`(journey_date) where outcome is null` for the resolver's sweep.
+Indexes: `(train_no, travel_class, quota, journey_date)` for the outcome join. ~~and
+`(journey_date) where outcome is null` for the resolver's sweep~~ — **removed with the resolver**
+(§5.3). Task 2's pgTAP asserts that index's *absence*, so anyone implementing from an older copy of
+this paragraph will fail a test rather than quietly add back a scan for a sweep that does not exist.
+
+Two more columns carry decisions rather than data, and are in the table above:
+
+- **`source_prediction`** (text) beside `source_prediction_pct`. The source sends both a string
+  (`"77% Chance"`, `"No More Booking"`) and a number; the string carries cases the number flattens
+  to `0`. Neither is ever rendered (D4).
+- **`observed_on`** — the IST calendar day, generated and stored. It carries the idempotency
+  (§5.2) and exists as a real column rather than an index expression because PostgREST's
+  `on_conflict` accepts column names only.
 
 ### 5.2 The two feeders
 
