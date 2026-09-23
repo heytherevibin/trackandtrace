@@ -178,10 +178,14 @@ update console.setup_links
 select is(public.console_auth_setup_link(extensions.digest('a-token', 'sha256')), null, 'an expired link is gone from the read');
 
 -- console_me runs the guard, so with no claims at all it must refuse, not return null.
+-- 'session ended' is the wording all five 28000 sites share, so it names the promise rather
+-- than the branch -- see the note above the 28000 block in console_guard.test.sql. The branch
+-- reached here is console.current_member's null-claims check: swapping that one's words fails
+-- this assertion, and swapping any of the other four leaves it green.
 select throws_ok(
   $$ select public.console_me() $$,
   '28000',
-  null,
+  'session ended',
   'without a session, asking who you are ends the session'
 );
 
