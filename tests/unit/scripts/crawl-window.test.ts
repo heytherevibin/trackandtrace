@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addDays, advanceCursor, coveredDates, cycleRuns, daysBetween, nextAsk, parseCursors } from "../../../scripts/crawl-window.mjs";
+import { addDays, advanceCursor, coveredDates, cycleRuns, daysBetween, isIsoDate, nextAsk, parseCursors } from "../../../scripts/crawl-window.mjs";
 
 // ---------------------------------------------------------------------------
 // The crawler asks each combo for ONE date a run, and rolls that date forward a stride a day.
@@ -127,25 +127,71 @@ describe("what the rolling window guarantees", () => {
     expect(wraps[0]).toBe(cycleRuns(60, 4));
   });
 
-  it("sees one journey date several times, at decreasing distances from departure — which is the point of sampling sparsely", () => {
-    // A date whose whole life inside the horizon falls within the simulation, and which entered it
-    // while the crawler was already sweeping: the steady state, not the first days after a cold start.
-    const journey = addDays("2026-09-24", 100);
-    const seen = asked.filter((a, i) => covered[i]?.includes(journey)).map((a) => daysBetween(a.today, journey));
+  /**
+   * Every journey date whose whole life inside the horizon falls within the simulation, with the
+   * distances from departure at which the rolling window saw it. The steady state — not one date,
+   * and not the first days after a cold start.
+   *
+   * The old version of these two tests picked `addDays(from, 100)`, a date at offset 100: an exact
+   * multiple of `cycleRuns(60, 4) = 20`, and therefore the one residue in twenty where the sweep
+   * wraps onto it and `days_out = 0` happens to occur. One phase-aligned date is not the population,
+   * and a bound of `≤ 3` is not `=== 0` — so the assertion held while 133 dates in 140 got no
+   * outcome row at all. Assert over all of them, or assert nothing.
+   */
+  const steadyState = (() => {
+    const seen = new Map<string, number[]>();
+    asked.forEach((a, i) => {
+      for (const date of covered[i] ?? []) seen.set(date, [...(seen.get(date) ?? []), daysBetween(a.today, date)]);
+    });
+    return [...seen.entries()].filter(([date]) => {
+      const offset = daysBetween("2026-09-24", date);
+      return offset >= 60 && offset <= runs - 1;
+    });
+  })();
 
-    expect(seen.length).toBeGreaterThanOrEqual(4);
-    expect([...seen].sort((a, b) => b - a)).toEqual(seen); // strictly decreasing
-    expect(Math.min(...seen)).toBeLessThanOrEqual(3); // observed at or near departure: the outcome row
-    expect(Math.max(...seen)).toBeGreaterThanOrEqual(44); // and once while it was still far off
+  it("sees EVERY journey date in the steady state several times, at decreasing distances from departure", () => {
+    expect(steadyState.length).toBeGreaterThan(50);
+    for (const [date, seen] of steadyState) {
+      expect(seen.length, date).toBeGreaterThanOrEqual(4);
+      expect([...seen].sort((a, b) => b - a), date).toEqual(seen); // strictly decreasing
+      expect(Math.max(...seen), date).toBeGreaterThanOrEqual(44); // and once while it was still far off
+    }
   });
 
   it("does NOT promise a journey date at every distance — it is a sample, and this is the shape of it", () => {
-    const journey = addDays("2026-09-24", 100);
-    const seen = asked.filter((a, i) => covered[i]?.includes(journey)).map((a) => daysBetween(a.today, journey));
+    for (const [date, seen] of steadyState) {
+      // Four observations out of sixty possible distances. Gaps of about fifteen days between them.
+      expect(seen.length, date).toBeLessThan(10);
+      for (let i = 1; i < seen.length; i += 1) expect((seen[i - 1] as number) - (seen[i] as number), date).toBeGreaterThan(10);
+    }
+  });
 
-    // Four observations out of sixty possible distances. Gaps of about fifteen days between them.
-    expect(seen.length).toBeLessThan(10);
-    for (let i = 1; i < seen.length; i += 1) expect((seen[i - 1] as number) - (seen[i] as number)).toBeGreaterThan(10);
+  it("does NOT reach days_out = 0 on its own — the outcome row needs the pinned ask, and this is the gap it fills", () => {
+    // The correction this file's header records. `nextAsk` returns today only on the `beyond` wrap,
+    // so the outcome row falls to one journey date in `cycleRuns(60, 4)` and the phase never drifts.
+    // The pinned ask that fixes it lives in `crawl-plan.mjs`; it is proved in that file's tests.
+    const withOutcome = steadyState.filter(([, seen]) => seen.includes(0));
+    expect(withOutcome.length).toBeGreaterThan(0);
+    expect(withOutcome.length).toBeLessThan(steadyState.length / 10);
+
+    // And the starved residue is starved for ever, not merely unlucky in this window.
+    const worst = Math.max(...steadyState.map(([, seen]) => Math.min(...seen)));
+    expect(worst).toBe(15);
+  });
+});
+
+describe("isIsoDate", () => {
+  it("accepts a calendar-valid ISO date", () => {
+    expect(isIsoDate("2026-09-24")).toBe(true);
+  });
+
+  it.each([
+    ["the provider's own DD-MM-YYYY, which is the likeliest thing to type into --start", "24-09-2026"],
+    ["a bare flag, which the arg parser stores as the string true", "true"],
+    ["a day that does not exist", "2026-02-30"],
+    ["nothing at all", ""],
+  ])("refuses %s", (_label, value) => {
+    expect(isIsoDate(value)).toBe(false);
   });
 });
 

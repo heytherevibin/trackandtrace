@@ -20,7 +20,7 @@
 // journey date seen at a few DIFFERENT distances from departure, not at all sixty. A rolling window
 // gives exactly that, and gives it for the price of one call.
 //
-// What the rolling window guarantees, proved in `tests/unit/scripts/crawl-plan.test.ts`:
+// What the rolling window guarantees, proved in `tests/unit/scripts/crawl-window.test.ts`:
 //
 //   * No calendar day is ever skipped. Inside one sweep the windows are contiguous and never
 //     overlap, so every date from where a sweep began to where it reached is asked exactly once.
@@ -28,9 +28,30 @@
 //     beyond the horizon.
 //   * In the steady state — once the crawler has been running at least one horizon — a journey date
 //     is asked once per sweep from the day it enters the horizon until departure: four observations
-//     at a sixty-day horizon and a four-day window, at roughly 45, 30, 15 and 0 days out.
+//     at a sixty-day horizon and a four-day window, roughly fifteen days apart, the first of them
+//     about 45 days out.
 //
-// What it does NOT guarantee, said plainly because it is a sample: no journey date is observed at
+// ---------------------------------------------------------------------------
+// WHAT IT DOES NOT GUARANTEE — and the one that cost a correction
+// ---------------------------------------------------------------------------
+// This header used to claim those four observations land "at roughly 45, 30, 15 and 0 days out".
+// **The `0` was false**, and it was the only one that mattered: the migration defines the row whose
+// `days_out` is 0 as THE OUTCOME, the label a model trains against.
+//
+// `days_out = 0` needs the ask date to equal today, and `nextAsk` returns today only on the `beyond`
+// wrap — run 0 of a sweep, one journey date in `cycleRuns`. Inside a sweep, run `j` asks
+// `sweepStart + W·j` while today is `sweepStart + j`, so the window lands at
+// `days_out ∈ {3j, 3j+1, 3j+2, 3j+3}` and the closest observation of any other date is
+// `r − floor(r/4)` days out, anywhere in 1..15. The phase locks on the first run and never drifts,
+// so the same residue class is starved for ever: a date at `r = 19` is NEVER seen closer than 15
+// days before it departs, in any sweep. Measured over 200 runs at `H=60, W=4`: 133 of 140
+// steady-state journey dates got no outcome row at all.
+//
+// **The outcome row is supplied by a SECOND, PINNED ask at today**, added to every combo on every
+// run by `planAsks` in `crawl-plan.mjs`. It covers `days_out` 0..3, it does not move the cursor, and
+// it is not this file's business: the rolling window below is exactly what it was.
+//
+// The other non-guarantee, said plainly because this is a sample: no journey date is observed at
 // every distance, or at any particular one. Which distances a date gets depends on where the sweep
 // happened to be when it entered the horizon.
 //
@@ -78,6 +99,17 @@ function utcDay(iso) {
   const probe = new Date(at);
   if (probe.getUTCFullYear() !== Number(y) || probe.getUTCMonth() !== Number(m) - 1 || probe.getUTCDate() !== Number(d)) return null;
   return at;
+}
+
+/**
+ * Whether a string is a calendar-valid ISO date — the same check `parseCursors` applies, exported so
+ * a flag that becomes a cursor (`--start`) is held to it too rather than becoming a silent "today".
+ *
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+export function isIsoDate(value) {
+  return utcDay(value) !== null;
 }
 
 /** ISO in, ISO out, through UTC milliseconds — so a month end or a leap day cannot drift. */

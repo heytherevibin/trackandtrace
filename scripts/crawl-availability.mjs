@@ -11,11 +11,21 @@
 //        --start <yyyy-mm-dd> (ignore every cursor and ask this date; for a one-off)
 //        --max-calls <n> --daily <n> --reserve <n> --remaining-floor <n> --dry-run
 //
-// One ask per combo per run: each combo's window rolls forward a stride a day and wraps at the
-// horizon. **Where it got to lives in `scripts/crawl-cursor.json`**, written after every run and
-// read before the next. Losing that file is not a disaster — every combo restarts at today — but it
-// is a lost sweep, so it is not something to delete casually. It is gitignored: it is this
-// machine's record of what it has asked, not source.
+// Two asks per combo per run, and the second one is the point:
+//
+//   * the ROLLING window — each combo's cursor rolls forward a stride a day and wraps at the
+//     horizon, which is what gives a journey date several looks at decreasing distances;
+//   * an ask PINNED at today, which is the only thing that supplies the `days_out = 0` row the
+//     migration calls the outcome — the label a model trains against. The rolling window reaches it
+//     for one journey date in twenty; see `planAsks` in `crawl-plan.mjs` for the arithmetic.
+//
+// On the run a sweep wraps the two are the same date and only one ask is made.
+//
+// **Where the rolling window got to lives in `scripts/crawl-cursor.json`**, written after every run
+// and read before the next; the pinned ask does not touch it. Losing that file is not a disaster —
+// every combo restarts at today — but it is a lost sweep, and a restarted sweep abandons a band of
+// journey dates that nothing can go back for, so the run now says so and is not whole. It is
+// gitignored: it is this machine's record of what it has asked, not source.
 //
 // Exit: 0 the run was whole · 1 it was not (a refusal, or a gate stopped it) · 2 it was asked
 // wrongly, and nothing was spent.
@@ -36,20 +46,20 @@ import { readFileSync, statSync, writeFileSync } from "node:fs";
 import { registerHooks } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
+  ASKS_PER_COMBO_MAX,
   CALLS_PER_ASK_MAX,
   DEFAULT_DAILY_ALLOWANCE,
   DEFAULT_REMAINING_FLOOR,
   comboKey,
   crawlCeiling,
-  exitCodeFor,
   loadRouteFile,
   parseRouteFile,
   plannedCalls,
   preflight,
   runCrawl,
-  summarise,
 } from "./crawl-plan.mjs";
-import { DEFAULT_HORIZON_DAYS, DEFAULT_WINDOW_DAYS, cycleRuns, parseCursors } from "./crawl-window.mjs";
+import { exitCodeFor, summarise } from "./crawl-report.mjs";
+import { DEFAULT_HORIZON_DAYS, DEFAULT_WINDOW_DAYS, cycleRuns, isIsoDate, parseCursors } from "./crawl-window.mjs";
 import { coverageReport, parseObservationRows, readObservations, summariseCoverage } from "./observations-coverage.mjs";
 
 const HERE = new URL("./", import.meta.url);
@@ -114,9 +124,20 @@ function whole(found, name, fallback) {
   return value;
 }
 
+/** Asked wrongly: exit 2, nothing spent. Distinguished from a real crash, which must still throw. */
+class Misuse extends Error {}
+
+/**
+ * The run was asked wrongly and nothing was spent. It THROWS rather than calling `process.exit(2)`:
+ * `console.error` to a pipe is asynchronous in Node and `process.exit` does not drain it, so
+ * `npm run source:crawl | tee crawl.log` could lose the very message explaining why the run refused.
+ * The entry point at the foot of this file catches it, prints, and sets `process.exitCode`.
+ *
+ * @param {string} message
+ * @returns {never}
+ */
 function fail(message) {
-  console.error(`[crawl] ${message}`);
-  process.exit(2);
+  throw new Misuse(message);
 }
 
 /** Today in India: a journey date is an Indian calendar date, and a date the provider has closed answers 400. */
@@ -188,6 +209,12 @@ async function main() {
 
   const limit = whole(found, "only", parsed.routes.length);
   const routes = parsed.routes.slice(0, limit);
+  // `parseRouteFile` already refuses an empty `routes` array; the same rule has to survive --only.
+  // Without this, `--only 0` asked nothing, rewrote every cursor unchanged, printed "The run was
+  // whole" and exited 0 — so a wrapper that computes --only and gets 0 succeeded loudly at nothing.
+  if (routes.length === 0) {
+    fail(`--only ${limit} leaves no combos to ask, so nothing would be crawled. The route list has ${parsed.routes.length}; ask for at least one.`);
+  }
   const issues = preflight(routes, { classes: bookingClassSchema.options, quotas: quotaSchema.options });
   if (issues.length > 0) {
     fail(
@@ -212,6 +239,15 @@ async function main() {
   // --start is the one-off escape hatch: ignore every cursor and ask this exact date. The cursors
   // still advance from it, so a mistake costs one run's asks rather than the file.
   const startAt = found.get("start");
+  // Validated with the same ISO check `parseCursors` applies. Unvalidated, `--start 24-09-2026` —
+  // the provider's own DD-MM-YYYY, which this codebase's own adapter writes, and so the most likely
+  // thing to type — made `nextAsk` return today with `reset: "unreadable"`. Every combo then asked
+  // today, the cursors advanced from today, the banner still said the override had taken effect, and
+  // the one-off the operator wanted simply did not happen. A bare `--start` with no value stored the
+  // string "true" and took the same path.
+  if (startAt !== undefined && !isIsoDate(startAt)) {
+    fail(`--start must be an ISO date (yyyy-mm-dd); got ${startAt}. Nothing was asked.`);
+  }
   const cursors = startAt === undefined ? readCursors.cursors : Object.fromEntries(routes.map((r) => [comboKey(r), { next: startAt, refusals: readCursors.cursors[comboKey(r)]?.refusals ?? 0 }]));
 
   const { ceiling, reason } = crawlCeiling({
@@ -219,13 +255,17 @@ async function main() {
     liveReserve: whole(found, "reserve", liveRequestsPerDay(environment)),
     requested: found.has("max-calls") ? whole(found, "max-calls", 0) : undefined,
   });
+  // Two asks a combo now — the rolling window, and the ask pinned at today that supplies the
+  // days_out = 0 outcome row — so the worst case is twice what it was. Gate A itself is unchanged;
+  // what changed is that the arithmetic handed to it tells the truth about what a run will spend.
   const worstCase = plannedCalls({ combos: routes.length });
   const remainingFloor = whole(found, "remaining-floor", DEFAULT_REMAINING_FLOOR);
 
   console.log(`routes         ${routes.length} combo${routes.length === 1 ? "" : "s"}${limit < parsed.routes.length ? ` (of ${parsed.routes.length}, limited by --only)` : ""}`);
-  console.log(`window         one ask each, rolling ${windowDays} days a run over a ${horizonDays}-day horizon — a sweep takes ${cycleRuns(horizonDays, windowDays)} runs`);
+  console.log(`window         rolling ${windowDays} days a run over a ${horizonDays}-day horizon — a sweep takes ${cycleRuns(horizonDays, windowDays)} runs`);
+  console.log(`pinned         one more ask each at ${today}, which is what supplies the days_out = 0 outcome row (skipped where a sweep wraps onto today)`);
   console.log(`cursor         ${cursorPath}${Object.keys(readCursors.cursors).length === 0 ? " (none yet: every combo starts at today)" : ""}${startAt === undefined ? "" : ` (overridden for this run: ${startAt})`}`);
-  console.log(`worst case     ${worstCase} calls (${routes.length} × ${CALLS_PER_ASK_MAX} for the guard's one retry)`);
+  console.log(`worst case     ${worstCase} calls (${routes.length} combo${routes.length === 1 ? "" : "s"} × ${ASKS_PER_COMBO_MAX} asks × ${CALLS_PER_ASK_MAX} for the guard's one retry)`);
   console.log(`ceiling        ${reason}`);
   console.log(`burst floor    stop when the provider's RateLimit-Remaining reaches ${remainingFloor}`);
 
@@ -237,7 +277,7 @@ async function main() {
   }
   if (found.has("dry-run")) {
     console.log("\n--dry-run: nothing was asked.");
-    process.exit(0);
+    return;
   }
 
   const { createRailKitAvailabilitySource } = await import(new URL("services/sources/railkit-availability.ts", srcRoot).href);
@@ -316,7 +356,19 @@ async function main() {
 
   for (const line of summarise(summary)) console.log(line);
   await printStoreCoverage({ db, table: OBSERVATION_TABLE, today, listed: routes.map(comboKey) });
-  process.exit(exitCodeFor(summary));
+  // `process.exitCode`, never `process.exit`. The tail of the summary is where the failed combos,
+  // the restarted sweeps and "The run was NOT whole" live — and `console.log` to a pipe is
+  // asynchronous in Node, which `process.exit` does not drain. The loudness of a partial run must
+  // not depend on stdout happening to be a file rather than `| tee crawl.log` or a CI capture.
+  process.exitCode = exitCodeFor(summary);
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) await main();
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+  try {
+    await main();
+  } catch (error) {
+    if (!(error instanceof Misuse)) throw error;
+    console.error(`[crawl] ${error.message}`);
+    process.exitCode = 2;
+  }
+}
