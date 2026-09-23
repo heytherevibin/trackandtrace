@@ -4,11 +4,18 @@
 // deliberately NOT scheduled, which is a later decision, after a few supervised runs show what it
 // actually costs.
 //
-//   node --env-file=.env.local scripts/crawl-availability.mjs --horizon 8 --only 3
-//   (or: npm run source:crawl -- --horizon 8 --only 3)
+//   node --env-file=.env.local scripts/crawl-availability.mjs
+//   (or: npm run source:crawl)
 //
-// Flags: --routes <file> --horizon <days> --window <days> --start <yyyy-mm-dd> --only <n>
+// Flags: --routes <file> --cursor <file> --horizon <days> --window <days> --only <n>
+//        --start <yyyy-mm-dd> (ignore every cursor and ask this date; for a one-off)
 //        --max-calls <n> --daily <n> --reserve <n> --remaining-floor <n> --dry-run
+//
+// One ask per combo per run: each combo's window rolls forward a stride a day and wraps at the
+// horizon. **Where it got to lives in `scripts/crawl-cursor.json`**, written after every run and
+// read before the next. Losing that file is not a disaster — every combo restarts at today — but it
+// is a lost sweep, so it is not something to delete casually. It is gitignored: it is this
+// machine's record of what it has asked, not source.
 //
 // Exit: 0 the run was whole · 1 it was not (a refusal, or a gate stopped it) · 2 it was asked
 // wrongly, and nothing was spent.
@@ -20,16 +27,14 @@
 // The env file is passed in by the operator exactly as this script's siblings take it, and no key is
 // ever read from anywhere else or printed anywhere. Nothing here knows anything about a person.
 
-import { statSync } from "node:fs";
+import { readFileSync, statSync, writeFileSync } from "node:fs";
 import { registerHooks } from "node:module";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   CALLS_PER_ASK_MAX,
   DEFAULT_DAILY_ALLOWANCE,
-  DEFAULT_HORIZON_DAYS,
   DEFAULT_REMAINING_FLOOR,
-  DEFAULT_WINDOW_DAYS,
-  askDates,
+  comboKey,
   crawlCeiling,
   exitCodeFor,
   loadRouteFile,
@@ -39,6 +44,7 @@ import {
   runCrawl,
   summarise,
 } from "./crawl-plan.mjs";
+import { DEFAULT_HORIZON_DAYS, DEFAULT_WINDOW_DAYS, cycleRuns, parseCursors } from "./crawl-window.mjs";
 
 const HERE = new URL("./", import.meta.url);
 
@@ -107,9 +113,19 @@ function fail(message) {
   process.exit(2);
 }
 
-/** Today in India: the crawler's first date must never be a day the provider has already closed. */
+/** Today in India: a journey date is an Indian calendar date, and a date the provider has closed answers 400. */
 function istToday() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+}
+
+/** Absent is the normal first run: every combo starts at today. Unreadable is not, and is refused. */
+function readCursorFile(path) {
+  try {
+    return readFileSync(path, "utf8");
+  } catch (error) {
+    if (error.code === "ENOENT") return null;
+    throw error;
+  }
 }
 
 async function main() {
@@ -142,28 +158,41 @@ async function main() {
 
   const horizonDays = whole(found, "horizon", parsed.horizonDays ?? DEFAULT_HORIZON_DAYS);
   const windowDays = whole(found, "window", DEFAULT_WINDOW_DAYS);
-  const start = found.get("start") ?? istToday();
-  if (horizonDays < 1 || windowDays < 1) fail("--horizon and --window must each be at least 1");
+  const today = istToday();
+  if (horizonDays < 1 || windowDays < 2) fail("--horizon must be at least 1 and --window at least 2");
 
-  const dates = askDates(start, horizonDays, windowDays);
+  const cursorPath = found.get("cursor") ?? fileURLToPath(new URL("crawl-cursor.json", HERE));
+  const readCursors = parseCursors(readCursorFile(cursorPath));
+  if (!readCursors.ok) {
+    fail(
+      `the cursor file is unusable, so nothing was asked:\n  ${readCursors.issues.join("\n  ")}\n` +
+        `It says where each combo's rolling window got to. Fix ${cursorPath}, or delete it to restart every sweep at today.`,
+    );
+  }
+  // --start is the one-off escape hatch: ignore every cursor and ask this exact date. The cursors
+  // still advance from it, so a mistake costs one run's asks rather than the file.
+  const startAt = found.get("start");
+  const cursors = startAt === undefined ? readCursors.cursors : Object.fromEntries(routes.map((r) => [comboKey(r), { next: startAt, refusals: readCursors.cursors[comboKey(r)]?.refusals ?? 0 }]));
+
   const { ceiling, reason } = crawlCeiling({
     dailyAllowance: whole(found, "daily", DEFAULT_DAILY_ALLOWANCE),
     liveReserve: whole(found, "reserve", liveRequestsPerDay(environment)),
     requested: found.has("max-calls") ? whole(found, "max-calls", 0) : undefined,
   });
-  const worstCase = plannedCalls({ combos: routes.length, asksPerCombo: dates.length });
+  const worstCase = plannedCalls({ combos: routes.length });
   const remainingFloor = whole(found, "remaining-floor", DEFAULT_REMAINING_FLOOR);
 
   console.log(`routes         ${routes.length} combo${routes.length === 1 ? "" : "s"}${limit < parsed.routes.length ? ` (of ${parsed.routes.length}, limited by --only)` : ""}`);
-  console.log(`horizon        ${horizonDays} days from ${start}, in ${dates.length} stride${dates.length === 1 ? "" : "s"} of ${windowDays}`);
-  console.log(`worst case     ${worstCase} calls (${routes.length} × ${dates.length} × ${CALLS_PER_ASK_MAX} for the guard's one retry)`);
+  console.log(`window         one ask each, rolling ${windowDays} days a run over a ${horizonDays}-day horizon — a sweep takes ${cycleRuns(horizonDays, windowDays)} runs`);
+  console.log(`cursor         ${cursorPath}${Object.keys(readCursors.cursors).length === 0 ? " (none yet: every combo starts at today)" : ""}${startAt === undefined ? "" : ` (overridden for this run: ${startAt})`}`);
+  console.log(`worst case     ${worstCase} calls (${routes.length} × ${CALLS_PER_ASK_MAX} for the guard's one retry)`);
   console.log(`ceiling        ${reason}`);
   console.log(`burst floor    stop when the provider's RateLimit-Remaining reaches ${remainingFloor}`);
 
   if (worstCase > ceiling) {
     fail(
       `this run's worst case (${worstCase} calls) is over its ceiling (${ceiling}). Nothing was asked.\n` +
-        "Shorten the horizon, cut the list with --only, or state a wider share of the plan with --reserve — and say out loud how many live checks that leaves unprotected.",
+        "Cut the list with --only, or state a wider share of the plan with --reserve — and say out loud how many live checks that leaves unprotected.",
     );
   }
   if (found.has("dry-run")) {
@@ -221,7 +250,8 @@ async function main() {
 
   const summary = await runCrawl({
     routes,
-    start,
+    cursors,
+    today,
     horizonDays,
     windowDays,
     ceiling,
@@ -234,6 +264,15 @@ async function main() {
     },
     record: (request, outcome) => recordObservations(request, outcome.answer, db),
   });
+
+  // Written before anything else, and even when the run was not whole: the asks were spent either
+  // way, and a cursor that forgets them makes the next run re-ask a band it has already covered.
+  try {
+    writeFileSync(cursorPath, `${JSON.stringify(summary.cursors, null, 2)}\n`);
+  } catch (error) {
+    console.error(`[crawl] the run finished but its cursor could not be saved to ${cursorPath}: ${error.message}`);
+    console.error("[crawl] the next run will restart every sweep at today unless this is fixed.");
+  }
 
   for (const line of summarise(summary)) console.log(line);
   process.exit(exitCodeFor(summary));

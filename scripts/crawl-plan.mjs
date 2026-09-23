@@ -1,5 +1,5 @@
-// The availability crawler's plan: the stride, the route list and its preflight, the two gates that
-// keep the run off the provider's plan, the loop that walks the list, and what it reports.
+// The availability crawler's plan: the rolling window, the route list and its preflight, the two
+// gates that keep the run off the provider's plan, the loop that walks the list, and what it reports.
 //
 // Everything here is pure — no network, no database, no clock beyond the date it is handed — so all
 // of it is tested without either. `crawl-availability.mjs` is the runner that wires it to the real
@@ -44,6 +44,7 @@
 
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { advanceCursor, cycleRuns, daysBetween, nextAsk } from "./crawl-window.mjs";
 
 const HERE = new URL("./", import.meta.url);
 
@@ -56,19 +57,6 @@ export const CALLS_PER_ASK_MAX = 2;
 /** Nothing a flag can say makes one run worth more than this. The last line of the gate. */
 export const ABSOLUTE_MAX_CALLS_PER_RUN = 500;
 /**
- * How far one call reaches. Measured 2026-09-23: `/seats` answers **four dated entries** running
- * forward from the date asked for — which is not the same as the asked date plus the next three.
- * 12301 HWH-NDLS 3A/GN asked for 2026-10-15 answered 15, 16, 17 and **19**: four entries spanning
- * five days, with the 18th simply absent. A quota can shorten it too — a TQ combo answered two.
- *
- * The stride is still 4, and still right, because every ask starts at its own date: asking D, D+4,
- * D+8 … leaves no calendar day unasked. What varies is what comes back, and a date the provider
- * omits is a day it has nothing to say about, not a hole the stride opened. Where a window runs past
- * D+3 the next ask re-reads that day; the store's upsert absorbs it, later read winning.
- */
-export const DEFAULT_WINDOW_DAYS = 4;
-export const DEFAULT_HORIZON_DAYS = 60;
-/**
  * Advance is 10,000 a month ≈ 333 a day, shared with live traveller traffic. The reserve subtracted
  * from it is not a constant here: it is `LIVE_REQUESTS_PER_DAY` (300), read from the environment, so
  * the crawler's headroom moves whenever the live budget does.
@@ -76,11 +64,17 @@ export const DEFAULT_HORIZON_DAYS = 60;
 export const DEFAULT_DAILY_ALLOWANCE = 333;
 /** RailKit's bucket is 600 per 10 minutes; this much of it is left standing for live checks. */
 export const DEFAULT_REMAINING_FLOOR = 50;
+/**
+ * How many runs in a row a combo may refuse before the report calls it a bad list entry.
+ *
+ * Measured: 12951 answers `Unable to process your request` for every class and date tried. With one
+ * ask per combo per run, "always refuses" can only be counted ACROSS runs — which is the other
+ * thing the cursor file is for.
+ */
+export const REFUSALS_BEFORE_STALE = 3;
 
-const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const TRAIN_NO = /^\d{5}$/;
 const STATION = /^[A-Z]{2,5}$/;
-const DAY_MS = 86_400_000;
 
 // ---------------------------------------------------------------------------
 // The shapes, written down so the tests that import this file are checked
@@ -94,65 +88,20 @@ const DAY_MS = 86_400_000;
 /** @typedef {Answered | Refused} Outcome */
 /** @typedef {{ outcome: Outcome, calls: number, remaining?: string | null }} AskResult */
 /** @typedef {{ combo: string, date: string, code: string, why: string }} Failure */
+/** @typedef {{ combo: string, date: string, daysOut: number, rows: number }} Asked */
+/** @typedef {{ combo: string, date: string, days: number }} ShortWindow */
+/** @typedef {import("./crawl-window.mjs").CursorEntry} CursorEntry */
+/** @typedef {import("./crawl-window.mjs").Cursors} Cursors */
 /** @typedef {{ ok: true, routes: Route[], horizonDays?: number } | { ok: false, issues: string[] }} ParsedRoutes */
 /**
  * @typedef {{
- *   start: string, horizonDays: number, windowDays: number, dates: string[],
+ *   today: string, horizonDays: number, windowDays: number,
  *   listed: number, planned: number, combos: number, asks: number, calls: number, rows: number,
- *   failures: Failure[], alwaysRefused: string[], stopped: string | null,
+ *   asked: Asked[], failures: Failure[], shortWindows: ShortWindow[], wrapped: string[],
+ *   stale: string[], cursors: Cursors, stopped: string | null,
  *   remaining: number | null, whole: boolean
  * }} Summary
  */
-
-// ---------------------------------------------------------------------------
-// The stride — the one piece of arithmetic that must be right
-// ---------------------------------------------------------------------------
-
-function utcDay(iso) {
-  const match = ISO_DATE.exec(String(iso).trim());
-  if (!match) return null;
-  const [, y, m, d] = match;
-  const at = Date.UTC(Number(y), Number(m) - 1, Number(d));
-  const probe = new Date(at);
-  if (probe.getUTCFullYear() !== Number(y) || probe.getUTCMonth() !== Number(m) - 1 || probe.getUTCDate() !== Number(d)) return null;
-  return at;
-}
-
-/** ISO in, ISO out, through UTC milliseconds — so a month end or a leap day cannot drift. */
-export function addDays(iso, days) {
-  const at = utcDay(iso);
-  if (at === null) throw new RangeError(`not an ISO date: ${iso}`);
-  return new Date(at + days * DAY_MS).toISOString().slice(0, 10);
-}
-
-function positiveInteger(value, name) {
-  if (!Number.isInteger(value) || value < 1) throw new RangeError(`${name} must be a whole number of days, at least 1; got ${value}`);
-  return value;
-}
-
-/**
- * Which dates to ask for, to cover `horizonDays` from `start` exactly once.
- *
- * One call answers `windowDays` consecutive days, so the asks are `windowDays` apart and there are
- * `ceil(horizon / window)` of them: a sixty-day horizon is fifteen calls, not sixty. Off by one and
- * the run either pays 25% more quota forever or leaves a `windowDays`-long hole in every combo that
- * nothing can fill, because past dates answer `400 Failed to fetch availability`.
- *
- * The first ask is `start` and never a day before it, for the same reason.
- */
-export function askDates(start, horizonDays, windowDays) {
-  if (utcDay(start) === null) throw new RangeError(`not an ISO date: ${start}`);
-  positiveInteger(horizonDays, "horizonDays");
-  positiveInteger(windowDays, "windowDays");
-  const asks = Math.ceil(horizonDays / windowDays);
-  return Array.from({ length: asks }, (_, i) => addDays(start, i * windowDays));
-}
-
-/** Every day the given asks actually cover. The test for "no gap, no repeat" is written against this. */
-export function coveredDates(asks, windowDays) {
-  positiveInteger(windowDays, "windowDays");
-  return asks.flatMap((date) => Array.from({ length: windowDays }, (_, i) => addDays(date, i)));
-}
 
 // ---------------------------------------------------------------------------
 // The route list, and the preflight that runs before anything is spent
@@ -286,13 +235,17 @@ export function crawlCeiling({ dailyAllowance, liveReserve, requested }) {
 }
 
 /**
- * The worst case: every combo, every stride, and the one retry `guarded.ts` allows each.
+ * The worst case for one run: one ask per combo, and the one retry `guarded.ts` allows each.
  *
- * @param {{ combos: number, asksPerCombo: number, callsPerAsk?: number }} plan
+ * This is the whole difference the sparse strategy makes. A dense sweep multiplied this by
+ * `ceil(horizon / window)` — fifteen — so a default ceiling of 33 funded two combos. One ask per
+ * combo funds sixteen.
+ *
+ * @param {{ combos: number, callsPerAsk?: number }} plan
  * @returns {number}
  */
-export function plannedCalls({ combos, asksPerCombo, callsPerAsk = CALLS_PER_ASK_MAX }) {
-  return combos * asksPerCombo * callsPerAsk;
+export function plannedCalls({ combos, callsPerAsk = CALLS_PER_ASK_MAX }) {
+  return combos * callsPerAsk;
 }
 
 // ---------------------------------------------------------------------------
@@ -325,41 +278,50 @@ function why(outcome) {
 }
 
 /**
- * Walks the list, one ask per combo per stride, and counts what actually happened.
+ * Walks the list once, asking each combo for the single date its cursor points at.
  *
  * `ask` and `record` are injected so the loop, the gates and the report are testable without a
  * network or a database. `ask` returns `{ outcome, calls, remaining }`: `calls` is how many requests
  * actually left the process for that ask (0 when the breaker was resting, 2 when the guard retried),
  * which is why asks and calls are reported separately.
  *
- * A refused combo is reported and the run continues — one bad entry must not cost the rest of the
- * list. A gate, by contrast, stops the run: slowing down would still spend the plan.
+ * **The cursor advances whether or not the ask succeeded.** A refusal is reported and counted, but
+ * holding the cursor still would let one permanently unanswerable date stall a combo for ever. The
+ * band it failed on comes round again on the next sweep, closer to departure — which is the one
+ * real advantage a rolling window has over a dense one here.
+ *
+ * A refused combo never stops the run; one bad entry must not cost the rest of the list. A gate, by
+ * contrast, does stop it: slowing down would still spend the plan.
  *
  * @param {{
- *   routes: readonly Route[], start: string, horizonDays: number, windowDays: number,
+ *   routes: readonly Route[], cursors: Cursors, today: string, horizonDays: number, windowDays: number,
  *   ask: (request: AskRequest) => Promise<AskResult>,
  *   record: (request: AskRequest, outcome: Answered) => Promise<number>,
  *   ceiling: number, remainingFloor?: number, callsPerAsk?: number
  * }} options
  * @returns {Promise<Summary>}
  */
-export async function runCrawl({ routes, start, horizonDays, windowDays, ask, record, ceiling, remainingFloor = 0, callsPerAsk = CALLS_PER_ASK_MAX }) {
-  const dates = askDates(start, horizonDays, windowDays);
-  const planned = routes.length * dates.length;
+export async function runCrawl({ routes, cursors, today, horizonDays, windowDays, ask, record, ceiling, remainingFloor = 0, callsPerAsk = CALLS_PER_ASK_MAX }) {
+  cycleRuns(horizonDays, windowDays);
   /** @type {Summary} */
   const summary = {
-    start,
+    today,
     horizonDays,
     windowDays,
-    dates,
     listed: routes.length,
-    planned,
+    planned: routes.length,
     combos: 0,
     asks: 0,
     calls: 0,
     rows: 0,
+    asked: [],
     failures: [],
-    alwaysRefused: [],
+    shortWindows: [],
+    wrapped: [],
+    stale: [],
+    // Combos this run does not reach keep the place they got to. Losing one would restart that
+    // combo's sweep at today and quietly re-read a band it had already covered.
+    cursors: { ...cursors },
     stopped: null,
     remaining: null,
     whole: false,
@@ -368,50 +330,48 @@ export async function runCrawl({ routes, start, horizonDays, windowDays, ask, re
   for (const route of routes) {
     if (summary.stopped !== null) break;
     const key = comboKey(route);
-    let asked = 0;
-    // Whether the PROVIDER answered, which is not the same as whether a row was written. A store
-    // that refuses every write would otherwise make every combo look like a bad list entry, and
-    // send an operator deleting good routes over a fault that is ours.
-    let provided = 0;
+    const entry = cursors[key];
+    const { date, reset } = nextAsk({ cursor: entry?.next, today, horizonDays, windowDays });
 
-    for (const journeyDate of dates) {
-      if (summary.calls + callsPerAsk > ceiling) {
-        summary.stopped = `the run's own ceiling of ${ceiling} calls — stopping rather than slowing, so the plan live checks depend on stays whole`;
-        break;
-      }
+    if (summary.calls + callsPerAsk > ceiling) {
+      summary.stopped = `the run's own ceiling of ${ceiling} calls — stopping rather than slowing, so the plan live checks depend on stays whole`;
+      break;
+    }
+    if (reset === "beyond") summary.wrapped.push(key);
 
-      const request = { trainNo: route.trainNo, from: route.from, to: route.to, journeyDate, travelClass: route.travelClass, quota: route.quota };
-      const { outcome, calls, remaining } = await ask(request);
-      asked += 1;
-      summary.asks += 1;
-      summary.calls += calls;
+    const request = { trainNo: route.trainNo, from: route.from, to: route.to, journeyDate: date, travelClass: route.travelClass, quota: route.quota };
+    const { outcome, calls, remaining } = await ask(request);
+    summary.combos += 1;
+    summary.asks += 1;
+    summary.calls += calls;
 
-      const seen = remainingVerdict(remaining, remainingFloor);
-      if (seen.known) summary.remaining = seen.remaining;
+    const seen = remainingVerdict(remaining, remainingFloor);
+    if (seen.known) summary.remaining = seen.remaining;
 
-      if (outcome.ok) {
-        provided += 1;
-        const written = await record(request, outcome);
-        summary.rows += written;
-        if (written === 0) summary.failures.push({ combo: key, date: journeyDate, code: "NOT_RECORDED", why: "the provider answered but the store wrote no rows" });
-      } else {
-        summary.failures.push({ combo: key, date: journeyDate, code: outcome.code, why: why(outcome) });
-      }
-
-      if (seen.stop) {
-        summary.stopped = `the provider's own RateLimit-Remaining fell to ${seen.remaining}, at or below the floor of ${remainingFloor}`;
-        break;
-      }
+    let written = 0;
+    if (outcome.ok) {
+      written = await record(request, outcome);
+      summary.rows += written;
+      // The provider answered, so this combo is not a bad list entry whatever the store did.
+      summary.cursors[key] = { next: advanceCursor(date, windowDays), refusals: 0 };
+      if (written === 0) summary.failures.push({ combo: key, date, code: "NOT_RECORDED", why: "the provider answered but the store wrote no rows" });
+      else if (written < windowDays) summary.shortWindows.push({ combo: key, date, days: written });
+    } else {
+      const refusals = (entry?.refusals ?? 0) + 1;
+      summary.cursors[key] = { next: advanceCursor(date, windowDays), refusals };
+      summary.failures.push({ combo: key, date, code: outcome.code, why: why(outcome) });
+      if (refusals >= REFUSALS_BEFORE_STALE) summary.stale.push(`${key} (${refusals} runs in a row)`);
     }
 
-    if (asked > 0) summary.combos += 1;
-    // Measured: 12951 answers `Unable to process your request` for every class and date tried. A
-    // combo that refuses on every stride is a bad list entry wearing a failure's clothes, and saying
-    // so is what stops it being retried daily forever.
-    if (asked > 0 && provided === 0 && summary.stopped === null) summary.alwaysRefused.push(key);
+    summary.asked.push({ combo: key, date, daysOut: daysBetween(today, date), rows: written });
+
+    if (seen.stop) {
+      summary.stopped = `the provider's own RateLimit-Remaining fell to ${seen.remaining}, at or below the floor of ${remainingFloor}`;
+      break;
+    }
   }
 
-  summary.whole = summary.stopped === null && summary.failures.length === 0 && summary.asks === planned;
+  summary.whole = summary.stopped === null && summary.failures.length === 0 && summary.asks === summary.planned;
   return summary;
 }
 
@@ -429,25 +389,43 @@ export function summarise(summary) {
   const lines = [
     "",
     `${pad("combos attempted")} ${summary.combos} of ${summary.listed}`,
-    `${pad("asks")} ${summary.asks} of ${summary.planned} planned (${summary.dates.length} strides × ${summary.windowDays} days, ${summary.horizonDays}-day horizon from ${summary.start})`,
+    `${pad("asks")} ${summary.asks} of ${summary.planned} planned (one per combo; the sweep takes ${cycleRuns(summary.horizonDays, summary.windowDays)} runs at a ${summary.horizonDays}-day horizon)`,
     `${pad("calls made")} ${summary.calls}`,
     `${pad("rows written")} ${summary.rows}`,
     `${pad("RateLimit-Remaining")} ${summary.remaining === null ? "not sent by the provider" : summary.remaining}`,
   ];
 
+  if (summary.asked.length > 0) {
+    lines.push("", "Where each combo's window is now:");
+    for (const one of summary.asked) {
+      const next = summary.cursors[one.combo]?.next ?? "?";
+      lines.push(`  ${one.combo}  asked ${one.date} (${one.daysOut} days out) · ${one.rows} row${one.rows === 1 ? "" : "s"} · next ${next}`);
+    }
+  }
+
+  if (summary.wrapped.length > 0) {
+    lines.push("", `Wrapped back to ${summary.today} — a sweep finished and the next one starts closer to departure:`);
+    for (const combo of summary.wrapped) lines.push(`  ${combo}`);
+  }
+
   if (summary.stopped !== null) lines.push("", `STOPPED: ${summary.stopped}`);
 
   if (summary.failures.length > 0) {
-    lines.push("", `${summary.failures.length} ask${summary.failures.length === 1 ? "" : "s"} did not become rows. Each is a permanent hole: past dates answer 400 and cannot be re-read.`);
+    lines.push("", `${summary.failures.length} ask${summary.failures.length === 1 ? "" : "s"} did not become rows. The band comes round again next sweep, closer in — but nearer departure there are fewer sweeps left to catch it.`);
     for (const failure of summary.failures) lines.push(`  ${failure.combo}  ${failure.date}  ${failure.why}`);
   }
 
-  if (summary.alwaysRefused.length > 0) {
-    lines.push("", "Refused on every stride — a bad list entry, not a transient failure. Delete it from routes.json rather than retrying it daily:");
-    for (const combo of summary.alwaysRefused) lines.push(`  ${combo}`);
+  if (summary.shortWindows.length > 0) {
+    lines.push("", `${summary.shortWindows.length} window${summary.shortWindows.length === 1 ? "" : "s"} came back with fewer than ${summary.windowDays} days. Normal at TQ and on a train that does not run daily; a pattern anywhere else is worth a look:`);
+    for (const short of summary.shortWindows) lines.push(`  ${short.combo}  ${short.date}  ${short.days} day${short.days === 1 ? "" : "s"}`);
   }
 
-  lines.push("", summary.whole ? "The run was whole: every combo, every stride." : "The run was NOT whole. The dataset has holes where the lines above say it does.");
+  if (summary.stale.length > 0) {
+    lines.push("", `Refused ${REFUSALS_BEFORE_STALE} or more runs in a row — a bad list entry, not a transient failure. Delete it from routes.json rather than retrying it daily:`);
+    for (const combo of summary.stale) lines.push(`  ${combo}`);
+  }
+
+  lines.push("", summary.whole ? "The run was whole: every combo asked and answered." : "The run was NOT whole. The dataset has holes where the lines above say it does.");
   return lines;
 }
 
