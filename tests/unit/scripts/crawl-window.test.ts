@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addDays, advanceCursor, coveredDates, cycleRuns, daysBetween, isIsoDate, nextAsk, parseCursors } from "../../../scripts/crawl-window.mjs";
+import { addDays, advanceCursor, coveredDates, cursorsForRun, cycleRuns, daysBetween, isIsoDate, nextAsk, parseCursors } from "../../../scripts/crawl-window.mjs";
 
 // ---------------------------------------------------------------------------
 // The crawler asks each combo for ONE date a run, and rolls that date forward a stride a day.
@@ -215,5 +215,61 @@ describe("parseCursors", () => {
     ["a refusal count that is not a whole number", JSON.stringify({ a: { next: "2026-10-02", refusals: 1.5 } })],
   ])("refuses %s rather than crawling from a place it guessed", (_label, json) => {
     expect(parseCursors(json).ok).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// `--start`: a one-off override that must not cost anything it was not pointed at
+// ---------------------------------------------------------------------------
+// It used to rebuild the whole cursor map from the `--only`-cut route list, and the run then wrote
+// that map over the file. `npm run source:crawl -- --start 2026-11-01 --only 2` — the natural way
+// to test one change against two combos — therefore deleted combos 3..6 entirely. The next ordinary
+// run found no entry for them, which takes `reset: "none"` rather than `behind`, so nothing landed
+// in `restarted` and the run printed "The run was whole" and exited 0 over four restarted sweeps.
+
+describe("cursorsForRun", () => {
+  const STORED = {
+    "12621 MAS-NDLS SL/GN": { next: "2026-10-02", refusals: 0 },
+    "12301 HWH-NDLS 3A/GN": { next: "2026-10-14", refusals: 2 },
+    "12051 DR-MAO 2S/GN": { next: "2026-11-30", refusals: 1 },
+  };
+
+  it("is exactly the stored map when there is no override", () => {
+    expect(cursorsForRun({ stored: STORED, keys: Object.keys(STORED), startAt: undefined })).toEqual(STORED);
+  });
+
+  it("points the combos this run is about at the date it was given", () => {
+    const cursors = cursorsForRun({ stored: STORED, keys: ["12621 MAS-NDLS SL/GN"], startAt: "2026-11-01" });
+    expect(cursors["12621 MAS-NDLS SL/GN"]).toEqual({ next: "2026-11-01", refusals: 0 });
+  });
+
+  it("KEEPS every combo the override was not pointed at, which --only used to erase", () => {
+    const cursors = cursorsForRun({ stored: STORED, keys: ["12621 MAS-NDLS SL/GN"], startAt: "2026-11-01" });
+
+    expect(cursors["12301 HWH-NDLS 3A/GN"]).toEqual({ next: "2026-10-14", refusals: 2 });
+    expect(cursors["12051 DR-MAO 2S/GN"]).toEqual({ next: "2026-11-30", refusals: 1 });
+  });
+
+  it("keeps a combo that has left the route list entirely, exactly as a run that never reaches one does", () => {
+    // A combo taken off `routes.json` for a day must not lose its place; `runCrawl` already holds
+    // the cursor of a combo it never reaches, and this is the same promise for the same reason.
+    const cursors = cursorsForRun({ stored: STORED, keys: ["12621 MAS-NDLS SL/GN", "unlisted 99999 A-B SL/GN"], startAt: "2026-11-01" });
+    expect(Object.keys(cursors).sort()).toEqual([...Object.keys(STORED), "unlisted 99999 A-B SL/GN"].sort());
+  });
+
+  it("carries the combo's own refusal count across the override, rather than forgiving it", () => {
+    const cursors = cursorsForRun({ stored: STORED, keys: ["12301 HWH-NDLS 3A/GN"], startAt: "2026-11-01" });
+    expect(cursors["12301 HWH-NDLS 3A/GN"]).toEqual({ next: "2026-11-01", refusals: 2 });
+  });
+
+  it("starts a combo with no stored entry at zero refusals", () => {
+    const cursors = cursorsForRun({ stored: {}, keys: ["12621 MAS-NDLS SL/GN"], startAt: "2026-11-01" });
+    expect(cursors["12621 MAS-NDLS SL/GN"]).toEqual({ next: "2026-11-01", refusals: 0 });
+  });
+
+  it("does not mutate the map it was handed", () => {
+    const stored = { ...STORED };
+    cursorsForRun({ stored, keys: ["12621 MAS-NDLS SL/GN"], startAt: "2026-11-01" });
+    expect(stored).toEqual(STORED);
   });
 });

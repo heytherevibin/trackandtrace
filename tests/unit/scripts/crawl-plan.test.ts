@@ -23,7 +23,10 @@ import { addDays, advanceCursor, coveredDates, daysBetween } from "../../../scri
 //      floor, and must stop — never slow — at its own ceiling.
 //   2. The outcome row. `days_out = 0` is the label a model trains against, and the rolling window
 //      alone reaches it for one journey date in twenty. The pinned ask that fixes that is proved
-//      here, over every journey date in the steady state.
+//      here, over every journey date in the steady state — and against the provider that was
+//      MEASURED, which answers the next days the train *runs* rather than four consecutive dates.
+//      A proof against a fake that returns the asked date plus the next three is a proof about
+//      `coveredDates`, not about the dataset; see `answerFor`.
 //
 // The loop that spends them is `crawl-run.test.ts`, the route list and its preflight are
 // `crawl-routes.test.ts`, and what a run SAYS about itself is `crawl-report.test.ts`.
@@ -45,11 +48,60 @@ function route(over: Partial<Record<string, string>> = {}) {
 //     over every journey date in the steady state, not one phase-aligned date.
 // ---------------------------------------------------------------------------
 
+const FROM = "2026-09-24";
+
+/**
+ * Whether the train runs on a given date — the thing the old fake provider here did not have.
+ *
+ * Six days a week, phased so that it reproduces the measured answer exactly: the day it skips is
+ * 2026-10-18, which is the day 12301 HWH–NDLS actually left out of the window measured on
+ * 2026-09-23. See `SIX_DAYS_A_WEEK` pinned below.
+ */
+const SIX_DAYS_A_WEEK = (date: string) => daysBetween(FROM, date) % 7 !== 3;
+/** Two days a week — the runbook's "a weekly train answers one date in four, legitimately". */
+const TWICE_A_WEEK = (date: string) => [1, 4].includes(daysBetween(FROM, date) % 7);
+
+/**
+ * What the provider answers for one ask — **the next `windowDays` days the train RUNS, at or after
+ * the date asked for.** Not the asked date plus the next three.
+ *
+ * This is the whole of F2. `scripts/crawl-window.mjs` records the measured truth and this file used
+ * to contradict it, modelling the answer as `coveredDates([date], windowDays)` — four consecutive
+ * dates. Against that fake, the outcome-row proof below is a property of `planAsks` and
+ * `coveredDates` and of nothing else: it would pass for any provider behaviour whatsoever,
+ * including one that drops a day from the window. The proof is the branch's load-bearing claim, so
+ * the provider it is proved against has to be the one that was measured.
+ *
+ * **What the property even is for such a train.** If a train does not run on a day, there is no
+ * journey that day, so there is no availability to observe and no outcome to record. The absence of
+ * a `days_out = 0` row for it is correct — it is not a hole — and `never returns a day the train
+ * does not run` below says so explicitly rather than leaving it implied by a filtered list.
+ *
+ * **And the one thing that could have broken it, now measured.** The label exists only if *today*
+ * is inside the pinned answer, so a train that has already departed today was the open risk: if the
+ * provider dropped an already-departed day, that combo would never get an outcome row and nothing
+ * on this branch would notice. Measured on a real run on 2026-09-23 at **22:00 IST**: 12051 DR–MAO
+ * departs about **05:25**, seventeen hours earlier, and still answered for today —
+ * `WAITLIST can_book=false`, a `days_out = 0` row. All six combos on the list got one, at departure
+ * times spanning 05:25 to 22:00. **A train that has already departed still answers for today.** One
+ * day across six trains is the evidence; this fake models it, and returns today whenever the train
+ * runs today, whatever the hour.
+ */
+function answerFor(date: string, windowDays: number, runsOn: (date: string) => boolean): string[] {
+  const days: string[] = [];
+  for (let i = 0; days.length < windowDays && i < 400; i += 1) {
+    const day = addDays(date, i);
+    if (runsOn(day)) days.push(day);
+  }
+  return days;
+}
+
 /**
  * Drives the real plan for `runs` daily runs of one combo, exactly as the crawler drives it, and
- * returns for each journey date every distance from departure at which it was observed.
+ * returns for each journey date every distance from departure at which it was observed. Dates the
+ * train does not run never appear, because the provider never answers for them.
  */
-function observeDaily(runs: number, { horizonDays = 60, windowDays = 4, from = "2026-09-24" } = {}) {
+function observeDaily(runs: number, { horizonDays = 60, windowDays = 4, from = FROM, runsOn = SIX_DAYS_A_WEEK } = {}) {
   const routes = [route()];
   const key = comboKey(routes[0] as never);
   let cursors: Record<string, { next: string; refusals: number }> = {};
@@ -58,7 +110,7 @@ function observeDaily(runs: number, { horizonDays = 60, windowDays = 4, from = "
   for (let day = 0; day < runs; day += 1) {
     const today = addDays(from, day);
     for (const step of planAsks({ routes, cursors, today, horizonDays, windowDays })) {
-      for (const date of coveredDates([step.date], windowDays)) {
+      for (const date of answerFor(step.date, windowDays, runsOn)) {
         seen.set(date, [...(seen.get(date) ?? []), daysBetween(today, date)]);
       }
       // Only the rolling ask moves the cursor. The pinned one is a second look at today.
@@ -69,28 +121,59 @@ function observeDaily(runs: number, { horizonDays = 60, windowDays = 4, from = "
 }
 
 /** Journey dates whose whole life inside the horizon falls within the simulation: the steady state. */
-function steadyState(seen: Map<string, number[]>, runs: number, { horizonDays = 60, from = "2026-09-24" } = {}) {
+function steadyState(seen: Map<string, number[]>, runs: number, { horizonDays = 60, from = FROM } = {}) {
   return [...seen.keys()].filter((date) => {
     const offset = daysBetween(from, date);
     return offset >= horizonDays && offset <= runs - 1;
   });
 }
 
-describe("the outcome row", () => {
+/** Every calendar date the simulation walked over, running or not. */
+function calendar(runs: number, from = FROM) {
+  return Array.from({ length: runs }, (_, i) => addDays(from, i));
+}
+
+describe("the provider this is proved against", () => {
+  it("answers the next four days the train RUNS, at or after the date asked for — the measured 12301 window", () => {
+    // Measured 2026-09-23: 12301 HWH-NDLS 3A/GN asked for 2026-10-15 answered 15, 16, 17 and 19.
+    // Four entries over five days; the 18th is simply absent because the train did not run.
+    expect(answerFor("2026-10-15", 4, SIX_DAYS_A_WEEK)).toEqual(["2026-10-15", "2026-10-16", "2026-10-17", "2026-10-19"]);
+  });
+
+  it("is not four consecutive dates, which is what this file used to assume", () => {
+    expect(answerFor("2026-10-15", 4, SIX_DAYS_A_WEEK)).not.toEqual(coveredDates(["2026-10-15"], 4));
+  });
+
+  it("answers from the first running day at or after the ask, when the train does not run on the day asked for", () => {
+    // 2026-10-18 is the skipped day, so an ask pinned there begins on the 19th.
+    expect(answerFor("2026-10-18", 4, SIX_DAYS_A_WEEK)[0]).toBe("2026-10-19");
+  });
+});
+
+describe.each([
+  ["a train that runs six days a week", SIX_DAYS_A_WEEK],
+  ["a train that runs twice a week", TWICE_A_WEEK],
+])("the outcome row, against %s", (_label, runsOn) => {
   const RUNS = 200;
-  const seen = observeDaily(RUNS);
+  const seen = observeDaily(RUNS, { runsOn });
   const dates = steadyState(seen, RUNS);
 
   it("has a steady state worth asserting over — not one phase-aligned date", () => {
-    expect(dates.length).toBeGreaterThan(100);
+    expect(dates.length).toBeGreaterThan(30);
   });
 
-  it("gives EVERY journey date in the steady state a days_out = 0 row, which is the label a model trains against", () => {
+  it("gives EVERY journey date the train RUNS in the steady state a days_out = 0 row, which is the label a model trains against", () => {
     const without = dates.filter((date) => !(seen.get(date) ?? []).includes(0));
     expect(
       without.length,
       `${without.length} of ${dates.length} journey dates never got a days_out = 0 row; the first few are ${without.slice(0, 4).join(", ")}`,
     ).toBe(0);
+  });
+
+  it("never returns a day the train does not run, so having no outcome row for one is correct and not a hole", () => {
+    const idle = calendar(RUNS).filter((date) => !runsOn(date));
+    expect(idle.length).toBeGreaterThan(0);
+    for (const date of idle) expect(seen.has(date), `${date} is a day the train does not run`).toBe(false);
   });
 
   it("still sees every journey date several times before departure, at decreasing distances", () => {

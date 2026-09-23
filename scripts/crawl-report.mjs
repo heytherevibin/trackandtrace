@@ -18,6 +18,12 @@
 //     partway through — and those journey dates are gone. It used to be recorded nowhere: a crawler
 //     five days out of date printed "The run was whole" and exited 0. It is now named, with the band
 //     it gave up, and it makes the run un-whole.
+//   * **An ask that never reached the provider.** A resting breaker answers with the same code a
+//     real refusal carries and spends no call. Folded in with the refusals it advanced a cursor
+//     over a four-day band nobody asked for and struck a blameless combo towards "delete this from
+//     routes.json". It has its own section, it names the held cursor, and it makes the run
+//     un-whole — but it is emphatically NOT a refusal, and the prose has to say so or an operator
+//     will go looking for a bad route that does not exist.
 //   * **A failed pinned ask.** The pinned ask at today is what supplies the `days_out = 0` outcome
 //     row, and it can legitimately refuse — the train may simply not run today. So it is reported
 //     apart from the rolling asks, is not counted towards a combo's consecutive-refusal total, and
@@ -75,6 +81,24 @@ export function summarise(summary) {
   }
 
   if (summary.stopped !== null) lines.push("", `STOPPED: ${summary.stopped}`);
+
+  if (summary.notAsked.length > 0) {
+    lines.push(
+      "",
+      `${summary.notAsked.length} ask${s(summary.notAsked.length)} NEVER REACHED THE PROVIDER — nothing was sent, so this is NOT a refusal: the provider passed no verdict on the dates below. Each cursor held where it was and took no refusal strike, because the band was not covered and the next sweep does not come back for it:`,
+    );
+    for (const one of summary.notAsked) {
+      const because = one.rested
+        ? "the breaker was resting, so the guard sent nothing"
+        : "the adapter refused this route before building a URL — that IS a bad list entry, and it got past the preflight";
+      lines.push(`  ${one.combo}  ${one.kind.padEnd(7)} ${one.date}  ${because}`);
+    }
+    lines.push(
+      "  The BAND is not lost — the next run asks exactly where each of these stopped. What is lost is today's observation of it, and a day the crawler did not reach is a day the dataset never gets.",
+    );
+    if (summary.notAsked.some((one) => one.rested)) lines.push("  Nothing was spent on these. Run again once the provider has recovered.");
+    if (summary.notAsked.some((one) => !one.rested)) lines.push("  A route the adapter will not build a URL for will do this every run: fix or remove that entry in routes.json.");
+  }
 
   if (summary.failures.length > 0) {
     lines.push(

@@ -204,13 +204,93 @@ describe("what must never read as no seats", () => {
     ["no availability key", { success: true, data: { train: TRAIN, fare: FARE } }],
     ["availability that is not an array", { success: true, data: { train: TRAIN, fare: FARE, availability: {} } }],
     ["a train block that is missing", { success: true, data: { fare: FARE, availability: DAYS } }],
-    ["a fare block that is missing", { success: true, data: { train: TRAIN, availability: DAYS } }],
     ["a different train than the one asked about", { success: true, data: { train: { ...TRAIN, trainNo: "12951" }, fare: FARE, availability: DAYS } }],
   ])("fails closed on %s", (_label, value) => {
     const out = parse(value);
     expect(out.ok).toBe(false);
     if (out.ok) return;
     expect(out.code).toBe("SOURCE_UNAVAILABLE");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The fare, which is the one block this parser must NOT fail closed on
+// ---------------------------------------------------------------------------
+// Everything else here fails closed on purpose: a day it cannot read would otherwise be
+// indistinguishable from a day with no berths, and a traveller acts on that. The fare is different
+// in kind. `availability_observations` has no fare column, no page renders one, and the block was
+// measured on a single train — so refusing the whole answer over an absent fare field costs a
+// permanently unrecoverable observation (a past date answers 400), a band of journey dates, and a
+// refusal strike, in exchange for a number nothing reads. That is the wrong trade, so the fare is
+// read when it is whole and dropped when it is not.
+//
+// It stays all-or-nothing WITHIN itself: a fare missing its GST is not a fare, and inventing a zero
+// would be worse than having none. When the traveller form makes the fare load-bearing, that is the
+// moment to decide what a partial fare means — not now, by accident, in a crawler.
+
+describe("the fare", () => {
+  it("is read when the provider sends it whole", () => {
+    const out = parse(body());
+    expect(out.ok && out.answer.fare).toEqual({ base: 710, reservation: 40, superfast: 30, gst: 0, total: 780 });
+  });
+
+  it("does not cost the availability when the whole block is missing", () => {
+    const out = parse({ success: true, data: { train: TRAIN, availability: DAYS } });
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.answer.fare).toBeNull();
+    expect(out.answer.days).toHaveLength(3);
+  });
+
+  it.each([["baseFare"], ["reservationCharge"], ["superfastCharge"], ["serviceTax"], ["totalFare"]])(
+    "does not cost the availability when %s alone is absent",
+    (field) => {
+      const partial: Record<string, unknown> = { ...FARE };
+      delete partial[field];
+      const out = parse(body({ fare: partial }));
+
+      expect(out.ok).toBe(true);
+      if (!out.ok) return;
+      expect(out.answer.fare).toBeNull();
+      expect(out.answer.days).toHaveLength(3);
+    },
+  );
+
+  it("is null rather than partial: a fare missing a charge is not a fare, and a zero would be invented", () => {
+    const out = parse(body({ fare: { ...FARE, serviceTax: null } }));
+    expect(out.ok && out.answer.fare).toBeNull();
+  });
+
+  it("still reads a genuine zero charge, which is the ordinary GST-exempt case", () => {
+    const out = parse(body({ fare: { ...FARE, superfastCharge: 0 } }));
+    expect(out.ok && out.answer.fare).toMatchObject({ superfast: 0 });
+  });
+});
+
+describe("a prediction percentage the store cannot hold", () => {
+  // `source_prediction_pct numeric(5,2)` refuses any magnitude at or above 1000, and the four rows
+  // of a window go in as one batch — so one absurd value used to lose the whole window rather than
+  // the one number nothing reads. Same trade as the fare.
+  it.each([
+    ["at the column's limit", 1000],
+    ["far over it", 12_345.6],
+    ["negative and over it", -1000],
+  ])("is dropped %s, rather than failing the batch it travels in", (_label, value) => {
+    const out = parse(body({ availability: [{ ...DAYS[1], predictionPercentage: value }] }));
+
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.answer.days[0]?.predictionPercentage).toBeNull();
+    expect(out.answer.days[0]?.prediction).toBe("77% Chance");
+  });
+
+  it.each([
+    ["an ordinary percentage", 77, 77],
+    ["zero", 0, 0],
+    ["the largest the column holds", 999.99, 999.99],
+  ])("keeps %s", (_label, value, expected) => {
+    const out = parse(body({ availability: [{ ...DAYS[1], predictionPercentage: value }] }));
+    expect(out.ok && out.answer.days[0]?.predictionPercentage).toBe(expected);
   });
 });
 

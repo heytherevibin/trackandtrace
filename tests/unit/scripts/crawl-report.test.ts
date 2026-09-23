@@ -19,12 +19,17 @@ function route(over: Partial<Record<string, string>> = {}) {
 
 const OK = { ok: true as const, answer: { days: [] } };
 const REFUSED = { ok: false as const, code: "SOURCE_UNAVAILABLE", message: "could not answer", cause: "server" };
+/** The guard's own answer while the breaker rests: same code, same shape, and nothing sent. */
+const RESTING = { ok: false as const, code: "SOURCE_UNAVAILABLE", message: "resting until the provider recovers", retryAfter: 30 };
 
-type Stubbed = typeof OK | typeof REFUSED;
+type Stubbed = typeof OK | typeof REFUSED | typeof RESTING;
 
-function stubAsk(reply: (n: number) => Stubbed, calls = 1, remaining: string | null = null) {
+function stubAsk(reply: (n: number) => Stubbed, calls: number | ((n: number) => number) = 1, remaining: string | null = null) {
   let n = 0;
-  return async () => ({ outcome: reply(n++), calls, remaining });
+  return async () => {
+    const at = n++;
+    return { outcome: reply(at), calls: typeof calls === "function" ? calls(at) : calls, remaining };
+  };
 }
 
 const TWO = [route(), route({ trainNo: "12301", from: "HWH", travelClass: "3A" })];
@@ -89,6 +94,20 @@ describe("summarise", () => {
     expect(printed).toMatch(/does not run today/);
     // Normal, so it is not the run's verdict.
     expect(printed).toMatch(/The run was whole/);
+  });
+
+  it("gives an ask that never reached the provider its own section, apart from the refusals", async () => {
+    const printed = await text({ ask: stubAsk(() => RESTING, 0), cursors: { [KEY_ONE]: { next: "2026-10-02", refusals: 0 } } });
+
+    expect(printed).toMatch(/never reached the provider/i);
+    expect(printed).toContain("2026-10-02");
+    // The cursor holding still is the whole point, so the report says it — and says no strike was
+    // taken — rather than leaving the operator to infer either from an unchanged number in a file.
+    expect(printed).toMatch(/cursor held where it was|cursor.*did not move/i);
+    expect(printed).toMatch(/no refusal strike/i);
+    expect(printed).toMatch(/not whole/i);
+    // It is NOT the refusal section: a refusal means the band was asked for and comes round again.
+    expect(printed).not.toMatch(/did not become rows/);
   });
 
   it("says plainly when the run was not whole", async () => {

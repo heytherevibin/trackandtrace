@@ -22,10 +22,18 @@
 // On the run a sweep wraps the two are the same date and only one ask is made.
 //
 // **Where the rolling window got to lives in `scripts/crawl-cursor.json`**, written after every run
-// and read before the next; the pinned ask does not touch it. Losing that file is not a disaster —
-// every combo restarts at today — but it is a lost sweep, and a restarted sweep abandons a band of
-// journey dates that nothing can go back for, so the run now says so and is not whole. It is
-// gitignored: it is this machine's record of what it has asked, not source.
+// and read before the next; the pinned ask does not touch it. It is gitignored: it is this
+// machine's record of what it has asked, not source.
+//
+// Losing that file is not a disaster — every combo restarts its sweep at today — but it is a lost
+// sweep: the band the cursor was pointing at gets re-read while another band waits a full cycle
+// longer. **The run cannot tell you it happened, and this header used to claim otherwise.** A lost
+// file and a first run are the same input, an empty map, so a missing entry takes `reset: "none"`;
+// nothing lands in `restarted` and the run is whole. Only a cursor in the PAST (`behind`) names the
+// band it gave up and makes the run un-whole, because only then is there a band to name — and only
+// then does the crawler know it had one. Which is why `--start` no longer overwrites the entries it
+// was not pointed at (`cursorsForRun`): that was the one way to lose entries silently from inside a
+// run that then reported itself whole.
 //
 // Exit: 0 the run was whole · 1 it was not (a refusal, or a gate stopped it) · 2 it was asked
 // wrongly, and nothing was spent.
@@ -59,7 +67,7 @@ import {
   runCrawl,
 } from "./crawl-plan.mjs";
 import { exitCodeFor, summarise } from "./crawl-report.mjs";
-import { DEFAULT_HORIZON_DAYS, DEFAULT_WINDOW_DAYS, cycleRuns, isIsoDate, parseCursors } from "./crawl-window.mjs";
+import { DEFAULT_HORIZON_DAYS, DEFAULT_WINDOW_DAYS, cursorsForRun, cycleRuns, isIsoDate, parseCursors } from "./crawl-window.mjs";
 import { coverageReport, parseObservationRows, readObservations, summariseCoverage } from "./observations-coverage.mjs";
 
 const HERE = new URL("./", import.meta.url);
@@ -260,7 +268,9 @@ async function main() {
   if (startAt !== undefined && !isIsoDate(startAt)) {
     fail(`--start must be an ISO date (yyyy-mm-dd); got ${startAt}. Nothing was asked.`);
   }
-  const cursors = startAt === undefined ? readCursors.cursors : Object.fromEntries(routes.map((r) => [comboKey(r), { next: startAt, refusals: readCursors.cursors[comboKey(r)]?.refusals ?? 0 }]));
+  // Laid ON the stored map, never substituted for it: `routes` is already cut by `--only`, and this
+  // object is written back over the whole cursor file below. See `cursorsForRun`.
+  const cursors = cursorsForRun({ stored: readCursors.cursors, keys: routes.map(comboKey), startAt });
 
   const { ceiling, reason } = crawlCeiling({
     dailyAllowance: whole(found, "daily", DEFAULT_DAILY_ALLOWANCE),

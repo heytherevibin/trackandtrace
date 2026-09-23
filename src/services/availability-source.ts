@@ -67,7 +67,17 @@ export interface AvailabilityDayRecord extends AvailabilityDay {
 
 export interface AvailabilityAnswer {
   readonly train: { readonly no: string; readonly name: string; readonly fromName: string; readonly toName: string; readonly distanceKm: number };
-  readonly fare: { readonly base: number; readonly reservation: number; readonly superfast: number; readonly gst: number; readonly total: number };
+  /**
+   * **Null when the provider did not send a fare this adapter could read whole**, which is not a
+   * failure: no column in `availability_observations` stores a fare and no page renders one, so
+   * refusing the answer over it would cost a permanently unrecoverable observation — a past journey
+   * date answers 400 — in exchange for a number nothing reads. All-or-nothing within itself: a fare
+   * missing its GST is not a fare, and a zero standing in for an absent charge would be invented.
+   *
+   * A reader that starts *showing* a fare has to handle the null, and that is the point at which
+   * what a partial fare means becomes a decision worth making rather than an accident in a crawler.
+   */
+  readonly fare: { readonly base: number; readonly reservation: number; readonly superfast: number; readonly gst: number; readonly total: number } | null;
   readonly days: readonly AvailabilityDayRecord[];
   readonly retrievedAt: string;
 }

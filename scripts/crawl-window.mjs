@@ -15,8 +15,13 @@
 // passes the horizon, when it wraps back to today and sweeps again.
 //
 // The alternative — sweeping the whole sixty-day horizon every run — costs `ceil(60/4) = 15` calls
-// per combo per run instead of one, which is what makes a plan of 333 calls a day fund two combos
-// instead of sixteen. It is also the wrong shape for the data: what a clearance model needs is each
+// per combo per run instead of one, which is what makes a plan of 333 calls a day fund **one** combo
+// instead of eight. (Eight, not sixteen: sixteen was true when a combo made one ask a run, and
+// `5d0e949` added the pinned ask, so `ASKS_PER_COMBO_MAX` is 2 and the default ceiling of 33 funds
+// `33 / (2 × 2) = 8`. `crawl-plan.test.ts` pins it. Sizing a route list from the old number lands an
+// operator on the preflight refusal, and the only flag that makes an oversized list fit is
+// `--reserve` — which is exactly the flag that takes protection away from live PNR checks.)
+// It is also the wrong shape for the data: what a clearance model needs is each
 // journey date seen at a few DIFFERENT distances from departure, not at all sixty. A rolling window
 // gives exactly that, and gives it for the price of one call.
 //
@@ -219,6 +224,34 @@ export function parseCursors(text) {
     else cursors[key] = { next: entry.next, refusals: entry.refusals };
   }
   return issues.length > 0 ? { ok: false, issues } : { ok: true, cursors };
+}
+
+/**
+ * The cursor map a run starts from: what the file held, with `--start`'s override laid on top of it
+ * for the combos this run is actually about.
+ *
+ * **The override is laid ON, never substituted FOR.** It used to be built from the route list alone
+ * — and that list has already been cut by `--only` — while the run writes its whole cursor map back
+ * over the file afterwards. So `--start 2026-11-01 --only 2`, the natural way to test one change
+ * against two combos, deleted every other combo's sweep position and refusal count outright. The
+ * loss was silent in the worst way available: a *missing* entry takes `reset: "none"`, not
+ * `behind`, so nothing landed in `restarted`, and the next ordinary run printed "The run was whole"
+ * and exited 0 having restarted four sweeps. A combo temporarily off the list file was dropped the
+ * same way.
+ *
+ * Preserving what the run did not touch is the same promise `runCrawl` already keeps for a combo it
+ * never reaches, for the same reason: this file is the only record of where a sweep got to.
+ *
+ * A combo's refusal count survives the override, because `--start` says where to ask, not that the
+ * combo has stopped refusing.
+ *
+ * @param {{ stored: Cursors, keys: readonly string[], startAt?: string }} at
+ * @returns {Cursors}
+ */
+export function cursorsForRun({ stored, keys, startAt }) {
+  if (startAt === undefined) return stored;
+  const overrides = Object.fromEntries(keys.map((key) => [key, { next: startAt, refusals: stored[key]?.refusals ?? 0 }]));
+  return { ...stored, ...overrides };
 }
 
 

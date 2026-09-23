@@ -87,6 +87,20 @@ What the report **cannot** see, so that nobody trusts it further than it goes:
   post-run print: `today` is read once at the start, so combos crawled after 00:00 IST land on the
   next day and are marked "nothing today". Run at a stable hour, well away from IST midnight.
 
+**The departure time does not matter, and this was worth measuring.** The pinned ask is the only
+thing that produces the `days_out = 0` outcome row, and it produces one only if *today* comes back
+inside the answer. Since the provider returns "the next days the train runs, at or after the date
+asked for" and a **past** date is a hard 400, it was entirely plausible that a train which had
+already left today would answer from tomorrow — and that combo would then never get an outcome row,
+silently: the ask succeeds, four rows land, and nothing in the run's output compares the dates
+returned against the date asked for.
+
+Measured on 2026-09-23, run at **22:00 IST**: 12051 DR–MAO departs about **05:25**, seventeen hours
+earlier, and still returned a `days_out = 0` row (`WAITLIST can_book=false`). All six combos got
+one, at departure times spanning 05:25 to 22:00. So the hour you choose is about IST midnight only,
+not about the trains on your list. That is one day's evidence across six trains — if you ever add a
+combo and it shows no outcome row for a day it certainly ran, this is the assumption to re-test.
+
 ## Reading `npm run source:report`
 
 ```
@@ -174,6 +188,19 @@ A combo that refuses three runs in a row is reported as a bad list entry. Delete
 `scripts/routes.json` rather than retrying it daily: 12951 answered `Unable to process your request`
 for every class and date tried, and a permanent refusal wearing a transient's clothes costs a call
 every day forever.
+
+**"NEVER REACHED THE PROVIDER" is not a refusal, and nothing on that list is a bad entry.** After
+five failures inside a minute the guard opens the availability fuse, and every ask after that is
+answered locally without a request being sent. Those asks tell you nothing about the combos they
+name: their cursors hold where they were, they take no refusal strike, and the run stops there
+rather than walking the rest of the list for nothing. Run again once the provider has recovered and
+each combo resumes exactly where it stopped — the band is intact; what you have lost is that day's
+observation of it. The one exception the section calls out by name is an entry the adapter refuses
+to build a URL for at all: that is a bad entry, it got past the preflight, and it will do the same
+thing every run until you fix it.
+
+**Do not delete a combo from `routes.json` on the strength of that section.** Only the
+`Refused N runs in a row` list means what this runbook says it means.
 
 ## Related
 

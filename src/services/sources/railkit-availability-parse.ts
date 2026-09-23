@@ -18,9 +18,17 @@ import { unavailable, type SourceFailure } from "./outcome";
 //   * Dates arrive `D-M-YYYY`, not zero-padded (`23-9-2026`). They are
 //     normalised to ISO here, on the way in.
 //
-// Everything fails closed: a record this cannot read becomes "unavailable",
-// never an answer with no days. A day list that is empty is unreadable, not
-// sold out.
+// Everything that could be mistaken for an answer fails closed: a record this
+// cannot read becomes "unavailable", never an answer with no days. A day list
+// that is empty is unreadable, not sold out.
+//
+// **The fare is the deliberate exception, and the only one.** Nothing reads it —
+// no column stores it, no page renders it — so failing the whole answer over an
+// absent charge threw away an observation that can never be made again, because
+// a past journey date answers 400. It is read when whole and null otherwise.
+// `percent` makes the same trade for a prediction percentage the column cannot
+// hold. Both are argued where they are written; neither is a licence to soften
+// anything a traveller would act on.
 // ---------------------------------------------------------------------------
 
 const OUT = messages.source.outcomes;
@@ -118,9 +126,23 @@ function amount(source: Json, key: string): number | null {
   return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
+/**
+ * The source's own confirmation guess, bounded by what the column that receives it can hold.
+ *
+ * `source_prediction_pct` is `numeric(5,2)`, so Postgres refuses any magnitude at or above 1000 —
+ * and the four days of a window are written as **one batch**, so a single absurd value used to lose
+ * the whole window rather than the one number nothing reads. Same trade as the fare above: parse it
+ * when it is storable, drop it when it is not, and keep the availability either way.
+ *
+ * Bounded by the column and not by "0 to 100" on purpose. The column is a measured constraint; what
+ * range this provider's percentage takes is not, and narrowing to an unmeasured guess would discard
+ * real readings to no end. `source_prediction` keeps the source's own words beside it regardless.
+ */
+const PREDICTION_PCT_LIMIT = 1000;
+
 function percent(value: unknown): number | null {
   const n = typeof value === "number" ? value : typeof value === "string" && value.trim() !== "" ? Number(value) : Number.NaN;
-  return Number.isFinite(n) ? n : null;
+  return Number.isFinite(n) && Math.abs(n) < PREDICTION_PCT_LIMIT ? n : null;
 }
 
 /**
@@ -170,7 +192,22 @@ function trainFrom(value: unknown, request: AvailabilityRequest): AvailabilityAn
   return { no, name, fromName, toName, distanceKm };
 }
 
-function fareFrom(value: unknown): AvailabilityAnswer["fare"] | null {
+/**
+ * The fare, or null — and **null never fails the answer**.
+ *
+ * This is the one block in this file that does not fail closed, and the asymmetry is deliberate.
+ * Everywhere else, something unreadable could be mistaken for "no berths", and a traveller acts on
+ * that. Nothing acts on this: `availability_observations` has no fare column, no page renders one,
+ * and the block was measured on a single train. Refusing the whole answer over one absent charge
+ * therefore cost an observation that can never be made again — a past journey date answers
+ * `400 Failed to fetch availability` — plus a band of journey dates and a refusal strike against
+ * the combo, all to protect a number no reader has.
+ *
+ * All-or-nothing within itself, though: a fare missing its GST is not a fare, and a zero standing
+ * in for an absent charge would be invented rather than read. `pick` treats absent, `null` and `""`
+ * alike; a genuine `0` passes, which is the ordinary GST-exempt case and is pinned by a test.
+ */
+function fareFrom(value: unknown): AvailabilityAnswer["fare"] {
   if (!isRecord(value)) return null;
   const base = amount(value, "baseFare");
   const reservation = amount(value, "reservationCharge");
@@ -216,8 +253,9 @@ export function parseRailkitAvailabilityResponse(body: unknown, request: Availab
   if (!record) return unreadable();
 
   const train = trainFrom(record.train, request);
+  if (!train) return unreadable();
+  // The fare does NOT fail the answer. See `fareFrom`, and `AvailabilityAnswer.fare`.
   const fare = fareFrom(record.fare);
-  if (!train || !fare) return unreadable();
 
   const rows = record.availability;
   // No rows is not "no berths": the window is always four dates, so an empty list means we could
