@@ -59,3 +59,8 @@ scripts/crawl-cursor.json
 
 # agent worktrees
 /.claude/worktrees/
+
+# the subagent-driven-development workspace: ledgers, briefs, reports and review packages for
+# in-flight plans. Scratch for whoever is running the plan, never source. It was untracked rather
+# than ignored until now, so one `git add -A` would have committed every internal review note.
+/.superpowers/
