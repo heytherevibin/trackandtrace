@@ -133,6 +133,8 @@ export const REFUSALS_BEFORE_STALE = 3;
 /** @typedef {{ combo: string, route: Route, date: string, kind: AskKind, reset: "none" | "beyond" | "behind" | "unreadable" }} PlannedAsk */
 /** @typedef {{ combo: string, date: string, code: string, why: string }} Failure */
 /** @typedef {{ combo: string, kind: AskKind, date: string, code: string, why: string, rested: boolean }} NotAsked */
+/** An ask that was planned and never reached, because a gate stopped the run before it came round. */
+/** @typedef {{ combo: string, kind: AskKind, date: string }} Forfeited */
 /** @typedef {{ combo: string, kind: AskKind, date: string, daysOut: number, rows: number }} Asked */
 /** @typedef {{ combo: string, date: string, days: number }} ShortWindow */
 /** @typedef {{ combo: string, reason: "behind" | "unreadable", cursor: string, gaveUp: string | null }} Restart */
@@ -142,7 +144,7 @@ export const REFUSALS_BEFORE_STALE = 3;
  * @typedef {{
  *   today: string, horizonDays: number, windowDays: number,
  *   listed: number, planned: number, combos: number, asks: number, calls: number, rows: number,
- *   asked: Asked[], failures: Failure[], pinnedFailures: Failure[], notAsked: NotAsked[],
+ *   asked: Asked[], failures: Failure[], pinnedFailures: Failure[], notAsked: NotAsked[], forfeited: Forfeited[],
  *   shortWindows: ShortWindow[],
  *   wrapped: string[], restarted: Restart[], stale: string[], cursors: Cursors, stopped: string | null,
  *   remaining: number | null, whole: boolean
@@ -284,9 +286,6 @@ function why(outcome) {
   return `${outcome.code}${cause}: ${outcome.message}`;
 }
 
-/** The adapter's own code for a request it refused locally, before it built a URL. */
-const INVALID = "INVALID";
-
 /**
  * Of the asks that spent no call, which ones were held back by the GUARD rather than refused by
  * the adapter — and so mean that every remaining ask would be held back too.
@@ -307,14 +306,26 @@ const INVALID = "INVALID";
  * before a call is spent — which is precisely why it must not be folded into the first: if the
  * preflight ever loosens, a malformed route would otherwise be filed as "blameless" for ever.
  *
- * Told apart by the adapter's own code, which is already the contract both directions of this file
- * read. Neither one moves a cursor or earns a strike; they differ only in whether the run goes on.
+ * **Identified POSITIVELY, and this is the whole point of the function.** The obvious rule —
+ * `code !== INVALID` — says "everything except one known route error is the gate", which fails
+ * OPEN: rename or narrow that code and a single bad entry silently starts stopping the whole run,
+ * the same family of defect as treating a rest like a refusal. Nothing binds `Refused.code` (a bare
+ * string here) to the adapter's union, so no test would catch the flip.
+ *
+ * So the gate is named by its own shape instead. `guarded.ts:59` is the only `SOURCE_UNAVAILABLE`
+ * in this codebase built without a `cause` — every other one goes through `outcome.ts`'s
+ * `unavailable(message, cause, …)`, which always sets one. A causeless `SOURCE_UNAVAILABLE` is
+ * therefore the guard's rest and nothing else, and any future shape falls through to "not the
+ * gate": the run continues, which wastes a walk down the list and costs no data. That is the
+ * direction this must fail in.
+ *
+ * Neither one moves a cursor or earns a strike; they differ only in whether the run goes on.
  *
  * @param {Refused} outcome
  * @returns {boolean}
  */
 function restedOnTheGate(outcome) {
-  return outcome.code !== INVALID;
+  return outcome.code === "SOURCE_UNAVAILABLE" && outcome.cause === undefined;
 }
 
 /**
@@ -371,6 +382,7 @@ export async function runCrawl({ routes, cursors, today, horizonDays, windowDays
     failures: [],
     pinnedFailures: [],
     notAsked: [],
+    forfeited: [],
     shortWindows: [],
     wrapped: [],
     restarted: [],
@@ -383,8 +395,15 @@ export async function runCrawl({ routes, cursors, today, horizonDays, windowDays
     whole: false,
   };
 
-  for (const step of plan) {
-    if (summary.stopped !== null) break;
+  // Everything a stop leaves unasked, recorded where the stop happens because the breaking step is
+  // itself forfeited only when the gate closed BEFORE its ask. The pinned ones are what matter: a
+  // pinned ask is the only ask that reaches `days_out = 0`, so one never made is a label that does
+  // not exist and that no later run can create. Stopping is still right; it was never free.
+  const forfeitFrom = (index) => {
+    summary.forfeited = plan.slice(index).map((one) => ({ combo: one.combo, kind: one.kind, date: one.date }));
+  };
+
+  for (const [index, step] of plan.entries()) {
     const key = step.combo;
     const entry = cursors[key];
 
@@ -392,6 +411,7 @@ export async function runCrawl({ routes, cursors, today, horizonDays, windowDays
     // `callsPerAsk - 1` at every ceiling the arithmetic does not divide.
     if (summary.calls + callsPerAsk > ceiling) {
       summary.stopped = `the run's own ceiling of ${ceiling} calls — stopping rather than slowing, so the plan live checks depend on stays whole`;
+      forfeitFrom(index);
       break;
     }
 
@@ -436,6 +456,7 @@ export async function runCrawl({ routes, cursors, today, horizonDays, windowDays
       // already what `runCrawl` does for combos it never gets to.
       if (rested) {
         summary.stopped = `the provider's breaker is resting, so ${key}'s ask for ${step.date} was never sent — it is open for this caller as a whole, so every remaining ask would rest too`;
+        forfeitFrom(index + 1);
         break;
       }
       continue;
@@ -463,6 +484,7 @@ export async function runCrawl({ routes, cursors, today, horizonDays, windowDays
 
     if (seen.stop) {
       summary.stopped = `the provider's own RateLimit-Remaining fell to ${seen.remaining}, at or below the floor of ${remainingFloor}`;
+      forfeitFrom(index + 1);
       break;
     }
   }

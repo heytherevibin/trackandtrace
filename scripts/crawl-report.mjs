@@ -80,7 +80,29 @@ export function summarise(summary) {
     lines.push("  Run daily, or accept the hole: this is the one failure nothing can repair afterwards.");
   }
 
-  if (summary.stopped !== null) lines.push("", `STOPPED: ${summary.stopped}`);
+  if (summary.stopped !== null) {
+    lines.push("", `STOPPED: ${summary.stopped}`);
+    // What stopping cost, said out loud. Stopping is the right call — the fuse is 30 s at minimum
+    // and every remaining ask would rest too — but "it costs nothing" was never true. A pinned ask
+    // is the only ask that reaches `days_out = 0`, so one the run never made is a label that does
+    // not exist and that no later run can create: the rolling window reaches 0 for one journey date
+    // in twenty.
+    // Keyed on the DATE, not on `kind`. On the run a sweep wraps, `planAsks` emits one step instead
+    // of two because the rolling date already IS today — and that merged step is marked `rolling`
+    // while carrying the outcome. Counting `kind === "pinned"` would quietly miss exactly the combos
+    // that had just wrapped.
+    const lostOutcomes = summary.forfeited.filter((one) => one.date === summary.today);
+    if (lostOutcomes.length > 0) {
+      lines.push(
+        `  ${lostOutcomes.length} combo${s(lostOutcomes.length)} past the stop were never asked for today's outcome row, and THAT is gone for good — a days_out = 0 row is the label, and only the pinned ask reaches it:`,
+      );
+      for (const one of lostOutcomes) lines.push(`    ${one.combo}  ${one.date}`);
+    }
+    const lostBands = summary.forfeited.filter((one) => one.date !== summary.today);
+    if (lostBands.length > 0) {
+      lines.push(`  ${lostBands.length} rolling ask${s(lostBands.length)} past the stop were not made either; those cursors held, so the next run asks the same band.`);
+    }
+  }
 
   if (summary.notAsked.length > 0) {
     lines.push(
@@ -94,7 +116,8 @@ export function summarise(summary) {
       lines.push(`  ${one.combo}  ${one.kind.padEnd(7)} ${one.date}  ${because}`);
     }
     lines.push(
-      "  The BAND is not lost — the next run asks exactly where each of these stopped. What is lost is today's observation of it, and a day the crawler did not reach is a day the dataset never gets.",
+      "  Each cursor above still points where it did, so the next run asks that same band. What is lost is today's observation of it, and a day the crawler did not reach is a day the dataset never gets.",
+      "  (A combo whose cursor was already BEHIND is the exception: it is listed under RESTARTED above, and the next run will again find it behind and again ask today.)",
     );
     if (summary.notAsked.some((one) => one.rested)) lines.push("  Nothing was spent on these. Run again once the provider has recovered.");
     if (summary.notAsked.some((one) => !one.rested)) lines.push("  A route the adapter will not build a URL for will do this every run: fix or remove that entry in routes.json.");
