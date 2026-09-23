@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(29);
+select plan(30);
 
 select has_table('console', 'settings', 'settings exists');
 select col_not_null('console', 'settings', 'version', 'a settings row always has a version');
@@ -107,10 +107,10 @@ select throws_ok(
 -- '{}'::jsonb` is one `if`. The message cannot tell them apart; their fixtures can, and do:
 -- with `or p_changes = '{}'::jsonb` deleted this one fails alone, and with `p_changes is null
 -- or` deleted this one stays green while the null-change-set assertion below fails together
--- with the version check guarding it. Second, 'unknown environment' -- the third of the three,
--- raised when no settings row matches p_environment -- is asserted nowhere in this suite, and
--- so is held up by nothing: deleting that guard outright, and swapping its words for others
--- under the same errcode, each leave all 17 files and all 652 assertions green.
+-- with the version check guarding it. Second, the third of the three, 'unknown environment',
+-- is not reachable from here at all: it sits on the far side of console.use_tap, so no
+-- assertion in this block can arrive at it. It has its own further down, with the tap that
+-- getting there costs.
 select throws_ok(
   $$select public.console_save_settings('development', 1, '{}'::jsonb, 'maintenance')$$,
   '22023',
@@ -164,6 +164,33 @@ select is(
   (select version from console.settings where environment = 'production')::int,
   1,
   'the null change set attempt left the version unchanged'
+);
+
+-- The third 22023, and the only one that costs a tap to reach. 'unknown environment' sits
+-- after console.use_tap, not before it like the two above, so a change set and a reason are
+-- not enough on their own -- without a real tap the call raises 42501 'no tap for this action'
+-- and never reaches the settings lookup at all. So this mints one, for exactly these
+-- arguments, and the environment is part of what use_tap digests.
+--
+-- 'staging' is the same name the table-level assertion near the top of this file refuses:
+-- outside the closed set console.settings will hold, so no row can match it and none has to be
+-- deleted to make that true -- the seeded count of 3 asserted above stays 3. The two together
+-- say the whole rule: the table will not store that environment, and the save path will not
+-- write to it either.
+--
+-- The refused call does not spend the tap. The raise aborts the whole statement, so use_tap's
+-- `used_at` update rolls back with it and the challenge row is left untouched for anything
+-- after this -- which is why no assertion below has to work around it.
+insert into console.challenges (member_id, session_id, purpose, challenge, digest, expires_at, verified_at)
+values ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'action', 'settings-challenge-unknownenv',
+        console.action_digest('settings.save', 'staging', ('{"checks_paused": true}'::jsonb)::text, 'saving to nowhere'),
+        now() + interval '5 minutes', now());
+
+select throws_ok(
+  $$select public.console_save_settings('staging', 1, '{"checks_paused": true}'::jsonb, 'saving to nowhere')$$,
+  '22023',
+  'unknown environment',
+  'a save aimed at an environment the table does not hold is refused'
 );
 
 -- The tap's value is the change set as jsonb renders it, which is what the
