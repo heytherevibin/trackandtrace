@@ -36,7 +36,8 @@
     "source:probe:railkit": "node --env-file=.env.local scripts/probe-railkit.mjs",
     "source:probe:availability": "node --env-file=.env.local scripts/probe-railkit-availability.mjs",
     "source:health": "node --env-file-if-exists=.env.local scripts/source-health.mjs",
-    "source:crawl": "node --env-file=.env.local scripts/crawl-availability.mjs"
+    "source:crawl": "node --env-file=.env.local scripts/crawl-availability.mjs",
+    "source:report": "node --env-file=.env.local scripts/observations-report.mjs"
   },
   "dependencies": {
     "@base-ui/react": "1.8.0",

@@ -20,6 +20,11 @@
 // Exit: 0 the run was whole · 1 it was not (a refusal, or a gate stopped it) · 2 it was asked
 // wrongly, and nothing was spent.
 //
+// **The exit code is about THIS RUN and nothing else.** After the run it also prints the whole
+// store's coverage (`observations-coverage.mjs`), because a run can be perfectly whole while the
+// dataset is holed by days nobody ran it — but a holed store does NOT change the code above.
+// `npm run source:report` is the check with its own threshold and its own exit code.
+//
 // This file is only the wiring. The stride, the route preflight, the two quota gates, the loop and
 // the report all live in `crawl-plan.mjs`, which is pure and tested — **read its header before
 // changing anything about what this run is allowed to spend.**
@@ -45,6 +50,7 @@ import {
   summarise,
 } from "./crawl-plan.mjs";
 import { DEFAULT_HORIZON_DAYS, DEFAULT_WINDOW_DAYS, cycleRuns, parseCursors } from "./crawl-window.mjs";
+import { coverageReport, parseObservationRows, readObservations, summariseCoverage } from "./observations-coverage.mjs";
 
 const HERE = new URL("./", import.meta.url);
 
@@ -116,6 +122,40 @@ function fail(message) {
 /** Today in India: a journey date is an Indian calendar date, and a date the provider has closed answers 400. */
 function istToday() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+}
+
+/**
+ * What the STORE looks like, after this run has written to it.
+ *
+ * The report above is about the run: it can say "the run was whole" while the dataset has holes
+ * from days nobody ran the crawler at all — and those are the holes that can never be filled, since
+ * a past journey date answers 400. This closes that blindness. It costs nothing on the provider's
+ * plan (it reads our own database), and it runs after the crawl, never before its preflight.
+ *
+ * **It never changes the run's exit code.** A failure to read the store is printed and stepped over
+ * for the same reason: the crawl's own verdict must not depend on a second thing being healthy.
+ */
+async function printStoreCoverage({ db, table, today, listed }) {
+  try {
+    const read = await readObservations(db, { table });
+    if (!read.ok) {
+      console.error(`[crawl] the store's coverage could not be read: ${read.reason}`);
+      return;
+    }
+    const parsed = parseObservationRows(read.rows);
+    if (!parsed.ok) {
+      console.error(`[crawl] the store holds rows the coverage report cannot read: ${parsed.issues.slice(0, 3).join("; ")}`);
+      return;
+    }
+    const coverage = coverageReport({ rows: parsed.rows, today, listed });
+    for (const line of summariseCoverage(coverage)) console.log(line);
+    if (!coverage.enough) {
+      console.log("\nThe STORE is below its coverage threshold, which this run's exit code does not report: 0 or 1 here still means only whether THIS run was whole.");
+      console.log("`npm run source:report` is the check that fails on the store.");
+    }
+  } catch (error) {
+    console.error(`[crawl] the store's coverage could not be read: ${error.message}`);
+  }
 }
 
 /** Absent is the normal first run: every combo starts at today. Unreadable is not, and is refused. */
@@ -275,6 +315,7 @@ async function main() {
   }
 
   for (const line of summarise(summary)) console.log(line);
+  await printStoreCoverage({ db, table: OBSERVATION_TABLE, today, listed: routes.map(comboKey) });
   process.exit(exitCodeFor(summary));
 }
 
