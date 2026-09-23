@@ -164,7 +164,13 @@ export const REFUSALS_BEFORE_STALE = 3;
  * first run and never drifts, so the same residue class is starved for ever. Measured over 200 runs
  * at `H=60, W=4`: **133 of 140** steady-state journey dates never got an outcome row, and a past
  * date answers 400, so none of them can be refilled. The pinned ask covers `days_out` 0..3, so every
- * journey date gets its outcome row on the day it departs.
+ * journey date gets its outcome row on the day it departs — **on every day the crawler runs.**
+ *
+ * That condition is the whole of what changed. The label no longer depends on where the sweep
+ * happens to be, which is why it used to fail silently; it depends on somebody running this. A
+ * skipped day costs one outcome row per combo, permanently: miss one day in seven and 20 of those
+ * 140 journey dates go unlabelled. Nothing later can fill them, which is why `npm run source:report`
+ * exists and why a missed day is worth an alarm rather than a shrug.
  *
  * Two consequences, both load-bearing:
  *
