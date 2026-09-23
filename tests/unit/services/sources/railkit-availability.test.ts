@@ -49,10 +49,20 @@ function sourceWith(fetchImpl: FetchLike) {
   return createRailKitAvailabilitySource(CONFIG, { fetch: fetchImpl as unknown as typeof fetch, now: () => NOW });
 }
 
-/** No outcome may ever be "fine, and there are no days": that is what a page would read as sold out. */
+/**
+ * The one shape that must never exist is "fine, and there are no days" — a page reads that as sold
+ * out. So this asserts the whole claim in its name, on whichever branch it is handed: an answer
+ * carries at least one day, and a refusal carries no day list at all and is never NOT_FOUND, which
+ * would read as "there is no such train". Callers assert separately which branch they expect.
+ */
 function expectNotAnEmptyAnswer(out: AvailabilityOutcome): void {
-  expect(out.ok).toBe(false);
-  if (out.ok) expect(out.answer.days.length).toBeGreaterThan(0);
+  if (out.ok) {
+    expect(out.answer.days.length).toBeGreaterThan(0);
+    return;
+  }
+  expect(out).not.toHaveProperty("answer");
+  expect(out).not.toHaveProperty("days");
+  expect(out.code).not.toBe("NOT_FOUND");
 }
 
 const timedOut = () => Promise.reject(Object.assign(new Error("The operation was aborted due to timeout"), { name: "TimeoutError" }));
@@ -129,6 +139,7 @@ describe("the answer it returns", () => {
     expect(out.answer.days[0]).toMatchObject({ date: "2026-09-23", canBook: false, rawStatus: "NOT AVAILABLE" });
     expect(out.answer.days[1]).toMatchObject({ date: "2026-09-24", canBook: true, wlBooking: 65, wlCurrent: 26 });
     expect(out.answer.retrievedAt).toBe(NOW.toISOString());
+    expectNotAnEmptyAnswer(out);
   });
 
   it("returns a REGRET day as an answer, not as a failure", async () => {
@@ -136,6 +147,7 @@ describe("the answer it returns", () => {
     const out = await sourceWith(async () => response(200, regret)).check(REQUEST);
     expect(out.ok).toBe(true);
     expect(out.ok && out.answer.days[0]).toMatchObject({ status: "REGRET", canBook: false });
+    expectNotAnEmptyAnswer(out);
   });
 });
 

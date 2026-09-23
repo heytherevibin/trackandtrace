@@ -112,11 +112,33 @@ function payloadOf(body: Json): Json | null {
   return data;
 }
 
-function trainFrom(value: unknown, requested: string): AvailabilityAnswer["train"] | null {
+/**
+ * The response echoes what the URL asked for. `trainNo` is checked by the caller; these four are
+ * the rest. Each is compared when present and ignored when absent, exactly as the PNR parser
+ * treats the PNR it gets back: an echo that
+ * *disagrees* is an answer to a question we did not ask, while an echo the provider stops sending
+ * is no reason to refuse a berth count. A crawler issues thousands of these and reads none of them
+ * by eye, so the only thing that will ever notice a swapped route is this comparison.
+ */
+function echoesRequest(value: Json, request: AvailabilityRequest): boolean {
+  const pairs: readonly (readonly [string, string])[] = [
+    ["from", request.from],
+    ["to", request.to],
+    ["travelClass", request.travelClass],
+    ["quota", request.quota],
+  ];
+  return pairs.every(([key, asked]) => {
+    const echoed = text(value, [key])?.toUpperCase();
+    return echoed === undefined || echoed === asked.trim().toUpperCase();
+  });
+}
+
+function trainFrom(value: unknown, request: AvailabilityRequest): AvailabilityAnswer["train"] | null {
   if (!isRecord(value)) return null;
   const no = text(value, ["trainNo"]);
   // A record about a different train answers a question we did not ask.
-  if (!no || !TRAIN_NO.test(no) || no !== requested) return null;
+  if (!no || !TRAIN_NO.test(no) || no !== request.trainNo.trim()) return null;
+  if (!echoesRequest(value, request)) return null;
   const name = text(value, ["trainName"]);
   const fromName = text(value, ["fromStationName"]);
   const toName = text(value, ["toStationName"]);
@@ -169,7 +191,7 @@ export function parseRailkitAvailabilityResponse(body: unknown, request: Availab
   const record = payloadOf(body);
   if (!record) return unreadable();
 
-  const train = trainFrom(record.train, request.trainNo);
+  const train = trainFrom(record.train, request);
   const fare = fareFrom(record.fare);
   if (!train || !fare) return unreadable();
 

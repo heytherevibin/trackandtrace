@@ -178,6 +178,32 @@ describe("what must never read as no seats", () => {
   });
 });
 
+describe("the route the answer claims to be about", () => {
+  it.each([
+    ["a different origin", { from: "SBC" }],
+    ["a different destination", { to: "BCT" }],
+    ["a different class", { travelClass: "3A" }],
+    ["a different quota", { quota: "TQ" }],
+  ])("refuses an answer echoing %s, which is a question we did not ask", (_label, patch) => {
+    const out = parse(body({ train: { ...TRAIN, ...patch } }));
+    expect(out.ok).toBe(false);
+    if (out.ok) return;
+    expect(out.code).toBe("SOURCE_UNAVAILABLE");
+    expect(out.code).not.toBe("NOT_FOUND");
+  });
+
+  it("compares the echo regardless of the case either side sends it in", () => {
+    const shouted = parse(body({ train: { ...TRAIN, from: "mas", to: "ndls", travelClass: "sl", quota: "gn" } }));
+    expect(shouted.ok).toBe(true);
+  });
+
+  it("still answers when the provider stops echoing the route at all", () => {
+    const out = parse(body({ train: { trainNo: "12621", trainName: "TAMIL NADU EXP", fromStationName: "MGR CHENNAI CTL", toStationName: "NEW DELHI", distance: 2175 } }));
+    expect(out.ok).toBe(true);
+    expect(out.ok && out.answer.days).toHaveLength(3);
+  });
+});
+
 describe("the measured refusals", () => {
   const refusal = (error: string) => parse({ success: false, error });
 
