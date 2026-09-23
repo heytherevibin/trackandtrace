@@ -110,19 +110,10 @@ Every action above writes one audit row inside the same transaction as the chang
 the target, your reason, and the before/after where there is one. Nothing is written for an action
 that was refused part-way — the transaction takes the whole set or none of it.
 
-The Audit log module (14) is not built yet, so until it is, reading the trail means a read-only query
-against the project's database:
-
-```sql
-select at, actor_name, action, target, reason
-  from console.audit_log
- where category = 'team'
- order by at desc
- limit 50;
-```
-
-Rows are kept for two years (`console.purge_audit()`), and the table holds no foreign keys, so it
-survives every other kind of cleanup.
+Read the trail in **Audit log** (`/audit-log`, module 14) — filter Category to *Team*, or Member to
+one person. [console-audit-log.md](console-audit-log.md) covers what each result means and what the
+export is. Rows are kept for two years, the table refuses every update and delete, and it holds no
+foreign keys, so a row outlives the member it names and survives every other kind of cleanup.
 
 ## When Team refuses and you cannot tell why
 

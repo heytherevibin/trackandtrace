@@ -45,6 +45,27 @@ function readStack() {
   return { url: found.API_URL, publishableKey: found.PUBLISHABLE_KEY, secretKey: found.SECRET_KEY };
 }
 
+/**
+ * `resetConsole()` (tests/e2e/console-auth/fixtures.ts) shells out to `psql`, so without one every
+ * spec in this suite dies with `spawnSync psql ENOENT` before a browser opens -- twenty identical
+ * stack traces that read like a regression and are not one. macOS ships no `psql` unless libpq or
+ * the Postgres app is installed, so this is the ordinary state of a fresh machine. Checked here,
+ * once, with the sentence a reader needs, rather than discovered twenty times in a scrollback.
+ */
+function requirePsql() {
+  try {
+    execFileSync("psql", ["--version"], { stdio: "ignore" });
+  } catch {
+    fail(
+      "`psql` is not on PATH, and this suite's resetConsole() shells out to it -- every spec would fail\n" +
+        "before a browser opened. Install libpq (`brew install libpq` and add its bin to PATH), or put any\n" +
+        "psql that can reach the local stack on PATH.",
+    );
+  }
+}
+
+requirePsql();
+
 const stack = readStack();
 
 const child = spawn("npx", ["playwright", "test", "--config", "playwright.console.config.ts"], {

@@ -44,6 +44,34 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      console_audit: {
+        Args: {
+          p_category?: string
+          p_environment?: string
+          p_from?: string
+          p_limit?: number
+          p_member?: string
+          p_offset?: number
+          p_result?: string
+          p_search?: string
+          p_to?: string
+        }
+        Returns: Json
+      }
+      console_audit_actors: {
+        Args: { p_environment?: string; p_from?: string; p_to?: string }
+        Returns: Json
+      }
+      console_audit_entry: { Args: { p_id: string }; Returns: Json }
+      console_audit_export: {
+        Args: {
+          p_environment: string
+          p_filters: string
+          p_range: string
+          p_reason: string
+        }
+        Returns: Json
+      }
       console_auth_accept_invite: {
         Args: {
           p_environment: string

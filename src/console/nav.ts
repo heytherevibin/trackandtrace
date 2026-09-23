@@ -36,12 +36,11 @@ const EVERY_ROLE = ["owner", "admin", "support", "viewer"] as const;
  *
  * `built` was false for all fourteen in 2d-1: no module had a page, and a rail of links that all
  * lead nowhere is worse than no rail (task-4-brief.md's ruling). A module's flag flips to true in
- * the same PR that adds its page, and 2d-2 task-8 flips the first one -- 13 Team. The rest are still
- * to come:
+ * the same PR that adds its page; 2d-2 task-8 flipped the first one -- 13 Team -- and 2d-2b task-2
+ * flips the second, 14 Audit log. The rest are still to come:
  *   - 01 Overview: 2f
  *   - 11 Switches & settings: 2e
- *   - 14 Audit log: 2d-2
- * The other nine modules have no page planned yet.
+ * The other ten modules have no page planned yet.
  */
 export const CONSOLE_MODULES: readonly ConsoleModule[] = [
   { num: "01", label: "Overview", group: "operate", roles: EVERY_ROLE, href: consoleHref("/"), built: false },
@@ -61,7 +60,11 @@ export const CONSOLE_MODULES: readonly ConsoleModule[] = [
   // one `built: true` in the list -- and because it is Owner-only, an Owner is the first and so far
   // only role for which the rail and the phone drawer render at all.
   { num: "13", label: "Team", group: "configure", roles: OWNER_ONLY, href: consoleHref("/team"), built: true },
-  { num: "14", label: "Audit log", group: "record", roles: OWNER_ADMIN, href: consoleHref("/audit-log"), built: false },
+  // 2d-2b task-2: src/app/console/audit-log/page.tsx exists, so this flips too -- and because it is
+  // Owner+Admin, an Admin now gets a rail for the first time (Team, the only other built module, is
+  // Owner-only). Flipping it is what the flag is for; the task brief's file list omits this file,
+  // which task-2-report.md records.
+  { num: "14", label: "Audit log", group: "record", roles: OWNER_ADMIN, href: consoleHref("/audit-log"), built: true },
 ];
 
 /**

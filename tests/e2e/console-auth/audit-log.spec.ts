@@ -1,0 +1,388 @@
+import { OPENED, auditRows, expectEntriesTotal, inviteAndSignIn, settledAuditRows, shot, writeForeignRows } from "./audit-helpers";
+import { consoleSql, expect, ownerIdentity, resetConsole, setUpFirstOwner, test } from "./fixtures";
+import { freshAddress, idOf } from "./team-helpers";
+import { consoleMessages } from "@/console/messages";
+import { expectAxeClean, gotoReady } from "../helpers";
+import { layoutBreaks } from "../layout";
+
+const BASE = "http://admin.localhost:4211";
+const m = consoleMessages.audit;
+const frame = consoleMessages.frame;
+
+test.beforeEach(() => resetConsole());
+
+// The export lives in ./audit-log-export.spec.ts. It was lifted out when this file reached 493
+// lines against the 500-line cap tests/unit/tokens.contract.test.ts enforces over `src/` and
+// `tests/`, and it is the clean seam: the only test here that downloaded a file, ran a tap or
+// needed a clock. Nothing depends on which file runs first -- `globalTeardown` holds the database
+// clean for any subset of specs, which is what retired the one-file rule.
+
+/**
+ * The Audit log (AuditLog.dc.html), in a real Chromium against a real local Supabase stack. Three
+ * things only this run can show, and the first two are the whole point of the module:
+ *
+ * 1. **The read is audited, and the page proves it about itself.** The row the page writes when it
+ *    is opened -- "Opened the audit log" / "Audit log" -- is one of the rows it then shows. A unit
+ *    test can assert that `writeConsoleAudit` was called; only this can show the row coming back out
+ *    of `console_audit` through the real function, the real zod and the real table.
+ * 2. **Filtering and paging never write another one.** Ruling (task-2-addendum.md §5): one row per
+ *    server render, none from the GET route the client re-reads. So a filter change must leave the
+ *    count of "Opened the audit log" rows exactly where it was -- and the filtered view's address
+ *    must still be linkable, which is the other half of the same design.
+ * 3. The layout holds and axe is clean at the sheet's own 1280 width, which jsdom cannot say
+ *    anything about (console-rail.test.tsx's own note on the reverse case).
+ */
+test.describe("the Audit log", () => {
+  test("shows its own open, and neither filtering nor paging records another", async ({ page, baseURL }) => {
+    const owner = await setUpFirstOwner(page, baseURL ?? BASE);
+
+    // Scoped to the rows this test wrote: `resetConsole()` deliberately leaves the audit log alone,
+    // so a bare count would be counting every earlier run on this machine too. The scoped counter
+    // and the settle that waits for `after()`'s own write live in ./audit-helpers.ts, with why.
+    const opensByThisOwner = () => auditRows(owner.name, OPENED);
+
+    await gotoReady(page, "/audit-log");
+    await expect(page.getByRole("heading", { level: 1, name: "Audit log" })).toBeVisible();
+    await expect(page.getByText("Every action taken in the console: who took it, when and why.")).toBeVisible();
+
+    // The sheet's own columns in the sheet's own relative order (AuditLog.dc.html:160), with the
+    // Environment column the environment ruling added (task-2-addendum.md §4) second -- where it is
+    // always readable rather than the first thing to scroll out of a wide table.
+    const table = page.getByRole("table");
+    await expect(table).toBeVisible();
+    // "Open" last, in a visually-hidden span: the header is there for a screen reader and not on
+    // screen, because every cell under it says the same word (:160).
+    await expect(table.getByRole("columnheader")).toHaveText(["Time ↓", "Environment", "Member", "Action", "Target", "Reason", "Result", "Address", "Open"]);
+
+    // The page's own row, read back out through console_audit, the real zod and the real table.
+    // `after()` writes it once the response has gone out, so the first paint may not carry it -- a
+    // reload is what makes it certain, and a reload is itself a legitimate second open.
+    await gotoReady(page, "/audit-log");
+    const mine = page.getByRole("row", { name: new RegExp(`Opened the audit log.*${owner.name}|${owner.name}.*Opened the audit log`) });
+    await expect(mine.first()).toBeVisible();
+    await expect(mine.first()).toContainText("Audit log");
+    await expect(mine.first()).toContainText("Owner");
+    const before = await settledAuditRows(owner.name, OPENED);
+
+    // A filter change re-reads from GET /api/audit and writes nothing. The address follows it
+    // (history.replaceState) so the filtered view stays linkable without a server render.
+    await page.getByRole("button", { name: "7 days" }).click();
+    await expect(page.getByRole("button", { name: "7 days" })).toHaveAttribute("aria-pressed", "true");
+    await expect.poll(() => new URL(page.url()).searchParams.get("range")).toBe("7d");
+    await page.getByRole("combobox", { name: "Result" }).selectOption("done");
+    await expect.poll(() => new URL(page.url()).searchParams.get("result")).toBe("done");
+    await expect(page.getByText("Filters", { exact: true })).toBeVisible();
+    await expect(page.getByText("Result: Done")).toBeVisible();
+    await expect(page.getByRole("table")).toBeVisible();
+
+    // Ruling (task-2-addendum.md §5), in the only place it can actually be shown: two client
+    // re-reads happened and the log did not grow by one row.
+    expect(opensByThisOwner(), "a filter change must not record an open").toBe(before);
+
+    // Everything except the entries table's own sideways scroll, which is what DataTable is built to
+    // do with a wide table ("Scrolls sideways on wide screens; stacks into labelled rows below md",
+    // src/components/ui/data-table.tsx) and which layoutBreaks -- a *phone* layout tool reading
+    // getBoundingClientRect, which knows nothing about clipping -- reports as a break on principle.
+    //
+    // The table is hidden for the measurement rather than filtered out of it by element name. The
+    // name filter this replaces (`td|th|tr|...`) let a `span "Done"` through the moment Task 3's
+    // ninth column pushed a Badge past 1280, which is a false alarm about a cell that is merely
+    // scrolled out of view -- and the next such cell would have been a different tag again.
+    const entries = page.locator('[role="region"][aria-label^="Audit entries"]');
+    await entries.evaluate((el: HTMLElement) => (el.style.display = "none"));
+    const breaks = await layoutBreaks(page);
+    await entries.evaluate((el: HTMLElement) => (el.style.display = ""));
+    expect(breaks, "the Audit log at 1280px, outside the entries table's own scroller").toEqual([]);
+
+    // And with the table back, what a member would actually feel: the page does not scroll
+    // sideways. Measured rather than inferred, because `documentElement.scrollWidth` cannot be
+    // trusted here -- Chrome folds a nested scroller's overflow into every ancestor's scrollWidth
+    // (1412px in a 1280px viewport on this page) while still clipping it and refusing to scroll.
+    // `window.scrollX` is the property that does not lie.
+    const scrolledBy = await page.evaluate(() => {
+      window.scrollTo(3000, 0);
+      const x = window.scrollX;
+      window.scrollTo(0, 0);
+      return x;
+    });
+    expect(scrolledBy, "the Audit log must not scroll sideways at 1280px").toBe(0);
+    await expectAxeClean(page);
+
+    // Clear filters takes the address back to the page's own, which is what "the default view
+    // writes nothing at all" means once it is a real browser URL.
+    await page.getByRole("button", { name: "Clear filters" }).click();
+    await expect.poll(() => new URL(page.url()).search).toBe("");
+    expect(opensByThisOwner(), "clearing the filters must not record an open either").toBe(before);
+  });
+
+  /**
+   * Why no link to this page may ever set `prefetch` -- measured against the running server rather
+   * than reasoned about, because the reasoning went the wrong way round once already.
+   *
+   * The automatic path cannot be exercised here at all:
+   * `next/dist/client/components/links.js:217-223` disables viewport prefetching outright when
+   * `NODE_ENV !== 'production'`, and this suite runs `next dev`. So both requests below are made by
+   * hand, in the two shapes Next's own fetch strategies send
+   * (`segment-cache/cache.js:1195` vs `:1954-1958`), through `page.request`, which carries the
+   * browser context's cookies -- so each one is the signed-in member's own.
+   *
+   * What they establish:
+   *
+   * 1. A request carrying `Next-Router-Prefetch: 1` (the PPR strategy, which is what a `<Link>` with
+   *    no `prefetch` prop uses) is answered from the route shell and **never renders this page**. No
+   *    row, and the page's own header check never even runs -- it is belt-and-braces, not the thing
+   *    keeping the log clean. This test passes with that check deleted, which is exactly why it is
+   *    written as a statement about Next rather than about the guard.
+   * 2. The same request **without** that header -- the shape `FetchStrategy.Full` sends, which is
+   *    what `<Link prefetch>` selects -- renders the page in full and **does** write a row. That is
+   *    the hazard in one assertion: add `prefetch` to a link pointing here and every viewport
+   *    impression of it records an open that never happened, into a table nothing can delete from.
+   *
+   * The rule that actually prevents it is "no console link sets `prefetch`", held by
+   * tests/unit/console/audit/prefetch-guard.test.tsx. This test is what tells us the day Next
+   * changes either half of the measurement underneath that rule.
+   */
+  test("a prefetch never renders the page; the same request without the header does, and is recorded", async ({ page, baseURL }) => {
+    const owner = await setUpFirstOwner(page, baseURL ?? BASE);
+    const opens = () => auditRows(owner.name, OPENED);
+    const url = `${baseURL ?? BASE}/audit-log`;
+
+    await gotoReady(page, url);
+    // Settled, not merely non-zero: `after()` writes the row once the response has already gone out.
+    const before = await settledAuditRows(owner.name, OPENED);
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const prefetch = await page.request.get(url, { headers: { RSC: "1", "Next-Router-Prefetch": "1" } });
+      expect(prefetch.ok(), "a prefetch is still served, just not rendered").toBe(true);
+      // The shell, not the page: none of what this page draws is in it.
+      const body = await prefetch.text();
+      expect(body, "a prefetch must not carry the page's own content").not.toContain(m.entries.title);
+      expect(body.length, "the shell is a fraction of the rendered page").toBeLessThan(2000);
+    }
+    // The same chance to land that the real render's own `after()` got above.
+    await page.waitForTimeout(1000);
+    expect(opens(), "three prefetches must record nothing").toBe(before);
+
+    // The hazard, pinned: no prefetch header, a full render, a row. This is what a `<Link prefetch>`
+    // to this page would do on every viewport impression.
+    const full = await page.request.get(url, { headers: { RSC: "1" } });
+    expect(full.ok()).toBe(true);
+    expect(await full.text(), "a full-payload fetch does render the page").toContain(m.entries.title);
+    await expect.poll(opens, { message: "a full-payload fetch is indistinguishable from an open, and is recorded as one" }).toBe(before + 1);
+  });
+
+  /**
+   * The drawer (Task 3), on a row the console really wrote. Two things only this run can show:
+   *
+   * 1. **The key's name comes from a LEFT join on `console.keys`, at read time.** The "Added a key"
+   *    row the first-Owner setup writes carries a real `key_id`; the drawer resolves it to the name
+   *    that ceremony was given. Then the key is removed -- an ordinary thing an Owner does -- and
+   *    the same row, which nothing may rewrite, says the key is gone rather than pretending the
+   *    action was taken without one (task-3-addendum.md §2).
+   * 2. **Opening an entry records nothing.** One row per server render of the page, and none from
+   *    the GET route -- opening a drawer is not opening the log.
+   */
+  test("opens one entry in full, and names the key that was tapped until it is gone", async ({ page, baseURL }) => {
+    const owner = await setUpFirstOwner(page, baseURL ?? BASE);
+
+    // Scoped to this owner's own rows (./audit-helpers.ts): console.audit_log survives
+    // resetConsole() by design, so a bare count would be counting every earlier run too.
+    const mine = () => auditRows(owner.name);
+    await gotoReady(page, "/audit-log");
+    const before = await settledAuditRows(owner.name);
+
+    // The setup journey writes two "Added a key" rows; this is the first key's. Scoped to this
+    // owner, for the same reason the count above is: the log survives resetConsole(), so every
+    // earlier run's "Added a key / YubiKey 5C" row is still in this table -- twelve of them, the
+    // first time this was written without the owner's name in the filter.
+    const row = page.getByRole("row").filter({ hasText: owner.name }).filter({ hasText: "Added a key" }).filter({ hasText: "YubiKey 5C" });
+    await expect(row).toHaveCount(1);
+    const openControl = row.getByRole("button", { name: /^Open the entry: Added a key at \d\d:\d\d IST$/ });
+    await openControl.click();
+
+    const drawer = page.getByRole("dialog", { name: m.entry.title });
+    await expect(drawer).toBeVisible();
+    // The sheet's nine labels and Environment second (AuditLog.dc.html:229-238). Named one by one
+    // rather than as `Object.values`, so a reordering of the messages file cannot pass this.
+    const { time, environment, member, action, target, reason, result, address, session, change } = m.entry.labels;
+    await expect(drawer.locator("dt")).toHaveText([time, environment, member, action, target, reason, result, address, session, change]);
+    await expect(drawer.getByText(m.entry.retention)).toBeVisible();
+    // The key the ceremony really recorded, through the join rather than through anything the
+    // table handed over -- no row the list returns carries a key name at all.
+    await expect(drawer.getByText(`${owner.name} · Owner · ${m.entry.keyNamed("YubiKey 5C")}`)).toBeVisible();
+    // "Added a key" writes an `after` and no `before`: one of the three shapes the sheet composes.
+    await expect(drawer.locator("dt", { hasText: m.entry.labels.change }).locator("+ dd")).toHaveText(/^type: none → “(security_key|passkey)”\.$/);
+    await shot(page, "audit-entry-drawer-1280");
+    await expectAxeClean(page);
+
+    expect(mine(), "opening an entry must not record anything").toBe(before);
+
+    // The key goes. The entry does not, and cannot: the log holds no foreign key and nothing may
+    // rewrite a row in it. `console.sessions.key_id` is `on delete set null` and the session's
+    // `key_verified_at` stands, so the member stays signed in throughout.
+    await drawer.getByRole("button", { name: "Close" }).click();
+    await expect(drawer).toHaveCount(0);
+    consoleSql(`delete from console.keys where name = 'YubiKey 5C' and member_id = (select user_id from console.members where email = '${owner.email}')`);
+
+    await openControl.click();
+    await expect(drawer.getByText(`${owner.name} · Owner · ${m.entry.keyGone}`)).toBeVisible();
+    await expect(drawer.getByText("YubiKey 5C")).toHaveCount(1); // the target, and no longer the key clause
+    expect(mine(), "and neither must re-opening it").toBe(before);
+  });
+
+
+  /**
+   * The two questions this module gets opened to answer -- "what happened to the team?" and "what
+   * did this person do?" -- with the count on the page following each. A member is pinned
+   * throughout, and that is not decoration: the page opens on Today, and Today holds every other
+   * test in this run too, because `resetConsole()` deliberately leaves the log alone. Pinned, the
+   * numbers are exact: one `team` row per first-Owner setup, one `session` row per key.
+   */
+  test("narrows by category and by member, and the count the page shows follows each", async ({ page, baseURL }) => {
+    const owner = await setUpFirstOwner(page, baseURL ?? BASE);
+    const otherName = "Nikhil Rao";
+    const other = writeForeignRows(otherName, "team", ["Changed a role", "Removed a member"]);
+    await gotoReady(page, "/audit-log");
+    const member = page.getByRole("combobox", { name: m.filters.member });
+    const category = page.getByRole("combobox", { name: m.filters.category });
+    await member.selectOption(idOf(owner.email));
+    await category.selectOption("team");
+    await expectEntriesTotal(page, "today", 1);
+    await expect(page.getByRole("row").filter({ hasText: "First Owner created" })).toHaveCount(1);
+    // The same member, a different category: two keys, two rows.
+    await category.selectOption("session");
+    await expectEntriesTotal(page, "today", 2);
+    await expect(page.getByRole("row").filter({ hasText: "Added a key" })).toHaveCount(2);
+    await shot(page, "audit-table-filtered-1280");
+    // The same category, a different member -- and the count moves the other way.
+    await category.selectOption("team");
+    await expectEntriesTotal(page, "today", 1);
+    await member.selectOption(other);
+    await expectEntriesTotal(page, "today", 2);
+    await expect(page.getByRole("row").filter({ hasText: otherName })).toHaveCount(2);
+    // Both filters at once, and still a link somebody else can open.
+    const query = new URL(page.url()).searchParams;
+    expect([query.get("member"), query.get("category")], "the whole filtered view is in the address").toEqual([other, "team"]);
+  });
+
+  /**
+   * The other half of the sheet's own no-access row: a role below the floor opening module 14 gets
+   * the state, not a redirect, and the attempt is recorded as Refused (AuditLog.dc.html:312,
+   * task-2-addendum.md §5). Both refused roles in one test rather than two -- the sheet draws this
+   * page as **Support** opening 14 (Main.dc.html:285's own note) and `access.Viewer` excludes it
+   * too, and the two differ only in the word the state says. Neither has a rail either: 13 Team is
+   * Owner-only and this module is Owner and Admin, so below Admin no built module is left to link.
+   */
+  test("gives a Support member and a Viewer the no-access state, and records each attempt as Refused", async ({ page, baseURL }) => {
+    const owner = await setUpFirstOwner(page, baseURL ?? BASE);
+    // Scoped to this owner, to refusals, and to the role refused: their setup journey's Done rows
+    // are in the same table and are not what this counts.
+    const refused = (role: string) =>
+      Number(consoleSql(`select count(*) from console.audit_log where actor_name = '${owner.name}' and result = 'refused' and actor_role = '${role}'`));
+    for (const role of ["support", "viewer"] as const) {
+      // Demoted directly: this is about what the page does with a role, not about how the role got
+      // there, and console_change_role needs a second Owner and a tap to get there through the UI.
+      consoleSql(`update console.members set role = '${role}' where email = '${owner.email}'`);
+      await gotoReady(page, "/audit-log");
+      await expect(page.getByText(frame.states.noAccess.title(frame.roleLabel[role]))).toBeVisible();
+      await expect(page.getByText(frame.states.noAccess.detail)).toBeVisible();
+      await expect(page.getByRole("table")).toHaveCount(0);
+      await expect(page.getByRole("navigation", { name: "Console" }), "no built module is theirs, so no rail").toHaveCount(0);
+      await expectAxeClean(page);
+      // `after()` writes the row once the response has already gone out, hence the poll.
+      await expect.poll(() => refused(role), { message: `a refused open by a ${role} is recorded` }).toBe(1);
+    }
+  });
+
+  /**
+   * An **Admin**, invited and signed in on a device of their own, reaching module 14 from the rail
+   * -- the first module an Admin can open at all: 13 Team, the only other built one, is Owner-only
+   * (Main.dc.html:293-298's `access.Admin` has no '13' in it), so until this page shipped an Admin
+   * signed in to a console with no rail and nowhere to go. Through the real invite, acceptance and
+   * two real key enrolments rather than an `update … set role`, because the claim is about a role a
+   * console can hand out -- and the Owner's own actions are in the log the Admin then reads, which
+   * is the other half of what "Owner *and* Admin" buys.
+   */
+  test("an Admin reaches the Audit log from the rail, and reads the Owner's own actions in it", async ({ page, baseURL }) => {
+    test.setTimeout(180_000); // A first-Owner setup, an invite tap and a full enrolment; the default 30s is for none of those.
+    const owner = await setUpFirstOwner(page, baseURL ?? BASE);
+    const email = freshAddress("rohan");
+    const admin = ownerIdentity(email).name;
+    const them = await inviteAndSignIn(page, email, "Admin", "Second pair of eyes on the console.");
+    try {
+      // The rail an Admin gets. Configure is 13 Team's group and Team is Owner-only, so its absence
+      // is the access map holding rather than a missing link.
+      const rail = them.getByRole("navigation", { name: "Console" });
+      await expect(rail.getByText("Configure"), "13 Team is not an Admin's").toHaveCount(0);
+      await rail.getByRole("link", { name: /Audit log/ }).click();
+      await expect(them.getByRole("heading", { level: 1, name: "Audit log" })).toBeVisible();
+      // The Owner's own history, read by somebody else: the invite that created this Admin is in it.
+      await expect(them.getByRole("row").filter({ hasText: owner.name }).filter({ hasText: "Invited a member" })).toHaveCount(1);
+      await expectAxeClean(them);
+      // And the Admin's own open is recorded as theirs, under their own role.
+      await expect.poll(() => auditRows(admin, OPENED), { message: "an Admin's open is recorded too" }).toBeGreaterThan(0);
+      expect(consoleSql(`select distinct actor_role from console.audit_log where actor_name = '${admin}' and action = '${OPENED}'`).trim()).toBe("admin");
+    } finally {
+      await them.context().close();
+    }
+  });
+
+  /**
+   * Task 6, end to end, and the only place the whole chain can be shown at once: the page's own
+   * server read of `public.console_audit_actors` through PostgREST with no arguments, the parse,
+   * the prop, and the picker a member actually uses.
+   *
+   * **What it is for.** The picker used to accumulate its options from the actors named by the rows
+   * it had already fetched, because `console_team` is Owner-only while this module is Owner *and*
+   * Admin. So a member who had done nothing in the range on screen could not be selected at all --
+   * which is exactly when a reader wants to ask whether they have. Nothing was hidden and the log
+   * stayed honest; the filter simply could not reach a silent member.
+   *
+   * Two rows for one actor, under two names, because the log names an actor **as they were** and a
+   * plain `DISTINCT` would put two options carrying the same `value` in the picker. Asserting one
+   * option, named by the later row, pins `distinct on (actor_id) … order by actor_id, at desc` from
+   * the browser rather than from SQL -- and it stays deterministic across repeated suite runs,
+   * which matters here because `resetConsole()` deliberately leaves the audit log alone.
+   */
+  test("offers a member who has done nothing in the range, and answers them with the empty state", async ({ page, baseURL }) => {
+    await setUpFirstOwner(page, baseURL ?? BASE);
+
+    // Written straight into the log, which is also the point: this person has no console.members
+    // row at all, so console_team could not name them even if module 14 were allowed to read it.
+    // A hundred days back, so nothing they did can fall inside any range this file asks for.
+    const actor = "d1f00000-0000-4000-8000-00000000f00d";
+    const name = "Priya Nathan";
+    consoleSql(
+      `insert into console.audit_log (at, environment, actor_id, actor_name, actor_role, category, action, target, result) values
+         (now() - interval '101 days', 'development', '${actor}', 'Priya N.', 'support', 'leads', 'Looked up an email', 'p•••@example.com', 'done'),
+         (now() - interval '100 days', 'development', '${actor}', '${name}', 'admin', 'configure', 'Changed a switch', 'Site notice', 'done')`,
+    );
+
+    await gotoReady(page, "/audit-log");
+    // The page opens on Today, so nothing this actor has ever done is on screen.
+    await expect(page.getByRole("button", { name: m.filters.ranges.today })).toHaveAttribute("aria-pressed", "true");
+
+    const picker = page.getByRole("combobox", { name: m.filters.member });
+    await expect(picker.getByRole("option", { name })).toHaveCount(1);
+    await expect(picker.getByRole("option", { name: "Priya N." })).toHaveCount(0);
+
+    await picker.selectOption(actor);
+    // Still linkable: the filter goes into the address without a server render, as every other one
+    // on this page does.
+    await expect.poll(() => new URL(page.url()).searchParams.get("member")).toBe(actor);
+
+    // The answer the old picker could not give. Not a dead end -- "nothing, here".
+    await expect(page.getByText(m.empty.title)).toBeVisible();
+    await expect(page.getByText(m.empty.detail)).toBeVisible();
+    await expect(page.getByRole("table")).toHaveCount(0);
+
+    // The chip names them, which only the roster can do: without it `memberName` falls through to
+    // the raw uuid, because no row on screen carries this actor.
+    await expect(page.getByText(m.filters.chip(m.filters.member, name))).toBeVisible();
+
+    // And the roster does not narrow with the rows it filtered away: they are still selected, and
+    // everyone else is still reachable without clearing the filter first.
+    await expect(picker).toHaveValue(actor);
+    await expect(picker.getByRole("option", { name })).toHaveCount(1);
+  });
+});

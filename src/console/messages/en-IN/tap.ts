@@ -24,4 +24,16 @@ export const tap = {
   // key and a dismissed prompt as the same NotAllowedError, so the client can never raise that
   // state on its own -- the server does, and its message is shown as sent.
   didNotAnswer: keys.didNotAnswer,
+  // **Not drawn**, and shared by every module that taps.
+  //
+  // A tap is minted over four fields and each has a length; `readBody` puts a failed schema's own
+  // message in front of whoever sent it, so before this line the console answered an over-long one
+  // with zod's "Too big: expected string to have <=200 characters" -- rendered straight into TC-01,
+  // because `consoleApiMessage` passes a real refusal through unchanged. That is a developer string
+  // in the one dialog a member is asked to trust.
+  //
+  // It is unreachable through any console surface (every field that feeds a tap is bounded where it
+  // is typed), which is exactly why it needed writing down: the one route nobody re-read is where
+  // it surfaced.
+  tooLong: "The console couldn't prepare that confirmation. Narrow what you're asking for and try again.",
 } as const satisfies MessageTree;

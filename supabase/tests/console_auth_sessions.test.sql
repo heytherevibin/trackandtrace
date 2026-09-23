@@ -98,8 +98,11 @@ select public.console_auth_start_session(
   '44444444-4444-4444-4444-444444444444', '11111111-1111-1111-1111-111111111111', 'Safari on iPhone', 'hash2'
 );
 select public.console_auth_revoke_session('44444444-4444-4444-4444-444444444444');
+-- This member's own live sessions, not the table's: a console e2e run leaves a
+-- signed-in member behind on the same database `supabase test db` then runs
+-- against, and their session is live too.
 select is(
-  (select count(*)::int from console.sessions where revoked_at is null),
+  (select count(*)::int from console.sessions where revoked_at is null and member_id = '11111111-1111-1111-1111-111111111111'),
   1,
   'one revoked session leaves the other alone'
 );

@@ -109,27 +109,37 @@ export async function joinFromInvite(browser: Browser, email: string, role: stri
   const context = await browser.newContext();
   const them = await context.newPage();
   try {
-    const invite = await letterFor(them, email, INVITE_SUBJECT);
-    expect(invite.text, "the letter names the role they were invited as").toContain(`as ${role}`);
-    await them.goto(linkIn(invite.text, "setup"));
-    await them.getByRole("button", { name: "Accept and email me a sign-in link" }).click();
-    await expect(them.getByText("Check your inbox. Open the link on the device you'll set up.")).toBeVisible();
-
-    const signIn = await letterFor(them, email, SIGN_IN_SUBJECT);
-    await them.goto(linkIn(signIn.text, "auth/confirm"));
-    const firstKey = await addVirtualKey(them, "usb");
-    await expect(them.getByRole("heading", { name: "Add your first key" }), `${email} was sent to enrol, not to tap a key they should no longer hold`).toBeVisible();
-    await chooseKeyKind(them, "usb");
-    await them.getByLabel("Name this key").fill("YubiKey 5C");
-    await them.getByRole("button", { name: "Add key" }).click();
-    await expect(them.getByRole("heading", { name: "Add a second key" })).toBeVisible();
-    await swapAuthenticatorAfterTap(them, firstKey, "internal");
-    await chooseKeyKind(them, "internal");
-    await them.getByLabel("Name this key").fill("iPhone");
-    await them.getByRole("button", { name: "Add key" }).click();
-    await them.getByRole("button", { name: "Open the console" }).click();
-    await expectSignedInAs(them, ownerIdentity(email).name, role);
+    await joinFromInviteOn(them, email, role);
   } finally {
     await context.close();
   }
+}
+
+/**
+ * The same journey, on a page the caller made and keeps. A pure extraction from `joinFromInvite`
+ * above, which is now this plus the context it opens and closes around it: the Audit log is the
+ * first module a role other than Owner can open at all, so it is the first spec that has to keep
+ * driving the page once the join is proven rather than throwing the device away.
+ */
+export async function joinFromInviteOn(them: Page, email: string, role: string): Promise<void> {
+  const invite = await letterFor(them, email, INVITE_SUBJECT);
+  expect(invite.text, "the letter names the role they were invited as").toContain(`as ${role}`);
+  await them.goto(linkIn(invite.text, "setup"));
+  await them.getByRole("button", { name: "Accept and email me a sign-in link" }).click();
+  await expect(them.getByText("Check your inbox. Open the link on the device you'll set up.")).toBeVisible();
+
+  const signIn = await letterFor(them, email, SIGN_IN_SUBJECT);
+  await them.goto(linkIn(signIn.text, "auth/confirm"));
+  const firstKey = await addVirtualKey(them, "usb");
+  await expect(them.getByRole("heading", { name: "Add your first key" }), `${email} was sent to enrol, not to tap a key they should no longer hold`).toBeVisible();
+  await chooseKeyKind(them, "usb");
+  await them.getByLabel("Name this key").fill("YubiKey 5C");
+  await them.getByRole("button", { name: "Add key" }).click();
+  await expect(them.getByRole("heading", { name: "Add a second key" })).toBeVisible();
+  await swapAuthenticatorAfterTap(them, firstKey, "internal");
+  await chooseKeyKind(them, "internal");
+  await them.getByLabel("Name this key").fill("iPhone");
+  await them.getByRole("button", { name: "Add key" }).click();
+  await them.getByRole("button", { name: "Open the console" }).click();
+  await expectSignedInAs(them, ownerIdentity(email).name, role);
 }

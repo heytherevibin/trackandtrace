@@ -145,37 +145,54 @@ describe("ConsoleRailDrawer: the phone trigger and its drawer", () => {
 // console-frame.tsx itself branches on, using the real (non-fixture) railFor and CONSOLE_MODULES.
 //
 // 2d-2 task-8 is where it stopped reading "no role, yet": 13 Team is built, and it is Owner-only
-// (Main.dc.html:293-298's own access map), so an Owner is the first and so far only role for which
-// this console renders a rail at all -- on the desktop and in the phone drawer alike.
-describe("today's reality: the rail and its phone trigger render for an Owner, and for no one else", () => {
-  it("groups.length > 0 is true for an Owner against the real CONSOLE_MODULES", () => {
-    expect(railFor("owner").length > 0).toBe(true);
-    expect(railFor("owner", CONSOLE_MODULES).length > 0).toBe(true);
+// (Main.dc.html:293-298's own access map), so an Owner was the first role for which this console
+// rendered a rail at all. 2d-2b task-2 adds the second built module -- 14 Audit log, which the same
+// access map gives to Owner *and* Admin -- so an Admin now gets a rail too, with one row in it.
+// Support and a Viewer still get neither, because neither built module is theirs.
+describe("today's reality: the rail and its phone trigger render for an Owner and an Admin, and for no one else", () => {
+  it("groups.length > 0 is true for an Owner and an Admin against the real CONSOLE_MODULES", () => {
+    for (const role of ["owner", "admin"] as const) {
+      expect(railFor(role).length > 0, role).toBe(true);
+      expect(railFor(role, CONSOLE_MODULES).length > 0, role).toBe(true);
+    }
   });
 
-  it("and false for every other role", () => {
-    for (const role of ROLES.filter((r) => r !== "owner")) {
+  it("and false for a Support member and a Viewer", () => {
+    for (const role of ROLES.filter((r) => r !== "owner" && r !== "admin")) {
       expect(railFor(role).length > 0, role).toBe(false);
       expect(railFor(role, CONSOLE_MODULES).length > 0, role).toBe(false);
     }
   });
 
-  // What the Owner's rail actually draws, through the real components rather than a fixture: the
-  // Configure legend and one numbered, linked Team row. Both layouts, because both are fed the same
-  // `groups` and this is the first time either has had anything real to render.
-  it("draws Configure and a linked Team row, in the rail and in the phone drawer alike", async () => {
+  // What the Owner's rail actually draws, through the real components rather than a fixture: two
+  // legends and two numbered, linked rows. Both layouts, because both are fed the same `groups`.
+  it("draws Configure and Record, with a linked Team and Audit log row, in the rail and in the phone drawer alike", async () => {
     const groups = railFor("owner");
     render(<ConsoleRail groups={groups} />);
     const rail = screen.getByRole("navigation", { name: "Console" });
     expect(within(rail).getByText("Configure")).toBeVisible();
     expect(within(rail).getByRole("link", { name: /Team/ })).toHaveAttribute("href", "/team");
     expect(within(rail).getByText("13")).toBeVisible();
+    expect(within(rail).getByText("Record")).toBeVisible();
+    expect(within(rail).getByRole("link", { name: /Audit log/ })).toHaveAttribute("href", "/audit-log");
+    expect(within(rail).getByText("14")).toBeVisible();
 
     render(<ConsoleRailDrawer groups={groups} />);
     fireEvent.click(screen.getByRole("button", { name: "Open menu" }));
     const drawer = await screen.findByRole("dialog", { name: "Console" });
     expect(within(drawer).getByText("Configure")).toBeVisible();
     expect(within(drawer).getByRole("link", { name: /Team/ })).toHaveAttribute("href", "/team");
+    expect(within(drawer).getByRole("link", { name: /Audit log/ })).toHaveAttribute("href", "/audit-log");
+  });
+
+  // An Admin's rail is the Audit log alone: Team is Owner-only, so the Configure group is dropped
+  // entirely rather than rendered empty.
+  it("gives an Admin the Record group and nothing else", () => {
+    render(<ConsoleRail groups={railFor("admin")} />);
+    const rail = screen.getByRole("navigation", { name: "Console" });
+    expect(within(rail).getByText("Record")).toBeVisible();
+    expect(within(rail).queryByText("Configure")).not.toBeInTheDocument();
+    expect(within(rail).getAllByRole("link")).toHaveLength(1);
   });
 });
 

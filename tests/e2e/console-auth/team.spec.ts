@@ -43,15 +43,12 @@ const BASE = "http://admin.localhost:4211";
 
 test.beforeEach(() => resetConsole());
 
-/**
- * The console is also left as this file found it, which `beforeEach` alone does not do: it fixes
- * the state each test *starts* in, so the last test's rows outlive the run. That matters because
- * `npm run db:test`'s pgTAP suite is not isolated from them -- console_team.test.sql counts Owners,
- * invites and roster rows across the whole console, not only its own fixtures, so one leftover Owner
- * and one leftover invite fail seven of its assertions (task-9-report.md has the list). Before this
- * file the property held by luck: sign-in.spec.ts ran last and its own last test creates no member.
- */
-test.afterAll(() => resetConsole());
+// Leaving the console empty afterwards is no longer this file's job. It used to be -- `beforeEach`
+// fixes the state each test *starts* in, so the last test's rows outlive the run, and
+// `npm run db:test` is not isolated from them. But the property was only ever held for a **full**
+// run, by `workers: 1` and this file sorting last, and a single-spec run left the database dirty
+// with nothing to say so. `globalTeardown` (./global-teardown.ts) holds it for any subset now, so
+// the `afterAll` that was here is gone rather than duplicated.
 
 test.describe("Team", () => {
   /**
@@ -202,10 +199,15 @@ test.describe("Team", () => {
     await them.getByRole("button", { name: "Open the console" }).click();
     await expectSignedInAs(them, name, "Admin");
 
-    // The rail an Admin is allowed: nothing. 13 Team is the only built module and it is Owner-only,
-    // so ConsoleFrame draws neither the rail nor the phone drawer's trigger, and /team itself
-    // answers with the sheet's no-access state rather than a redirect (task-3-addendum.md §4).
-    await expect(them.getByRole("navigation", { name: "Console" })).toHaveCount(0);
+    // The rail an Admin is allowed. This assertion used to be "nothing at all", and was true while
+    // 13 Team was the only built module and Owner-only. Phase 2d-2b's Task 2 made 14 Audit log
+    // built, and the sheet's own access map (Main.dc.html:293-298) gives an Admin 14 but not 13 --
+    // so an Admin has a rail for the first time (src/console/nav.ts:64), holding Audit log and not
+    // Team. Both halves matter: the rail exists, and it does not leak a module this role cannot
+    // open. /team itself still answers with the sheet's no-access state rather than a redirect
+    // (2d-2's task-3-addendum.md §4).
+    await expect(them.getByRole("navigation", { name: "Console" })).toHaveCount(1);
+    await expect(them.getByRole("link", { name: "Audit log", exact: true })).toHaveCount(1);
     await expect(them.getByRole("link", { name: "Team", exact: true })).toHaveCount(0);
     await gotoReady(them, "/team");
     await expect(them.getByText("This module isn't part of the Admin role.")).toBeVisible();

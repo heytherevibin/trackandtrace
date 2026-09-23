@@ -20,4 +20,22 @@ import { consoleMessages } from "@/console/messages";
  */
 export const TAP_REASON_MAX = 200;
 
+/**
+ * The other three fields a tap is digested over, bounded here beside the reason so that every
+ * caller can ask what will fit **before** it builds something that will not.
+ *
+ * `value` is the one that moved, and it moved because of what it carries. For most actions it is a
+ * short scalar -- a role, a key count. For the audit log's export it is the whole canonical filter
+ * object, and its own route had bounded that at 2000 while this file, which is what actually binds,
+ * said 200. A search of 117 characters was enough to make an export impossible, and the member was
+ * told so in zod's words (branch review, Important 1). The number is now one number, imported
+ * rather than restated, and the export route derives its own limit from it.
+ *
+ * Raising `value` is deliberate and is safe: nothing stores it. `console_auth_new_action_challenge`
+ * keeps only `console.action_digest`'s 32-byte output, so the field's length reaches no column.
+ */
+export const TAP_ACTION_MAX = 80;
+export const TAP_TARGET_MAX = 200;
+export const TAP_VALUE_MAX = 2_000;
+
 export const tapReason = z.string().trim().min(10, consoleMessages.tap.reasonShort).max(TAP_REASON_MAX);
