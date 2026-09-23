@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(19);
+select plan(20);
 
 insert into auth.users (id, email) values ('11111111-1111-1111-1111-111111111111', 'owner@trakline.in');
 insert into console.members (user_id, email, name, role, status)
@@ -65,12 +65,10 @@ select throws_ok(
 -- and keeping its errcode: the four sessions-row conditions below (no key tap, revoked, idle a
 -- day, expired) all land on the one `not found` after the sessions update -- one site, four
 -- assertions, indistinguishable. The removed-member one lands on the members-row `not found`.
--- Both of the last two land on claim_uuid's cast handler: `set_config(..., '', true)` makes
--- ''::jsonb raise before any claim is read, so "no claims at all" reaches the same site as the
--- malformed subject below it and never reaches current_member's null-claims check at all --
--- that check is exercised only from console_my_keys and console_member_api, where swapping it
--- is what fails. Naming the message still earns its place: it is the only thing asserting the
--- wording those five sites are required to share.
+-- The last three cover the two claims sites, one of which this file used to miss entirely:
+-- two reach claim_uuid's cast handler by its two different routes, and the empty-object one
+-- reaches current_member's null-claims check. Naming the message still earns its place: it is
+-- the only thing asserting the wording those five sites are required to share.
 --
 -- A session that has not tapped a key is not a session yet.
 update console.sessions set key_verified_at = null where session_id = '22222222-2222-2222-2222-222222222222';
@@ -99,9 +97,30 @@ select throws_ok($$select console.current_member()$$, '28000', 'session ended', 
 update console.sessions set expires_at = now() + interval '7 days'
  where session_id = '22222222-2222-2222-2222-222222222222';
 
--- With no claims at all, the guard fails closed, not open.
+-- Three ways the claims themselves can fail, and they are three, not two.
+--
+-- This one used to be one assertion reading "no claims at all is refused", and it did not test
+-- that. `set_config(..., '', true)` leaves an empty string, not an absent setting, and
+-- ''::jsonb raises before any claim is read -- so it reached claim_uuid's cast handler, the
+-- same site as the malformed subject below it, and current_member's null-claims check went
+-- untested here. Nor can an absent setting be staged from inside this file: once a session has
+-- set request.jwt.claims, neither `set_config(..., NULL, true)` nor `reset` restores NULL --
+-- both leave '' -- and pg_temp.speak_as has already set it far above. Measured, not assumed.
+--
+-- So the empty string keeps its assertion under the name it actually earns, and claims that
+-- parse but carry no identity get their own. Both routes into the cast handler are worth
+-- holding separately: '' fails at the jsonb cast and 'not-a-uuid' at the uuid cast, and
+-- claim_uuid's comment warns that moving that expression into a DECLARE initializer would stop
+-- the handler catching it -- the empty string is the one that would notice first.
+
+-- An empty claims string is not parseable JSON, and fails closed at the jsonb cast.
 select set_config('request.jwt.claims', '', true);
-select throws_ok($$select console.current_member()$$, '28000', 'session ended', 'no claims at all is refused');
+select throws_ok($$select console.current_member()$$, '28000', 'session ended', 'an empty claims string is refused');
+
+-- Claims that parse but name nobody: no subject, no session. This is the one that reaches
+-- current_member's `v_user is null or v_session is null`, and nothing else in this file does.
+select set_config('request.jwt.claims', '{}', true);
+select throws_ok($$select console.current_member()$$, '28000', 'session ended', 'claims naming no subject and no session are refused');
 
 -- A malformed claim fails closed too: 28000, never the raw cast error underneath.
 select set_config('request.jwt.claims', json_build_object('sub', 'not-a-uuid')::text, true);
