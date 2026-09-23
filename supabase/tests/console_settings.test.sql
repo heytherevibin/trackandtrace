@@ -86,7 +86,7 @@ select pg_temp.speak_as('11111111-1111-1111-1111-111111111111', '22222222-2222-2
 select throws_ok(
   $$select public.console_save_settings('development', 1, '{"checks_paused": true}'::jsonb, 'maintenance')$$,
   '42501',
-  null,
+  'no tap for this action',
   'a save without a tap is refused'
 );
 
@@ -125,7 +125,7 @@ values ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-2222222
 select throws_ok(
   $$select public.console_save_settings('production', 1, '{"checks_paused": true}'::jsonb, 'never-tapped')$$,
   '42501',
-  null,
+  'no tap for this action',
   'a tap no key ever answered cannot save a setting either'
 );
 
@@ -204,7 +204,7 @@ values ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-2222222
 select throws_ok(
   $$select public.console_save_settings('development', 2, '{"checks_paused": false}'::jsonb, 'viewer-attempt')$$,
   '42501',
-  null,
+  'no access',
   'a member below admin is refused even with a valid tap'
 );
 select is(

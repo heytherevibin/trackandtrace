@@ -84,19 +84,19 @@ select is(
 select throws_ok(
   $$ select public.console_rename_key('99999999-9999-9999-9999-999999999999', 'Not mine', 'development') $$,
   '42501',
-  null,
+  'no access',
   'a key that is not yours cannot be renamed'
 );
 select throws_ok(
   $$ select public.console_rename_key('bbbbbbbb-0000-0000-0000-000000000001', 'Mine now', 'development') $$,
   '42501',
-  null,
+  'no access',
   'nor can another member''s key, which does exist'
 );
 select throws_ok(
   $$ select public.console_remove_key('bbbbbbbb-0000-0000-0000-000000000001', 'Not mine to remove.', 'development') $$,
   '42501',
-  null,
+  'no access',
   'and another member''s key cannot be removed either'
 );
 
@@ -104,7 +104,7 @@ select throws_ok(
 select throws_ok(
   $$ select public.console_remove_key('aaaaaaaa-0000-0000-0000-000000000003', 'Left at the old office; replaced.', 'development') $$,
   '42501',
-  null,
+  'no tap for this action',
   'removing a key with no tap is refused'
 );
 select is((select count(*)::int from console.keys where member_id = '11111111-1111-1111-1111-111111111111'), 3, 'and removes nothing');
@@ -121,7 +121,7 @@ select public.console_auth_new_challenge(
 select throws_ok(
   $$ select public.console_remove_key('aaaaaaaa-0000-0000-0000-000000000003', 'Left at the old office; replaced.', 'development') $$,
   '42501',
-  null,
+  'no tap for this action',
   'a tap no key answered removes nothing, however exactly its digest matches'
 );
 select is((select count(*)::int from console.keys where member_id = '11111111-1111-1111-1111-111111111111'), 3, 'and all three keys remain');
@@ -168,7 +168,7 @@ select public.console_auth_verify_challenge(
 select throws_ok(
   $$ select public.console_remove_key('aaaaaaaa-0000-0000-0000-000000000002', 'Down to two, trying anyway.', 'development') $$,
   '42501',
-  null,
+  'a member must keep at least two keys',
   'removing a key that would leave fewer than two is refused'
 );
 select is((select count(*)::int from console.keys where member_id = '11111111-1111-1111-1111-111111111111'), 2, 'and both remain');
@@ -195,7 +195,7 @@ select public.console_auth_verify_challenge(
 select throws_ok(
   $$ select public.console_remove_key('cccccccc-0000-0000-0000-000000000002', 'Replacing the spare.', 'development') $$,
   '42501',
-  null,
+  'no tap for this action',
   'a tap taken for one key does not remove a different key of the same name'
 );
 select is(
