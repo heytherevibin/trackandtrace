@@ -16,7 +16,11 @@ export interface RedisCacheOptions {
 }
 
 export class EncryptedRedisCache implements Cache {
-  constructor(private readonly options: RedisCacheOptions) {}
+  private readonly options: RedisCacheOptions;
+
+  constructor(options: RedisCacheOptions) {
+    this.options = options;
+  }
 
   private name(key: string): string {
     return `${this.options.namespace}:${keyedHash(this.options.keys.cacheName, key)}`;

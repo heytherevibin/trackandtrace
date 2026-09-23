@@ -45,10 +45,12 @@ export interface SharedRateLimiterOptions {
 /** Sliding windows shared by every instance; this instance's memory limiter when the store can't answer. */
 export class SharedRateLimiter implements RateLimiter {
   private readonly windows = new Map<string, WindowLimiter>();
+  private readonly options: SharedRateLimiterOptions;
   private readonly fallback: RateLimiter;
   private readonly now: () => number;
 
-  constructor(private readonly options: SharedRateLimiterOptions) {
+  constructor(options: SharedRateLimiterOptions) {
+    this.options = options;
     this.fallback = options.fallback ?? new MemoryRateLimiter();
     this.now = options.now ?? Date.now;
   }
