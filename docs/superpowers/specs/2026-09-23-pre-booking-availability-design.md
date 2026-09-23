@@ -165,12 +165,27 @@ create table public.availability_observations (
   days_out        integer not null generated always as (journey_date - (observed_at at time zone 'Asia/Kolkata')::date) stored,
   status          text not null,
   raw_status      text not null,
+  can_book        boolean not null,
   seats           integer,
+  wl_booking      integer,
+  wl_current      integer,
   source_prediction_pct numeric(5,2),
-  outcome         text,
-  outcome_at      timestamptz
+  outcome         text
 );
 ```
+
+**Corrected after Task 2, 2026-09-23.** Three changes, each because the first draft of this table
+was written before the adapter existed:
+
+- **`can_book` was missing and cannot be backfilled.** `status` alone does not say whether a berth
+  can be had: a row reading `status=WAITLIST`, `canBook=false`, `rawStatus=NOT AVAILABLE` is one
+  where booking has *closed*. Those are the rows nearest departure, which is where a clearance model
+  most needs to be right. Without the column the signal survives only inside free text.
+- **`wl_booking` / `wl_current` were named in §5.3 and absent here** — the booking-position and
+  current waitlist from `GNWL65/WL26`. Nullable, because `AVAILABLE 0042`, `RAC 12` and `REGRET` do
+  not carry two numbers, and a `not null` would reject every row announcing a free berth.
+- **`outcome_at` and the resolver index are gone.** They served the sweep §5.3's measurement
+  deleted. `outcome` stays and is read from the `days_out = 0` row.
 
 **No personal data. No PNR. No user id.** These are facts about berths, not about people — which is
 what makes the store defensible under §9's terms question and keeps it outside every privacy surface
@@ -232,10 +247,6 @@ Advance is 10,000/month ≈ **333/day**, shared with live traffic.
 Each call yields four dated observations, so forty combos produce **~160 rows a day, ~4,800 a month**
 before any user traffic — double the earlier estimate, because the four-date window was being
 counted as one row. The **+50k pack at ₹379** takes the crawler to ~200 combos.
-
-**The crawler's route list biases the model.** Rajdhani routes predict Rajdhani behaviour; branch
-lines will be predicted badly by a model that never saw one. The list is a modelling decision and is
-recorded as such, not chosen by convenience.
 
 **The crawler's route list biases the model.** Rajdhani routes predict Rajdhani behaviour; branch
 lines will be predicted badly by a model that never saw one. The list is a modelling decision and is
