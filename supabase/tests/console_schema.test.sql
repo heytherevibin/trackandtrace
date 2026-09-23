@@ -1,5 +1,33 @@
 begin;
 create extension if not exists pgtap with schema extensions;
+
+-- A refusal that comes from a constraint, asserted by the constraint's own name instead of the
+-- sentence Postgres wraps it in. `get stacked diagnostics ... CONSTRAINT_NAME` reads the error's
+-- structured field, which the constraint machinery fills in whatever words the server is built
+-- to print, so these assertions survive a rewording that throws_ok's exact-message form would
+-- not. Detection is unchanged: a renamed or dropped constraint still fails, and so does a
+-- statement that raises nothing. Only errors that carry a constraint belong here -- a not-null
+-- violation and an application `raise` both leave CONSTRAINT_NAME empty, which this reports as
+-- '<no constraint>' rather than passing. Defined per file, like pg_temp.speak_as: every test
+-- file here is self-contained.
+create or replace function pg_temp.throws_constraint(
+  p_sql text, p_errcode text, p_constraint text, p_description text
+) returns text language plpgsql as $tc$
+declare
+  v_code       text;
+  v_constraint text;
+begin
+  execute p_sql;
+  return extensions.is('nothing raised', p_errcode || ' on ' || p_constraint, p_description);
+exception when others then
+  get stacked diagnostics v_code = RETURNED_SQLSTATE, v_constraint = CONSTRAINT_NAME;
+  return extensions.is(
+    v_code || ' on ' || coalesce(nullif(v_constraint, ''), '<no constraint>'),
+    p_errcode || ' on ' || p_constraint,
+    p_description
+  );
+end $tc$;
+
 select plan(23);
 
 select has_schema('console', 'the console schema exists');
@@ -55,25 +83,22 @@ insert into auth.users (id, email) values ('11111111-1111-1111-1111-111111111111
 insert into console.members (user_id, email, name, role)
   values ('11111111-1111-1111-1111-111111111111', 'owner@trakline.in', 'Owner Member', 'owner');
 
-select throws_ok(
+select pg_temp.throws_constraint(
   $$insert into console.members (user_id, email, name, role) values (gen_random_uuid(), 'MIXED@trakline.in', 'Mixed Case', 'admin')$$,
-  '23514'::char(5),
-  'new row for relation "members" violates check constraint "members_email_check"',
+  '23514', 'members_email_check',
   'an address must be stored lower-case'
 );
-select throws_ok(
+select pg_temp.throws_constraint(
   $$insert into console.members (user_id, email, name, role) values (gen_random_uuid(), 'x', 'Too Short', 'admin')$$,
-  '23514'::char(5),
-  'new row for relation "members" violates check constraint "members_email_check"',
+  '23514', 'members_email_check',
   'an address that short is refused'
 );
 
 -- invited_by must name a real member, not just any uuid.
 insert into auth.users (id, email) values ('22222222-2222-2222-2222-222222222222', 'second@trakline.in');
-select throws_ok(
+select pg_temp.throws_constraint(
   $$insert into console.members (user_id, email, name, role, invited_by) values ('22222222-2222-2222-2222-222222222222', 'second@trakline.in', 'Second Member', 'admin', gen_random_uuid())$$,
-  '23503'::char(5),
-  'insert or update on table "members" violates foreign key constraint "members_invited_by_fkey"',
+  '23503', 'members_invited_by_fkey',
   'invited_by must name a member'
 );
 
