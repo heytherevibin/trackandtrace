@@ -124,10 +124,15 @@ select is(
   null,
   'a second link made before any Owner existed cannot be redeemed once the first has been, though the first Owner is only in setup'
 );
+-- P0001 is what a bare `raise exception` gets when nothing sets an errcode, so 'P0001', null
+-- here used to accept any uncoded raise from anywhere in the call. console.has_owner's guard
+-- (20260920090800_console_first_owner.sql:36) is the only site that says these words, and it
+-- is the only P0001 the three assertions in this file can now pass on: swapping its words,
+-- and deleting the guard outright, each fail all three.
 select throws_ok(
   $$select console.create_first_owner_link('setup-guard@trakline.in')$$,
   'P0001',
-  null,
+  'the console already has an Owner',
   'no first-Owner link while an Owner exists in setup'
 );
 
@@ -136,7 +141,7 @@ update console.members set status = 'active' where email = 'owner-a@trakline.in'
 select throws_ok(
   $$select console.create_first_owner_link('active-guard@trakline.in')$$,
   'P0001',
-  null,
+  'the console already has an Owner',
   'no first-Owner link while an Owner exists and active'
 );
 
@@ -239,7 +244,7 @@ select is(
 select throws_ok(
   $$select console.create_first_owner_link('second@trakline.in')$$,
   'P0001',
-  null,
+  'the console already has an Owner',
   'no second first-Owner link once the console has an Owner'
 );
 

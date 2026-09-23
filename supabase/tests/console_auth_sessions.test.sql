@@ -142,6 +142,15 @@ select is(
 -- verify_session's update excludes revoked_at is null, so a revoked session
 -- always misses; it must raise 'session ended' there, not return as if it had
 -- quietly succeeded.
+--
+-- All five refusals below name 'session ended', and the name does not say which of them
+-- refused: console_auth_verify_session raises those two words from one site
+-- (20260920090600_console_auth_sessions.sql:70) for every condition it rejects, and four more
+-- sites in console.claim_uuid and console.current_member say the same. That sameness is
+-- deliberate -- see the note above the 28000 block in console_guard.test.sql. What the name
+-- does pin is the site's function: swapping only this one's words fails all five here and
+-- nothing in console_guard, console_my_keys or console_member_api, and swapping any of the
+-- other four fails nothing in this file. The fixtures, not the message, separate the five.
 select public.console_auth_start_session(
   'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '11111111-1111-1111-1111-111111111111', 'Soon revoked', 'hash-revoked'
 );
@@ -149,7 +158,7 @@ select public.console_auth_revoke_session('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
 select throws_ok(
   $$select public.console_auth_verify_session('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '33333333-3333-3333-3333-333333333333')$$,
   '28000',
-  null,
+  'session ended',
   'verifying a revoked session raises instead of silently doing nothing'
 );
 
@@ -208,7 +217,7 @@ select public.console_auth_start_session(
 select throws_ok(
   $$select public.console_auth_verify_session('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', null)$$,
   '28000',
-  null,
+  'session ended',
   'verifying with a null key raises instead of verifying with no credential'
 );
 select is(
@@ -227,7 +236,7 @@ select public.console_auth_start_session(
 select throws_ok(
   $$select public.console_auth_verify_session('dddddddd-dddd-dddd-dddd-dddddddddddd', 'cccccccc-cccc-cccc-cccc-cccccccccccc')$$,
   '28000',
-  null,
+  'session ended',
   'verifying with another member''s key raises instead of verifying'
 );
 select is(
@@ -269,7 +278,7 @@ update console.sessions set expires_at = now() - interval '29 days'
 select throws_ok(
   $$select public.console_auth_verify_session('12121212-1212-1212-1212-121212121212', '33333333-3333-3333-3333-333333333333')$$,
   '28000',
-  null,
+  'session ended',
   'verifying an expired session raises instead of reviving it'
 );
 select is(
@@ -288,7 +297,7 @@ update console.sessions set expires_at = now() + interval '7 days',
 select throws_ok(
   $$select public.console_auth_verify_session('13131313-1313-1313-1313-131313131313', '33333333-3333-3333-3333-333333333333')$$,
   '28000',
-  null,
+  'session ended',
   'verifying a session idle beyond 24 hours raises instead of reviving it'
 );
 select is(

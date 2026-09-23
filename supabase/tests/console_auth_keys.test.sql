@@ -66,7 +66,7 @@ select is(
 select throws_ok(
   $$select public.console_auth_record_key('11111111-1111-1111-1111-111111111111', '\x01'::bytea, '\x03'::bytea, 0, array['usb'], 'Same key', 'security_key')$$,
   '23505',
-  null,
+  'duplicate key value violates unique constraint "console_keys_credential_key"',
   'the same key cannot be added twice'
 );
 
@@ -78,7 +78,7 @@ select throws_ok(
 select throws_ok(
   $$select public.console_auth_record_key('00000000-0000-0000-0000-000000000000', '\x0a'::bytea, '\x0b'::bytea, 0, array['usb'], 'Ghost key', 'security_key')$$,
   '23503',
-  null,
+  'insert or update on table "keys" violates foreign key constraint "keys_member_id_fkey"',
   'a key cannot be registered for a member that does not exist'
 );
 

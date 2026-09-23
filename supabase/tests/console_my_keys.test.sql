@@ -243,10 +243,14 @@ select is(
 );
 select is(public.console_sign_out_others('development'), 0, 'a second call finds nothing left to revoke');
 
--- Every one of these refuses outright without a live key-verified session.
+-- Every one of these refuses outright without a live key-verified session. 'session ended' is
+-- the same wording five separate sites answer 28000 with, so it does not name the branch --
+-- see the note above the 28000 block in console_guard.test.sql. These two reach
+-- console.current_member's `v_user is null or v_session is null`, which console_guard never
+-- does: swapping that check's words alone fails both of these and nothing there.
 set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111"}';
-select throws_ok($$ select public.console_my_keys() $$, '28000', null, 'no session id, no keys');
-select throws_ok($$ select public.console_my_sessions() $$, '28000', null, 'no session id, no sessions');
+select throws_ok($$ select public.console_my_keys() $$, '28000', 'session ended', 'no session id, no keys');
+select throws_ok($$ select public.console_my_sessions() $$, '28000', 'session ended', 'no session id, no sessions');
 
 select * from finish();
 rollback;

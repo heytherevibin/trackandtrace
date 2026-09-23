@@ -52,19 +52,19 @@ select is(
 select throws_ok(
   $$update console.settings set checks_per_address = 61 where environment = 'production'$$,
   '23514',
-  null,
+  'new row for relation "settings" violates check constraint "settings_checks_per_address_check"',
   'checks_per_address outside its 5-60 range is refused'
 );
 select throws_ok(
   $$update console.settings set primary_source = 'other' where environment = 'production'$$,
   '23514',
-  null,
+  'new row for relation "settings" violates check constraint "settings_primary_source_check"',
   'a primary_source that is neither railkit nor rapidapi is refused'
 );
 select throws_ok(
   $$insert into console.settings (environment) values ('staging')$$,
   '23514',
-  null,
+  'new row for relation "settings" violates check constraint "settings_environment_check"',
   'an environment outside the three the table allows is refused'
 );
 
@@ -91,16 +91,36 @@ select throws_ok(
 );
 
 -- The function's own input validation runs before it ever looks for a tap.
+--
+-- console_save_settings raises 22023 from three separate places -- 'nothing to save',
+-- 'unknown setting %' and 'unknown environment' -- so a bare '22023', null here passed for
+-- whichever of the three fired -- and all three are console_save_settings' own, five and
+-- thirteen lines apart in 20260920090500_console_settings.sql, with no other 22023 anywhere
+-- in the migrations to widen the net further.
+-- Read off a live run rather than inferred: swapping 'nothing to save' for other words while
+-- keeping its errcode fails this assertion and the null-change-set one below; swapping
+-- 'unknown setting %' fails the next one alone.
+--
+-- Two things the naming does not buy, said plainly rather than left to look like coverage.
+-- First, this assertion and the null-change-set one further down share both the guard and
+-- its words -- `p_changes is null or jsonb_typeof(p_changes) <> 'object' or p_changes =
+-- '{}'::jsonb` is one `if`. The message cannot tell them apart; their fixtures can, and do:
+-- with `or p_changes = '{}'::jsonb` deleted this one fails alone, and with `p_changes is null
+-- or` deleted this one stays green while the null-change-set assertion below fails together
+-- with the version check guarding it. Second, 'unknown environment' -- the third of the three,
+-- raised when no settings row matches p_environment -- is asserted nowhere in this suite, and
+-- so is held up by nothing: deleting that guard outright, and swapping its words for others
+-- under the same errcode, each leave all 17 files and all 652 assertions green.
 select throws_ok(
   $$select public.console_save_settings('development', 1, '{}'::jsonb, 'maintenance')$$,
   '22023',
-  null,
+  'nothing to save',
   'a save with an empty change set is refused'
 );
 select throws_ok(
   $$select public.console_save_settings('development', 1, '{"not_a_real_setting": true}'::jsonb, 'maintenance')$$,
   '22023',
-  null,
+  'unknown setting not_a_real_setting',
   'a save naming a setting that does not exist is refused'
 );
 
@@ -137,7 +157,7 @@ values ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-2222222
 select throws_ok(
   $$select public.console_save_settings('production', 1, null, 'null-changeset-attempt')$$,
   '22023',
-  null,
+  'nothing to save',
   'a literal SQL null change set is refused, not silently accepted by a valid tap'
 );
 select is(
@@ -189,7 +209,7 @@ values ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-2222222
 select throws_ok(
   $$select public.console_save_settings('development', 1, '{"checks_paused": false}'::jsonb, 'undo')$$,
   '40001',
-  null,
+  'stale version',
   'a stale version is refused'
 );
 

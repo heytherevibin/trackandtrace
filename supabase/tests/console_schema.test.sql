@@ -45,7 +45,12 @@ select col_is_unique('console', 'members', 'email', 'one member per address');
 
 select has_index('console', 'members', 'console_members_active_idx', 'the active-member index exists');
 
--- The email CHECK actually bites, both ways.
+-- The email CHECK actually bites, both ways. Both assertions name the same words, because
+-- members_email_check is one constraint carrying both halves -- `email = lower(email) and
+-- char_length(email) between 3 and 254` -- and Postgres names the constraint, never the
+-- conjunct that failed. So the message pins which constraint refused, not which half, and the
+-- fixtures do the rest: re-adding members_email_check with only the length half fails the
+-- lower-case assertion, and with only the lower-case half fails the too-short one.
 insert into auth.users (id, email) values ('11111111-1111-1111-1111-111111111111', 'owner@trakline.in');
 insert into console.members (user_id, email, name, role)
   values ('11111111-1111-1111-1111-111111111111', 'owner@trakline.in', 'Owner Member', 'owner');
@@ -53,13 +58,13 @@ insert into console.members (user_id, email, name, role)
 select throws_ok(
   $$insert into console.members (user_id, email, name, role) values (gen_random_uuid(), 'MIXED@trakline.in', 'Mixed Case', 'admin')$$,
   '23514'::char(5),
-  NULL,
+  'new row for relation "members" violates check constraint "members_email_check"',
   'an address must be stored lower-case'
 );
 select throws_ok(
   $$insert into console.members (user_id, email, name, role) values (gen_random_uuid(), 'x', 'Too Short', 'admin')$$,
   '23514'::char(5),
-  NULL,
+  'new row for relation "members" violates check constraint "members_email_check"',
   'an address that short is refused'
 );
 
@@ -68,7 +73,7 @@ insert into auth.users (id, email) values ('22222222-2222-2222-2222-222222222222
 select throws_ok(
   $$insert into console.members (user_id, email, name, role, invited_by) values ('22222222-2222-2222-2222-222222222222', 'second@trakline.in', 'Second Member', 'admin', gen_random_uuid())$$,
   '23503'::char(5),
-  NULL,
+  'insert or update on table "members" violates foreign key constraint "members_invited_by_fkey"',
   'invited_by must name a member'
 );
 

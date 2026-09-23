@@ -26,7 +26,7 @@ select throws_ok(
   $$insert into console.keys (member_id, credential_id, public_key, counter, name, type)
     values ('11111111-1111-1111-1111-111111111111', '\x01'::bytea, '\x03'::bytea, 0, 'Copy', 'security_key')$$,
   '23505',
-  null,
+  'duplicate key value violates unique constraint "console_keys_credential_key"',
   'the same credential cannot be registered twice'
 );
 
@@ -62,7 +62,7 @@ select throws_ok(
   $$insert into console.challenges (member_id, session_id, purpose, challenge, expires_at)
     values ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'sign_in', 'sign-in-challenge-0001', now() + interval '5 minutes')$$,
   '23505'::char(5),
-  null,
+  'duplicate key value violates unique constraint "console_challenges_challenge_key"',
   'the same challenge string cannot be registered twice'
 );
 
@@ -71,7 +71,7 @@ select throws_ok(
   $$insert into console.challenges (member_id, session_id, purpose, challenge, expires_at)
     values ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'action', 'action-challenge-0009', now() + interval '5 minutes')$$,
   '23514'::char(5),
-  null,
+  'new row for relation "challenges" violates check constraint "console_challenges_action_digest"',
   'an action challenge without a digest is refused'
 );
 
@@ -82,7 +82,7 @@ select throws_ok(
   $$insert into console.challenges (member_id, session_id, purpose, challenge, expires_at)
     values ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'sign_in', 'ten-minute-challenge', now() + interval '10 minutes')$$,
   '23514'::char(5),
-  null,
+  'new row for relation "challenges" violates check constraint "console_challenges_expiry_window"',
   'a challenge more than five minutes out is refused'
 );
 select lives_ok(

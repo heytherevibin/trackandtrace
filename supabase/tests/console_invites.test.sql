@@ -28,7 +28,7 @@ select throws_ok(
   $$insert into console.invites (email, role, invited_by, token_hash, expires_at)
     values ('new@trakline.in', 'viewer', '11111111-1111-1111-1111-111111111111', '\xbb'::bytea, now() + interval '7 days')$$,
   '23505'::char(5),
-  null,
+  'duplicate key value violates unique constraint "console_invites_live_email_idx"',
   'an address cannot hold two live invites'
 );
 
@@ -37,7 +37,7 @@ select throws_ok(
   $$insert into console.invites (email, role, invited_by, token_hash, expires_at)
     values ('other@trakline.in', 'viewer', '11111111-1111-1111-1111-111111111111', '\xaa'::bytea, now() + interval '7 days')$$,
   '23505'::char(5),
-  null,
+  'duplicate key value violates unique constraint "console_invites_token_key"',
   'invites cannot share a token hash'
 );
 
@@ -46,7 +46,7 @@ select throws_ok(
   $$insert into console.invites (email, role, invited_by, token_hash, expires_at)
     values ('Mixed@trakline.in', 'viewer', '11111111-1111-1111-1111-111111111111', '\xcc'::bytea, now() + interval '7 days')$$,
   '23514'::char(5),
-  null,
+  'new row for relation "invites" violates check constraint "invites_email_check"',
   'invites must have lowercase email'
 );
 
@@ -55,7 +55,7 @@ select throws_ok(
   $$insert into console.invites (email, role, invited_by, token_hash, expires_at)
     values ('another@trakline.in', 'viewer', '99999999-9999-9999-9999-999999999999', '\xdd'::bytea, now() + interval '7 days')$$,
   '23503'::char(5),
-  null,
+  'insert or update on table "invites" violates foreign key constraint "invites_invited_by_fkey"',
   'invited_by must reference a real member'
 );
 
@@ -81,7 +81,7 @@ select throws_ok(
   $$insert into console.setup_links (email, token_hash, expires_at)
     values ('other@trakline.in', '\xff'::bytea, now() + interval '24 hours')$$,
   '23505'::char(5),
-  null,
+  'duplicate key value violates unique constraint "console_setup_links_token_key"',
   'setup_links cannot share a token hash'
 );
 
@@ -90,16 +90,21 @@ select throws_ok(
   $$insert into console.setup_links (email, token_hash, expires_at)
     values ('Mixed@trakline.in', '\x99'::bytea, now() + interval '24 hours')$$,
   '23514'::char(5),
-  null,
+  'new row for relation "setup_links" violates check constraint "setup_links_email_check"',
   'setup_links must have lowercase email'
 );
 
--- Expiry window constraints: invites must fall within 7 days
+-- Expiry window constraints: invites must fall within 7 days. These two name the same words:
+-- console_invites_expiry_window is one constraint holding both ends of the window
+-- (`expires_at > created_at and expires_at <= created_at + 7 days`), and Postgres reports the
+-- constraint, not the conjunct. The message pins the constraint; the fixtures pin the ends --
+-- re-added with only `expires_at > created_at` the too-long one fails, with only the 7-day
+-- bound the already-expired one does.
 select throws_ok(
   $$insert into console.invites (email, role, invited_by, token_hash, expires_at)
     values ('toolong@trakline.in', 'viewer', '11111111-1111-1111-1111-111111111111', '\x11'::bytea, now() + interval '30 days')$$,
   '23514'::char(5),
-  null,
+  'new row for relation "invites" violates check constraint "console_invites_expiry_window"',
   'an invite cannot outlast a week'
 );
 
@@ -107,7 +112,7 @@ select throws_ok(
   $$insert into console.invites (email, role, invited_by, token_hash, expires_at)
     values ('tooearly@trakline.in', 'viewer', '11111111-1111-1111-1111-111111111111', '\x22'::bytea, now() - interval '1 hour')$$,
   '23514'::char(5),
-  null,
+  'new row for relation "invites" violates check constraint "console_invites_expiry_window"',
   'an invite cannot arrive expired'
 );
 
@@ -116,7 +121,7 @@ select throws_ok(
   $$insert into console.setup_links (email, token_hash, expires_at)
     values ('toolong@trakline.in', '\x33'::bytea, now() + interval '48 hours')$$,
   '23514'::char(5),
-  null,
+  'new row for relation "setup_links" violates check constraint "console_setup_links_expiry_window"',
   'the first-Owner link cannot outlast a day'
 );
 
