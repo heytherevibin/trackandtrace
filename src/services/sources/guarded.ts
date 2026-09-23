@@ -1,12 +1,21 @@
 import { messages } from "@/messages";
-import type { Breaker } from "@/services/breaker";
-import type { PnrDataSource } from "@/services/pnr-source";
-import type { SourceOutcome } from "./outcome";
+import type { Breaker, Recordable } from "@/services/breaker";
+import type { SourceFailure } from "./outcome";
 
 // Wraps one third-party adapter, inside the fallback: while the provider's
 // breaker is open nothing is asked of it (so the fallback answers at once);
 // otherwise every request is counted, only safe failures are retried once, and
 // the breaker hears the final answer.
+//
+// It is generic in the question and the answer so the same policy can wrap a
+// `PnrDataSource` and an `AvailabilitySource` — both ask one thing and answer
+// `{ ok: true, … }` or the shared failure shape, which is all this file reads.
+// The two get different breakers, not different code: see `breaker.ts`.
+
+/** One question, one answer — the shape both source seams already have. */
+export interface Guardable<Q, O> {
+  check(query: Q): Promise<O>;
+}
 
 export interface GuardDeps {
   readonly breaker: Breaker;
@@ -22,7 +31,7 @@ const RETRY_STATUSES: ReadonlySet<number> = new Set([502, 503, 504]);
 const RETRY_BUDGET_MS = 3_000;
 
 /** A network failure or a gateway error may pass; a timeout, a refusal or another error will not. */
-export function isSafeToRetry(outcome: SourceOutcome): boolean {
+export function isSafeToRetry(outcome: Recordable): boolean {
   if (outcome.ok) return false;
   return outcome.cause === "network" || (outcome.cause === "server" && outcome.status !== undefined && RETRY_STATUSES.has(outcome.status));
 }
@@ -34,26 +43,26 @@ export function retryDelayMs(random: () => number): number {
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-export function createGuardedSource(source: PnrDataSource, deps: GuardDeps): PnrDataSource {
+export function createGuardedSource<Q, O extends Recordable>(source: Guardable<Q, O>, deps: GuardDeps): Guardable<Q, O | SourceFailure> {
   const sleep = deps.sleep ?? wait;
   const random = deps.random ?? Math.random;
   const now = deps.now ?? Date.now;
 
-  async function attempt(pnr: string): Promise<SourceOutcome> {
+  async function attempt(query: Q): Promise<O> {
     await deps.countRequest();
-    return source.check(pnr);
+    return source.check(query);
   }
 
   return {
-    async check(pnr) {
+    async check(query) {
       const gate = await deps.breaker.admit();
       if (gate.open) return { ok: false, code: "SOURCE_UNAVAILABLE", message: messages.source.outcomes.resting, retryAfter: gate.retryAfterSeconds };
 
       const started = now();
-      const first = await attempt(pnr);
+      const first = await attempt(query);
       const retry = isSafeToRetry(first) && now() - started < RETRY_BUDGET_MS;
       if (retry) await sleep(retryDelayMs(random));
-      const outcome = retry ? await attempt(pnr) : first;
+      const outcome = retry ? await attempt(query) : first;
       await deps.breaker.record(outcome);
       return outcome;
     },

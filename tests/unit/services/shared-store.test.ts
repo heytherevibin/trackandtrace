@@ -3,7 +3,8 @@ import { MemoryCache } from "@/services/cache";
 import { parseEnv } from "@/services/env";
 import { EncryptedRedisCache } from "@/services/redis-cache";
 import { UNLIMITED_BUDGET } from "@/services/live-budget";
-import { createPnrCache, liveBudget, resetLocalState } from "@/services/shared-store";
+import { createPnrCache, liveBudget, providerGuard, resetLocalState } from "@/services/shared-store";
+import type { SourceOutcome } from "@/services/sources/outcome";
 
 const DATA_KEY = Buffer.alloc(32, 7).toString("base64");
 
@@ -50,6 +51,43 @@ describe("liveBudget", () => {
     expect(warn).toHaveBeenCalledTimes(1);
     expect(String(warn.mock.calls[0]?.[0])).toMatch(/^\[budget\]/);
     expect(JSON.stringify(warn.mock.calls)).not.toMatch(/\d{10}/);
+    warn.mockRestore();
+  });
+});
+
+describe("providerGuard", () => {
+  const FAKE_RAILKIT = `railkit_${"a1".repeat(16)}`;
+  const serverError: SourceOutcome = { ok: false, code: "SOURCE_UNAVAILABLE", message: "x", cause: "server" };
+  const keyRefused: SourceOutcome = { ok: false, code: "SOURCE_UNAVAILABLE", message: "x", cause: "refused", status: 401 };
+  const notOnRoute: SourceOutcome = { ok: false, code: "INVALID", message: "not an intermediate station" };
+
+  function railkit() {
+    resetLocalState();
+    const current = envOf({ NODE_ENV: "test", PNR_SOURCE: "railkit", RAILKIT_API_KEY: FAKE_RAILKIT });
+    return { pnr: providerGuard("railkit", "pnr", current), availability: providerGuard("railkit", "availability", current), current };
+  }
+
+  it("gives one caller of a provider the same guard twice, and the other caller a different one", () => {
+    const { pnr, availability, current } = railkit();
+    expect(providerGuard("railkit", "pnr", current)).toBe(pnr);
+    expect(availability).not.toBe(pnr);
+  });
+
+  it("keeps a crawler's refusals — and its wrong questions — off the live PNR fuse", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { pnr, availability } = railkit();
+    for (let i = 0; i < 10; i += 1) await availability.breaker.record(serverError);
+    for (let i = 0; i < 10; i += 1) await availability.breaker.record(notOnRoute);
+    await expect(availability.breaker.admit()).resolves.toMatchObject({ open: true });
+    await expect(pnr.breaker.admit()).resolves.toEqual({ open: false });
+    warn.mockRestore();
+  });
+
+  it("still rests the live PNR fuse when the crawler finds the key refused", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { pnr, availability } = railkit();
+    await availability.breaker.record(keyRefused);
+    await expect(pnr.breaker.admit()).resolves.toEqual({ open: true, retryAfterSeconds: 600 });
     warn.mockRestore();
   });
 });

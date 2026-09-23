@@ -13,7 +13,7 @@ Next.js server
   pnr-query (src/services/pnr-query.ts)    — the one PNR path: validate → rate limit (IPv6 per /64) → cache → daily live-request budget → single-flight → source
   shared-store (src/services/shared-store.ts) — Upstash Redis (Mumbai) on deployments: shared limits + the encrypted 60 s PNR cache
   sources (src/services/sources/*)         — registry: live seam (unavailable until a provider lands) | railkit | rapidapi (third-party, shown as Trakline; optional fallback between them) | fixture (dev only)
-  guarded (src/services/sources/guarded.ts) — each provider behind its breaker, one safe retry (network, 502/503/504) and a daily usage count
+  guarded (src/services/sources/guarded.ts) — each caller of a provider behind its own breaker, one safe retry (network, 502/503/504) and a daily usage count. Generic in question and answer, so it wraps the availability seam too
   watchlist-repo (src/services/watchlist-repo.ts) — supabase-js over RLS-guarded tables
   session (src/services/session.ts)        — verified JWT claims → SessionUser DTO
   proxy (src/proxy.ts)                     — one app, two hosts: the console host (admin.trakline.in; admin.localhost locally) is rewritten into src/app/console with a per-request nonce CSP; elsewhere /console answers 404 and Supabase sessions are refreshed on page requests (skips /api and /monitoring)
@@ -52,8 +52,8 @@ PNRs never travel in an address, because request paths and query strings are rec
 | Refresh within 30 s of the record's retrieval | Answered from the cache (`cached: true`, the record's own retrieval time); no provider request |
 | Daily live-request budget spent (`LIVE_REQUESTS_PER_DAY`, 300 by default; every address together, per IST day) | Checks with a cached record are answered from the cache; the rest get 503 SOURCE_UNAVAILABLE, "Trakline has used today's live checks. Try again after 00:00 IST.", with Retry-After to midnight IST. No provider is asked. One `[budget]` warning a day, with the day and the limit only |
 | Upstash slow or down | Cache misses; limits and the daily budget fall back to this instance's memory; checks keep answering |
-| Provider failing repeatedly | 5 failures in 60 s open its breaker for 30 s (doubling per failed probe, up to 10 min); the fallback answers at once and no request is spent on the failing provider |
-| Provider refuses the key or plan, or its quota | Breaker open 10 min (401/403), or for the provider's Retry-After (429) |
+| Provider failing repeatedly | 5 failures in 60 s open that caller's breaker for 30 s (doubling per failed probe, up to 10 min); the fallback answers at once and no request is spent on the failing provider. Live PNR checks and the availability crawler count separately, so one cannot rest the other |
+| Provider refuses the key or plan, or its quota | Breaker open 10 min (401/403), or for the provider's Retry-After (429) — facts about the account, so these rest every caller of that provider |
 | Sentry unreachable | Error reports are dropped; the app is unaffected |
 | A script, style or connection the policy doesn't allow | Blocked by the enforced CSP; reported to Sentry from production; `tests/e2e/csp.spec.ts` fails on any violation on every route in both faces |
 | Malformed API body | Client zod validation fails → error state, never rendered as data |

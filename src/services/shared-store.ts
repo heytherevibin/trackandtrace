@@ -27,7 +27,7 @@ interface SharedStore {
 
 const stores = new WeakMap<Env, SharedStore | null>();
 const states = new WeakMap<Env, { readonly kv: Kv; readonly prefix: string }>();
-const guards = new WeakMap<Env, Map<ThirdPartySource, GuardDeps>>();
+const guards = new WeakMap<Env, Map<string, GuardDeps>>();
 const budgets = new WeakMap<Env, LiveBudget>();
 /** Breaker state and usage counts without a shared store, and while it is down. */
 const localKv = new MemoryKv();
@@ -106,21 +106,40 @@ export function liveBudget(current: Env = env()): LiveBudget {
   return made;
 }
 
-/** One breaker and one usage counter per provider, shared by every check in this environment. */
-export function providerGuard(source: ThirdPartySource, current: Env = env()): GuardDeps {
-  const perEnv = guards.get(current) ?? new Map<ThirdPartySource, GuardDeps>();
+/**
+ * Which caller of a provider is asking. They fail for different reasons — a
+ * route crawler's refusals are mostly its own wrong questions — so each gets its
+ * own breaker, over one shared provider-wide fuse for a refused key or a spent
+ * plan. See `breaker.ts`.
+ */
+export type GuardEndpoint = "pnr" | "availability";
+
+/** One breaker per provider *and caller*, one usage counter per provider, shared by every check in this environment. */
+export function providerGuard(source: ThirdPartySource, endpoint: GuardEndpoint, current: Env = env()): GuardDeps {
+  const perEnv = guards.get(current) ?? new Map<string, GuardDeps>();
   guards.set(current, perEnv);
-  const known = perEnv.get(source);
+  const caller = `${source}:${endpoint}`;
+  const known = perEnv.get(caller);
   if (known) return known;
   const { kv, prefix } = stateStore(current);
   const count = createUsageCounter(kv, prefix);
   const made: GuardDeps = {
-    breaker: createBreaker(kv, `${prefix}:breaker:${source}`, {
-      onChange: (event) =>
-        log.warn(`[source:${source}] breaker ${event.state}`, event.state === "open" ? { seconds: event.openMs / 1000, reason: event.reason } : {}),
-    }),
+    breaker: createBreaker(
+      kv,
+      // The provider base is the key this product has always used; adding a caller segment to it
+      // gives each caller its own four keys without moving anyone else's.
+      { provider: `${prefix}:breaker:${source}`, endpoint: `${prefix}:breaker:${caller}` },
+      {
+        onChange: (event) =>
+          log.warn(
+            `[source:${caller}] breaker ${event.state}`,
+            event.state === "open" ? { seconds: event.openMs / 1000, reason: event.reason, rests: event.scope } : {},
+          ),
+      },
+    ),
+    // One plan, one quota, so both callers count against one provider total.
     countRequest: () => count(source),
   };
-  perEnv.set(source, made);
+  perEnv.set(caller, made);
   return made;
 }
