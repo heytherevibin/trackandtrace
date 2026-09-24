@@ -83,6 +83,39 @@ test.describe("the collision checker", () => {
     });
     expect((await collisionsInView(page)).some((finding) => finding.startsWith("sideways overflow"))).toBe(true);
   });
+
+  test("sees text drawn inside a header that is not the masthead", async ({ page }) => {
+    await gotoReady(page, "/");
+    await page.evaluate(() => {
+      const header = document.createElement("header");
+      for (const [text, top] of [
+        ["Probe header one", 240],
+        ["Probe header two", 246],
+      ] as const) {
+        const line = document.createElement("p");
+        line.textContent = text;
+        line.style.cssText = `position:fixed;left:40px;top:${top}px;margin:0;font:16px/20px sans-serif;z-index:9999`;
+        header.append(line);
+      }
+      document.body.append(header);
+    });
+    expect(await collisionsInView(page)).toContain('text "Probe header one" × text "Probe header two"');
+  });
+
+  test("compares a positioned child's text against its own parent's text", async ({ page }) => {
+    await gotoReady(page, "/");
+    await page.evaluate(() => {
+      const li = document.createElement("li");
+      li.textContent = "Probe parent";
+      li.style.cssText = "position:fixed;left:40px;top:400px;margin:0;font:16px/20px sans-serif;z-index:9999";
+      const child = document.createElement("p");
+      child.textContent = "Probe child";
+      child.style.cssText = "position:absolute;left:0;top:0;margin:0;font:16px/20px sans-serif";
+      li.append(child);
+      document.body.append(li);
+    });
+    expect(await collisionsInView(page)).toContain('text "Probe parent" × text "Probe child"');
+  });
 });
 
 // Today's landing, before the journey adds anything: the baseline every journey PR must keep.
@@ -106,3 +139,15 @@ for (const size of SIZES) {
     }
   });
 }
+
+// The footer's "Your device asks for reduced motion" note only shows under the device's own setting.
+test.describe("the landing at 390×844 under the device's reduced motion", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+  test.skip(({ isMobile }) => !isMobile, "runs once, in the project that emulates a phone");
+
+  test("nothing collides, top to bottom", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await gotoReady(page, "/");
+    expect(await collisionsTopToBottom(page)).toEqual([]);
+  });
+});

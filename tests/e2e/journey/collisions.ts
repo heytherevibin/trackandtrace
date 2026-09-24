@@ -24,11 +24,11 @@ export async function collisionsInView(page: Page, options: CollisionOptions = {
         top: number;
         bottom: number;
       }
-      const header = document.querySelector("header");
-      const mastheadBottom = header ? header.getBoundingClientRect().bottom : 0;
+      const masthead = document.querySelector("header");
+      const mastheadBottom = masthead ? masthead.getBoundingClientRect().bottom : 0;
       const vw = document.documentElement.clientWidth;
       const vh = window.innerHeight;
-      const ignored = ["header", ".sr-only", "noscript", "script", "style", "nextjs-portal", "[data-sonner-toaster]", ...skip].join(", ");
+      const ignored = [".sr-only", "noscript", "script", "style", "nextjs-portal", "[data-sonner-toaster]", ...skip].join(", ");
 
       /** Seen by a person: laid out, not skipped by the browser (a closed <details>' content, content-visibility), not hidden, not clipped away as screen-reader-only, not faded out. */
       const visible = (el: Element): boolean => {
@@ -70,7 +70,9 @@ export async function collisionsInView(page: Page, options: CollisionOptions = {
         }
         return clip;
       };
-      const inView = (r: Box) => r.right - r.left > 1 && r.bottom - r.top > 1 && r.bottom > mastheadBottom + 2 && r.top < vh && r.right > 0 && r.left < vw;
+      // Below the masthead and inside the window; content inside the masthead itself is exempt from the
+      // masthead cut and is checked against the window's top edge instead.
+      const inView = (r: Box, insideMasthead: boolean) => r.right - r.left > 1 && r.bottom - r.top > 1 && r.bottom > (insideMasthead ? 0 : mastheadBottom + 2) && r.top < vh && r.right > 0 && r.left < vw;
       const overlap = (a: Box, b: Box) => Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) * Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
       const related = (a: Element, b: Element) => a === b || a.contains(b) || b.contains(a);
       const name = (el: Element) => `${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ""}${el.classList[0] ? `.${el.classList[0]}` : ""}`;
@@ -81,9 +83,11 @@ export async function collisionsInView(page: Page, options: CollisionOptions = {
         const owner = node.parentElement;
         const words = node.nodeValue?.trim() ?? "";
         if (!words || !owner || owner.closest(ignored)) continue;
-        // Cheap first: text wholly above or below the window is never walked for visibility.
+        const insideMasthead = masthead ? masthead.contains(owner) : false;
+        // Cheap first: text wholly above or below the window is never walked for visibility. Text inside the
+        // masthead itself is never "above" it, so it skips this cut.
         const reach = owner.getBoundingClientRect();
-        if (reach.bottom <= mastheadBottom || reach.top >= vh || !visible(owner)) continue;
+        if ((!insideMasthead && reach.bottom <= mastheadBottom) || reach.top >= vh || !visible(owner)) continue;
         const style = getComputedStyle(owner);
         const size = Number.parseFloat(style.fontSize);
         const leading = style.lineHeight === "normal" ? size * 1.2 : Number.parseFloat(style.lineHeight);
@@ -94,19 +98,21 @@ export async function collisionsInView(page: Page, options: CollisionOptions = {
           const middle = (line.top + line.bottom) / 2;
           const half = Math.min(line.height, leading) / 2;
           const box = { left: Math.max(line.left, clip.left), right: Math.min(line.right, clip.right), top: Math.max(middle - half, clip.top), bottom: Math.min(middle + half, clip.bottom) };
-          if (inView(box)) texts.push({ box, owner, block: blockOf(owner), text: words.slice(0, 40) });
+          if (inView(box, insideMasthead)) texts.push({ box, owner, block: blockOf(owner), text: words.slice(0, 40) });
         }
       }
       const drawn = panels.length
         ? [...document.querySelectorAll(panels.join(", "))]
             .filter((el) => !el.closest(ignored) && visible(el))
             .map((el) => ({ el, box: el.getBoundingClientRect() }))
-            .filter(({ box }) => inView(box))
+            .filter(({ el, box }) => inView(box, masthead ? masthead.contains(el) : false))
         : [];
 
       const found: string[] = [];
       texts.forEach((a, i) => {
-        for (const b of texts.slice(i + 1)) if (!related(a.block, b.block) && overlap(a.box, b.box) > 6) found.push(`text "${a.text}" × text "${b.text}"`);
+        // Lines of one paragraph share a block and never collide with each other; a positioned child laid
+        // over its own parent's text is a different block and is compared like any other pair.
+        for (const b of texts.slice(i + 1)) if (a.block !== b.block && overlap(a.box, b.box) > 6) found.push(`text "${a.text}" × text "${b.text}"`);
       });
       for (const panel of drawn) {
         for (const t of texts) if (!panel.el.contains(t.owner) && overlap(panel.box, t.box) > 6) found.push(`panel ${name(panel.el)} × text "${t.text}"`);
@@ -123,11 +129,14 @@ export async function collisionsInView(page: Page, options: CollisionOptions = {
 
 /** Scrolls from top to bottom in steps of 45% of the window; each finding once, with the scroll position it was seen at. */
 export async function collisionsTopToBottom(page: Page, options: CollisionOptions = {}): Promise<string[]> {
-  const { height, max } = await page.evaluate(() => ({ height: window.innerHeight, max: document.documentElement.scrollHeight - window.innerHeight }));
+  const height = await page.evaluate(() => window.innerHeight);
   const step = Math.max(1, Math.round(height * 0.45));
-  const positions = [...new Set([...Array.from({ length: Math.floor(max / step) + 1 }, (_, i) => i * step), max])];
   const found = new Map<string, number>();
-  for (const y of positions) {
+  // max can grow as later sections (pinned scenes) change scrollHeight, so it is re-measured every step;
+  // each y is clamped to that latest max, which makes the final visited position max itself.
+  for (let y = 0; ; y += step) {
+    const max = await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight);
+    const at = Math.min(y, max);
     // An instant jump, then two frames: style, layout and anything that follows the scroll have settled.
     await page.evaluate(
       (top) =>
@@ -135,9 +144,10 @@ export async function collisionsTopToBottom(page: Page, options: CollisionOption
           window.scrollTo({ top, behavior: "instant" });
           requestAnimationFrame(() => requestAnimationFrame(() => done()));
         }),
-      y,
+      at,
     );
-    for (const finding of await collisionsInView(page, options)) if (!found.has(finding)) found.set(finding, y);
+    for (const finding of await collisionsInView(page, options)) if (!found.has(finding)) found.set(finding, at);
+    if (at >= max) break;
   }
   return [...found].map(([finding, y]) => `@${y}: ${finding}`);
 }
