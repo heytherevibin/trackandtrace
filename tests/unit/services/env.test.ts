@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { accountsConfigured, fixtureAllowed, googleSignInEnabled, liveRequestsPerDay, parseEnv, passkeysEnabled, sharedStoreConfig } from "@/services/env";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { accountsConfigured, env, fixtureAllowed, googleSignInEnabled, liveRequestsPerDay, parseEnv, passkeysEnabled, resetEnvCache, sharedStoreConfig } from "@/services/env";
 
 const dev = { NODE_ENV: "development" } as const;
 
@@ -313,5 +313,46 @@ describe("the daily live-request budget", () => {
     for (const value of ["0", "-5", "12.5", "lots"]) {
       expect(parseEnv({ ...dev, LIVE_REQUESTS_PER_DAY: value }).ok, value).toBe(false);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The retired fallback's one-time notice
+// ---------------------------------------------------------------------------
+// The coercion keeps a stale `PNR_FALLBACK=rapidapi` from throwing at boot. The notice is what keeps
+// it from being coerced silently for ever — an accommodation nobody is told about is how the line it
+// lives on outlives the variable it was written for.
+
+describe("the retired fallback's boot notice", () => {
+  const before = { ...process.env };
+
+  afterEach(() => {
+    process.env = { ...before };
+    resetEnvCache();
+    vi.restoreAllMocks();
+  });
+
+  it("says so once, and says which variable to delete", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    process.env = { ...before, NODE_ENV: "development", PNR_SOURCE: "railkit", RAILKIT_API_KEY: FAKE_KEY, PNR_FALLBACK: "rapidapi" };
+    resetEnvCache();
+
+    expect(env().PNR_FALLBACK).toBe("none");
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0]?.[0])).toMatch(/PNR_FALLBACK[\s\S]*removed[\s\S]*Delete the variable/);
+
+    // Cached after the first read, so a busy process is not told on every call.
+    env();
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it("stays quiet when the variable is absent, which is the state this is steering towards", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    process.env = { ...before, NODE_ENV: "development", PNR_SOURCE: "railkit", RAILKIT_API_KEY: FAKE_KEY };
+    delete process.env.PNR_FALLBACK;
+    resetEnvCache();
+
+    expect(env().PNR_FALLBACK).toBe("none");
+    expect(warn).not.toHaveBeenCalled();
   });
 });
