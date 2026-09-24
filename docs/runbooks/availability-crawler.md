@@ -248,6 +248,19 @@ so a genuinely bad sole entry can never be named. That is the safe direction —
 long costs a call a run, a good route deleted costs the dataset for ever — and it is why the list
 below is what to read instead. Keep more than one combo on the list where you can.
 
+**`--only 1` builds a one-combo list, and that is how you will actually meet this.** The flag is
+recommended all over this runbook for a cheap supervised run, so the blind spot is one keystroke
+away rather than a property of `routes.json` you would have to go out of your way to create. A
+narrowed run is for watching what one combo does, not for judging whether it deserves its place;
+read the `produced NO ROWS` section, or run the full list, before concluding anything about a route.
+
+**An all-pinned-only list cannot report a blind run either.** If every combo on the list is in a
+quota that makes the pinned ask alone — two `TQ` entries and nothing else, say — then there are no
+rolling refusals to hold, so `blind` stays empty, the run reports itself whole and exits 0 even
+though the provider answered nothing. Nothing is lost that was not already lost (a pinned refusal
+has never counted towards staleness), but the run's own output will not say the provider was down.
+The coverage report will, the next day.
+
 **What catches a combo that has quietly stopped producing data is the run's own
 `produced NO ROWS for 7 runs or more` section.** Each run, per combo, the crawler counts the
 consecutive runs in which none of that combo's asks produced a single row, carries the count in

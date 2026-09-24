@@ -302,4 +302,24 @@ describe("a run in which NO ask answered", () => {
     expect(summary.stale).toEqual([]);
     expect(summary.cursors[KEY_ONE]?.runsWithoutRows).toBe(1);
   });
+
+  // "Answered" means an ASK came back ok — not that a ROW was written. Nothing pinned the
+  // difference, and `answered.size === 0` and `summary.rows === 0` are the same on every other test
+  // in this file, so conflating them was a one-word change the suite would have waved through.
+  //
+  // They are not the same thing, and the failure is nasty: a healthy provider behind a broken store
+  // writes no rows at all, so every run would read as blind, the stale signal would be suppressed
+  // for as long as the store stayed broken, and the report would send the operator to look at the
+  // provider — which is answering perfectly.
+  it("counts an ASK that answered, not a ROW that landed: a broken store must not blind the run", async () => {
+    // Both of KEY_ONE's asks refuse — its own pinned ask answering would excuse it by the older
+    // invariant, which is a different mechanism from the one under test. KEY_TWO answers, and the
+    // store writes nothing for anyone.
+    const { ask } = stubAsk((n) => (n < 2 ? REFUSED : OK));
+    const summary = await run({ ask, record: async () => 0, cursors: NEARLY });
+
+    expect(summary.rows).toBe(0);
+    expect(summary.blind).toEqual([]);
+    expect(summary.stale).toEqual([`${KEY_ONE} (${REFUSALS_BEFORE_STALE} runs in a row)`]);
+  });
 });

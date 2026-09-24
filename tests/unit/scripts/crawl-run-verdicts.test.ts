@@ -224,8 +224,12 @@ describe("the ask a wrap merges onto today", () => {
   /** Beyond the horizon, so `nextAsk` wraps it back to today and emits one merged step. */
   const WRAPPING = { [KEY_ONE]: { next: "2026-12-31", refusals: REFUSALS_BEFORE_STALE - 1 } };
 
+  // The SECOND combo must answer. With every ask refusing, the run is blind and the blind rule
+  // suppresses the strike on its own — which would make this test pass no matter what the
+  // date-keyed rule did, and that rule is the whole subject of this block. A witness keeps the
+  // question pointed at the right mechanism.
   it("takes no staleness strike, because a refusal at today may only mean the train does not run today", async () => {
-    const { ask, seen } = stubAsk(() => REFUSED);
+    const { ask, seen } = stubAsk((n) => (n === 0 ? REFUSED : OK));
     const summary = await run({ ask, cursors: WRAPPING });
 
     expect(seen[0]?.request.journeyDate).toBe(TODAY);
