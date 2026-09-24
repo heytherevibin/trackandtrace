@@ -83,8 +83,8 @@ describe("dayCeiling", () => {
   });
 });
 
-type SelectCall = { readonly table: string; readonly columns: string; readonly options: { readonly count?: string }; readonly day: string | null; readonly range: readonly [number, number] | null };
-type InsertCall = { readonly table: string; readonly rows: readonly Record<string, unknown>[] };
+type SelectCall = { readonly table: string; readonly columns: string; readonly options: { readonly count?: string }; readonly day: string | null; readonly range: readonly [number, number] | null; readonly signal: AbortSignal | null };
+type InsertCall = { readonly table: string; readonly rows: readonly Record<string, unknown>[]; readonly signal: AbortSignal | null };
 
 type Answer = { readonly data: unknown; readonly error: { readonly message: string } | null; readonly count?: number | null };
 
@@ -96,11 +96,15 @@ function fakeDb(answer: Answer): { db: CrawlerCallDb; selects: SelectCall[]; ins
     from(table: string) {
       return {
         select(columns: string, options: { count?: string } = {}) {
-          const call: { table: string; columns: string; options: { count?: string }; day: string | null; range: [number, number] | null } = { table, columns, options, day: null, range: null };
+          const call: { table: string; columns: string; options: { count?: string }; day: string | null; range: [number, number] | null; signal: AbortSignal | null } = { table, columns, options, day: null, range: null, signal: null };
           selects.push(call as unknown as SelectCall);
           const chain = {
             eq(_column: string, value: string) {
               call.day = value;
+              return chain;
+            },
+            abortSignal(signal: AbortSignal) {
+              call.signal = signal;
               return chain;
             },
             range(from: number, to: number) {
@@ -111,8 +115,20 @@ function fakeDb(answer: Answer): { db: CrawlerCallDb; selects: SelectCall[]; ins
           return chain;
         },
         insert(rows: readonly Record<string, unknown>[]) {
-          inserts.push({ table, rows });
-          return Promise.resolve(answer);
+          const call: { table: string; rows: readonly Record<string, unknown>[]; signal: AbortSignal | null } = { table, rows, signal: null };
+          inserts.push(call as unknown as InsertCall);
+          // Thenable rather than a promise: the write is awaited directly when no signal is
+          // passed, and through `.abortSignal(…)` when one is, exactly as supabase-js builds it.
+          const chain = {
+            abortSignal(signal: AbortSignal) {
+              call.signal = signal;
+              return chain;
+            },
+            then<T>(resolve: (value: Answer) => T, reject: (reason: unknown) => T) {
+              return Promise.resolve(answer).then(resolve, reject);
+            },
+          };
+          return chain;
         },
       };
     },
@@ -158,6 +174,17 @@ describe("readCallsToday", () => {
     const { db } = fakeDb({ data: [], error: null, count: null });
 
     expect((await readCallsToday(db, "2026-09-24")).ok).toBe(false);
+  });
+
+  // The runner passes `AbortSignal.timeout(STORE_TIMEOUT_MS)`, and until now nothing drove the
+  // branch that hands it on: the 30-second bound on the gate's own read was an untested claim.
+  it("hands the caller's signal to the store, so the gate's own read is bounded", async () => {
+    const { db, selects } = fakeDb({ data: [], error: null, count: 0 });
+    const signal = AbortSignal.timeout(30_000);
+
+    await readCallsToday(db, "2026-09-24", { signal });
+
+    expect(selects[0]?.signal).toBe(signal);
   });
 
   it("refuses a day that is not an ISO date rather than filtering on nonsense", async () => {
@@ -221,6 +248,44 @@ describe("recordProviderCall", () => {
     } as unknown as CrawlerCallDb;
 
     expect((await recordProviderCall(db, "2026-09-24T09:00:00.000Z")).ok).toBe(false);
+  });
+
+  // ---------------------------------------------------------------------------
+  // THE HUNG INSERT. This write sits in front of EVERY provider call, and
+  // supabase-js sets no timeout of its own: an insert that hangs — a stalled
+  // connection, a store that accepts the TCP connection and never answers —
+  // hung the run at its first ask, having printed its banner and nothing else.
+  // For the unattended run this branch exists to enable, that is a job that
+  // never finishes and never says why.
+  // ---------------------------------------------------------------------------
+  it("hands the caller's signal to the store, so a hung insert cannot hang the run", async () => {
+    const { db, inserts } = fakeDb({ data: null, error: null });
+    const signal = AbortSignal.timeout(30_000);
+
+    await recordProviderCall(db, "2026-09-24T09:00:00.000Z", { signal });
+
+    expect(inserts[0]?.signal).toBe(signal);
+  });
+
+  // A timed-out charge is an UNCOUNTABLE call, so it takes the same path a
+  // refused one does: the caller gives the call up rather than sending one
+  // nothing can count.
+  it("answers a timed-out write as a refusal, rather than never answering at all", async () => {
+    const db = {
+      from: () => ({
+        insert: () => ({
+          abortSignal: (signal: AbortSignal) =>
+            new Promise((_resolve, reject) => {
+              signal.addEventListener("abort", () => reject(new DOMException("The signal has been aborted", "AbortError")));
+            }),
+        }),
+      }),
+    } as unknown as CrawlerCallDb;
+
+    const written = await recordProviderCall(db, "2026-09-24T09:00:00.000Z", { signal: AbortSignal.timeout(5) });
+
+    expect(written.ok).toBe(false);
+    expect(!written.ok && written.reason).toMatch(/could not be charged/);
   });
 });
 

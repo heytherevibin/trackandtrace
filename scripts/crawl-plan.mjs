@@ -32,9 +32,11 @@
 //      live check.
 //   C. The day — `dayCeiling` in `src/services/crawler-budget.ts`, backed by a Postgres ledger of
 //      one row per provider call. The effective ceiling is the smaller of gate A's and what is left
-//      of the day. It is consulted BEFORE planning, incremented as the run goes rather than at the
-//      end, and it FAILS CLOSED: a count that cannot be read refuses the run. See below for why it
-//      is a counter of its own and not `usage.ts`, and `affordablePrefix` for the door it leaves.
+//      of the day. It is consulted BEFORE planning and AGAIN BEFORE EVERY ASK — the second read is
+//      what keeps a concurrent run from out-voting it — incremented as the run goes rather than at
+//      the end, and it FAILS CLOSED: a count that cannot be read refuses the run, or stops it.
+//      `crawl-spend.mjs` holds both decisions, where a test can drive them; see below for why it is
+//      a counter of its own and not `usage.ts`, and `affordablePrefix` for the door it leaves.
 //
 // Nothing here ever calls `liveBudget.take()`: spending a traveller's allowance to fill a dataset is
 // the exact failure this file exists to prevent.

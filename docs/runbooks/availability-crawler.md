@@ -180,6 +180,29 @@ the cost of that choice is that a call which never actually goes out is charged 
 this run spend less and never more. Nothing may update or delete a row in that ledger — not even the
 service role — because a spend record that can be rewritten proves nothing.
 
+**A budget refusal exits `1`, not `2`.** The daily gate turning a second run away is the gate
+working, which is what the refusal message says — so a wrapper that pages on `2` ("it was asked
+wrongly") is not paged by it. `2` stays for a bad flag, an unusable route list or an unreadable
+cursor file.
+
+**Two runs at once are narrowed, not prevented, and the difference matters if you schedule this.**
+The day's count is read before planning **and again before every ask**, so two runs started inside
+the same window — a scheduler firing while you run it by hand is the obvious case — do not both
+spend a whole run: whichever one reaches an ask the ledger can no longer cover stops there, the same
+way the burst floor and the per-run ceiling stop it, with its cursors held. It is not a lock and does
+not need to be, because every call writes its row *before* it leaves: the ledger is self-correcting,
+and what is left is the window between one run's check and its own charge — **about one ask, so two
+calls, per overlapping run**, against an unbounded double-spend before. Still do not overlap on
+purpose: a run stopped that way is a run that did not ask for half its list.
+
+**Do not run it near IST midnight, and the day's budget is the second reason.** The gate is read
+against the day the run *started* on, while each call's row is stamped with its own moment — so a
+run that crosses midnight is gated against day N's remainder and charges its tail to day N+1. Every
+row is still truthful and `observed_on` splits at the same instant, so the spend and the
+observations agree row for row; what you lose is the guarantee, because day N+1 begins already
+partly spent by a run nothing gated against it. The coverage section above gives the same advice for
+its own reason. One stable hour, well away from midnight, settles both.
+
 **This removes the reason scheduling was unsafe. It does not schedule anything**, and deciding to is
 a separate decision.
 
@@ -216,7 +239,8 @@ the **whole** route list, even under `--only`: the flag limits what this run ask
 store owes, so a two-combo run still shows you the four combos it did not touch.
 
 **The crawl's exit code is about the run only:** `0` the run was whole, `1` a refusal or a gate
-stopped it, `2` it was asked wrongly and nothing was spent. A store below the coverage threshold
+stopped it — including a budget refusal, and including a run the day's budget stopped part way —
+`2` it was asked wrongly and nothing was spent. A store below the coverage threshold
 does **not** change it — that is `npm run source:report`'s job, and keeping the two separate is what
 keeps either legible.
 
@@ -342,6 +366,9 @@ thing every run until you fix it.
 - `src/services/crawler-budget.ts` — the day's budget: what today has already cost, and the
   arithmetic that turns it into this run's ceiling. `supabase/migrations/20260924120000_crawler_provider_calls.sql`
   is the ledger it counts, and says why it is in Postgres rather than Upstash.
+- `scripts/crawl-spend.mjs` — where that budget is *enforced*: the charge in front of every provider
+  call, the refusal that stops a run starting, and the re-read before every ask. Read it before
+  changing anything about how a call is counted.
 - `scripts/crawl-availability.mjs` — the asks a run makes per combo, and why the pinned one exists.
 - `scripts/crawl-routes.mjs` — the route list, the preflight, and `QUOTAS_OPENING_NEAR_DEPARTURE`:
   which quotas skip the rolling ask, and which of those entries were measured rather than inferred.

@@ -83,6 +83,16 @@ function whole(value: number): number {
  * zero: a run nobody can measure is precisely the hazard this exists to remove,
  * and "the counter was down" is the one excuse that would let a scheduled
  * crawler spend a month.
+ *
+ * **This decides once, from one reading of the ledger, and one reading can be
+ * out-voted.** Two runs started inside the same window both see the same spend,
+ * both find their worst case fits, and both spend it. Nothing here can prevent
+ * that — there is no lock and deliberately no RPC — so the RUNNER re-reads the
+ * count before every ask and stops when what is left will not cover the next
+ * one (`createDayGate` in `scripts/crawl-spend.mjs`). That works only because
+ * every call writes its row BEFORE it leaves, which makes the ledger
+ * self-correcting; it bounds a concurrent overspend to about one ask per
+ * overlapping run rather than a whole run, and it is not atomicity.
  */
 export function dayCeiling({ perRunCeiling, dailyCap, spent }: { readonly perRunCeiling: number; readonly dailyCap: number; readonly spent: SpendToday }): DayVerdict {
   if (!spent.ok) {
@@ -148,11 +158,20 @@ export async function readCallsToday(db: CrawlerCallDb, day: string, options: { 
  *
  * It returns a verdict rather than throwing, and the caller is expected to stop:
  * a call that cannot be recorded is a call the next run will not know about.
+ *
+ * **Bounded by the caller's signal, because this sits in front of every provider
+ * call.** supabase-js sets no timeout of its own, so an insert that hangs — a
+ * stalled connection, a store that accepts the connection and never answers —
+ * hung the run at its first ask with nothing printed but its banner. A timed-out
+ * charge is an uncountable call, so the abort lands in the same `catch` a refusal
+ * does and the caller gives the call up: fail closed, as the read already does.
  */
-export async function recordProviderCall(db: CrawlerCallDb, spentAt: string): Promise<{ readonly ok: true } | { readonly ok: false; readonly reason: string }> {
+export async function recordProviderCall(db: CrawlerCallDb, spentAt: string, options: { readonly signal?: AbortSignal } = {}): Promise<{ readonly ok: true } | { readonly ok: false; readonly reason: string }> {
   const row: CrawlerCallRow = { spent_at: spentAt };
   try {
-    const { error } = await db.from(CRAWLER_CALL_TABLE).insert([row]);
+    let chain = db.from(CRAWLER_CALL_TABLE).insert([row]);
+    if (options.signal !== undefined) chain = chain.abortSignal(options.signal);
+    const { error } = await chain;
     if (error) return { ok: false, reason: `the call could not be charged to the crawler's daily budget: ${error.message}` };
     return { ok: true };
   } catch (cause) {

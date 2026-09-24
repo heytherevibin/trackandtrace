@@ -45,16 +45,32 @@
 // by IST day by the same SQL expression `observed_on` uses — and takes the SMALLER of its own
 // ceiling and what is left of the day. Each call is charged as it is about to leave, never at the
 // end, because a process killed mid-run has still spent what it sent. A count that cannot be read
-// refuses the run outright. See `crawl-plan.mjs`'s header for the gates and
-// `src/services/crawler-budget.ts` for the arithmetic.
+// refuses the run outright. See `crawl-plan.mjs`'s header for the gates,
+// `src/services/crawler-budget.ts` for the arithmetic, and **`crawl-spend.mjs` for the enforcement,
+// which lives there rather than here precisely so that a test can drive it.**
 //
 // The consequence an operator will meet: **after one full run, a second run the same day refuses**,
 // because the worst case no longer fits in what is left. That is right for a crawler meant to run
 // once a day, and it also blocks a legitimate retry after a run a gate cut short — so the refusal
 // names the `--only n` that does still fit, and says what `--only` actually selects.
 //
-// Exit: 0 the run was whole · 1 it was not (a refusal, or a gate stopped it) · 2 it was asked
-// wrongly, and nothing was spent.
+// **The count is re-read before every ask, not only at the start.** Read once, it can be out-voted:
+// two runs started inside the same window both pass the gate and both spend a whole run — 28 + 28
+// against a cap of 33 — and the overrun comes out of what live PNR checks depend on. This is not a
+// lock, and it works only because every call writes its row before it leaves: the ledger is
+// self-correcting, so re-reading it bounds a concurrent overspend to about one ask instead of a
+// whole run, and the run stops mid-way exactly as the burst floor and the per-run ceiling do.
+//
+// **A run that crosses IST midnight is gated against the day it started on and charges its tail to
+// the day it finishes on.** Both halves are honestly recorded — `spent_on` is derived per row, and
+// `observed_on` splits at the same instant — but the gate the second half passed was the first
+// day's. Run at a stable hour well away from midnight; the runbook says so twice, and this is the
+// second reason.
+//
+// Exit: 0 the run was whole · 1 it was not — a gate stopped it, or a budget refusal turned it away
+// before it asked anything · 2 it was asked wrongly, and nothing was spent. A refused run is the
+// daily gate WORKING, so it takes 1 and never 2: a wrapper that pages on "called wrongly" must not
+// be paged by a second run being correctly refused.
 //
 // **The exit code is about THIS RUN and nothing else.** After the run it also prints the whole
 // store's coverage (`observations-coverage.mjs`), because a run can be perfectly whole while the
@@ -63,9 +79,9 @@
 //
 // This file is only the wiring. The stride, the route preflight, the quota gates, the loop and the
 // report all live in `crawl-plan.mjs`, `crawl-run.mjs` and `crawl-report.mjs`, which are pure and
-// tested; the day's budget lives in `src/services/crawler-budget.ts` and the TypeScript import hook
-// in `crawl-imports.mjs` — **read `crawl-plan.mjs`'s header before changing anything about what
-// this run is allowed to spend.**
+// tested; the day's budget lives in `src/services/crawler-budget.ts` and `crawl-spend.mjs`, and the
+// TypeScript import hook in `crawl-imports.mjs` — **read `crawl-plan.mjs`'s header before changing
+// anything about what this run is allowed to spend.**
 //
 // The env file is passed in by the operator exactly as this script's siblings take it, and no key is
 // ever read from anywhere else or printed anywhere. Nothing here knows anything about a person.
@@ -87,7 +103,8 @@ import {
   rollingAskIsPointless,
 } from "./crawl-plan.mjs";
 import { runCrawl } from "./crawl-run.mjs";
-import { dayBudgetLines, exitCodeFor, overBudgetRefusal, summarise } from "./crawl-report.mjs";
+import { STORE_TIMEOUT_MS, createCountingFetch, createDayGate, mayRun } from "./crawl-spend.mjs";
+import { dayBudgetLines, exitCodeFor, summarise } from "./crawl-report.mjs";
 import { DEFAULT_HORIZON_DAYS, DEFAULT_WINDOW_DAYS, cursorsForRun, cycleRuns, isIsoDate, parseCursors } from "./crawl-window.mjs";
 import { coverageReport, parseObservationRows, readObservations, summariseCoverage } from "./observations-coverage.mjs";
 
@@ -120,6 +137,16 @@ function whole(found, name, fallback) {
 class Misuse extends Error {}
 
 /**
+ * A GATE stopped the run: exit 1, nothing spent. Distinguished from `Misuse` because the two mean
+ * opposite things to whatever wrapper reads the code. The header's contract has always said 1 is
+ * "a refusal, or a gate stopped it" and 2 is "it was asked wrongly" — and a budget refusal went out
+ * as 2, so a scheduler that pages on "called wrongly" would have been paged every time a second run
+ * that day was correctly refused. The daily gate refusing is the gate WORKING, and the refusal
+ * message itself says so; it must not carry the code that means somebody typed the wrong thing.
+ */
+class Refusal extends Error {}
+
+/**
  * The run was asked wrongly and nothing was spent. It THROWS rather than calling `process.exit(2)`:
  * `console.error` to a pipe is asynchronous in Node and `process.exit` does not drain it, so
  * `npm run source:crawl | tee crawl.log` could lose the very message explaining why the run refused.
@@ -132,24 +159,20 @@ function fail(message) {
   throw new Misuse(message);
 }
 
+/**
+ * A gate refused the run. Nothing was spent, and this is a routine outcome rather than a fault.
+ *
+ * @param {string} message
+ * @returns {never}
+ */
+function refuse(message) {
+  throw new Refusal(message);
+}
+
 /** Today in India: a journey date is an Indian calendar date, and a date the provider has closed answers 400. */
 function istToday() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 }
-
-/**
- * supabase-js sets no request timeout of its own, so a store read that never answers hangs the run.
- * This one ABORTS the fetch rather than merely racing it: a race leaves the request in flight, and a
- * request in flight holds the event loop open, so the process would still never exit.
- *
- * It bounds both reads this file makes, and what firing early costs differs between them. On the
- * coverage read the asks are already spent and the cursor written, so the cost is one missing print
- * and never a wrong verdict — `npm run source:report` does the same read unbounded. On gate C's
- * spend read the cost is the whole run, which is the right direction: an unreadable count refuses.
- *
- * Thirty seconds is generous for a read of our own database.
- */
-const STORE_READ_TIMEOUT_MS = 30_000;
 
 /**
  * What the STORE looks like, after this run has written to it.
@@ -164,7 +187,7 @@ const STORE_READ_TIMEOUT_MS = 30_000;
  */
 async function printStoreCoverage({ db, table, today, listed }) {
   try {
-    const read = await readObservations(db, { table, signal: AbortSignal.timeout(STORE_READ_TIMEOUT_MS) });
+    const read = await readObservations(db, { table, signal: AbortSignal.timeout(STORE_TIMEOUT_MS) });
     if (!read.ok) {
       console.error(`[crawl] the store's coverage could not be read: ${read.reason}`);
       console.error("[crawl] this run is unaffected: its rows are written and its cursor is saved. `npm run source:report` is the check on the store.");
@@ -299,17 +322,16 @@ async function main() {
   // GATE C: THE DAY. The effective ceiling is the smaller of gate A's and what is left of today.
   // The daily cap is `headroom` — `DEFAULT_DAILY_ALLOWANCE` less the live reserve — which is the
   // very number gate A is built from, so one constant governs both.
-  //
-  // **It fails closed**, inside `dayCeiling` rather than here: a count that cannot be read refuses
-  // the run. An unmeasurable run is exactly the hazard the counter exists to remove, and "the
-  // counter was down" is the one excuse that would let a scheduled crawler spend a month.
   const day = dayCeiling({
     perRunCeiling: runCeiling,
     dailyCap: headroom,
-    spent: await readCallsToday(db, today, { signal: AbortSignal.timeout(STORE_READ_TIMEOUT_MS) }),
+    spent: await readCallsToday(db, today, { signal: AbortSignal.timeout(STORE_TIMEOUT_MS) }),
   });
-  if (!day.ok) fail(day.reason);
-  const ceiling = day.ceiling;
+  // **The decision is `mayRun`, in `crawl-spend.mjs`, because it has to be a decision a test can
+  // drive.** Both refusals — an unreadable count, and a worst case over what is left of the day —
+  // used to be two lines here, in a file nothing imports: deleting either left all 2262 tests
+  // green. The ceiling it hands back is the DAY's, not this run's own.
+  const verdict = mayRun({ day, worstCase, routes });
 
   console.log(`routes         ${routes.length} combo${routes.length === 1 ? "" : "s"}${limit < parsed.routes.length ? ` (of ${parsed.routes.length}, limited by --only)` : ""}`);
   console.log(`window         rolling ${windowDays} days a run over a ${horizonDays}-day horizon — a sweep takes ${cycleRuns(horizonDays, windowDays)} runs`);
@@ -324,11 +346,16 @@ async function main() {
     `worst case     ${worstCase} calls (${worstCase / CALLS_PER_ASK_MAX} asks × ${CALLS_PER_ASK_MAX} for the guard's one retry: ${routes.length - pinnedOnly.length} combo${routes.length - pinnedOnly.length === 1 ? "" : "s"} × ${ASKS_PER_COMBO_MAX} asks${pinnedOnly.length === 0 ? "" : `, ${pinnedOnly.length} × 1`})`,
   );
   console.log(`ceiling        ${reason}`);
-  for (const line of dayBudgetLines({ today, dailyCap: day.dailyCap, spentToday: day.spentToday, remainingToday: day.remainingToday, reason: day.reason })) console.log(line);
+  // Missing when the count could not be read, which is the refusal printed immediately below: there
+  // is no spend to state, and inventing a zero is the one thing gate C must never do.
+  if (day.ok) for (const line of dayBudgetLines({ today, dailyCap: day.dailyCap, spentToday: day.spentToday, remainingToday: day.remainingToday, reason: day.reason })) console.log(line);
   console.log(`burst floor    stop when the provider's RateLimit-Remaining reaches ${remainingFloor}`);
   console.log(`store          ${new URL(environment.NEXT_PUBLIC_SUPABASE_URL).host} · ${OBSERVATION_TABLE} · ${CRAWLER_CALL_TABLE}`);
 
-  if (worstCase > ceiling) fail(overBudgetRefusal({ worstCase, ceiling, routes, day }));
+  // The ONE place gate C is enforced, and `refuse` rather than `fail`: a budget refusal is exit 1,
+  // the gate working, not exit 2, somebody typing the wrong thing.
+  if (!verdict.ok) refuse(verdict.reason);
+  const ceiling = verdict.ceiling;
   if (found.has("dry-run")) {
     console.log("\n--dry-run: nothing was asked, so nothing was charged to today's budget. The day's numbers above are what it stood at.");
     return;
@@ -341,41 +368,14 @@ async function main() {
 
   // Every call the adapter makes passes through here: this is the only honest count of what left the
   // process, the only place the provider's own RateLimit headers can be read, and therefore the only
-  // honest place to charge the day's budget.
-  //
-  // **Charged BEFORE the call leaves, and the run gives the call up if the charge fails.** A process
-  // killed mid-run has still spent what it sent, and a counter that loses those calls is worse than
-  // none: it under-reports exactly when something went wrong. Recording first over-counts a call
-  // that never actually goes out — the safe direction, since this run then spends less, never more
-  // — and it matches what `callsThisAsk` has always counted, which is intent rather than completion.
-  //
-  // A failed charge throws, so nothing is sent and `callsThisAsk` stays where it was: `runCrawl`
-  // then sees an ask that spent no call, holds the cursor, records no strike and files it under
-  // `notAsked`, which is exactly true. The run is not whole and exits 1. If the ledger stays down,
-  // the availability breaker opens on the repeated failures and the run stops of its own accord.
-  let callsThisAsk = 0;
-  let lastRemaining = null;
-  let uncharged = 0;
-  const countingFetch = async (input, init) => {
-    if (callsThisAsk >= CALLS_PER_ASK_MAX) {
-      // Unreachable while the loop's own arithmetic holds. If it ever fires, that arithmetic is
-      // wrong and the run must fail closed rather than keep spending.
-      throw Object.assign(new Error("the per-ask call bound was exceeded"), { name: "AbortError" });
-    }
-    const charged = await recordProviderCall(db, new Date().toISOString());
-    if (!charged.ok) {
-      uncharged += 1;
-      throw new Error(`${charged.reason} — so the call was not made: a call this run cannot count is a call the next run will not know about`);
-    }
-    callsThisAsk += 1;
-    const response = await fetch(input, init);
-    lastRemaining = response.headers.get("ratelimit-remaining");
-    return response;
-  };
+  // honest place to charge the day's budget. **Charged BEFORE the call leaves, and the call is given
+  // up if the charge fails** — the reasoning, and the tests that prove a caller acts on it rather
+  // than merely computing the right number, are in `crawl-spend.mjs`.
+  const counter = createCountingFetch({ record: (spentAt, options) => recordProviderCall(db, spentAt, options) });
 
   const adapter = createRailKitAvailabilitySource(
     { key: environment.RAILKIT_API_KEY, baseUrl: environment.RAILKIT_BASE_URL, timeoutMs: environment.RAILKIT_TIMEOUT_MS },
-    { fetch: countingFetch },
+    { fetch: counter.fetch },
   );
   // "availability", never "pnr": Task 3 split the fuses so this run's refusals rest this caller and
   // not a traveller's PNR check. Only a refused key or a spent plan reaches the shared fuse, which
@@ -391,11 +391,14 @@ async function main() {
     ceiling,
     remainingFloor,
     ask: async (request) => {
-      callsThisAsk = 0;
-      lastRemaining = null;
+      counter.beginAsk();
       const outcome = await source.check(request);
-      return { outcome, calls: callsThisAsk, remaining: lastRemaining };
+      return { outcome, calls: counter.calls, remaining: counter.remaining };
     },
+    // Gate C again, before every ask. The count above was read once, before planning: two runs
+    // started inside the same window both passed it and both spent a whole run. Re-reading the
+    // ledger — which every call writes to before it leaves — bounds that to about one ask.
+    dayGate: createDayGate({ read: (options) => readCallsToday(db, today, options), dailyCap: day.dailyCap }),
     record: (request, outcome) => recordObservations(request, outcome.answer, db),
   });
 
@@ -411,6 +414,7 @@ async function main() {
   for (const line of summarise(summary)) console.log(line);
   // Said here rather than folded into the summary: `runCrawl` is pure and knows nothing about the
   // ledger, and an ask filed under `notAsked` reads as a resting breaker unless this says otherwise.
+  const uncharged = counter.uncharged;
   if (uncharged > 0) {
     console.error(`\n[crawl] ${uncharged} call${uncharged === 1 ? " was" : "s were"} given up because the day's budget could not be charged, so ${uncharged === 1 ? "it was" : "they were"} never sent.`);
     console.error("[crawl] Those asks are in the 'never reached the provider' section above, and their cursors held. Fix the ledger before the next run: a run that cannot count itself is the one thing the daily gate exists to prevent.");
@@ -431,8 +435,8 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   try {
     await main();
   } catch (error) {
-    if (!(error instanceof Misuse)) throw error;
+    if (!(error instanceof Misuse) && !(error instanceof Refusal)) throw error;
     console.error(`[crawl] ${error.message}`);
-    process.exitCode = 2;
+    process.exitCode = error instanceof Refusal ? 1 : 2;
   }
 }
