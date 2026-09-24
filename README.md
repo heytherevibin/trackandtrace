@@ -40,7 +40,7 @@ Anything the adapter cannot read (an unknown seat status, class, or date) fails 
 
 ### Only one source
 
-RailKit is the only provider. `PNR_FALLBACK` names a second one to ask while the first is unavailable, and there is no second one to name, so `none` is the only value that parses and anything else is refused at boot (`src/services/env.ts`). That makes RailKit a single point of failure: an expired paid plan quietly drops to 50 requests a month, and RailKit may suspend a key without notice. `npm run source:health` is how you find out before travellers do — it asks each configured source once and exits non-zero when one cannot answer. The fallback seam is kept, tested and ready for a second provider.
+RailKit is the only provider. `PNR_FALLBACK` names a second one to ask while the first is unavailable, and there is no second one to name, so `none` is the only value that names anything and anything else is refused at boot — except the retired `rapidapi`, which is read as `none` and warned about, so the deploy that removed it could not take the live path down over a stale variable (`src/services/env.ts`). Delete `PNR_FALLBACK` from every environment and that accommodation can go with it. That makes RailKit a single point of failure: an expired paid plan quietly drops to 50 requests a month, and RailKit may suspend a key without notice. `npm run source:health` is how you find out before travellers do — it asks each configured source once and exits non-zero when one cannot answer. The fallback seam is kept, tested and ready for a second provider.
 
 ## Scripts
 

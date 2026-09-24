@@ -56,12 +56,28 @@ function thirdPartySource(source: ThirdPartySource, current: Env): PnrDataSource
   return adapter ? createGuardedSource(adapter, providerGuard(source, "pnr", current)) : null;
 }
 
-/** The provider's own adapter, when this deployment holds its key. A second provider adds a branch. */
+/**
+ * The provider's own adapter, when this deployment holds its key. A second provider adds a branch.
+ *
+ * **Exhaustive on purpose.** With two providers an unhandled one was impossible to write; with one
+ * it is an `if` away. A provider added to `ThirdPartySource` without a branch here would return
+ * `null`, which `resolvePnrSource` reads as "no key for it" and answers with the unavailable `live`
+ * seam — a new provider that silently never gets asked, with nothing in the logs to say so. The
+ * `never` makes that a compile error instead.
+ *
+ * A missing KEY still returns `null`, because that genuinely is "this deployment cannot use it".
+ */
 function providerAdapter(source: ThirdPartySource, current: Env): PnrDataSource | null {
-  if (source === "railkit" && current.RAILKIT_API_KEY) {
-    return createRailkitSource({ key: current.RAILKIT_API_KEY, baseUrl: current.RAILKIT_BASE_URL, timeoutMs: current.RAILKIT_TIMEOUT_MS });
+  switch (source) {
+    case "railkit":
+      return current.RAILKIT_API_KEY
+        ? createRailkitSource({ key: current.RAILKIT_API_KEY, baseUrl: current.RAILKIT_BASE_URL, timeoutMs: current.RAILKIT_TIMEOUT_MS })
+        : null;
+    default: {
+      const unwired: never = source;
+      throw new Error(`no adapter is wired for third-party source ${String(unwired)}`);
+    }
   }
-  return null;
 }
 
 export function getPnrSource(): PnrDataSource {
