@@ -30,15 +30,30 @@
 //   B. The burst — `remainingVerdict`. The provider's own `RateLimit-Remaining`, read from every
 //      response. At or below the floor the run stops, so the token bucket is never emptied under a
 //      live check.
+//   C. The day — `dayCeiling` in `src/services/crawler-budget.ts`, backed by a Postgres ledger of
+//      one row per provider call. The effective ceiling is the smaller of gate A's and what is left
+//      of the day. It is consulted BEFORE planning and AGAIN BEFORE EVERY ASK — the second read is
+//      what keeps a concurrent run from out-voting it — incremented as the run goes rather than at
+//      the end, and it FAILS CLOSED: a count that cannot be read refuses the run, or stops it.
+//      `crawl-spend.mjs` holds both decisions, where a test can drive them; see below for why it is
+//      a counter of its own and not `usage.ts`, and `affordablePrefix` for the door it leaves.
 //
 // Nothing here ever calls `liveBudget.take()`: spending a traveller's allowance to fill a dataset is
 // the exact failure this file exists to prevent.
 //
-// **What gate A does not do, stated plainly: it is per RUN, not per DAY.** Two runs in one day spend
-// twice the ceiling, because nothing here remembers the first. A human runs this and reads it, so
-// today that is a human's decision to make. It stops being one the moment anything schedules this:
-// a scheduled crawler needs a shared daily counter of its own, and that counter must exist BEFORE
-// the first unattended run, not after the first spent month.
+// **What gate A does not do, and gate C now does: gate A is per RUN, not per DAY.** Two runs in one
+// day used to spend twice the ceiling, because nothing here remembered the first. A human ran this
+// and read it, so that was a human's decision to make — and it stopped being one the moment
+// anything could schedule it. Gate C is that counter, and it exists BEFORE the first unattended run
+// rather than after the first spent month. **Its cap is not a new number:** it is the same headroom
+// gate A is built from — `DEFAULT_DAILY_ALLOWANCE` less the live reserve — so one constant governs
+// both and widening one cannot leave the other behind.
+//
+// The consequence, said out loud because an operator meets it: after one full run, a second run the
+// same day REFUSES, since 28 worst-case calls do not fit in what is left. That is right for a
+// crawler meant to run once a day, and it also blocks a legitimate retry after a run a gate cut
+// short — so the refusal names the `--only n` that does still fit, with the arithmetic. Nothing here
+// schedules anything; that decision is the owner's, and separate.
 //
 // **Why its own counter, corrected:** not because `usage.ts` counts both callers together — it does
 // not. `shared-store.ts` prefixes every key with `tt:${VERCEL_ENV ?? NODE_ENV}`, and `env.ts`
@@ -49,6 +64,14 @@
 // look at, and production's usage number under-reports the plan's real consumption by this run's
 // entire cost — which cannot be reconciled after the fact either. The first symptom is the 429 that
 // rests both callers.
+//
+// So gate C counts in **Postgres**, not Upstash: the crawler already requires that database and
+// refuses to start when the observation store cannot take a row, so the counter cannot be
+// unavailable while the crawler is able to run — one failure domain, not two — it is shared across
+// machines, it needs no credential the crawler does not already hold, and the environment prefix
+// above simply does not arise. It is bucketed by IST day, by the same SQL expression
+// `availability_observations.observed_on` uses, so the spend and the rows it bought agree when read
+// side by side.
 //
 // The good half of the same mechanism is worth keeping in view: because the prefixes differ, a local
 // crawler's breaker writes cannot reach the production fuses. The only channel from this crawler to
@@ -328,6 +351,35 @@ export function crawlCeiling({ dailyAllowance, liveReserve, requested }) {
 export function plannedCalls({ routes, combos = 0, callsPerAsk = CALLS_PER_ASK_MAX, asksPerCombo = ASKS_PER_COMBO_MAX }) {
   const asks = routes === undefined ? combos * asksPerCombo : routes.reduce((n, route) => n + (rollingAskIsPointless(route) === null ? asksPerCombo : 1), 0);
   return asks * callsPerAsk;
+}
+
+/**
+ * The largest `n` for which `--only n` still fits in `ceiling` calls. **Zero means nothing fits**,
+ * and is not the same as `--only 0`, which the runner refuses outright.
+ *
+ * This is the door in gate C's wall. Once a day's budget is partly spent, a whole run no longer
+ * fits and the run refuses — correct for a crawler meant to run once a day, and a wall with no door
+ * in it for an operator legitimately retrying after a run a gate cut short. A shorter list has a
+ * smaller worst case and may well fit, so the refusal names the exact `--only` that does.
+ *
+ * **A PREFIX, because that is the only thing `--only` can select.** `crawl-availability.mjs` does
+ * `parsed.routes.slice(0, limit)`: the flag takes the FIRST n entries in route-file order and
+ * cannot pick which combos to ask. A "largest affordable subset" would name a run nobody can
+ * actually request — and would quietly promise that a cut-short run's missed combos are the ones
+ * that get retried, which they are not.
+ *
+ * Costs rise with `n`, so the first prefix that does not fit ends the search.
+ *
+ * @param {{ routes: readonly Route[], ceiling: number }} at
+ * @returns {number}
+ */
+export function affordablePrefix({ routes, ceiling }) {
+  let fits = 0;
+  for (let n = 1; n <= routes.length; n += 1) {
+    if (plannedCalls({ routes: routes.slice(0, n) }) > ceiling) break;
+    fits = n;
+  }
+  return fits;
 }
 
 // ---------------------------------------------------------------------------

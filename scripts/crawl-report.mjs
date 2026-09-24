@@ -55,10 +55,13 @@
 //
 // No personal data: this is about berths. There is no PNR here, no user, no passenger.
 
-import { REFUSALS_BEFORE_STALE, RUNS_WITHOUT_ROWS_BEFORE_NOTICE } from "./crawl-plan.mjs";
+import { REFUSALS_BEFORE_STALE, RUNS_WITHOUT_ROWS_BEFORE_NOTICE, affordablePrefix, plannedCalls } from "./crawl-plan.mjs";
 import { cycleRuns } from "./crawl-window.mjs";
 
 /** @typedef {import("./crawl-plan.mjs").Summary} Summary */
+/** @typedef {import("./crawl-plan.mjs").Route} Route */
+/** What gate C knows about today. `limitedByDay` says which of the two ceilings is binding. */
+/** @typedef {{ dailyCap: number, spentToday: number, remainingToday: number, limitedByDay: boolean }} DayBudget */
 
 const pad = (label) => label.padEnd(18);
 const s = (n) => (n === 1 ? "" : "s");
@@ -239,4 +242,59 @@ export function summarise(summary) {
  */
 export function exitCodeFor(summary) {
   return summary.whole ? 0 : 1;
+}
+
+// ---------------------------------------------------------------------------
+// Gate C, in the two places an operator meets it: the banner, and the refusal.
+// ---------------------------------------------------------------------------
+
+/**
+ * What the day has already cost and what is left of it — the number an operator most needs now that
+ * a second run can refuse, and the reason `--dry-run` prints these lines before returning.
+ *
+ * The day is IST, bucketed by the same SQL expression `availability_observations.observed_on` uses,
+ * so this line and the store's own coverage can be read side by side without converting anything.
+ *
+ * @param {{ today: string, dailyCap: number, spentToday: number, remainingToday: number, reason: string }} day
+ * @returns {string[]}
+ */
+export function dayBudgetLines({ today, dailyCap, spentToday, remainingToday, reason }) {
+  // Padded to the pre-run banner's own 15, not `summarise`'s 18: these lines sit among the banner's.
+  const label = (text) => text.padEnd(15);
+  return [
+    `${label("spent today")}${spentToday} of ${dailyCap} call${s(dailyCap)} charged to ${today} (IST), ${remainingToday} left — the crawler's own counter, beside the observations`,
+    `${label("day ceiling")}${reason}`,
+  ];
+}
+
+/**
+ * Why a run refused before asking anything, and what an operator can do about it.
+ *
+ * **The `--only` arithmetic is the point of this function.** Once a day is partly spent a whole run
+ * no longer fits, which is correct for a crawler meant to run once a day — and is also a wall in
+ * front of a legitimate retry after a run a gate cut short. Without a named, costed alternative the
+ * only flag left is `--reserve`, which widens the gate by leaving live PNR checks unprotected. So
+ * the refusal says which shorter run still fits, and what it costs.
+ *
+ * It also says what `--only` actually does, because the obvious reading is wrong: it takes the
+ * FIRST n entries of the route file, in file order. It cannot retry the combos an interrupted run
+ * missed, and an operator who assumes it can will believe a hole has been filled that has not.
+ *
+ * @param {{ worstCase: number, ceiling: number, routes: readonly Route[], day: DayBudget | null }} at
+ * @returns {string}
+ */
+export function overBudgetRefusal({ worstCase, ceiling, routes, day }) {
+  const byDay = day !== null && day.limitedByDay;
+  const fits = affordablePrefix({ routes, ceiling });
+  const head = byDay
+    ? `this run's worst case (${worstCase} calls) is over what is left of today's budget (${ceiling} call${s(ceiling)}). Nothing was asked.\n` +
+      `Today has already cost ${day.spentToday} of its ${day.dailyCap} calls, leaving ${day.remainingToday}. That is the daily gate working, not a fault: this crawler is meant to run once a day, and one full run costs up to ${worstCase}.`
+    : `this run's worst case (${worstCase} calls) is over its ceiling (${ceiling}). Nothing was asked.`;
+  const door =
+    fits === 0
+      ? `Not even \`--only 1\` fits: the first combo alone costs up to ${plannedCalls({ routes: routes.slice(0, 1) })} calls and ${ceiling} ${ceiling === 1 ? "is" : "are"} left.`
+      : `A shorter list fits: \`--only ${fits}\` asks the first ${fits} of the ${routes.length} combos and costs at most ${plannedCalls({ routes: routes.slice(0, fits) })} calls.\n` +
+        "Read that flag literally — it takes the FIRST n entries of the route file, in file order. It cannot pick which combos to retry, so a run cut short in the middle of the list is not repaired by it.";
+  const reserve = "Or state a wider share of the plan with --reserve — and say out loud how many live PNR checks that leaves unprotected.";
+  return `${head}\n\n${door}\n${reserve}`;
 }

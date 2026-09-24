@@ -137,11 +137,12 @@ function routeIsAtFault(outcome) {
  *   routes: readonly Route[], cursors: Cursors, today: string, horizonDays: number, windowDays: number,
  *   ask: (request: AskRequest) => Promise<AskResult>,
  *   record: (request: AskRequest, outcome: Answered) => Promise<number>,
- *   ceiling: number, remainingFloor?: number, callsPerAsk?: number
+ *   ceiling: number, remainingFloor?: number, callsPerAsk?: number,
+ *   dayGate?: () => Promise<string | null>
  * }} options
  * @returns {Promise<Summary>}
  */
-export async function runCrawl({ routes, cursors, today, horizonDays, windowDays, ask, record, ceiling, remainingFloor = 0, callsPerAsk = CALLS_PER_ASK_MAX }) {
+export async function runCrawl({ routes, cursors, today, horizonDays, windowDays, ask, record, ceiling, remainingFloor = 0, callsPerAsk = CALLS_PER_ASK_MAX, dayGate = async () => null }) {
   const plan = planAsks({ routes, cursors, today, horizonDays, windowDays });
   /** @type {Summary} */
   const summary = {
@@ -235,6 +236,16 @@ export async function runCrawl({ routes, cursors, today, horizonDays, windowDays
     // `callsPerAsk - 1` at every ceiling the arithmetic does not divide.
     if (summary.calls + callsPerAsk > ceiling) {
       summary.stopped = `the run's own ceiling of ${ceiling} calls — stopping rather than slowing, so the plan live checks depend on stays whole`;
+      forfeitFrom(index);
+      break;
+    }
+
+    // GATE C, again: the day's remaining budget, re-read because another run may be spending the
+    // same day (`createDayGate` in `crawl-spend.mjs`). After the local check, so a run already at
+    // its own ceiling pays for no query.
+    const overspent = await dayGate();
+    if (overspent !== null) {
+      summary.stopped = overspent;
       forfeitFrom(index);
       break;
     }

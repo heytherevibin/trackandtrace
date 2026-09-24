@@ -158,12 +158,53 @@ not stored anywhere.
 
 ## The two facts an operator gets wrong
 
-**1. The ceiling is per RUN, not per DAY.** `crawl-plan.mjs` gates each run at the provider's daily
-allowance less the reserve held back for live PNR checks. Nothing remembers the previous run, so
-**two runs in one day spend twice the ceiling.** Today that is a human's decision, because a human
-is the scheduler. The moment anything schedules this, it needs a shared daily counter of its own —
-with its own key, because the usage counter cannot say which caller spent what — and that counter
-has to exist *before* the first unattended run, not after the first spent month.
+**1. There are now two ceilings, and the day's is the one that will surprise you.** `crawl-plan.mjs`
+gates each run at the provider's daily allowance less the reserve held back for live PNR checks —
+that is the per-RUN ceiling, and it used to be the only one, so two runs in one day spent twice it.
+A second, per-DAY ceiling now sits over the top: every provider call the crawler makes is written as
+a row in `crawler_provider_calls`, bucketed by IST day by the same expression the observations'
+`observed_on` uses, and a run may spend only the smaller of its own ceiling and what is left of the
+day. The cap is not a new number — it is the same headroom the per-run ceiling is built from.
+
+**So after one full run, a second run the same day refuses.** That is correct for a crawler meant to
+run once a day. It also blocks a legitimate retry after a run a gate cut short, so the refusal names
+the `--only n` that does still fit and what it costs. Read `--only` literally when you use it: it
+takes the FIRST n entries of `routes.json`, in file order, so it retries the head of the list and
+**not** the combos the interrupted run missed. `--reserve` is the other way past, and it widens the
+gate by leaving live PNR checks unprotected — say how many, out loud, when you use it.
+
+**If the counter cannot be read, the run does not start.** An unmeasurable run is the thing the
+counter exists to prevent, so "the ledger was down" refuses rather than assuming a clean day. Each
+call is charged *before* it leaves, so a process killed mid-run still costs the day what it sent;
+the cost of that choice is that a call which never actually goes out is charged anyway, which makes
+this run spend less and never more. Nothing may update or delete a row in that ledger — not even the
+service role — because a spend record that can be rewritten proves nothing.
+
+**A budget refusal exits `1`, not `2`.** The daily gate turning a second run away is the gate
+working, which is what the refusal message says — so a wrapper that pages on `2` ("it was asked
+wrongly") is not paged by it. `2` stays for a bad flag, an unusable route list or an unreadable
+cursor file.
+
+**Two runs at once are narrowed, not prevented, and the difference matters if you schedule this.**
+The day's count is read before planning **and again before every ask**, so two runs started inside
+the same window — a scheduler firing while you run it by hand is the obvious case — do not both
+spend a whole run: whichever one reaches an ask the ledger can no longer cover stops there, the same
+way the burst floor and the per-run ceiling stop it, with its cursors held. It is not a lock and does
+not need to be, because every call writes its row *before* it leaves: the ledger is self-correcting,
+and what is left is the window between one run's check and its own charge — **about one ask, so two
+calls, per overlapping run**, against an unbounded double-spend before. Still do not overlap on
+purpose: a run stopped that way is a run that did not ask for half its list.
+
+**Do not run it near IST midnight, and the day's budget is the second reason.** The gate is read
+against the day the run *started* on, while each call's row is stamped with its own moment — so a
+run that crosses midnight is gated against day N's remainder and charges its tail to day N+1. Every
+row is still truthful and `observed_on` splits at the same instant, so the spend and the
+observations agree row for row; what you lose is the guarantee, because day N+1 begins already
+partly spent by a run nothing gated against it. The coverage section above gives the same advice for
+its own reason. One stable hour, well away from midnight, settles both.
+
+**This removes the reason scheduling was unsafe. It does not schedule anything**, and deciding to is
+a separate decision.
 
 **2. `scripts/crawl-cursor.json` is this machine's memory of the sweep.** It holds where each
 combo's rolling window got to, and how many runs in a row that combo has refused. It is written
@@ -183,9 +224,14 @@ npm run source:crawl -- --only 2     # ask for the first two combos of the list 
 ```
 
 Before anything is spent it prints the list, the window, the cursor file, the worst case in calls,
-the ceiling and the burst floor, and it refuses to start if the worst case is over the ceiling. A
+the run's ceiling, **what today has already cost and what is left of it**, the burst floor and the
+store it will write to — and it refuses to start if the worst case is over the effective ceiling. A
 malformed route fails that preflight rather than the budget — the guard counts a request before the
 adapter sees it, so a bad entry would otherwise spend quota on a call that never leaves the process.
+
+`--dry-run` asks nothing and charges nothing, and those two day numbers are the reason to reach for
+it: it is how you find out whether today has room before you commit to a run. It does need the
+database, because the counter lives there.
 
 After the run it prints what happened, and then the whole store's coverage, because a run can be
 perfectly whole while the dataset is holed by days nobody ran it. That coverage print is always over
@@ -193,7 +239,8 @@ the **whole** route list, even under `--only`: the flag limits what this run ask
 store owes, so a two-combo run still shows you the four combos it did not touch.
 
 **The crawl's exit code is about the run only:** `0` the run was whole, `1` a refusal or a gate
-stopped it, `2` it was asked wrongly and nothing was spent. A store below the coverage threshold
+stopped it — including a budget refusal, and including a run the day's budget stopped part way —
+`2` it was asked wrongly and nothing was spent. A store below the coverage threshold
 does **not** change it — that is `npm run source:report`'s job, and keeping the two separate is what
 keeps either legible.
 
@@ -314,8 +361,14 @@ thing every run until you fix it.
 - `scripts/observations-coverage.mjs` — the gap rule itself, and what it cannot see. Read its header
   before changing what the report counts; `scripts/observations-report.mjs` is only the wiring.
 - `scripts/crawl-window.mjs` — the sampling strategy, and what it does and does not guarantee.
-- `scripts/crawl-plan.mjs` — the preflight and the two quota gates. Read its header before changing
+- `scripts/crawl-plan.mjs` — the preflight and the three quota gates. Read its header before changing
   anything about what a run may spend.
+- `src/services/crawler-budget.ts` — the day's budget: what today has already cost, and the
+  arithmetic that turns it into this run's ceiling. `supabase/migrations/20260924120000_crawler_provider_calls.sql`
+  is the ledger it counts, and says why it is in Postgres rather than Upstash.
+- `scripts/crawl-spend.mjs` — where that budget is *enforced*: the charge in front of every provider
+  call, the refusal that stops a run starting, and the re-read before every ask. Read it before
+  changing anything about how a call is counted.
 - `scripts/crawl-availability.mjs` — the asks a run makes per combo, and why the pinned one exists.
 - `scripts/crawl-routes.mjs` — the route list, the preflight, and `QUOTAS_OPENING_NEAR_DEPARTURE`:
   which quotas skip the rolling ask, and which of those entries were measured rather than inferred.

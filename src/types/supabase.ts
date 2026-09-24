@@ -75,6 +75,24 @@ export type Database = {
         }
         Relationships: []
       }
+      crawler_provider_calls: {
+        Row: {
+          id: string
+          spent_at: string
+          spent_on: string
+        }
+        Insert: {
+          id?: string
+          spent_at?: string
+          spent_on?: string
+        }
+        Update: {
+          id?: string
+          spent_at?: string
+          spent_on?: string
+        }
+        Relationships: []
+      }
       watchlist_entries: {
         Row: {
           checks: Json
