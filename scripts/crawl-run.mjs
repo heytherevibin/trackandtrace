@@ -8,7 +8,7 @@
 //
 // No personal data: this is about berths. There is no PNR here, no user, no passenger.
 
-import { CALLS_PER_ASK_MAX, REFUSALS_BEFORE_STALE, planAsks, remainingVerdict } from "./crawl-plan.mjs";
+import { CALLS_PER_ASK_MAX, REFUSALS_BEFORE_STALE, RUNS_WITHOUT_ROWS_BEFORE_NOTICE, planAsks, remainingVerdict } from "./crawl-plan.mjs";
 
 import { addDays, advanceCursor, daysBetween } from "./crawl-window.mjs";
 
@@ -136,6 +136,8 @@ export async function runCrawl({ routes, cursors, today, horizonDays, windowDays
     forfeited: [],
     shortWindows: [],
     excused: [],
+    withheld: [],
+    withoutRows: [],
     wrapped: [],
     restarted: [],
     stale: [],
@@ -147,19 +149,57 @@ export async function runCrawl({ routes, cursors, today, horizonDays, windowDays
     whole: false,
   };
 
+  /** Combos at least one of whose asks ANSWERED this run, whichever ask it was. The invariant's evidence. */
+  const answered = new Set();
+  /**
+   * Combos an ask of which the run was PREVENTED from putting to the provider, and in what words.
+   *
+   * Not the same thing as a refusal and not the same thing as an answer: it is the question this run
+   * did not get to ask, so no verdict that would have turned on it may be settled from here. Two
+   * ways in, and both are the run's problem rather than the combo's — a gate stopping the run before
+   * the ask came round, and the guard's breaker resting when it did. A zero-call `INVALID` is
+   * deliberately NOT one of them: that is the adapter refusing to build a URL for this route, which
+   * is evidence about the route itself.
+   */
+  /** @type {Map<string, string>} */
+  const unasked = new Map();
+
   // Everything a stop leaves unasked, recorded where the stop happens because the breaking step is
   // itself forfeited only when the gate closed BEFORE its ask. The pinned ones are what matter: a
   // pinned ask is the only ask that reaches `days_out = 0`, so one never made is a label that does
   // not exist and that no later run can create. Stopping is still right; it was never free.
   const forfeitFrom = (index) => {
     summary.forfeited = plan.slice(index).map((one) => ({ combo: one.combo, kind: one.kind, date: one.date }));
+    for (const one of summary.forfeited) if (!unasked.has(one.combo)) unasked.set(one.combo, `the run stopped before its ${one.kind} ask for ${one.date}`);
   };
-
-  /** Combos at least one of whose asks ANSWERED this run, whichever ask it was. The invariant's evidence. */
-  const answered = new Set();
   /** Rolling refusals, held rather than struck: a combo's pinned ask comes after it and may excuse it. */
-  /** @type {Map<string, { date: string, refusals: number }>} */
+  /** @type {Map<string, { date: string, refusals: number, before: number }>} */
   const held = new Map();
+  /** Combos the provider passed a verdict on this run — answered or refused, either way a request was seen. */
+  const judged = new Set();
+  /** Rows written per combo this run. Anything above zero is proof the combo is still producing data. */
+  /** @type {Map<string, number>} */
+  const rowsBy = new Map();
+
+  /**
+   * Writes a combo's consecutive-runs-without-rows count, keeping everything else its entry holds.
+   *
+   * **Zero is written by REMOVING the field**, so a healthy list's cursor file is byte-for-byte the
+   * shape it has always been and the field appears only where there is something to see.
+   *
+   * A combo may have no entry at all — a pinned-only one makes no rolling ask, so nothing has ever
+   * written it a cursor — and the count still has to live somewhere. Seeding at `today` changes
+   * nothing about what is asked: `nextAsk` returns today for a combo with no cursor anyway. It is
+   * seeded only when there is a non-zero count to keep, never merely to say "zero".
+   */
+  const setRunsWithoutRows = (key, runs) => {
+    const stored = summary.cursors[key];
+    if (runs === 0 && stored === undefined) return;
+    const entry = { next: today, refusals: 0, ...stored };
+    if (runs === 0) delete entry.runsWithoutRows;
+    else entry.runsWithoutRows = runs;
+    summary.cursors[key] = entry;
+  };
 
   for (const [index, step] of plan.entries()) {
     const key = step.combo;
@@ -217,6 +257,9 @@ export async function runCrawl({ routes, cursors, today, horizonDays, windowDays
       // nothing now that the cursors hold — the combos not reached keep their places, which is
       // already what `runCrawl` does for combos it never gets to.
       if (rested) {
+        // Recorded before `forfeitFrom`, which fills in the rest of the plan: this combo's own
+        // reason is the specific one, and it is the reason a verdict about THIS combo turns on.
+        unasked.set(key, `the breaker was resting when its ${step.kind} ask for ${step.date} came round, so nothing was sent`);
         summary.stopped = `the provider's breaker is resting, so ${key}'s ask for ${step.date} was never sent — it is open for this caller as a whole, so every remaining ask would rest too`;
         forfeitFrom(index + 1);
         break;
@@ -224,21 +267,36 @@ export async function runCrawl({ routes, cursors, today, horizonDays, windowDays
       continue;
     }
 
+    // Past the zero-call branch, a request reached the provider and came back with something. That
+    // is the only footing from which this run may conclude anything about the combo at all.
+    judged.add(key);
+
     let written = 0;
     if (outcome.ok) {
       answered.add(key);
       written = await record(request, outcome);
+      rowsBy.set(key, (rowsBy.get(key) ?? 0) + written);
       summary.rows += written;
       // The provider answered, so this combo is not a bad list entry whatever the store did.
-      if (step.kind === "rolling") summary.cursors[key] = { next: advanceCursor(step.date, windowDays), refusals: 0 };
+      if (step.kind === "rolling") summary.cursors[key] = { ...summary.cursors[key], next: advanceCursor(step.date, windowDays), refusals: 0 };
       // A store that wrote nothing is our fault, not the train's, whichever ask it was.
       if (written === 0) summary.failures.push({ combo: key, date: step.date, code: "NOT_RECORDED", why: "the provider answered but the store wrote no rows" });
       else if (step.kind === "rolling" && written < windowDays) summary.shortWindows.push({ combo: key, date: step.date, days: written });
     } else if (step.kind === "rolling") {
-      const refusals = (entry?.refusals ?? 0) + 1;
-      summary.cursors[key] = { next: advanceCursor(step.date, windowDays), refusals };
+      // **The strike is keyed on the DATE, not on `kind`.** Where a sweep wraps, `nextAsk` returns
+      // today and `planAsks` emits ONE step, marked `rolling`, carrying the outcome row — and a
+      // refusal AT TODAY may mean only that the train does not run today, which is the whole reason
+      // a pinned refusal has never counted. Marking decides how the ask is reported; the date
+      // decides what the refusal is evidence of. `crawl-report.mjs` already had to key its count of
+      // forfeited outcome rows on the date for exactly this merge.
+      //
+      // It costs at most one strike opportunity in a sweep — a combo's rolling ask falls on today
+      // once per wrap — and it removes a case where the branch's own rule contradicted itself.
+      const before = entry?.refusals ?? 0;
+      const refusals = step.date === today ? before : before + 1;
+      summary.cursors[key] = { ...summary.cursors[key], next: advanceCursor(step.date, windowDays), refusals };
       summary.failures.push({ combo: key, date: step.date, code: outcome.code, why: why(outcome) });
-      held.set(key, { date: step.date, refusals });
+      if (refusals !== before) held.set(key, { date: step.date, refusals, before });
     } else {
       summary.pinnedFailures.push({ combo: key, date: step.date, code: outcome.code, why: why(outcome) });
     }
@@ -276,14 +334,66 @@ export async function runCrawl({ routes, cursors, today, horizonDays, windowDays
   //
   // One thing it cannot do: a combo making the PINNED ASK ONLY can never go stale, since a pinned
   // refusal has never counted (the train may not run today) and it has no rolling ask to refuse.
-  // Find that one by hand, in the report's pinned-failure section.
+  // The consecutive-runs-without-rows count below is what catches that one.
+  //
+  // **AND A RUN MAY ONLY SETTLE WHAT IT ACTUALLY ASKED.** `answered` is complete only for a run that
+  // reached the end of its plan. A gate landing between a combo's rolling refusal and its pinned ask
+  // — the burst floor on the refusal's own header, the ceiling, or the breaker opening on the very
+  // next ask — leaves that combo with no answer *because the question was never put*. Settling the
+  // strike there writes `refusals: 3` and names a good route on a list the runbook says to DELETE
+  // from, on the strength of an ask the run itself threw away; three days of provider trouble
+  // tripping the fuse at the same point in the plan is all it takes. So such a refusal is HELD:
+  // no strike, no clearing, the stored count exactly where the last complete run left it, and the
+  // next complete run decides. The CURSOR still moves — the rolling ask was made and the provider
+  // did refuse that date, so the band comes round again next sweep — which is why the held line
+  // says so out loud rather than leaving an operator to work out which verdicts a stopped run was
+  // entitled to reach.
   for (const [key, one] of held) {
-    if (!answered.has(key)) {
-      if (one.refusals >= REFUSALS_BEFORE_STALE) summary.stale.push(`${key} (${one.refusals} runs in a row)`);
+    if (answered.has(key)) {
+      summary.cursors[key] = { ...summary.cursors[key], refusals: 0 };
+      summary.excused.push({ combo: key, date: one.date, refusals: one.refusals });
       continue;
     }
-    summary.cursors[key] = { ...summary.cursors[key], refusals: 0 };
-    summary.excused.push({ combo: key, date: one.date, refusals: one.refusals });
+    const prevented = unasked.get(key);
+    if (prevented !== undefined) {
+      summary.cursors[key] = { ...summary.cursors[key], refusals: one.before };
+      summary.withheld.push({ combo: key, date: one.date, wouldHaveBeen: one.refusals, refusals: one.before, because: prevented });
+      continue;
+    }
+    if (one.refusals >= REFUSALS_BEFORE_STALE) summary.stale.push(`${key} (${one.refusals} runs in a row)`);
+  }
+
+  // ---------------------------------------------------------------------------
+  // IS THIS COMBO PRODUCING ANY DATA? — the question the stale list cannot ask.
+  // ---------------------------------------------------------------------------
+  // Staleness is narrow on purpose: it means "the provider has never heard of this route, so delete
+  // the entry". Three shapes of dead combo slip past it, and all three are alive and useless. A
+  // PINNED-ONLY combo has no rolling ask to refuse and a pinned refusal has never counted. A combo
+  // whose rolling ask is permanently dead while its pinned ask answers is excused every run by the
+  // invariant above — correctly, and it has quietly become a pinned-only sampler, contributing
+  // nothing to the long-range band the sweep exists to collect. And a combo the provider answers
+  // while the store writes nothing is nobody's bad list entry.
+  //
+  // So count the one thing that is true of every one of them and needs no domain knowledge and no
+  // theory about why: THIS COMBO PRODUCED NO ROWS. It is sampler-agnostic — pinned-only,
+  // rolling-only, both, or any future shape — and it is the measure `source:report` cannot supply,
+  // because a combo that has NEVER produced a row has no first observation and so sits outside that
+  // report's denominator at 100% for ever.
+  //
+  // **The same rule as everywhere else on this file: only a run that asked may count.** A combo
+  // whose ask never reached the provider, or one of whose asks a gate forfeited, is held exactly as
+  // its strike is held — the run does not know what the ask it never made would have produced.
+  // Rows clear it regardless, because rows are positive evidence and need no completeness.
+  for (const key of judged) {
+    if ((rowsBy.get(key) ?? 0) > 0) setRunsWithoutRows(key, 0);
+    else if (!unasked.has(key)) setRunsWithoutRows(key, (cursors[key]?.runsWithoutRows ?? 0) + 1);
+  }
+  // Reported over this run's own list, in the list's order, so `--only` does not print verdicts
+  // about combos the operator did not ask about. It is NOT the stale list, it does not merge with
+  // it, and it never says delete: see `RUNS_WITHOUT_ROWS_BEFORE_NOTICE`.
+  for (const key of new Set(plan.map((one) => one.combo))) {
+    const runs = summary.cursors[key]?.runsWithoutRows ?? 0;
+    if (runs >= RUNS_WITHOUT_ROWS_BEFORE_NOTICE) summary.withoutRows.push({ combo: key, runs });
   }
 
   // `asks > 0` is part of it: a run that asked nothing did nothing, and "whole" must not be the
@@ -299,6 +409,10 @@ export async function runCrawl({ routes, cursors, today, horizonDays, windowDays
   return summary;
 }
 
-// The report — `summarise` and `exitCodeFor` — lives in `crawl-report.mjs`, which this file grew
-// out of. It imports `REFUSALS_BEFORE_STALE` from here; nothing here imports it back.
+// The report — `summarise` and `exitCodeFor` — lives in `crawl-report.mjs`. Both that file and this
+// one grew out of `crawl-plan.mjs`, and both take their thresholds from it rather than from each
+// other: `crawl-report.mjs` imports `REFUSALS_BEFORE_STALE` and `RUNS_WITHOUT_ROWS_BEFORE_NOTICE`
+// from `crawl-plan.mjs`, not from here, and nothing imports this file but the runner and the tests.
+// (This paragraph moved here verbatim in the split and said the opposite of all of that until
+// 2026-09-24.)
 

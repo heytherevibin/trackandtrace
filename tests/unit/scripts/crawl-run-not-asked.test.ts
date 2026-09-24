@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { REFUSALS_BEFORE_STALE} from "../../../scripts/crawl-plan.mjs";
+import { REFUSALS_BEFORE_STALE } from "../../../scripts/crawl-plan.mjs";
 import { runCrawl } from "../../../scripts/crawl-run.mjs";
 
 // ---------------------------------------------------------------------------
@@ -205,6 +205,8 @@ describe("an ask that spent no call", () => {
     const summary = await run({ ask, cursors: AWAY });
 
     expect(summary.notAsked).toEqual([]);
-    expect(summary.cursors[KEY_ONE]).toEqual({ next: "2026-10-06", refusals: 1 });
+    // Both of its asks refused, so it also produced nothing this run: `crawl-run-without-rows.test.ts`
+    // is where that count is pinned.
+    expect(summary.cursors[KEY_ONE]).toEqual({ next: "2026-10-06", refusals: 1, runsWithoutRows: 1 });
   });
 });

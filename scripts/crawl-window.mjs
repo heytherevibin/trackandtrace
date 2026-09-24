@@ -64,8 +64,16 @@
 // happened to be when it entered the horizon.
 //
 
-/** Where a combo got to, and how many runs in a row it has refused. */
-/** @typedef {{ next: string, refusals: number }} CursorEntry */
+/**
+ * Where a combo got to, how many runs in a row it has refused, and how many runs in a row it has
+ * produced nothing at all.
+ *
+ * `runsWithoutRows` is **optional, and absent means zero**. That is not an accident of migration: it
+ * is how a cursor file written before the field existed reads correctly on its first run, and it is
+ * how the field leaves again when a combo starts producing rows. A file for a healthy list therefore
+ * looks exactly as it always did, and the field's presence is itself the signal.
+ */
+/** @typedef {{ next: string, refusals: number, runsWithoutRows?: number }} CursorEntry */
 /** @typedef {Record<string, CursorEntry>} Cursors */
 /** @typedef {{ ok: true, cursors: Cursors } | { ok: false, issues: string[] }} ParsedCursors */
 
@@ -224,7 +232,11 @@ export function parseCursors(text) {
     if (entry === null || typeof entry !== "object" || Array.isArray(entry)) issues.push(`cursor ${key}: must be an object`);
     else if (typeof entry.next !== "string" || utcDay(entry.next) === null) issues.push(`cursor ${key}: next must be an ISO date`);
     else if (!Number.isInteger(entry.refusals) || entry.refusals < 0) issues.push(`cursor ${key}: refusals must be a whole number, zero or more`);
-    else cursors[key] = { next: entry.next, refusals: entry.refusals };
+    // Absent is the normal case and means zero — a file written before this field existed, or a
+    // combo that is producing rows. Present and wrong is refused like everything else here.
+    else if (entry.runsWithoutRows !== undefined && (!Number.isInteger(entry.runsWithoutRows) || entry.runsWithoutRows < 0))
+      issues.push(`cursor ${key}: runsWithoutRows must be a whole number, zero or more`);
+    else cursors[key] = entry.runsWithoutRows === undefined ? { next: entry.next, refusals: entry.refusals } : { next: entry.next, refusals: entry.refusals, runsWithoutRows: entry.runsWithoutRows };
   }
   return issues.length > 0 ? { ok: false, issues } : { ok: true, cursors };
 }
@@ -245,15 +257,17 @@ export function parseCursors(text) {
  * Preserving what the run did not touch is the same promise `runCrawl` already keeps for a combo it
  * never reaches, for the same reason: this file is the only record of where a sweep got to.
  *
- * A combo's refusal count survives the override, because `--start` says where to ask, not that the
- * combo has stopped refusing.
+ * A combo's refusal count survives the override, and so does its count of runs without rows, because
+ * `--start` says where to ask — not that the combo has stopped refusing, and not that it has started
+ * producing data. Overriding `next` alone is why this spreads the stored entry rather than rebuilding
+ * it field by field: a rebuild is how a field added later gets silently dropped.
  *
  * @param {{ stored: Cursors, keys: readonly string[], startAt?: string }} at
  * @returns {Cursors}
  */
 export function cursorsForRun({ stored, keys, startAt }) {
   if (startAt === undefined) return stored;
-  const overrides = Object.fromEntries(keys.map((key) => [key, { next: startAt, refusals: stored[key]?.refusals ?? 0 }]));
+  const overrides = Object.fromEntries(keys.map((key) => [key, { refusals: 0, ...stored[key], next: startAt }]));
   return { ...stored, ...overrides };
 }
 

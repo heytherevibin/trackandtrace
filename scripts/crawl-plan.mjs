@@ -124,6 +124,36 @@ export const DEFAULT_REMAINING_FLOOR = 50;
  *     answering their pinned ask every single run.
  */
 export const REFUSALS_BEFORE_STALE = 3;
+/**
+ * How many runs in a row a combo may produce NO ROWS AT ALL before the report says to go and look.
+ *
+ * **A different question from staleness, and deliberately a weaker verdict.** `REFUSALS_BEFORE_STALE`
+ * answers "has the provider ever heard of this route?" and its answer is *delete the entry*. This
+ * one answers "is this combo contributing anything to the dataset?", and its answer is only *go and
+ * look*. The two lists never merge: nothing is ever deleted on the strength of this count.
+ *
+ * It exists because the stale list cannot see a whole class of dead combo. A combo that makes the
+ * PINNED ASK ONLY (`QUOTAS_OPENING_NEAR_DEPARTURE`) has no rolling ask to refuse, and a pinned
+ * refusal has never counted; a combo whose rolling ask is permanently dead while its pinned ask
+ * answers is excused every run by the invariant in `crawl-run.mjs`. Neither shows up anywhere. Nor
+ * does the coverage report catch them promptly: its exit code is an aggregate over every listed
+ * combo, so one dead combo out of six takes about 13 days to cross the threshold on a 30-day history
+ * and about 39 on a 90-day one — and a combo that has NEVER answered has no first observation at
+ * all, so it sits in `neverObserved`, outside the denominator, at 100% for ever.
+ *
+ * This count needs to know none of that. It asks the only question that covers every sampler: did
+ * any ask of this combo produce a row this run?
+ *
+ * **Seven, because seven runs is a week and a week is the longest silence a train on this list can
+ * honestly have.** A combo is asked once per run, so a train that runs a single day a week still has
+ * that day inside any seven-run stretch: six consecutive empty runs is the worst a legitimate weekly
+ * service can do, and the seventh means it missed even its own running day. It counts RUNS and not
+ * days, so a skipped day does not inflate it. Comfortably above `REFUSALS_BEFORE_STALE`, so the
+ * weaker verdict also takes longer to reach; comfortably inside the twenty runs a sweep takes, so a
+ * dead rolling sampler is named long before its next wrap; and unlike the coverage report it does
+ * not get slower as the dataset gets older.
+ */
+export const RUNS_WITHOUT_ROWS_BEFORE_NOTICE = 7;
 
 // ---------------------------------------------------------------------------
 // The shapes, written down so the tests that import this file are checked
@@ -142,6 +172,14 @@ export const REFUSALS_BEFORE_STALE = 3;
 /** @typedef {{ combo: string, date: string, code: string, why: string }} Failure */
 /** A rolling refusal that took no staleness strike, because the same combo answered another ask. */
 /** @typedef {{ combo: string, date: string, refusals: number }} Excused */
+/**
+ * A rolling refusal this run was not entitled to settle EITHER WAY, because a gate cost the combo
+ * one of its other asks. `wouldHaveBeen` is the strike it did not take; `refusals` is the stored
+ * count, left exactly where the last complete run put it.
+ */
+/** @typedef {{ combo: string, date: string, wouldHaveBeen: number, refusals: number, because: string }} Withheld */
+/** A combo that has produced no rows for `RUNS_WITHOUT_ROWS_BEFORE_NOTICE` runs or more. NOT the stale list. */
+/** @typedef {{ combo: string, runs: number }} WithoutRows */
 /** @typedef {{ combo: string, kind: AskKind, date: string, code: string, why: string, rested: boolean }} NotAsked */
 /** An ask that was planned and never reached, because a gate stopped the run before it came round. */
 /** @typedef {{ combo: string, kind: AskKind, date: string }} Forfeited */
@@ -155,7 +193,7 @@ export const REFUSALS_BEFORE_STALE = 3;
  *   today: string, horizonDays: number, windowDays: number,
  *   listed: number, planned: number, combos: number, asks: number, calls: number, rows: number,
  *   asked: Asked[], failures: Failure[], pinnedFailures: Failure[], notAsked: NotAsked[], forfeited: Forfeited[],
- *   shortWindows: ShortWindow[], excused: Excused[],
+ *   shortWindows: ShortWindow[], excused: Excused[], withheld: Withheld[], withoutRows: WithoutRows[],
  *   wrapped: string[], restarted: Restart[], stale: string[], cursors: Cursors, stopped: string | null,
  *   remaining: number | null, whole: boolean
  * }} Summary
