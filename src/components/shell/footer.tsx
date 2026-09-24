@@ -10,7 +10,7 @@ import { IstClock } from "./ist-clock";
 import { MotionToggle } from "./motion-toggle";
 import { PRIMARY_NAV } from "./nav-config";
 
-/** The landing's footer: brand and disclaimer, Sections, Product, Company; then one bar with the copyright, service status and clock. */
+/** The landing's footer: brand and disclaimer, Sections, Product, Company; then one bar with the copyright, service status, clock and the Motion switch. */
 function FullFooter() {
   const m = messages.shell.footer;
   const status = serviceStatus();
