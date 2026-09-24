@@ -228,10 +228,13 @@ describe("parseCursors", () => {
 // in `restarted` and the run printed "The run was whole" and exited 0 over four restarted sweeps.
 
 describe("cursorsForRun", () => {
+  // `12051` carries `runsWithoutRows` and the other two do not, which is the real shape of a cursor
+  // file: the field is written only when it is non-zero, and an entry written before it existed has
+  // no such key at all. Both must survive an override.
   const STORED = {
     "12621 MAS-NDLS SL/GN": { next: "2026-10-02", refusals: 0 },
     "12301 HWH-NDLS 3A/GN": { next: "2026-10-14", refusals: 2 },
-    "12051 DR-MAO 2S/GN": { next: "2026-11-30", refusals: 1 },
+    "12051 DR-MAO 2S/GN": { next: "2026-11-30", refusals: 1, runsWithoutRows: 4 },
   };
 
   it("is exactly the stored map when there is no override", () => {
@@ -243,11 +246,22 @@ describe("cursorsForRun", () => {
     expect(cursors["12621 MAS-NDLS SL/GN"]).toEqual({ next: "2026-11-01", refusals: 0 });
   });
 
+  // `cursorsForRun` spreads the stored entry rather than rebuilding it field by field, and its own
+  // comment says why: "a rebuild is how a field added later gets silently dropped". Nothing guarded
+  // that until this test — reverting the spread to a rebuild left the whole suite green while
+  // zeroing every listed combo's `runsWithoutRows` on every `--start` run.
+  it("carries a field it has never heard of through an override, rather than rebuilding the entry", () => {
+    const cursors = cursorsForRun({ stored: STORED, keys: ["12051 DR-MAO 2S/GN"], startAt: "2026-11-01" });
+    // Only `next` is overridden. `refusals` and `runsWithoutRows` are what the route's own history
+    // says, and `--start` moves where a combo looks, not what is known about it.
+    expect(cursors["12051 DR-MAO 2S/GN"]).toEqual({ next: "2026-11-01", refusals: 1, runsWithoutRows: 4 });
+  });
+
   it("KEEPS every combo the override was not pointed at, which --only used to erase", () => {
     const cursors = cursorsForRun({ stored: STORED, keys: ["12621 MAS-NDLS SL/GN"], startAt: "2026-11-01" });
 
     expect(cursors["12301 HWH-NDLS 3A/GN"]).toEqual({ next: "2026-10-14", refusals: 2 });
-    expect(cursors["12051 DR-MAO 2S/GN"]).toEqual({ next: "2026-11-30", refusals: 1 });
+    expect(cursors["12051 DR-MAO 2S/GN"]).toEqual({ next: "2026-11-30", refusals: 1, runsWithoutRows: 4 });
   });
 
   it("keeps a combo that has left the route list entirely, exactly as a run that never reaches one does", () => {

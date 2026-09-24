@@ -3,8 +3,10 @@
     "THIS LIST IS THE MODEL'S BIAS. Read that before adding to it.",
     "A confirmation model learns the trains it was shown. Three Rajdhanis give a model that predicts Rajdhanis and is confidently wrong about a branch passenger train, because premium AC stock, sleeper Mail/Express and short-haul seating clear their waitlists on completely different curves. Every entry below was chosen to widen the spread, not to be interesting.",
     "The spread this list aims at, and why each axis matters: train kind (Rajdhani, Superfast Mail/Express, ordinary Express), class (AC berth, sleeper berth, and a seating class, which is not a berth at all), quota (GN opens 60 days out and drains slowly; TQ opens one day out and drains in minutes, so it is a different process, not a busier version of the same one), leg length, and region (northern, southern and western zones fill differently).",
+    "HOW EACH ENTRY IS SAMPLED, because it is not the same for all of them. A GN combo gets two asks a run: the rolling four-day window that walks the sixty-day horizon, and one pinned at today for the days_out = 0 outcome row. A TQ combo gets the PINNED ASK ONLY. Measured 2026-09-23 and 2026-09-24 on 12301 HWH-NDLS 2A/TQ: the pinned ask answered 2 rows both days while the rolling ask refused at 4 and at 7 days out, because Tatkal is not on sale that far ahead. So a TQ entry here is a sample of the last few days before departure and nothing else — which is the whole of what that quota has to say, and is what makes the GN/TQ pair below a contrast rather than two copies. See QUOTAS_OPENING_NEAR_DEPARTURE in scripts/crawl-routes.mjs.",
     "What is missing, stated so it is not mistaken for a complete sample: no Vande Bharat, no Garib Rath, no festival-season special, no genuinely short branch line, and only one intermediate-station leg. Add those before anyone fits a model to this.",
-    "These entries are UNVERIFIED against the provider. The preflight only checks their shape; the first real run is what checks whether the provider knows them. 12951 is deliberately absent: it answered `Unable to process your request` for every class and date tried on 2026-09-23, which is a bad list entry wearing a failure's clothes. A combo the crawler reports as always-refusing belongs here too — deleted, not retried daily forever."
+    "These entries are UNVERIFIED against the provider. The preflight only checks their shape; the first real run is what checks whether the provider knows them. 12951 is deliberately absent: it answered `Unable to process your request` for every class and date tried on 2026-09-23, which is a bad list entry wearing a failure's clothes. A combo the crawler reports as always-refusing belongs here too — deleted, not retried daily forever.",
+    "Only the `Refused N runs in a row` list means that. A combo whose pinned ask ANSWERS is one the provider knows, whatever its rolling ask did, and the run no longer counts a strike against it — which is what stopped both TQ entries below from being deleted after two runs for being Tatkal. And a combo that makes the pinned ask only can never appear on that list at all: watch the run's pinned-failure section for one that fails there every single day."
   ],
   "horizonDays": 60,
   "routes": [
@@ -22,7 +24,7 @@
       "to": "NDLS",
       "travelClass": "2A",
       "quota": "TQ",
-      "note": "The same train one class up, at Tatkal. Same stock, same day, different queue: the pair is how the model learns that quota is a process and not a busier GN."
+      "note": "The same train one class up, at Tatkal. Same stock, same day, different queue: the pair is how the model learns that quota is a process and not a busier GN. Sampled by the pinned ask alone — Tatkal has nothing to say at the distances the rolling window asks from."
     },
     {
       "trainNo": "12621",
@@ -38,7 +40,7 @@
       "to": "NDLS",
       "travelClass": "SL",
       "quota": "TQ",
-      "note": "Karnataka Express — a second sleeper long-haul, at Tatkal, from a different zone. Guards against the model learning one corridor's calendar."
+      "note": "Karnataka Express — a second sleeper long-haul, at Tatkal, from a different zone. Guards against the model learning one corridor's calendar. Sampled by the pinned ask alone, as every TQ entry is."
     },
     {
       "trainNo": "12137",

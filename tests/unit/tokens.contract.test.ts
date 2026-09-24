@@ -136,8 +136,22 @@ describe("component discipline", () => {
     expect(offenders, offenders.join("\n")).toEqual([]);
   });
 
-  it("keeps every source and test file under 500 lines", () => {
-    const all = [...walk(join(ROOT, "src")), ...walk(join(ROOT, "tests"))];
+  // `scripts/` was outside this walk until 2026-09-24, and `crawl-plan.mjs` reached 588 lines
+  // without anything saying so — the rule held everywhere the test looked and nowhere it did not.
+  // A contract that covers only part of the repo teaches its reader that a green run means the rule
+  // is kept.
+  it("keeps every source, test and script file under 500 lines", () => {
+    // `walk` matches .ts/.tsx/.css because its other callers are about tokens and CSS. The crawler
+    // is .mjs, which is why extending the directory list alone would still have missed it.
+    const code = (dir: string, out: string[] = []): string[] => {
+      for (const name of readdirSync(dir)) {
+        const p = join(dir, name);
+        if (statSync(p).isDirectory()) code(p, out);
+        else if (/\.(tsx?|mjs|cjs|js)$/.test(name)) out.push(p);
+      }
+      return out;
+    };
+    const all = [...walk(join(ROOT, "src")), ...walk(join(ROOT, "tests")), ...code(join(ROOT, "scripts"))];
     const long = all.filter((p) => readFileSync(p, "utf8").split("\n").length > 500).map((p) => relative(ROOT, p));
     expect(long).toEqual([]);
   });

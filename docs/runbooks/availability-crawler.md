@@ -38,6 +38,17 @@ forward each run over a sixty-day horizon, wrapping at the end, plus one pinned 
 unobserved on most days **by design** — that is the sampling strategy, not a fault. "Every journey
 date should have a row" would be an alarm that never stops ringing.
 
+**Two asks, except for a quota that only opens near departure, which gets the pinned ask alone.**
+Tatkal is on sale about a day before the train leaves, so a TQ combo has nothing to say at the 3 to
+57 days out the rolling window asks from: measured on 2026-09-23 and 2026-09-24, 12301 HWH-NDLS
+2A/TQ answered 2 rows to the pinned ask on both days and refused the rolling ask at 4 and at 7 days
+out, while 3A/GN on the same train answered 4 rows at every one of those distances. Making that
+rolling ask anyway spends a call a run to be refused, so the crawler does not make it. Which quotas
+this covers — and, for each, whether this project **measured** it or **inferred** it — is
+`QUOTAS_OPENING_NEAR_DEPARTURE` in `scripts/crawl-routes.mjs`: TQ is measured, PT (Premium Tatkal)
+is inferred and says what would settle it. The run prints which combos made one ask and why, both
+in its opening banner and beside the ask itself.
+
 What the sampler promises is narrower, and it is what the report measures:
 
 > **Every combo is asked, every run.** So a combo is *covered* on an IST day when at least one row
@@ -46,15 +57,17 @@ What the sampler promises is narrower, and it is what the report measures:
 > combo's first observation, up to yesterday.
 
 The report counts combo-**days**, not asks, so whether a run makes one ask per combo or two makes
-no difference to it.
+no difference to it — a pinned-only combo writes rows on the same days as any other, and is scored
+the same way.
 
 Three things that look like gaps and are not:
 
 - **A journey date missing from inside an answered window.** The provider returns the next four days
   the train *runs*. 12301 asked for 2026-10-15 answered 15, 16, 17 and **19**; the 18th is not a
   hole. A weekly train answers one date in four, legitimately.
-- **A short window.** Tatkal opens a day before departure, so a TQ combo answers fewer dates. Fewer
-  rows on a day is still a covered day.
+- **A short window, or a short pinned answer.** A quota that is not open for the whole band answers
+  fewer dates — a TQ combo's pinned ask answered two rows where a GN one answered four. Fewer rows
+  on a day is still a covered day.
 - **Today.** Today is still open — the run may not have happened yet — so today is never counted
   missing either way. The cost is that a crawler which stopped this morning shows up tomorrow.
 
@@ -189,6 +202,62 @@ A combo that refuses three runs in a row is reported as a bad list entry. Delete
 for every class and date tried, and a permanent refusal wearing a transient's clothes costs a call
 every day forever.
 
+**What "refuses" means there is narrower than it sounds, and the narrowing is the point.** Only a
+*rolling* ask can put a combo on that list, and only when **nothing** the combo was asked that run
+answered. If its pinned ask came back, the provider demonstrably knows the route, so the rolling
+refusal is not evidence of a bad entry: the run says so in its own section — *"took NO staleness
+strike, because the same combo's pinned ask answered this run"* — and the count goes back to zero.
+Without that rule, both Tatkal combos on the shipped list were one run away from being named bad
+entries for being Tatkal, and deleting them would have destroyed the GN/TQ contrast the list exists
+for. A combo where *everything* refuses is unaffected and still goes stale on the third run.
+
+The rule is keyed on the **date**, not on what the ask is labelled: a refusal *at today* never counts
+towards staleness, whichever kind of ask it was. On the one run in twenty where a combo's sweep wraps
+there is a single merged ask at today doing both jobs, and it is labelled `rolling` — but a refusal
+of it may mean only that the train does not run today, which is exactly why a pinned refusal has
+never counted. It is still reported as a failure and still makes the run un-whole.
+
+Two more cases never reach the list, stated so nobody trusts it further than it goes. A combo that
+makes the **pinned ask only** cannot, because a pinned refusal has never counted towards staleness
+(the train may simply not run today) and such a combo has no rolling ask to refuse. And a rolling
+refusal the run had **no standing to settle** does not count either: if a gate stopped the run
+before the same combo's other ask, the run never learned whether the provider knows that route, so
+it holds the refusal — no strike, no clearing, the count left exactly where the last complete run
+put it — and says so under *"HELD rather than settled"*. The cursor still moves on, because the
+provider did refuse the date it was asked for. Without that, three days of provider trouble tripping
+the fuse at the same point in the plan would condemn a perfectly good route.
+
+**What catches a combo that has quietly stopped producing data is the run's own
+`produced NO ROWS for 7 runs or more` section.** Each run, per combo, the crawler counts the
+consecutive runs in which none of that combo's asks produced a single row, carries the count in
+`scripts/crawl-cursor.json` beside `refusals`, and clears it the moment a row lands. It is
+sampler-agnostic on purpose — a pinned-only entry, a rolling-only one, a combo the provider answers
+while the store writes nothing, and any future shape all read the same from it — because it measures
+the only thing that always matters: *this entry is contributing nothing*. Seven is a week, and a
+train that runs one day a week still has that day inside any seven runs, so a combo that reaches the
+threshold has missed even its own running day. Two rules about it:
+
+- **It is not the stale list and it never says delete.** It says go and look. Confirm against the
+  pinned-failure and refusal sections, then fix or remove the entry deliberately.
+- **It does not change the exit code**, which stays a statement about whether *this run* was whole.
+
+**What `npm run source:report` does and does not do, corrected.** Its *per-combo lines* are prompt: a
+combo that produced nothing today is marked the same day (*"nothing today, though the run reached
+others"*) and reads *"below the threshold"* within a couple of days on a 30-day history. Its *exit
+code* is not: `enough` is the aggregate over every listed combo, so one dead combo out of six is
+diluted by the five healthy ones and takes about **13 days to take the check non-zero on a 30-day
+history and about 39 on a 90-day one** — a lag that grows as the dataset ages, which is the wrong
+direction. And a combo that has **never** produced a row has no first observation at all, so it is
+excluded from the denominator entirely, lands in `neverObserved`, and reads 100% and exit 0 **for
+ever**. So a newly added entry — a pinned-only TQ one above all, since a pinned failure does not make
+a run un-whole either — must be confirmed by its own first rows, by hand, on the day it is added.
+Nothing automated will distinguish it from a combo added this morning until seven runs have passed
+and the crawler's own count names it.
+
+So the three instruments divide the work: the `Refused N runs in a row` list finds a route the
+provider has never heard of, the crawler's `produced NO ROWS` count finds an entry that has stopped
+contributing under any sampler, and the coverage report is the check on the whole store over time.
+
 **"NEVER REACHED THE PROVIDER" is not a refusal, and nothing on that list is a bad entry.** After
 five failures inside a minute the guard opens the availability fuse, and every ask after that is
 answered locally without a request being sent. Those asks tell you nothing about the combos they
@@ -209,6 +278,7 @@ thing every run until you fix it.
 - `scripts/crawl-window.mjs` — the sampling strategy, and what it does and does not guarantee.
 - `scripts/crawl-plan.mjs` — the preflight and the two quota gates. Read its header before changing
   anything about what a run may spend.
-- `scripts/crawl-availability.mjs` — the two asks a run makes per combo, and why the second one
-  exists.
+- `scripts/crawl-availability.mjs` — the asks a run makes per combo, and why the pinned one exists.
+- `scripts/crawl-routes.mjs` — the route list, the preflight, and `QUOTAS_OPENING_NEAR_DEPARTURE`:
+  which quotas skip the rolling ask, and which of those entries were measured rather than inferred.
 - `docs/superpowers/specs/2026-09-23-pre-booking-availability-design.md` §5.3 — the measured horizon.

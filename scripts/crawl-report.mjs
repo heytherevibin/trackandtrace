@@ -29,10 +29,27 @@
 //     apart from the rolling asks, is not counted towards a combo's consecutive-refusal total, and
 //     does NOT make the run un-whole. Counting it would name a Tuesday-only train a bad list entry
 //     every Wednesday.
+//   * **A rolling refusal that earned no strike.** If a combo's pinned ask ANSWERED, the provider
+//     demonstrably knows that route, so its rolling refusal is not evidence of a bad list entry and
+//     `runCrawl` clears the count. A counter that silently does not move is exactly the sort of
+//     thing an operator later calls a bug, so the run names every refusal it excused and why.
+//   * **A rolling refusal the run had no standing to settle.** When a gate stops the run before the
+//     same combo's other ask, the evidence that would have excused it was forfeited, so the count
+//     moves NEITHER way and the next complete run decides. An operator reading a stopped run must
+//     not have to work out for themselves which verdicts it was entitled to reach, so it says which
+//     refusals it held, what the count stayed at, and that the cursor moved on regardless.
+//   * **A combo that has produced no rows for runs on end.** The stale list answers a narrow
+//     question and its answer is "delete this"; this one answers "is this entry contributing
+//     anything at all?" and its answer is only "go and look". They are printed apart and never
+//     merged, because an operator who reads the second as the first deletes a good route.
+//
+// One more thing the prose has to carry: a combo may make ONE ask rather than two, when its quota
+// only opens near departure and a rolling ask could never answer. That shows up beside the ask
+// itself, in the line that says what the combo asked for, because that is where a reader meets it.
 //
 // No personal data: this is about berths. There is no PNR here, no user, no passenger.
 
-import { REFUSALS_BEFORE_STALE } from "./crawl-plan.mjs";
+import { REFUSALS_BEFORE_STALE, RUNS_WITHOUT_ROWS_BEFORE_NOTICE } from "./crawl-plan.mjs";
 import { cycleRuns } from "./crawl-window.mjs";
 
 /** @typedef {import("./crawl-plan.mjs").Summary} Summary */
@@ -49,7 +66,7 @@ export function summarise(summary) {
   const lines = [
     "",
     `${pad("combos attempted")} ${summary.combos} of ${summary.listed}`,
-    `${pad("asks")} ${summary.asks} of ${summary.planned} planned (the rolling window plus one pinned at ${summary.today} for the outcome row, which are the same ask on the run a sweep wraps; the sweep takes ${sweep} runs at a ${summary.horizonDays}-day horizon)`,
+    `${pad("asks")} ${summary.asks} of ${summary.planned} planned (the rolling window plus one pinned at ${summary.today} for the outcome row — one ask only where a sweep wraps onto today, or where the quota opens too close to departure for a rolling ask to answer; the sweep takes ${sweep} runs at a ${summary.horizonDays}-day horizon)`,
     `${pad("calls made")} ${summary.calls}`,
     `${pad("rows written")} ${summary.rows}`,
     `${pad("RateLimit-Remaining")} ${summary.remaining === null ? "not sent by the provider" : summary.remaining}`,
@@ -58,7 +75,10 @@ export function summarise(summary) {
   if (summary.asked.length > 0) {
     lines.push("", "What each combo asked for, and where its window is now:");
     for (const one of summary.asked) {
-      const tail = one.kind === "rolling" ? ` · next ${summary.cursors[one.combo]?.next ?? "?"}` : " · the outcome row";
+      // A combo with one ask where its neighbours have two is the kind of thing a reader silently
+      // files as a bug, so the line that shows the ask is the line that says why.
+      const outcome = one.sole === undefined ? " · the outcome row" : ` · the outcome row, and this combo's ONLY ask: ${one.sole}`;
+      const tail = one.kind === "rolling" ? ` · next ${summary.cursors[one.combo]?.next ?? "?"}` : outcome;
       lines.push(`  ${one.combo}  ${one.kind.padEnd(7)} ${one.date} (${one.daysOut} days out) · ${one.rows} row${s(one.rows)}${tail}`);
     }
   }
@@ -131,6 +151,25 @@ export function summarise(summary) {
     for (const failure of summary.failures) lines.push(`  ${failure.combo}  ${failure.date}  ${failure.why}`);
   }
 
+  if (summary.excused.length > 0) {
+    lines.push(
+      "",
+      `${summary.excused.length} rolling refusal${s(summary.excused.length)} above took NO staleness strike, because the same combo's pinned ask answered this run. The provider demonstrably knows the route, so the refusal is not evidence of a bad list entry — each count below is back to zero rather than one run nearer "delete this from routes.json":`,
+    );
+    for (const one of summary.excused) lines.push(`  ${one.combo}  ${one.date}  would have been strike ${one.refusals} of ${REFUSALS_BEFORE_STALE}`);
+  }
+
+  if (summary.withheld.length > 0) {
+    lines.push(
+      "",
+      `${summary.withheld.length} rolling refusal${s(summary.withheld.length)} ${summary.withheld.length === 1 ? "was" : "were"} HELD rather than settled, because the run never got to put ${summary.withheld.length === 1 ? "the same combo's other ask" : "those combos' other asks"} to the provider. A strike says "the provider does not know this route" and this run has no standing to say it — so the count did NOT move either way, and the next COMPLETE run decides. The cursor DID move on, because the refusal is the provider's verdict on the date it asked for:`,
+    );
+    for (const one of summary.withheld) {
+      lines.push(`  ${one.combo}  ${one.date}  would have been strike ${one.wouldHaveBeen} of ${REFUSALS_BEFORE_STALE} · count held at ${one.refusals} · next ${summary.cursors[one.combo]?.next ?? "?"} · ${one.because}`);
+    }
+    lines.push("  Nothing above is a bad list entry and nothing above is cleared: this run simply does not know. Run again once the provider has recovered.");
+  }
+
   if (summary.pinnedFailures.length > 0) {
     lines.push(
       "",
@@ -142,7 +181,7 @@ export function summarise(summary) {
   if (summary.shortWindows.length > 0) {
     lines.push(
       "",
-      `${summary.shortWindows.length} rolling window${s(summary.shortWindows.length)} came back with fewer than ${summary.windowDays} days. Normal at TQ and on a train that does not run daily; a pattern anywhere else is worth a look:`,
+      `${summary.shortWindows.length} rolling window${s(summary.shortWindows.length)} came back with fewer than ${summary.windowDays} days. Normal on a train that does not run daily, or on a quota that is not open for the whole band; a pattern anywhere else is worth a look:`,
     );
     for (const short of summary.shortWindows) lines.push(`  ${short.combo}  ${short.date}  ${short.days} day${s(short.days)}`);
   }
@@ -153,6 +192,18 @@ export function summarise(summary) {
       `Refused ${REFUSALS_BEFORE_STALE} or more runs in a row — a bad list entry, not a transient failure. Delete it from routes.json rather than retrying it daily:`,
     );
     for (const combo of summary.stale) lines.push(`  ${combo}`);
+  }
+
+  if (summary.withoutRows.length > 0) {
+    lines.push(
+      "",
+      `${summary.withoutRows.length} combo${s(summary.withoutRows.length)} ${summary.withoutRows.length === 1 ? "has" : "have"} produced NO ROWS for ${RUNS_WITHOUT_ROWS_BEFORE_NOTICE} runs or more in a row. GO AND LOOK — this is NOT the stale list above and it does NOT say to delete anything. It says only that these entries are contributing nothing to the dataset, whatever their sampler is and whatever the reason:`,
+    );
+    for (const one of summary.withoutRows) lines.push(`  ${one.combo}  ${one.runs} runs`);
+    lines.push(
+      `  A train that runs one day a week still has that day inside any ${RUNS_WITHOUT_ROWS_BEFORE_NOTICE} runs, so this is past what a thin timetable explains. Likely causes, in order: a pinned-only (Tatkal) entry the provider will not answer for, a rolling ask that has died while the pinned one carries the combo, or a store that is writing nothing.`,
+      "  It does not change the exit code: that number is about whether THIS run was whole. Confirm against the sections above, then fix or remove the entry deliberately.",
+    );
   }
 
   lines.push("", summary.whole ? "The run was whole: every combo asked and answered." : "The run was NOT whole. The dataset has holes where the lines above say it does.");

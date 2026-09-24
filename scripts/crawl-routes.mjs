@@ -84,6 +84,71 @@ export function comboKey(route) {
   return `${route.trainNo} ${route.from}-${route.to} ${route.travelClass}/${route.quota}`;
 }
 
+// ---------------------------------------------------------------------------
+// The one piece of DOMAIN knowledge in the crawler, kept together and labelled
+// ---------------------------------------------------------------------------
+
+/**
+ * @typedef {{ basis: "measured" | "inferred", why: string, evidence: string, settledBy: string }} QuotaWindow
+ */
+
+/**
+ * Quotas that only go on sale close to departure, so the ROLLING window can never answer for them.
+ *
+ * Read `basis` before you trust an entry. **`measured` means this project asked the provider and
+ * wrote down what came back; `inferred` means nobody here has.** The distinction is the whole point
+ * of this table: skipping a combo's rolling ask is a decision about what the dataset will contain
+ * for the next sixty days, and a reader has to be able to tell which entries rest on evidence. Do
+ * not add a quota because it sounds like Tatkal — add it with a `basis`, and if that basis is
+ * `inferred`, say in `settledBy` what would turn it into a measurement.
+ *
+ * This is deliberately NOT every quota with unusual timing. `quotaSchema` has 21 members; two are
+ * here. The rest keep their rolling ask, which costs one call a run and is the safe direction to
+ * be wrong in — a wasted call, rather than a quota silently losing its long-range sample.
+ *
+ * @type {ReadonlyMap<string, QuotaWindow>}
+ */
+export const QUOTAS_OPENING_NEAR_DEPARTURE = new Map([
+  [
+    "TQ",
+    {
+      basis: /** @type {const} */ ("measured"),
+      why: "Tatkal opens about a day before departure",
+      evidence:
+        "Measured over two real runs, 2026-09-23 and 2026-09-24, on 12301 HWH-NDLS 2A/TQ: the ask pinned at today answered 2 rows both days, while the rolling ask refused at 4 days out and at 7 days out. The GN combo on the same train answered 4 rows at every one of those distances, so the refusal is the quota and not the route.",
+      settledBy: "Already settled; re-measure only if the provider changes when Tatkal opens.",
+    },
+  ],
+  [
+    "PT",
+    {
+      basis: /** @type {const} */ ("inferred"),
+      why: "Premium Tatkal is sold from the Tatkal window by design",
+      evidence: "NOT measured by this project. No PT combo has ever been on the route list, so nothing here has ever asked the provider for one.",
+      settledBy:
+        "Put one PT combo on the list beside a GN combo on the same train and leg, run for a few days, and compare its rolling ask against its pinned one — exactly as 12301 2A/TQ was compared against 12301 3A/GN. If the rolling ask answers, delete this entry: the sample it costs is worth more than the call it saves.",
+    },
+  ],
+]);
+
+/**
+ * Why this combo's ROLLING ask would be a wasted call, or `null` when it would not be.
+ *
+ * A string rather than a boolean because the run report has to say WHY a combo made one ask instead
+ * of two, and the reason belongs beside the table it comes from rather than restated in the report.
+ *
+ * Looked up through a `Map`, deliberately: `planAsks` runs before `preflight` has checked the quota
+ * against the schema, and a plain object would hand `constructor` or `__proto__` an exemption.
+ *
+ * @param {Route} route
+ * @returns {string | null}
+ */
+export function rollingAskIsPointless(route) {
+  const known = QUOTAS_OPENING_NEAR_DEPARTURE.get(route.quota);
+  if (known === undefined) return null;
+  return `${route.quota} opens close to departure — ${known.why}, ${known.basis} — so the rolling window, which asks days and weeks ahead, can never answer for it`;
+}
+
 /**
  * Every rule the adapter's own `normalise` applies, applied here first.
  *

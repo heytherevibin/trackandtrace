@@ -61,13 +61,13 @@
 //
 // No personal data: this is about berths. There is no PNR here, no user, no passenger.
 
-import { comboKey } from "./crawl-routes.mjs";
-import { addDays, advanceCursor, cycleRuns, daysBetween, nextAsk } from "./crawl-window.mjs";
+import { comboKey, rollingAskIsPointless } from "./crawl-routes.mjs";
+import { cycleRuns, nextAsk } from "./crawl-window.mjs";
 
 // The route list is its own file, but this one stays the scripts' single entry point for the plan:
 // `observations-coverage.mjs` and `observations-report.mjs` already import `comboKey` and the route
 // reader from here, and a split should not make three files change to move one function.
-export { comboKey, loadRouteFile, parseRouteFile, preflight } from "./crawl-routes.mjs";
+export { QUOTAS_OPENING_NEAR_DEPARTURE, comboKey, loadRouteFile, parseRouteFile, preflight, rollingAskIsPointless } from "./crawl-routes.mjs";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -78,7 +78,8 @@ export const CALLS_PER_ASK_MAX = 2;
 /**
  * Asks per combo per run: the rolling window, and the ask pinned at today that supplies the
  * `days_out = 0` outcome row. See `planAsks`. On run 0 of a sweep they are the same date and only
- * one is made, so this is a worst case and not an average.
+ * one is made, so this is a worst case and not an average — and a combo whose quota only opens near
+ * departure makes the pinned ask alone, every run (`QUOTAS_OPENING_NEAR_DEPARTURE`).
  */
 export const ASKS_PER_COMBO_MAX = 2;
 /**
@@ -113,10 +114,46 @@ export const DEFAULT_REMAINING_FLOOR = 50;
  * rolling ask per combo per run, "always refuses" can only be counted ACROSS runs — which is the
  * other thing the cursor file is for.
  *
- * **Only the ROLLING ask feeds this count.** A pinned ask at today may refuse because the train does
- * not run today, which is a fact about the calendar and not about the list. See `runCrawl`.
+ * Two rules keep the count pointed at that and nothing else, and `runCrawl` is where both live:
+ *
+ *   * **Only the ROLLING ask feeds this count.** A pinned ask at today may refuse because the train
+ *     does not run today, which is a fact about the calendar and not about the list.
+ *   * **A combo that ANSWERED any ask this run takes no strike at all**, and its count goes back to
+ *     zero. The provider demonstrably knows the route, so a refusal of its rolling ask is not
+ *     evidence of a bad entry. Measured: both Tatkal combos on the shipped list reached 2 while
+ *     answering their pinned ask every single run.
  */
 export const REFUSALS_BEFORE_STALE = 3;
+/**
+ * How many runs in a row a combo may produce NO ROWS AT ALL before the report says to go and look.
+ *
+ * **A different question from staleness, and deliberately a weaker verdict.** `REFUSALS_BEFORE_STALE`
+ * answers "has the provider ever heard of this route?" and its answer is *delete the entry*. This
+ * one answers "is this combo contributing anything to the dataset?", and its answer is only *go and
+ * look*. The two lists never merge: nothing is ever deleted on the strength of this count.
+ *
+ * It exists because the stale list cannot see a whole class of dead combo. A combo that makes the
+ * PINNED ASK ONLY (`QUOTAS_OPENING_NEAR_DEPARTURE`) has no rolling ask to refuse, and a pinned
+ * refusal has never counted; a combo whose rolling ask is permanently dead while its pinned ask
+ * answers is excused every run by the invariant in `crawl-run.mjs`. Neither shows up anywhere. Nor
+ * does the coverage report catch them promptly: its exit code is an aggregate over every listed
+ * combo, so one dead combo out of six takes about 13 days to cross the threshold on a 30-day history
+ * and about 39 on a 90-day one — and a combo that has NEVER answered has no first observation at
+ * all, so it sits in `neverObserved`, outside the denominator, at 100% for ever.
+ *
+ * This count needs to know none of that. It asks the only question that covers every sampler: did
+ * any ask of this combo produce a row this run?
+ *
+ * **Seven, because seven runs is a week and a week is the longest silence a train on this list can
+ * honestly have.** A combo is asked once per run, so a train that runs a single day a week still has
+ * that day inside any seven-run stretch: six consecutive empty runs is the worst a legitimate weekly
+ * service can do, and the seventh means it missed even its own running day. It counts RUNS and not
+ * days, so a skipped day does not inflate it. Comfortably above `REFUSALS_BEFORE_STALE`, so the
+ * weaker verdict also takes longer to reach; comfortably inside the twenty runs a sweep takes, so a
+ * dead rolling sampler is named long before its next wrap; and unlike the coverage report it does
+ * not get slower as the dataset gets older.
+ */
+export const RUNS_WITHOUT_ROWS_BEFORE_NOTICE = 7;
 
 // ---------------------------------------------------------------------------
 // The shapes, written down so the tests that import this file are checked
@@ -130,12 +167,23 @@ export const REFUSALS_BEFORE_STALE = 3;
 /** @typedef {Answered | Refused} Outcome */
 /** @typedef {{ outcome: Outcome, calls: number, remaining?: string | null }} AskResult */
 /** @typedef {"rolling" | "pinned"} AskKind */
-/** @typedef {{ combo: string, route: Route, date: string, kind: AskKind, reset: "none" | "beyond" | "behind" | "unreadable" }} PlannedAsk */
+/** `sole` is set only on a pinned ask that is its combo's ONLY ask, and says why. See `planAsks`. */
+/** @typedef {{ combo: string, route: Route, date: string, kind: AskKind, reset: "none" | "beyond" | "behind" | "unreadable", sole?: string }} PlannedAsk */
 /** @typedef {{ combo: string, date: string, code: string, why: string }} Failure */
+/** A rolling refusal that took no staleness strike, because the same combo answered another ask. */
+/** @typedef {{ combo: string, date: string, refusals: number }} Excused */
+/**
+ * A rolling refusal this run was not entitled to settle EITHER WAY, because a gate cost the combo
+ * one of its other asks. `wouldHaveBeen` is the strike it did not take; `refusals` is the stored
+ * count, left exactly where the last complete run put it.
+ */
+/** @typedef {{ combo: string, date: string, wouldHaveBeen: number, refusals: number, because: string }} Withheld */
+/** A combo that has produced no rows for `RUNS_WITHOUT_ROWS_BEFORE_NOTICE` runs or more. NOT the stale list. */
+/** @typedef {{ combo: string, runs: number }} WithoutRows */
 /** @typedef {{ combo: string, kind: AskKind, date: string, code: string, why: string, rested: boolean }} NotAsked */
 /** An ask that was planned and never reached, because a gate stopped the run before it came round. */
 /** @typedef {{ combo: string, kind: AskKind, date: string }} Forfeited */
-/** @typedef {{ combo: string, kind: AskKind, date: string, daysOut: number, rows: number }} Asked */
+/** @typedef {{ combo: string, kind: AskKind, date: string, daysOut: number, rows: number, sole?: string }} Asked */
 /** @typedef {{ combo: string, date: string, days: number }} ShortWindow */
 /** @typedef {{ combo: string, reason: "behind" | "unreadable", cursor: string, gaveUp: string | null }} Restart */
 /** @typedef {import("./crawl-window.mjs").CursorEntry} CursorEntry */
@@ -145,7 +193,7 @@ export const REFUSALS_BEFORE_STALE = 3;
  *   today: string, horizonDays: number, windowDays: number,
  *   listed: number, planned: number, combos: number, asks: number, calls: number, rows: number,
  *   asked: Asked[], failures: Failure[], pinnedFailures: Failure[], notAsked: NotAsked[], forfeited: Forfeited[],
- *   shortWindows: ShortWindow[],
+ *   shortWindows: ShortWindow[], excused: Excused[], withheld: Withheld[], withoutRows: WithoutRows[],
  *   wrapped: string[], restarted: Restart[], stale: string[], cursors: Cursors, stopped: string | null,
  *   remaining: number | null, whole: boolean
  * }} Summary
@@ -183,6 +231,14 @@ export const REFUSALS_BEFORE_STALE = 3;
  *   * **On run 0 of a sweep the two asks are the same date, so only one is planned.** A duplicate is
  *     a wasted call against a plan that funds very few.
  *
+ * **And some combos make the pinned ask ALONE.** A quota that only goes on sale close to departure
+ * — `QUOTAS_OPENING_NEAR_DEPARTURE`, TQ on measurement and PT on inference — has nothing to say in
+ * the band the rolling window asks in, so that ask refuses about 19 runs in 20 and spends a call
+ * each time to say so. For those combos the pinned ask IS the sampler, already pointed exactly
+ * where the quota lives (`days_out` 0..3). Such a step carries `sole`: the reason, so the report
+ * can say why a combo made one ask instead of two. That is a BUDGET decision and it uses domain
+ * knowledge; what keeps a Tatkal combo off the stale list needs neither and lives in `runCrawl`.
+ *
  * **The one thing this rests on, and it is now measured: a train that has already departed still
  * answers for today.** The label exists only if today is inside the pinned answer, so a morning
  * departure crawled in the evening was the open risk — the provider returns "the next days the
@@ -204,6 +260,11 @@ export function planAsks({ routes, cursors, today, horizonDays, windowDays }) {
   const plan = [];
   for (const route of routes) {
     const combo = comboKey(route);
+    const pointless = rollingAskIsPointless(route);
+    if (pointless !== null) {
+      plan.push({ combo, route, date: today, kind: "pinned", reset: "none", sole: pointless });
+      continue;
+    }
     const { date, reset } = nextAsk({ cursor: cursors[combo]?.next, today, horizonDays, windowDays });
     plan.push({ combo, route, date, kind: "rolling", reset });
     if (date !== today) plan.push({ combo, route, date: today, kind: "pinned", reset: "none" });
@@ -250,11 +311,17 @@ export function crawlCeiling({ dailyAllowance, liveReserve, requested }) {
  * `ceil(horizon / window)` — fifteen — so a default ceiling of 33 funded two combos. Two asks per
  * combo — the rolling window and the pinned outcome row — funds eight.
  *
- * @param {{ combos: number, callsPerAsk?: number, asksPerCombo?: number }} plan
+ * **Hand it `routes` wherever they are in hand.** A combo whose quota only opens near departure
+ * makes one ask, not two, so counting the list rather than its length is the truth about what the
+ * run will spend — and a ceiling told a run is more expensive than it is refuses a list that fits.
+ * `combos` remains for the arithmetic itself: N combos that each make both asks.
+ *
+ * @param {{ routes?: readonly Route[], combos?: number, callsPerAsk?: number, asksPerCombo?: number }} plan
  * @returns {number}
  */
-export function plannedCalls({ combos, callsPerAsk = CALLS_PER_ASK_MAX, asksPerCombo = ASKS_PER_COMBO_MAX }) {
-  return combos * asksPerCombo * callsPerAsk;
+export function plannedCalls({ routes, combos = 0, callsPerAsk = CALLS_PER_ASK_MAX, asksPerCombo = ASKS_PER_COMBO_MAX }) {
+  const asks = routes === undefined ? combos * asksPerCombo : routes.reduce((n, route) => n + (rollingAskIsPointless(route) === null ? asksPerCombo : 1), 0);
+  return asks * callsPerAsk;
 }
 
 // ---------------------------------------------------------------------------
@@ -275,232 +342,3 @@ export function remainingVerdict(header, floor) {
   if (!Number.isInteger(value) || value < 0) return { known: false, remaining: null, stop: false };
   return { known: true, remaining: value, stop: value <= floor };
 }
-
-// ---------------------------------------------------------------------------
-// The run
-// ---------------------------------------------------------------------------
-
-/** @param {Refused} outcome */
-function why(outcome) {
-  const cause = outcome.cause ? ` (${outcome.cause}${outcome.status === undefined ? "" : ` ${outcome.status}`})` : "";
-  return `${outcome.code}${cause}: ${outcome.message}`;
-}
-
-/**
- * Of the asks that spent no call, which ones were held back by the GUARD rather than refused by
- * the adapter — and so mean that every remaining ask would be held back too.
- *
- * **`calls === 0` is the right signal for the cursor and the strike, and the wrong one for this.**
- * Zero calls says exactly one thing, and it is the thing those two decisions turn on: nothing left
- * the process, so the provider never saw this date. It does not say why, and there are exactly two
- * ways to get it through `createGuardedSource(railkitAvailability)`:
- *
- *   * the breaker is open, so `admit()` refused and nothing was sent — blameless, and a GATE: it is
- *     open for every combo at once, so continuing walks the rest of the list for nothing;
- *   * `normalise` refused the route, so the adapter returned `INVALID` before any fetch — the route
- *     is at fault, and that is ONE BAD ENTRY, which must never cost the rest of the list.
- *
- * Nothing else reaches here at zero calls: `countRequest()` throwing would reject the ask rather
- * than answer it, and every other arm of the adapter is downstream of `fetch`. The second one is
- * currently unreachable from this crawler — `preflight` applies every rule `normalise` applies,
- * before a call is spent — which is precisely why it must not be folded into the first: if the
- * preflight ever loosens, a malformed route would otherwise be filed as "blameless" for ever.
- *
- * **Identified POSITIVELY, and this is the whole point of the function.** The obvious rule —
- * `code !== INVALID` — says "everything except one known route error is the gate", which fails
- * OPEN: rename or narrow that code and a single bad entry silently starts stopping the whole run,
- * the same family of defect as treating a rest like a refusal. Nothing binds `Refused.code` (a bare
- * string here) to the adapter's union, so no test would catch the flip.
- *
- * So the gate is named by its own shape instead. `guarded.ts:59` is the only `SOURCE_UNAVAILABLE`
- * in this codebase built without a `cause` — every other one goes through `outcome.ts`'s
- * `unavailable(message, cause, …)`, which always sets one. A causeless `SOURCE_UNAVAILABLE` is
- * therefore the guard's rest and nothing else, and any future shape falls through to "not the
- * gate": the run continues, which wastes a walk down the list and costs no data. That is the
- * direction this must fail in.
- *
- * Neither one moves a cursor or earns a strike; they differ only in whether the run goes on.
- *
- * @param {Refused} outcome
- * @returns {boolean}
- */
-function restedOnTheGate(outcome) {
-  return outcome.code === "SOURCE_UNAVAILABLE" && outcome.cause === undefined;
-}
-
-/**
- * Walks the plan once: for each combo, the single date its cursor points at, and the pinned ask at
- * today that supplies the outcome row.
- *
- * `ask` and `record` are injected so the loop, the gates and the report are testable without a
- * network or a database. `ask` returns `{ outcome, calls, remaining }`: `calls` is how many requests
- * actually left the process for that ask (0 when the breaker was resting, 2 when the guard retried),
- * which is why asks and calls are reported separately.
- *
- * **The cursor advances whether or not the ROLLING ask succeeded — but only if it was ASKED.** A
- * refusal is the provider's verdict on that date: it is reported and counted, and holding the
- * cursor still would let one permanently unanswerable date stall a combo for ever, so the band
- * comes round again on the next sweep, closer to departure. An ask that spent **no call** is not a
- * verdict at all — the breaker was resting, or the adapter refused the route before building a URL
- * — so nothing was covered, the cursor holds, no strike is recorded, and it is reported in its own
- * `notAsked` section. Treating the two alike burned a four-day band of journey dates nobody had
- * asked for and named blameless combos stale; those dates cannot be refilled, because a past date
- * answers 400. See `restedOnTheGate`.
- *
- * **Only the rolling ask can make a combo stale.** `REFUSALS_BEFORE_STALE` counts consecutive
- * refusals to spot a route the provider does not know (12951, measured). A pinned ask may
- * legitimately refuse or come back short because the train simply does not run today, so counting it
- * would name a perfectly good Tuesday-only train a bad list entry. Pinned refusals are reported in
- * their own section instead, and do not make the run un-whole.
- *
- * A refused combo never stops the run; one bad entry must not cost the rest of the list. A gate, by
- * contrast, does stop it: slowing down would still spend the plan. **A resting breaker is a gate**,
- * and the third one — it is open for this caller as a whole, so every remaining ask would rest too.
- *
- * @param {{
- *   routes: readonly Route[], cursors: Cursors, today: string, horizonDays: number, windowDays: number,
- *   ask: (request: AskRequest) => Promise<AskResult>,
- *   record: (request: AskRequest, outcome: Answered) => Promise<number>,
- *   ceiling: number, remainingFloor?: number, callsPerAsk?: number
- * }} options
- * @returns {Promise<Summary>}
- */
-export async function runCrawl({ routes, cursors, today, horizonDays, windowDays, ask, record, ceiling, remainingFloor = 0, callsPerAsk = CALLS_PER_ASK_MAX }) {
-  const plan = planAsks({ routes, cursors, today, horizonDays, windowDays });
-  /** @type {Summary} */
-  const summary = {
-    today,
-    horizonDays,
-    windowDays,
-    listed: routes.length,
-    planned: plan.length,
-    combos: 0,
-    asks: 0,
-    calls: 0,
-    rows: 0,
-    asked: [],
-    failures: [],
-    pinnedFailures: [],
-    notAsked: [],
-    forfeited: [],
-    shortWindows: [],
-    wrapped: [],
-    restarted: [],
-    stale: [],
-    // Combos this run does not reach keep the place they got to. Losing one would restart that
-    // combo's sweep at today and quietly re-read a band it had already covered.
-    cursors: { ...cursors },
-    stopped: null,
-    remaining: null,
-    whole: false,
-  };
-
-  // Everything a stop leaves unasked, recorded where the stop happens because the breaking step is
-  // itself forfeited only when the gate closed BEFORE its ask. The pinned ones are what matter: a
-  // pinned ask is the only ask that reaches `days_out = 0`, so one never made is a label that does
-  // not exist and that no later run can create. Stopping is still right; it was never free.
-  const forfeitFrom = (index) => {
-    summary.forfeited = plan.slice(index).map((one) => ({ combo: one.combo, kind: one.kind, date: one.date }));
-  };
-
-  for (const [index, step] of plan.entries()) {
-    const key = step.combo;
-    const entry = cursors[key];
-
-    // Reserved BEFORE the ask, never checked after it: a post-hoc `calls >= ceiling` overshoots by
-    // `callsPerAsk - 1` at every ceiling the arithmetic does not divide.
-    if (summary.calls + callsPerAsk > ceiling) {
-      summary.stopped = `the run's own ceiling of ${ceiling} calls — stopping rather than slowing, so the plan live checks depend on stays whole`;
-      forfeitFrom(index);
-      break;
-    }
-
-    if (step.kind === "rolling") {
-      summary.combos += 1;
-      if (step.reset === "beyond") summary.wrapped.push(key);
-      // `behind` and `unreadable` both abandon the band this sweep was partway through, and those
-      // journey dates are gone: a past date answers 400. That is a hole, so it is named and it makes
-      // the run un-whole — a restarted sweep that reports "the run was whole" is the lie this
-      // section exists to stop.
-      else if (step.reset === "behind" || step.reset === "unreadable") {
-        const cursor = entry?.next ?? "(none)";
-        summary.restarted.push({
-          combo: key,
-          reason: step.reset,
-          cursor,
-          gaveUp: step.reset === "behind" ? `${cursor} … ${addDays(today, -1)}` : null,
-        });
-      }
-    }
-
-    const request = { trainNo: step.route.trainNo, from: step.route.from, to: step.route.to, journeyDate: step.date, travelClass: step.route.travelClass, quota: step.route.quota };
-    const { outcome, calls, remaining } = await ask(request);
-    summary.asks += 1;
-    summary.calls += calls;
-
-    const seen = remainingVerdict(remaining, remainingFloor);
-    if (seen.known) summary.remaining = seen.remaining;
-
-    // NOTHING LEFT THE PROCESS. Not a refusal: a refusal is the provider's verdict on this date,
-    // and this is the absence of one. So the cursor holds — the band was not covered and the next
-    // sweep does not come back for it — and no strike is recorded, because a combo cannot be judged
-    // by a request nobody received. It is neither asked nor failed; it is its own line in the
-    // report, and it makes the run un-whole.
-    if (!outcome.ok && calls === 0) {
-      const rested = restedOnTheGate(outcome);
-      summary.notAsked.push({ combo: key, kind: step.kind, date: step.date, code: outcome.code, why: why(outcome), rested });
-      // A gate stops the run, exactly as the ceiling and the burst floor do. The breaker is open
-      // for this caller as a whole, so every ask left in the plan would rest too: walking them
-      // produces no rows, one breaker read each, and a wall of identical lines. Stopping costs
-      // nothing now that the cursors hold — the combos not reached keep their places, which is
-      // already what `runCrawl` does for combos it never gets to.
-      if (rested) {
-        summary.stopped = `the provider's breaker is resting, so ${key}'s ask for ${step.date} was never sent — it is open for this caller as a whole, so every remaining ask would rest too`;
-        forfeitFrom(index + 1);
-        break;
-      }
-      continue;
-    }
-
-    let written = 0;
-    if (outcome.ok) {
-      written = await record(request, outcome);
-      summary.rows += written;
-      // The provider answered, so this combo is not a bad list entry whatever the store did.
-      if (step.kind === "rolling") summary.cursors[key] = { next: advanceCursor(step.date, windowDays), refusals: 0 };
-      // A store that wrote nothing is our fault, not the train's, whichever ask it was.
-      if (written === 0) summary.failures.push({ combo: key, date: step.date, code: "NOT_RECORDED", why: "the provider answered but the store wrote no rows" });
-      else if (step.kind === "rolling" && written < windowDays) summary.shortWindows.push({ combo: key, date: step.date, days: written });
-    } else if (step.kind === "rolling") {
-      const refusals = (entry?.refusals ?? 0) + 1;
-      summary.cursors[key] = { next: advanceCursor(step.date, windowDays), refusals };
-      summary.failures.push({ combo: key, date: step.date, code: outcome.code, why: why(outcome) });
-      if (refusals >= REFUSALS_BEFORE_STALE) summary.stale.push(`${key} (${refusals} runs in a row)`);
-    } else {
-      summary.pinnedFailures.push({ combo: key, date: step.date, code: outcome.code, why: why(outcome) });
-    }
-
-    summary.asked.push({ combo: key, kind: step.kind, date: step.date, daysOut: daysBetween(today, step.date), rows: written });
-
-    if (seen.stop) {
-      summary.stopped = `the provider's own RateLimit-Remaining fell to ${seen.remaining}, at or below the floor of ${remainingFloor}`;
-      forfeitFrom(index + 1);
-      break;
-    }
-  }
-
-  // `asks > 0` is part of it: a run that asked nothing did nothing, and "whole" must not be the
-  // verdict on an empty list. `notAsked` is part of it for the same reason one ask at a time: a
-  // date the provider never saw is a date this run did not cover, whether or not a gate stopped it.
-  summary.whole =
-    summary.stopped === null &&
-    summary.failures.length === 0 &&
-    summary.notAsked.length === 0 &&
-    summary.restarted.length === 0 &&
-    summary.asks > 0 &&
-    summary.asks === summary.planned;
-  return summary;
-}
-
-// The report — `summarise` and `exitCodeFor` — lives in `crawl-report.mjs`, which this file grew
-// out of. It imports `REFUSALS_BEFORE_STALE` from here; nothing here imports it back.
