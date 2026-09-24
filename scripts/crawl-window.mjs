@@ -20,7 +20,10 @@
 // `5d0e949` added the pinned ask, so `ASKS_PER_COMBO_MAX` is 2 and the default ceiling of 33 funds
 // `33 / (2 × 2) = 8`. `crawl-plan.test.ts` pins it. Sizing a route list from the old number lands an
 // operator on the preflight refusal, and the only flag that makes an oversized list fit is
-// `--reserve` — which is exactly the flag that takes protection away from live PNR checks.)
+// `--reserve` — which is exactly the flag that takes protection away from live PNR checks.
+// Eight is a floor rather than the number: a combo whose quota only opens near departure makes the
+// pinned ask alone, so the shipped six — four GN and two TQ — cost 20 calls a run, not 24, and
+// `plannedCalls` is handed the routes rather than their count so the gate is told the truth.)
 // It is also the wrong shape for the data: what a clearance model needs is each
 // journey date seen at a few DIFFERENT distances from departure, not at all sixty. A rolling window
 // gives exactly that, and gives it for the price of one call.

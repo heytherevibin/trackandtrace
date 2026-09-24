@@ -29,6 +29,14 @@
 //     apart from the rolling asks, is not counted towards a combo's consecutive-refusal total, and
 //     does NOT make the run un-whole. Counting it would name a Tuesday-only train a bad list entry
 //     every Wednesday.
+//   * **A rolling refusal that earned no strike.** If a combo's pinned ask ANSWERED, the provider
+//     demonstrably knows that route, so its rolling refusal is not evidence of a bad list entry and
+//     `runCrawl` clears the count. A counter that silently does not move is exactly the sort of
+//     thing an operator later calls a bug, so the run names every refusal it excused and why.
+//
+// One more thing the prose has to carry: a combo may make ONE ask rather than two, when its quota
+// only opens near departure and a rolling ask could never answer. That shows up beside the ask
+// itself, in the line that says what the combo asked for, because that is where a reader meets it.
 //
 // No personal data: this is about berths. There is no PNR here, no user, no passenger.
 
@@ -49,7 +57,7 @@ export function summarise(summary) {
   const lines = [
     "",
     `${pad("combos attempted")} ${summary.combos} of ${summary.listed}`,
-    `${pad("asks")} ${summary.asks} of ${summary.planned} planned (the rolling window plus one pinned at ${summary.today} for the outcome row, which are the same ask on the run a sweep wraps; the sweep takes ${sweep} runs at a ${summary.horizonDays}-day horizon)`,
+    `${pad("asks")} ${summary.asks} of ${summary.planned} planned (the rolling window plus one pinned at ${summary.today} for the outcome row — one ask only where a sweep wraps onto today, or where the quota opens too close to departure for a rolling ask to answer; the sweep takes ${sweep} runs at a ${summary.horizonDays}-day horizon)`,
     `${pad("calls made")} ${summary.calls}`,
     `${pad("rows written")} ${summary.rows}`,
     `${pad("RateLimit-Remaining")} ${summary.remaining === null ? "not sent by the provider" : summary.remaining}`,
@@ -58,7 +66,10 @@ export function summarise(summary) {
   if (summary.asked.length > 0) {
     lines.push("", "What each combo asked for, and where its window is now:");
     for (const one of summary.asked) {
-      const tail = one.kind === "rolling" ? ` · next ${summary.cursors[one.combo]?.next ?? "?"}` : " · the outcome row";
+      // A combo with one ask where its neighbours have two is the kind of thing a reader silently
+      // files as a bug, so the line that shows the ask is the line that says why.
+      const outcome = one.sole === undefined ? " · the outcome row" : ` · the outcome row, and this combo's ONLY ask: ${one.sole}`;
+      const tail = one.kind === "rolling" ? ` · next ${summary.cursors[one.combo]?.next ?? "?"}` : outcome;
       lines.push(`  ${one.combo}  ${one.kind.padEnd(7)} ${one.date} (${one.daysOut} days out) · ${one.rows} row${s(one.rows)}${tail}`);
     }
   }
@@ -131,6 +142,14 @@ export function summarise(summary) {
     for (const failure of summary.failures) lines.push(`  ${failure.combo}  ${failure.date}  ${failure.why}`);
   }
 
+  if (summary.excused.length > 0) {
+    lines.push(
+      "",
+      `${summary.excused.length} rolling refusal${s(summary.excused.length)} above took NO staleness strike, because the same combo's pinned ask answered this run. The provider demonstrably knows the route, so the refusal is not evidence of a bad list entry — each count below is back to zero rather than one run nearer "delete this from routes.json":`,
+    );
+    for (const one of summary.excused) lines.push(`  ${one.combo}  ${one.date}  would have been strike ${one.refusals} of ${REFUSALS_BEFORE_STALE}`);
+  }
+
   if (summary.pinnedFailures.length > 0) {
     lines.push(
       "",
@@ -142,7 +161,7 @@ export function summarise(summary) {
   if (summary.shortWindows.length > 0) {
     lines.push(
       "",
-      `${summary.shortWindows.length} rolling window${s(summary.shortWindows.length)} came back with fewer than ${summary.windowDays} days. Normal at TQ and on a train that does not run daily; a pattern anywhere else is worth a look:`,
+      `${summary.shortWindows.length} rolling window${s(summary.shortWindows.length)} came back with fewer than ${summary.windowDays} days. Normal on a train that does not run daily, or on a quota that is not open for the whole band; a pattern anywhere else is worth a look:`,
     );
     for (const short of summary.shortWindows) lines.push(`  ${short.combo}  ${short.date}  ${short.days} day${s(short.days)}`);
   }

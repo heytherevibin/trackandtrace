@@ -69,6 +69,26 @@ describe("summarise", () => {
     expect(printed).toMatch(/outcome row/i);
   });
 
+  it("says why a combo made ONE ask instead of two, where it shows what each combo asked for", async () => {
+    const printed = await text({ ask: stubAsk(() => OK), routes: [route({ quota: "TQ" })] });
+
+    expect(printed).toMatch(/only ask/i);
+    expect(printed).toMatch(/TQ/);
+    expect(printed).toMatch(/departure/i);
+    // It is still one of the combos the run attempted, not a combo it skipped.
+    expect(printed).toMatch(/combos attempted\s+1 of 1/);
+  });
+
+  it("names a rolling refusal that took no staleness strike, so a counter that did not move is not a mystery", async () => {
+    const printed = await text({ ask: stubAsk((n) => (n === 0 ? REFUSED : OK)), cursors: { [KEY_ONE]: { next: "2026-10-02", refusals: 2 } } });
+
+    expect(printed).toMatch(/no staleness strike/i);
+    expect(printed).toMatch(/pinned ask answered/i);
+    expect(printed).toContain(KEY_ONE);
+    // The refusal itself is still reported: the band it asked for is a hole either way.
+    expect(printed).toMatch(/did not become rows/);
+  });
+
   it("names every failed combo and why, because a silent partial run is what ruins the dataset", async () => {
     const printed = await text({ ask: stubAsk((n) => (n === 0 ? REFUSED : OK)) });
 

@@ -190,6 +190,45 @@ describe.each([
 });
 
 // ---------------------------------------------------------------------------
+// 2. A quota that only opens near departure makes the PINNED ask only.
+//
+//    Measured 2026-09-23 and 2026-09-24 on 12301 HWH-NDLS 2A/TQ: the pinned ask at today answered
+//    two rows both days, the rolling ask refused at 4 and at 7 days out. Tatkal opens about a day
+//    before departure, so the rolling window — which asks 3..57 days out on 19 runs in 20 — has
+//    nothing to ask for. Making it anyway spends a call a run to learn that again.
+//
+//    The quota table itself, and which of its entries rest on measurement rather than inference,
+//    is `crawl-routes.test.ts`. This is about what the PLAN does with it.
+// ---------------------------------------------------------------------------
+
+describe("a quota that only opens near departure", () => {
+  const away = (quota: string) => ({ [comboKey(route({ quota }) as never)]: { next: "2026-10-02", refusals: 0 } });
+  const plan = (quota: string) => planAsks({ routes: [route({ quota })], cursors: away(quota), today: FROM, horizonDays: 60, windowDays: 4 });
+
+  it("makes the pinned ask and nothing else: its rolling ask could never answer, so it is a wasted call every run", () => {
+    expect(plan("TQ")).toHaveLength(1);
+    expect(plan("TQ")[0]?.kind).toBe("pinned");
+    expect(plan("TQ")[0]?.date).toBe(FROM);
+  });
+
+  it("says why, because a combo with one ask instead of two would otherwise confuse a reader of the report", () => {
+    expect(plan("TQ")[0]?.sole).toMatch(/TQ/);
+    expect(plan("TQ")[0]?.sole).toMatch(/departure/i);
+  });
+
+  it("leaves the pinned ask pointed exactly where that quota lives, which is days_out 0..3", () => {
+    expect(daysBetween(FROM, plan("TQ")[0]?.date as string)).toBe(0);
+  });
+
+  it("leaves every other quota with both asks and an untouched rolling window", () => {
+    const both = plan("GN");
+    expect(both.map((one) => one.kind)).toEqual(["rolling", "pinned"]);
+    expect(both[0]?.date).toBe("2026-10-02");
+    expect(both[0]?.sole).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 3. The gate. This is the requirement the task turns on.
 // ---------------------------------------------------------------------------
 
@@ -268,6 +307,16 @@ describe("plannedCalls", () => {
     expect(plannedCalls({ combos: 6 })).toBeLessThanOrEqual(crawlCeiling({ dailyAllowance: 333, liveReserve: 300 }).ceiling);
     expect(plannedCalls({ combos: 8 })).toBeLessThanOrEqual(33);
     expect(plannedCalls({ combos: 9 })).toBeGreaterThan(33);
+  });
+
+  it("counts ONE ask for a combo whose quota opens too close to departure for a rolling ask to answer", () => {
+    // The gate is only a gate if the arithmetic it is handed is the truth about what the run will
+    // spend. Charging a pinned-only combo for two asks would refuse a list that fits.
+    expect(plannedCalls({ routes: [route(), route({ trainNo: "12301", quota: "TQ" })] })).toBe((2 + 1) * CALLS_PER_ASK_MAX);
+  });
+
+  it("still charges every other quota for both asks, so the ceiling is never told a run is cheaper than it is", () => {
+    expect(plannedCalls({ routes: [route(), route({ trainNo: "12301" })] })).toBe(plannedCalls({ combos: 2 }));
   });
 });
 

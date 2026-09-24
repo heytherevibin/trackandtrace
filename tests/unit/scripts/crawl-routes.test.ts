@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { loadRouteFile, parseRouteFile, preflight } from "../../../scripts/crawl-plan.mjs";
+import { QUOTAS_OPENING_NEAR_DEPARTURE, loadRouteFile, parseRouteFile, plannedCalls, preflight, rollingAskIsPointless } from "../../../scripts/crawl-plan.mjs";
 import { bookingClassSchema, quotaSchema } from "@/types/schemas";
 
 // ---------------------------------------------------------------------------
@@ -99,6 +99,56 @@ describe("the shipped route list", () => {
 
   it("does not carry 12951, which answered `Unable to process your request` for every class and date tried", () => {
     expect(routes.map((r) => r.trainNo)).not.toContain("12951");
+  });
+
+  it("costs 20 calls a run at worst, not 24: its two Tatkal combos make the pinned ask only", () => {
+    // Four combos × 2 asks + two Tatkal combos × 1 ask = 10 asks, each allowed the guard's one retry.
+    expect(plannedCalls({ routes })).toBe(20);
+    expect(routes.filter((r) => rollingAskIsPointless(r) !== null)).toHaveLength(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Which quotas open too close to departure for a rolling ask to answer — and,
+// for each, whether this project MEASURED that or inferred it
+// ---------------------------------------------------------------------------
+
+describe("QUOTAS_OPENING_NEAR_DEPARTURE", () => {
+  it("holds TQ on measurement and PT on inference, and nothing else", () => {
+    // Silently extending this list is how a quota nobody has looked at loses its long-range sample.
+    expect([...QUOTAS_OPENING_NEAR_DEPARTURE.keys()]).toEqual(["TQ", "PT"]);
+  });
+
+  it("marks TQ as measured, and cites the runs that measured it", () => {
+    const tq = QUOTAS_OPENING_NEAR_DEPARTURE.get("TQ");
+    expect(tq?.basis).toBe("measured");
+    expect(tq?.evidence).toMatch(/2026-09-2[34]/);
+  });
+
+  it("marks PT as inferred, admits this project has not measured it, and says what would settle it", () => {
+    const pt = QUOTAS_OPENING_NEAR_DEPARTURE.get("PT");
+    expect(pt?.basis).toBe("inferred");
+    expect(pt?.evidence).toMatch(/not measured/i);
+    expect(pt?.settledBy).toMatch(/\S/);
+  });
+
+  it("gives every entry a basis that is one of the two words, so a reader never has to guess which it is", () => {
+    for (const [quota, entry] of QUOTAS_OPENING_NEAR_DEPARTURE) {
+      expect(["measured", "inferred"], quota).toContain(entry.basis);
+      expect(entry.settledBy?.length ?? 0, quota).toBeGreaterThan(0);
+    }
+  });
+
+  it("leaves every other quota the schema knows with its rolling ask", () => {
+    for (const quota of quotaSchema.options.filter((q) => !QUOTAS_OPENING_NEAR_DEPARTURE.has(q))) {
+      expect(rollingAskIsPointless(route({ quota })), quota).toBeNull();
+    }
+  });
+
+  it("is looked up safely, so a route file carrying a JavaScript property name cannot gain an exemption", () => {
+    // `planAsks` runs before the preflight has vetted the quota against the schema.
+    expect(rollingAskIsPointless(route({ quota: "constructor" }))).toBeNull();
+    expect(rollingAskIsPointless(route({ quota: "__proto__" }))).toBeNull();
   });
 });
 

@@ -19,7 +19,11 @@
 //     migration calls the outcome — the label a model trains against. The rolling window reaches it
 //     for one journey date in twenty; see `planAsks` in `crawl-plan.mjs` for the arithmetic.
 //
-// On the run a sweep wraps the two are the same date and only one ask is made.
+// On the run a sweep wraps the two are the same date and only one ask is made. **And a combo whose
+// quota only opens near departure makes the pinned ask alone, every run** — a Tatkal ask 4 to 57
+// days out has nothing to answer, so the rolling one spends a call a run to be refused. For those
+// combos the pinned ask IS the sampler; see `QUOTAS_OPENING_NEAR_DEPARTURE` in `crawl-routes.mjs`,
+// which says which entries were measured and which inferred.
 //
 // **Where the rolling window got to lives in `scripts/crawl-cursor.json`**, written after every run
 // and read before the next; the pinned ask does not touch it. It is gitignored: it is this
@@ -64,6 +68,7 @@ import {
   parseRouteFile,
   plannedCalls,
   preflight,
+  rollingAskIsPointless,
   runCrawl,
 } from "./crawl-plan.mjs";
 import { exitCodeFor, summarise } from "./crawl-report.mjs";
@@ -277,17 +282,27 @@ async function main() {
     liveReserve: whole(found, "reserve", liveRequestsPerDay(environment)),
     requested: found.has("max-calls") ? whole(found, "max-calls", 0) : undefined,
   });
-  // Two asks a combo now — the rolling window, and the ask pinned at today that supplies the
-  // days_out = 0 outcome row — so the worst case is twice what it was. Gate A itself is unchanged;
-  // what changed is that the arithmetic handed to it tells the truth about what a run will spend.
-  const worstCase = plannedCalls({ combos: routes.length });
+  // Two asks a combo — the rolling window, and the ask pinned at today that supplies the
+  // days_out = 0 outcome row — except for a combo whose quota only opens near departure, which
+  // makes the pinned ask alone. Gate A itself is unchanged; what matters is that the arithmetic
+  // handed to it tells the truth about what THIS list will spend, which is why it is given the
+  // routes and not merely their number.
+  const worstCase = plannedCalls({ routes });
+  const pinnedOnly = routes.filter((route) => rollingAskIsPointless(route) !== null);
   const remainingFloor = whole(found, "remaining-floor", DEFAULT_REMAINING_FLOOR);
 
   console.log(`routes         ${routes.length} combo${routes.length === 1 ? "" : "s"}${limit < parsed.routes.length ? ` (of ${parsed.routes.length}, limited by --only)` : ""}`);
   console.log(`window         rolling ${windowDays} days a run over a ${horizonDays}-day horizon — a sweep takes ${cycleRuns(horizonDays, windowDays)} runs`);
   console.log(`pinned         one more ask each at ${today}, which is what supplies the days_out = 0 outcome row (skipped where a sweep wraps onto today)`);
+  if (pinnedOnly.length > 0) {
+    const quotas = [...new Set(pinnedOnly.map((route) => route.quota))].join(", ");
+    console.log(`pinned only    ${pinnedOnly.length} combo${pinnedOnly.length === 1 ? "" : "s"} make the pinned ask and no rolling one: ${quotas} open${quotas.includes(",") ? "" : "s"} too close to departure for a rolling ask to answer`);
+    for (const route of pinnedOnly) console.log(`               ${comboKey(route)}`);
+  }
   console.log(`cursor         ${cursorPath}${Object.keys(readCursors.cursors).length === 0 ? " (none yet: every combo starts at today)" : ""}${startAt === undefined ? "" : ` (overridden for this run: ${startAt})`}`);
-  console.log(`worst case     ${worstCase} calls (${routes.length} combo${routes.length === 1 ? "" : "s"} × ${ASKS_PER_COMBO_MAX} asks × ${CALLS_PER_ASK_MAX} for the guard's one retry)`);
+  console.log(
+    `worst case     ${worstCase} calls (${worstCase / CALLS_PER_ASK_MAX} asks × ${CALLS_PER_ASK_MAX} for the guard's one retry: ${routes.length - pinnedOnly.length} combo${routes.length - pinnedOnly.length === 1 ? "" : "s"} × ${ASKS_PER_COMBO_MAX} asks${pinnedOnly.length === 0 ? "" : `, ${pinnedOnly.length} × 1`})`,
+  );
   console.log(`ceiling        ${reason}`);
   console.log(`burst floor    stop when the provider's RateLimit-Remaining reaches ${remainingFloor}`);
 
