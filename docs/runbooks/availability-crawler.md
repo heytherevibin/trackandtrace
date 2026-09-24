@@ -213,8 +213,18 @@ for. A combo where *everything* refuses is unaffected and still goes stale on th
 
 The cost of that rule, stated so nobody trusts the list further than it goes: a combo that makes the
 **pinned ask only** can never reach it, because a pinned refusal has never counted towards staleness
-(the train may simply not run today) and such a combo has no rolling ask to refuse. Those are found
-by hand — read the run's pinned-failure section for a combo that appears there every single day.
+(the train may simply not run today) and such a combo has no rolling ask to refuse.
+
+**What catches one instead is `npm run source:report`, and it is the better instrument anyway.** A
+dead pinned-only combo writes no rows on the day it refuses, and a day with no rows is exactly what
+the coverage report counts as a gap — whatever shape of ask was supposed to produce them. So a combo
+that has genuinely stopped answering shows as falling coverage within days and takes the check
+non-zero, while one that merely had no Tatkal to sell today stays at 100% because the other days
+covered it. The two instruments divide the work: the `Refused N runs in a row` list finds a route
+the provider has never heard of, and the coverage report finds a combo that has stopped producing
+data, for any reason and under any sampler. Reading the run's pinned-failure section for a combo that
+appears there every single day is the quick check; the coverage report is the one that will tell you
+without being asked.
 
 **"NEVER REACHED THE PROVIDER" is not a refusal, and nothing on that list is a bad entry.** After
 five failures inside a minute the guard opens the availability fuse, and every ask after that is
