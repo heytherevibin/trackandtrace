@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "../globals.css";
 import { DARK, LIGHT } from "@/components/brand/brand-colors";
+import { MOTION_BOOT_SCRIPT } from "@/components/motion/motion-boot";
 import { Providers } from "@/components/providers";
 import { AppShell } from "@/components/shell/app-shell";
 import { PwaRegister } from "@/components/shell/pwa-register";
@@ -40,6 +41,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   const userPromise = currentUser();
   return (
     <html lang="en" className={fontVars} data-scroll-behavior="smooth" suppressHydrationWarning>
+      <head>
+        {/* Motion, before first paint: html[data-motion] (motion-boot.ts). Inline, as the traveller CSP allows. */}
+        <script dangerouslySetInnerHTML={{ __html: MOTION_BOOT_SCRIPT }} />
+      </head>
       <body className="bg-surface-0 text-ink-1">
         {/*
 DIRECTION CONTRACT — Industry (Claude Design "Landing Redesign B")
