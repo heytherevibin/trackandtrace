@@ -163,7 +163,34 @@ html[data-theme-switching] *::after {
   .sweep {
     animation: none;
   }
+  /* !important: the press rule (:active plus three :not()s) outranks this selector, which had left a held
+     button settling to 96% under reduced motion, only instantly. */
   :where(button, [role="button"], .press):active {
-    transform: none;
+    transform: none !important;
   }
+}
+
+/* Motion off (the landing footer's switch; html[data-motion], written before first paint): exactly the rules
+   above, on every traveller page, whatever the device says. Keep the two blocks identical. */
+html[data-motion="off"],
+html[data-motion="off"] *,
+html[data-motion="off"] ::before,
+html[data-motion="off"] ::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+html[data-motion="off"]::view-transition-old(*),
+html[data-motion="off"]::view-transition-new(*),
+html[data-motion="off"]::view-transition-group(*) {
+  animation-duration: 0s !important;
+  animation-delay: 0s !important;
+}
+html[data-motion="off"] .skeleton::after,
+html[data-motion="off"] .sweep {
+  animation: none;
+}
+html[data-motion="off"] :where(button, [role="button"], .press):active {
+  transform: none !important;
 }

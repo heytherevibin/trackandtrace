@@ -1,5 +1,6 @@
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
+import { gotoReady } from "./helpers";
 
 // The Motion switch (spec 2026-09-24 §3.A, §3.B). Motion is decided before first paint. Off stills the
 // site's own movements exactly as the device's reduced-motion setting does, on every traveller page.
@@ -36,4 +37,43 @@ test.describe("Motion is decided before first paint", () => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     expect(await motionAtParse(page, "/")).toBe("off");
   });
+});
+
+/** Holds the pointer down on a button and reads how far it settled: 1 means it did not move. */
+async function heldScale(page: Page, target: Locator): Promise<number> {
+  await target.scrollIntoViewIfNeeded();
+  const box = (await target.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.waitForTimeout(250);
+  const scale = await target.evaluate((el) => {
+    const t = getComputedStyle(el).transform;
+    return t === "none" ? 1 : Number.parseFloat(t.slice(7));
+  });
+  // Release away from the button, so the press never runs a check.
+  await page.mouse.move(0, 0);
+  await page.mouse.up();
+  return scale;
+}
+
+const STILLED_BY: Readonly<Record<string, (page: Page) => Promise<void>>> = {
+  // Block body, not `(page) => page.addInitScript(...)`: addInitScript resolves to Promise<Disposable> on
+  // this Playwright version, which does not satisfy Promise<void> from an expression body.
+  "the reader switched Motion off": async (page) => {
+    await page.addInitScript(() => window.localStorage.setItem("tt.motion", "off"));
+  },
+  "the device asks for reduced motion": (page) => page.emulateMedia({ reducedMotion: "reduce" }),
+};
+
+test.describe("Motion off stills the site's own movements", () => {
+  for (const [why, still] of Object.entries(STILLED_BY)) {
+    test(`when ${why}: a held button does not settle, nothing eases, anchors jump`, async ({ page }) => {
+      await still(page);
+      await gotoReady(page, "/");
+      const run = page.getByRole("button", { name: "Run", exact: true }).first();
+      expect(await run.evaluate((el) => getComputedStyle(el).transitionDuration)).toBe("1e-05s");
+      expect(await heldScale(page, run)).toBe(1);
+      expect(await page.evaluate(() => getComputedStyle(document.documentElement).scrollBehavior)).toBe("auto");
+    });
+  }
 });
