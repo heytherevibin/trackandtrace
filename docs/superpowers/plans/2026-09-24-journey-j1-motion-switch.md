@@ -10,9 +10,9 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-24-landing-journey-design.md` — §6 J1, §3.A (the Footer row and every "Motion off" cell), §3.B (State), §3.G, §7 (the site-wide confirmation), §1 (the press bug found while planning).
 
-**Branch:** `feat/journey-j1-motion-switch`, from `main`.
+**Branch:** `feat/journey-j1-motion-switch`, from `docs/landing-journey-spec` (main plus the spec and this plan), so the PR carries the plan it implements, as #28 carried its own.
 
-**Scope ruling.** The spec has six PRs; this plan is J1 only. The J2 plan is written when J1 merges, from the code J1 actually shipped, the way Phase 2's plans were. J1 assumes the owner says yes to §7 (Motion off also quiets the site's own motions). If the owner says no, keep Task 2's press fix and Task 5 as they are. Drop Tasks 1, 3 and 4 (the head script, `SiteMotion` and the switch move to J3), and cut Task 2 to its device half.
+**Scope ruling.** The spec has six PRs; this plan is J1 only. The J2 plan is written when J1 merges, from the code J1 actually shipped, the way Phase 2's plans were. The owner confirmed §7 on 2026-09-24: Motion off quiets the site's own motions too, on every traveller page.
 
 ## Global Constraints
 
@@ -34,11 +34,11 @@ Every task's requirements include all of these.
 
 ## Before you start
 
-- The owner has approved the spec and answered §7.
+- The owner approved the spec and answered §7 on 2026-09-24.
 - Create the worktree. Next 16 allows one `next dev` per folder, and another session may be holding the main one:
 
 ```bash
-git -C /Users/heytherevibin/Downloads/Code/Dev/trackandtrace worktree add ../trackandtrace-j1 -b feat/journey-j1-motion-switch main
+git -C /Users/heytherevibin/Downloads/Code/Dev/trackandtrace worktree add ../trackandtrace-j1 -b feat/journey-j1-motion-switch docs/landing-journey-spec
 ```
 
 ```bash

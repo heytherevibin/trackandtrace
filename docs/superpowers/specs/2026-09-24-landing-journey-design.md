@@ -1,6 +1,6 @@
 # Landing journey — design
 
-Date: 2026-09-24 · Status: **draft for review** · Owner: Vibin Mathew
+Date: 2026-09-24 · Status: **approved 2026-09-24**, with the J1 plan · Owner: Vibin Mathew
 
 The landing ("/") becomes a train-themed scroll journey in the app's own Industry look: a drawn WAP-7-style
 locomotive that is scanned, taken apart, labelled, coupled up and sent on its way as the page scrolls, and
@@ -277,10 +277,9 @@ go-ahead. Each PR's plan is written when the one before it merges, from the code
 ## 7. What only the user can do
 
 - Approve this spec, then each PR's merge.
-- Confirm that Motion off also quiets the app's own small motions on the page (the press, the sweep, the
-  theme icon turn), as a device's reduced-motion setting already does; otherwise it covers the journey only.
-  J1 is built on a yes. On a no, J1 ships only the press fix and the collision checker, and the switch moves
-  to J3, where the journey first gives it something to switch.
+- ~~Confirm that Motion off also quiets the app's own small motions on the page (the press, the sweep, the
+  theme icon turn), as a device's reduced-motion setting already does.~~ **Confirmed 2026-09-24: yes,
+  site-wide.** J1 is built on it.
 - Try the result on a real mid-range Android phone before J5 merges (a hidden `?journey-hud` query shows the
   frame meter on preview deployments only).
 - Decide whether the nightly workflow may run on a schedule (it costs CI minutes).
