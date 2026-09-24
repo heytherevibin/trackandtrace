@@ -30,9 +30,14 @@ import { overBudgetRefusal } from "./crawl-report.mjs";
 
 /**
  * supabase-js sets no request timeout of its own, so a store call that never answers hangs the run.
- * Every read and every write this crawler makes is bounded by this, and the bound ABORTS rather
- * than merely racing: a race leaves the request in flight, and a request in flight holds the event
- * loop open, so the process would still never exit.
+ * Every ledger read and every ledger write is bounded by this, and the bound ABORTS rather than
+ * merely racing: a race leaves the request in flight, and a request in flight holds the event loop
+ * open, so the process would still never exit.
+ *
+ * **Not every store call this crawler makes is bounded** — the observation-store preflight and
+ * `recordObservations` are not, and saying otherwise here would have been a claim nobody checked.
+ * Those two hang a run that has spent nothing yet, or one that has already got its rows; this one
+ * sits in front of every provider call, which is why it was worth bounding first.
  *
  * What firing early costs differs by call site, and all three directions are safe. On the coverage
  * read the asks are already spent, so it costs one missing print. On gate C's spend read — at the
