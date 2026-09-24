@@ -83,10 +83,17 @@ async function mostTurnsOfThemeIcon(page: Page): Promise<number> {
   return page.evaluate(
     () =>
       new Promise<number>((done) => {
+        // The browser reports an untouched transform as "none", but once Motion has written the identity
+        // matrix explicitly it reads "matrix(1, 0, 0, 1, 0, 0)" -- the same no-turn state either way. Counting
+        // them as different states was the source of a flake (fix round 1, 2026-09-24): instrumentation
+        // showed every sampled run had only these two forms plus each end's exact target matrix -- never an
+        // interpolated value in between -- so the icon never actually turned; only its "not turned yet" state
+        // was sometimes serialized two different ways within the 30 sampled frames.
+        const canonical = (transform: string) => (transform === "none" ? "matrix(1, 0, 0, 1, 0, 0)" : transform);
         const seen = new Map<Element, Set<string>>();
         const sample = (frame: number) => {
           for (const icon of document.querySelectorAll('header button[aria-label^="Theme"] > span > span')) {
-            seen.set(icon, (seen.get(icon) ?? new Set<string>()).add(getComputedStyle(icon).transform));
+            seen.set(icon, (seen.get(icon) ?? new Set<string>()).add(canonical(getComputedStyle(icon).transform)));
           }
           if (frame < 30) requestAnimationFrame(() => sample(frame + 1));
           else done(Math.max(0, ...[...seen.values()].map((values) => values.size)));
