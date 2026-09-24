@@ -1,6 +1,9 @@
 import { z } from "zod";
 import type { PnrSource } from "@/types/domain";
 
+/** The one value `PNR_FALLBACK` used to take that no longer names anything. See the field. */
+const RETIRED_FALLBACK = "rapidapi";
+
 /**
  * Providers that are not an official railway source. Server knowledge: travellers only ever see
  * Trakline. One member today, RailKit. The breaker, the usage counter and the provider guard are
@@ -37,8 +40,21 @@ const envSchema = z
      * every check and for the prediction work behind them — and it opens by itself the day a
      * second provider joins this enum. Until then a deployment that sets anything else is told
      * so at boot rather than having it quietly ignored.
+     *
+     * **With one exception: `rapidapi` is read here as `none`, and this is not tidiness.** It was a
+     * valid setting until the source was removed, and a deployment carrying it had no reason to change:
+     * `railkit` as the source and `rapidapi` as the fallback parsed perfectly well for the six days
+     * between one provider replacing the other and this line being written.
+     *
+     * `env()` THROWS on an invalid environment in production. So without this, the deploy that
+     * removed RapidAPI would have taken every traveller PNR check down — over a value that says
+     * "fall back to a source that no longer exists", whose only correct reading is `none`. That is
+     * exactly what removing the source meant, so it is read that way and said out loud at boot
+     * rather than being turned into an outage.
+     *
+     * Delete this line once the variable is gone from every environment.
      */
-    PNR_FALLBACK: z.enum(["none", "railkit"]).default("none"),
+    PNR_FALLBACK: z.preprocess((value) => (value === RETIRED_FALLBACK ? "none" : value), z.enum(["none", "railkit"]).default("none")),
     LIVE_SOURCE_ENABLED: flag.default("0").transform((v) => v === "1"),
     /** Server only. A RailKit dashboard key (railkit_…); never expose with a NEXT_PUBLIC_ prefix. */
     RAILKIT_API_KEY: z
@@ -149,12 +165,19 @@ export function parseEnv(source: Readonly<Record<string, string | undefined>>): 
 
 let cached: Env | null = null;
 let warned = false;
+let warnedRetired = false;
 
 /** Validated environment. Fails loudly in production; falls back to defaults elsewhere. */
 export function env(): Env {
   if (cached) return cached;
   const parsed = parseEnv(process.env);
   if (parsed.ok) {
+    // Said once, wherever it happens, including production: the variable parsed only because it was
+    // read as `none`, and it will keep doing so silently until somebody deletes it.
+    if (process.env.PNR_FALLBACK === RETIRED_FALLBACK && !warnedRetired) {
+      warnedRetired = true;
+      console.warn(`[env] PNR_FALLBACK=${RETIRED_FALLBACK} names a source that was removed; reading it as "none". Delete the variable.`);
+    }
     cached = parsed.env;
     return cached;
   }
@@ -174,6 +197,7 @@ export function env(): Env {
 export function resetEnvCache(): void {
   cached = null;
   warned = false;
+  warnedRetired = false;
 }
 
 export function accountsConfigured(current: Env = env()): boolean {

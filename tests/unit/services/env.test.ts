@@ -203,9 +203,21 @@ describe("RailKit source configuration", () => {
   // leave `none` as the only setting that parses. Pinned so the day it stops being true is a day
   // somebody chose, not a day somebody discovered. See PNR_FALLBACK in src/services/env.ts.
   it("leaves `none` as the only fallback that parses while one provider is configured", () => {
-    const settings = ["none", "railkit", "live", "fixture", "rapidapi"];
+    const settings = ["none", "railkit", "live", "fixture", "nonsense"];
     const accepted = settings.filter((fallback) => parseEnv({ NODE_ENV: "production", PNR_SOURCE: "railkit", RAILKIT_API_KEY: KEY, PNR_FALLBACK: fallback }).ok);
     expect(accepted).toEqual(["none"]);
+  });
+
+  // The one exception, and the reason it exists: `env()` THROWS in production, `railkit` + `rapidapi`
+  // was a perfectly valid pair for the six days between one provider replacing the other and the
+  // other being deleted, and nothing made anyone change it. Without this the deploy that removed the
+  // source would have taken every traveller PNR check down over a setting whose only correct reading
+  // is `none`.
+  it("reads the retired fallback as `none` rather than refusing to boot over it", () => {
+    const parsed = parseEnv({ NODE_ENV: "production", PNR_SOURCE: "railkit", RAILKIT_API_KEY: KEY, PNR_FALLBACK: "rapidapi" });
+
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok) expect(parsed.env.PNR_FALLBACK).toBe("none");
   });
 
   it("no longer knows the retired third-party source, by either of its names", () => {
