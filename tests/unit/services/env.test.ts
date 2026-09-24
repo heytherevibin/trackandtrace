@@ -220,6 +220,23 @@ describe("RailKit source configuration", () => {
     if (parsed.ok) expect(parsed.env.PNR_FALLBACK).toBe("none");
   });
 
+  // Found by a failing preview deploy, not by reading: Preview held its OWN `PNR_SOURCE=rapidapi`
+  // and no RailKit key at all, so it had been running on the removed provider the whole time. The
+  // refusal is right -- it throws at build time, so nothing ships -- but `expected one of
+  // live|fixture|railkit` does not tell an operator that a provider was removed or what to do.
+  it("says what to do when a deployment still names the retired provider", () => {
+    const parsed = parseEnv({ NODE_ENV: "production", PNR_SOURCE: "rapidapi" });
+
+    expect(parsed.ok).toBe(false);
+    if (parsed.ok) return;
+    const said = parsed.issues.join(" ");
+    expect(said).toMatch(/was removed/);
+    expect(said).toMatch(/PNR_SOURCE=railkit/);
+    expect(said).toMatch(/PNR_SOURCE=live/);
+    // The part that would have saved a deploy: each Vercel environment holds its own value.
+    expect(said).toMatch(/EVERY Vercel environment/);
+  });
+
   it("no longer knows the retired third-party source, by either of its names", () => {
     expect(parseEnv({ NODE_ENV: "production", PNR_SOURCE: "rapidapi" }).ok).toBe(false);
     // Its leftover variables are unknown keys, not errors: a deployment still carrying them boots.

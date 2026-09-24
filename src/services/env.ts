@@ -1,8 +1,8 @@
 import { z } from "zod";
 import type { PnrSource } from "@/types/domain";
 
-/** The one value `PNR_FALLBACK` used to take that no longer names anything. See the field. */
-const RETIRED_FALLBACK = "rapidapi";
+/** The provider that was removed. `PNR_FALLBACK` reads it as `none`; `PNR_SOURCE` refuses it, with a message that says what to do. */
+const RETIRED_PROVIDER = "rapidapi";
 
 /**
  * Providers that are not an official railway source. Server knowledge: travellers only ever see
@@ -54,7 +54,7 @@ const envSchema = z
      *
      * Delete this line once the variable is gone from every environment.
      */
-    PNR_FALLBACK: z.preprocess((value) => (value === RETIRED_FALLBACK ? "none" : value), z.enum(["none", "railkit"]).default("none")),
+    PNR_FALLBACK: z.preprocess((value) => (value === RETIRED_PROVIDER ? "none" : value), z.enum(["none", "railkit"]).default("none")),
     LIVE_SOURCE_ENABLED: flag.default("0").transform((v) => v === "1"),
     /** Server only. A RailKit dashboard key (railkit_…); never expose with a NEXT_PUBLIC_ prefix. */
     RAILKIT_API_KEY: z
@@ -157,10 +157,19 @@ function withoutBlanks(source: Readonly<Record<string, string | undefined>>): Re
 export function parseEnv(source: Readonly<Record<string, string | undefined>>): ParsedEnv {
   const parsed = envSchema.safeParse(withoutBlanks(source));
   if (parsed.success) return { ok: true, env: parsed.data };
-  return {
-    ok: false,
-    issues: parsed.error.issues.map((issue) => `${issue.path.join(".") || "env"}: ${issue.message}`),
-  };
+  const issues = parsed.error.issues.map((issue) => `${issue.path.join(".") || "env"}: ${issue.message}`);
+  // `PNR_SOURCE` keeps refusing the retired provider rather than guessing a replacement — there is
+  // no correct automatic answer, and this throws at BUILD time, so the deployment simply never
+  // ships and whatever is already live keeps serving. But `expected one of live|fixture|railkit`
+  // does not tell an operator that a provider was removed, which environment they are looking at,
+  // or what to put there instead. A deployment that has been pointed at this provider for months is
+  // exactly the one whose owner will not recognise the name in a schema error.
+  if (source.PNR_SOURCE === RETIRED_PROVIDER) {
+    issues.unshift(
+      `PNR_SOURCE=${RETIRED_PROVIDER} names a provider that was removed. Set PNR_SOURCE=railkit with a RAILKIT_API_KEY to serve real checks, or PNR_SOURCE=live to answer "unavailable" without spending a plan — and check EVERY Vercel environment, because each holds its own value.`,
+    );
+  }
+  return { ok: false, issues };
 }
 
 let cached: Env | null = null;
@@ -174,9 +183,9 @@ export function env(): Env {
   if (parsed.ok) {
     // Said once, wherever it happens, including production: the variable parsed only because it was
     // read as `none`, and it will keep doing so silently until somebody deletes it.
-    if (process.env.PNR_FALLBACK === RETIRED_FALLBACK && !warnedRetired) {
+    if (process.env.PNR_FALLBACK === RETIRED_PROVIDER && !warnedRetired) {
       warnedRetired = true;
-      console.warn(`[env] PNR_FALLBACK=${RETIRED_FALLBACK} names a source that was removed; reading it as "none". Delete the variable.`);
+      console.warn(`[env] PNR_FALLBACK=${RETIRED_PROVIDER} names a source that was removed; reading it as "none". Delete the variable.`);
     }
     cached = parsed.env;
     return cached;
