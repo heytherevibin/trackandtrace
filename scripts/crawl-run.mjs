@@ -9,7 +9,6 @@
 // No personal data: this is about berths. There is no PNR here, no user, no passenger.
 
 import { CALLS_PER_ASK_MAX, REFUSALS_BEFORE_STALE, RUNS_WITHOUT_ROWS_BEFORE_NOTICE, planAsks, remainingVerdict } from "./crawl-plan.mjs";
-
 import { addDays, advanceCursor, daysBetween } from "./crawl-window.mjs";
 
 /** @typedef {import("./crawl-plan.mjs").Route} Route */
@@ -70,6 +69,28 @@ function why(outcome) {
  */
 function restedOnTheGate(outcome) {
   return outcome.code === "SOURCE_UNAVAILABLE" && outcome.cause === undefined;
+}
+
+/**
+ * Of the asks that spent no call, which ones still say something about the ROUTE.
+ *
+ * **This is a different question from `restedOnTheGate`, and it must fail the other way.** That one
+ * decides whether to stop the run, and falls through to "keep going" — a wasted walk, no data lost.
+ * This one decides whether a refusal may be settled into a staleness strike, and the runbook tells
+ * an operator to DELETE a route a strike names. So it must fall through to "hold".
+ *
+ * Only `INVALID` is evidence: the adapter would not build a URL for this route at all, which is a
+ * fact about the entry and not about the provider's mood. Every other zero-call outcome means the
+ * request was never sent, whatever its shape, so the combo cannot be judged by it — including a
+ * shape nothing in this codebase produces today. Sharing one predicate between the two decisions
+ * made this one inherit the unsafe direction, and a novel zero-call refusal settled a strike on an
+ * ask nobody made.
+ *
+ * @param {Refused} outcome
+ * @returns {boolean}
+ */
+function routeIsAtFault(outcome) {
+  return outcome.code === "INVALID";
 }
 
 /**
@@ -256,10 +277,19 @@ export async function runCrawl({ routes, cursors, today, horizonDays, windowDays
       // produces no rows, one breaker read each, and a wall of identical lines. Stopping costs
       // nothing now that the cursors hold — the combos not reached keep their places, which is
       // already what `runCrawl` does for combos it never gets to.
+      // Nothing was sent, so this combo's other refusals are not ripe to settle — whatever shape
+      // this one took. `INVALID` is the single exception, because it IS about the route.
+      // Recorded before `forfeitFrom`, which fills in the rest of the plan: this combo's own reason
+      // is the specific one, and it is the reason a verdict about THIS combo turns on.
+      if (!routeIsAtFault(outcome)) {
+        unasked.set(
+          key,
+          rested
+            ? `the breaker was resting when its ${step.kind} ask for ${step.date} came round, so nothing was sent`
+            : `its ${step.kind} ask for ${step.date} spent no call, so nothing was sent`,
+        );
+      }
       if (rested) {
-        // Recorded before `forfeitFrom`, which fills in the rest of the plan: this combo's own
-        // reason is the specific one, and it is the reason a verdict about THIS combo turns on.
-        unasked.set(key, `the breaker was resting when its ${step.kind} ask for ${step.date} came round, so nothing was sent`);
         summary.stopped = `the provider's breaker is resting, so ${key}'s ask for ${step.date} was never sent — it is open for this caller as a whole, so every remaining ask would rest too`;
         forfeitFrom(index + 1);
         break;

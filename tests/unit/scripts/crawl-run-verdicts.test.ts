@@ -257,4 +257,32 @@ describe("the ask a wrap merges onto today", () => {
 
     expect(summary.cursors[KEY_ONE]).toEqual({ next: "2026-10-06", refusals: 1, runsWithoutRows: 1 });
   });
+
+  // The two decisions a zero-call outcome feeds are NOT the same question, and they must fail in
+  // opposite directions:
+  //
+  //   * "should the run STOP?" — only the guard's own rest, identified by its shape. Anything else
+  //     falls through to *continue*, which wastes a walk and costs no data.
+  //   * "may a strike be settled?" — only when the ask actually happened. A zero-call outcome means
+  //     it did not, whatever its shape, so anything but `INVALID` must HOLD. `INVALID` is the one
+  //     exception because it IS evidence about the route: the adapter would not build a URL for it.
+  //
+  // Sharing one predicate between them made the second inherit the first's fail direction, which is
+  // the unsafe one here: a novel zero-call shape would settle a strike on an ask nobody sent, and
+  // the runbook tells the operator to delete a route the strike names.
+  it("holds the strike when a later ask spent no call in some shape nothing has seen before", async () => {
+    // Step 0 refuses for real. Step 1 — the pinned ask that would excuse it — comes back with zero
+    // calls in a shape that is neither the guard's rest nor INVALID. Nothing was sent, so nothing
+    // was learnt, so the refusal at step 0 is not ripe to settle.
+    const NOVEL = { ok: false as const, code: "SOURCE_UNAVAILABLE", message: "some future shape", cause: "unreadable" };
+    const { ask } = stubAsk(
+      (n) => (n === 0 ? REFUSED : n === 1 ? NOVEL : OK),
+      (n) => (n === 1 ? 0 : 1),
+    );
+    const summary = await run({ ask, cursors: { [KEY_ONE]: { next: "2026-10-02", refusals: REFUSALS_BEFORE_STALE - 1 } } });
+
+    expect(summary.stale).toEqual([]);
+    expect(summary.cursors[KEY_ONE]?.refusals).toBe(REFUSALS_BEFORE_STALE - 1);
+    expect(summarise(summary).join("\n")).toMatch(/HELD rather than settled/);
+  });
 });

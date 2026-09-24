@@ -131,6 +131,21 @@ describe("the count of consecutive runs a combo produced no rows in", () => {
     expect(summary.cursors[KEY_ONE]?.runsWithoutRows).toBe(3);
   });
 
+  // The case above rests on the combo's FIRST step, where the rest also stops the run — so the
+  // count survives whether or not the `unasked` guard exists. This is the one the guard is actually
+  // for: the rolling ask is put to the provider and refused, and the PINNED ask then rests. The
+  // combo produced nothing, but one of its two questions was never asked, so the run does not know
+  // that it produces nothing.
+  it("does not count a combo whose FIRST ask was answered and whose second one rested", async () => {
+    const { ask } = stubAsk(
+      (n) => (n === 1 ? RESTING : REFUSED),
+      (n) => (n === 1 ? 0 : 1),
+    );
+    const summary = await run({ ask, cursors: { [KEY_ONE]: { next: "2026-10-02", refusals: 0, runsWithoutRows: 3 } } });
+
+    expect(summary.cursors[KEY_ONE]?.runsWithoutRows).toBe(3);
+  });
+
   it("does not count a run a gate stopped before the combo's other ask", async () => {
     // The refusal's own header closes the burst gate, so the pinned ask that might have produced
     // rows was forfeited. The run does not know, so it does not count.
