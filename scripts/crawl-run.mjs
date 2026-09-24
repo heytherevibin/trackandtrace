@@ -125,6 +125,10 @@ function routeIsAtFault(outcome) {
  * pinned ask comes after its rolling one, so at the moment of the refusal the evidence that would
  * excuse it has not been collected yet.
  *
+ * **And NO combo is struck by a run in which nothing answered at all.** An outage refuses in the
+ * same words an unknown route does, so a run that heard nothing cannot tell them apart: the count
+ * is HELD where the last informative run put it, not cleared.
+ *
  * A refused combo never stops the run; one bad entry must not cost the rest of the list. A gate, by
  * contrast, does stop it: slowing down would still spend the plan. **A resting breaker is a gate**,
  * and the third one — it is open for this caller as a whole, so every remaining ask would rest too.
@@ -158,6 +162,7 @@ export async function runCrawl({ routes, cursors, today, horizonDays, windowDays
     shortWindows: [],
     excused: [],
     withheld: [],
+    blind: [],
     withoutRows: [],
     wrapped: [],
     restarted: [],
@@ -378,16 +383,44 @@ export async function runCrawl({ routes, cursors, today, horizonDays, windowDays
   // did refuse that date, so the band comes round again next sweep — which is why the held line
   // says so out loud rather than leaving an operator to work out which verdicts a stopped run was
   // entitled to reach.
+  /** Nothing anywhere in this run answered, so nothing this run saw is evidence about any route. */
+  const nothingAnswered = answered.size === 0;
   for (const [key, one] of held) {
     if (answered.has(key)) {
       summary.cursors[key] = { ...summary.cursors[key], refusals: 0 };
       summary.excused.push({ combo: key, date: one.date, refusals: one.refusals });
       continue;
     }
+    // Checked BEFORE the run-wide rule below: a gate naming the very ask this combo lost is more
+    // use to an operator than "nothing answered anywhere", and both hold the count identically.
     const prevented = unasked.get(key);
     if (prevented !== undefined) {
       summary.cursors[key] = { ...summary.cursors[key], refusals: one.before };
       summary.withheld.push({ combo: key, date: one.date, wouldHaveBeen: one.refusals, refusals: one.before, because: prevented });
+      continue;
+    }
+    // AND A RUN IN WHICH NOTHING ANSWERED STRIKES NOBODY.
+    //
+    // A dead route and a dead provider arrive in the same words: 12951 answers `Unable to process
+    // your request` for every class and date tried, and IRCTC down answers `Oops! Seems like IRCTC
+    // services are down at the moment.` Both are a 400, both map to `SOURCE_UNAVAILABLE(server)`,
+    // both spend a call, and the invariant above excuses neither — in an outage nothing answers, so
+    // nothing is excused. The only signal that separates them is whether something ELSE answered:
+    // if some combos answered and this one did not, that is about the route; if none did, that is
+    // about the provider. Measured 2026-09-24 — twelve straight refusals for a combo that had
+    // answered normally the day before, and five such days over the shipped list put every GN combo
+    // on the stale list on day four.
+    //
+    // HELD, not cleared, the same choice a forfeited ask already makes: clearing would erase a real
+    // strike sequence an outage merely interrupted, which is the other way to lose 12951.
+    //
+    // **The price, and it is the safe direction: a ONE-COMBO list can no longer go stale at all**,
+    // since "nothing answered" and "my only route is dead" are then one observation. A route kept
+    // too long costs a call a run; a route deleted wrongly costs the dataset. `runsWithoutRows`
+    // below still climbs on it, and the runbook's blind-spot list names this.
+    if (nothingAnswered) {
+      summary.cursors[key] = { ...summary.cursors[key], refusals: one.before };
+      summary.blind.push({ combo: key, date: one.date, wouldHaveBeen: one.refusals, refusals: one.before });
       continue;
     }
     if (one.refusals >= REFUSALS_BEFORE_STALE) summary.stale.push(`${key} (${one.refusals} runs in a row)`);
@@ -414,6 +447,12 @@ export async function runCrawl({ routes, cursors, today, horizonDays, windowDays
   // whose ask never reached the provider, or one of whose asks a gate forfeited, is held exactly as
   // its strike is held — the run does not know what the ask it never made would have produced.
   // Rows clear it regardless, because rows are positive evidence and need no completeness.
+  //
+  // **A run in which NOTHING ANSWERED is deliberately NOT held here.** The strike is a verdict on
+  // the ROUTE, and an outage is no evidence about a route. This is a verdict on the DATASET — "this
+  // combo produced no rows" — which is simply TRUE in an outage, whoever caused it. Its answer is
+  // only *go and look*, never *delete*, so being right about it costs nothing; and on a one-combo
+  // list, where the rule above gives the stale signal up entirely, it is the only instrument left.
   for (const key of judged) {
     if ((rowsBy.get(key) ?? 0) > 0) setRunsWithoutRows(key, 0);
     else if (!unasked.has(key)) setRunsWithoutRows(key, (cursors[key]?.runsWithoutRows ?? 0) + 1);

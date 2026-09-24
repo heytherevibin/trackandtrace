@@ -191,8 +191,10 @@ describe("a gate that stops the run before a combo's pinned ask", () => {
   // rest: the adapter refused to build a URL for this route, which is a bad list entry that got past
   // the preflight. That is the combo's own fault, so it holds nothing back.
   it("does not hold on an ask the ADAPTER refused locally: that is evidence about the route, not a lost question", async () => {
+    // KEY_TWO (step 2) answers, so the run learnt something and is entitled to a verdict at all: a
+    // run in which nothing answered holds every strike, whatever shape the refusals took.
     const { ask } = stubAsk(
-      (n) => (n === 1 ? INVALID : REFUSED),
+      (n) => (n === 1 ? INVALID : n === 2 ? OK : REFUSED),
       (n) => (n === 1 ? 0 : 1),
     );
     const summary = await run({ ask, cursors: NEARLY });

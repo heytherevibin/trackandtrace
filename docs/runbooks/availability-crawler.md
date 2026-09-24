@@ -203,13 +203,27 @@ for every class and date tried, and a permanent refusal wearing a transient's cl
 every day forever.
 
 **What "refuses" means there is narrower than it sounds, and the narrowing is the point.** Only a
-*rolling* ask can put a combo on that list, and only when **nothing** the combo was asked that run
-answered. If its pinned ask came back, the provider demonstrably knows the route, so the rolling
+*rolling* ask can put a combo on that list; only when **nothing** the combo was asked that run
+answered; and only when the run itself learnt something. If its pinned ask came back, the provider demonstrably knows the route, so the rolling
 refusal is not evidence of a bad entry: the run says so in its own section — *"took NO staleness
 strike, because the same combo's pinned ask answered this run"* — and the count goes back to zero.
 Without that rule, both Tatkal combos on the shipped list were one run away from being named bad
 entries for being Tatkal, and deleting them would have destroyed the GN/TQ contrast the list exists
 for. A combo where *everything* refuses is unaffected and still goes stale on the third run.
+
+**And a run in which NOTHING answered strikes nobody at all.** RailKit proxies IRCTC, and while
+IRCTC is down every ask comes back `400 {"error":"Oops! Seems like IRCTC services are down at the
+moment."}` — which the adapter maps to precisely the refusal a route the provider has never heard of
+produces, with a call spent either way. Nothing *inside* the refusal separates a dead route from a
+dead provider, and nothing can: the only signal that does is whether something **else** answered. If
+some combos answered and this one did not, that is about the route; if none did, that is about the
+provider, and the run reaches no verdict. Measured on 2026-09-24 — twelve consecutive refusals for
+12137 CSMT-NDLS 3A/GN, a combo that had answered normally on the 23rd and the 24th — and four days
+of that outage driven through the real run put **every GN combo on the shipped list** on the stale
+list. The run now says so in its own section, *"took NO staleness strike, because NOTHING IN THIS
+RUN ANSWERED"*, and each count is **held** where the last run that learnt anything left it: held and
+not cleared, so an outage cannot wipe a real strike sequence it merely interrupted either. The
+cursors still move on, because the provider did refuse the dates it was asked for.
 
 The rule is keyed on the **date**, not on what the ask is labelled: a refusal *at today* never counts
 towards staleness, whichever kind of ask it was. On the one run in twenty where a combo's sweep wraps
@@ -217,7 +231,7 @@ there is a single merged ask at today doing both jobs, and it is labelled `rolli
 of it may mean only that the train does not run today, which is exactly why a pinned refusal has
 never counted. It is still reported as a failure and still makes the run un-whole.
 
-Two more cases never reach the list, stated so nobody trusts it further than it goes. A combo that
+Three more cases never reach the list, stated so nobody trusts it further than it goes. A combo that
 makes the **pinned ask only** cannot, because a pinned refusal has never counted towards staleness
 (the train may simply not run today) and such a combo has no rolling ask to refuse. And a rolling
 refusal the run had **no standing to settle** does not count either: if a gate stopped the run
@@ -225,7 +239,14 @@ before the same combo's other ask, the run never learned whether the provider kn
 it holds the refusal — no strike, no clearing, the count left exactly where the last complete run
 put it — and says so under *"HELD rather than settled"*. The cursor still moves on, because the
 provider did refuse the date it was asked for. Without that, three days of provider trouble tripping
-the fuse at the same point in the plan would condemn a perfectly good route.
+the fuse at the same point in the plan would condemn a perfectly good route. And a rolling refusal
+in a run **nothing answered in** does not count, for the reason above.
+
+**A route list of ONE has no stale signal at all**, as a consequence of that last rule: with a
+single combo, "nothing in this run answered" and "my only route is dead" are the same observation,
+so a genuinely bad sole entry can never be named. That is the safe direction — a bad route kept too
+long costs a call a run, a good route deleted costs the dataset for ever — and it is why the list
+below is what to read instead. Keep more than one combo on the list where you can.
 
 **What catches a combo that has quietly stopped producing data is the run's own
 `produced NO ROWS for 7 runs or more` section.** Each run, per combo, the crawler counts the
@@ -240,6 +261,10 @@ threshold has missed even its own running day. Two rules about it:
 - **It is not the stale list and it never says delete.** It says go and look. Confirm against the
   pinned-failure and refusal sections, then fix or remove the entry deliberately.
 - **It does not change the exit code**, which stays a statement about whether *this run* was whole.
+- **It is not held during a provider outage, unlike the staleness count.** A strike is a verdict
+  about the *route*, and an outage is no evidence about a route; this count is a verdict about the
+  *dataset* — no rows landed — which is true whoever caused it. So it is the instrument that keeps
+  speaking while the provider is down, and the only one left on a one-combo list.
 
 **What `npm run source:report` does and does not do, corrected.** Its *per-combo lines* are prompt: a
 combo that produced nothing today is marked the same day (*"nothing today, though the run reached

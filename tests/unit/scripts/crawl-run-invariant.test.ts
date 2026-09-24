@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { REFUSALS_BEFORE_STALE } from "../../../scripts/crawl-plan.mjs";
+import { summarise } from "../../../scripts/crawl-report.mjs";
 import { runCrawl } from "../../../scripts/crawl-run.mjs";
 
 // ---------------------------------------------------------------------------
@@ -191,11 +192,13 @@ describe("a combo where EVERYTHING refuses", () => {
   });
 
   it("is not excused by an ask that never reached the provider, which is the absence of a verdict", async () => {
-    // The rolling ask refuses for real; the pinned one spends no call. Nothing answered, so the
-    // strike stands — a request nobody received cannot prove the provider knows the route.
+    // KEY_ONE's rolling ask refuses for real; its pinned one spends no call. Nothing KEY_ONE was
+    // asked answered, so the strike stands — a request nobody received cannot prove the provider
+    // knows the route. KEY_TWO answers, which is what entitles this run to judge KEY_ONE at all:
+    // see "a run in which NO ask answered" below.
     const { ask } = stubAsk(
-      (n) => (n === 0 ? REFUSED : INVALID),
-      (n) => (n === 0 ? 1 : 0),
+      (n) => (n === 0 ? REFUSED : n === 1 ? INVALID : OK),
+      (n) => (n === 1 ? 0 : 1),
     );
     const summary = await run({ ask, cursors: { [KEY_ONE]: { next: "2026-10-02", refusals: REFUSALS_BEFORE_STALE - 1 } } });
 
@@ -204,6 +207,99 @@ describe("a combo where EVERYTHING refuses", () => {
 });
 
 // ---------------------------------------------------------------------------
-// A restarted sweep: the band it gave up is gone, and the run must say so
+// A RUN IN WHICH NOTHING ANSWERED STRIKES NOBODY
+// ---------------------------------------------------------------------------
+// The two blocks above turn on one word: ANSWERED. This is what happens when that word is true of
+// nothing in the whole run.
+//
+// A dead route and a dead provider arrive in the same words. 12951 answers `Unable to process your
+// request` for every class and date tried; IRCTC down answers `Oops! Seems like IRCTC services are
+// down at the moment.` Both are a 400, both the adapter maps to `SOURCE_UNAVAILABLE(server)`, both
+// spend a call. Nothing inside the refusal separates them, and nothing can. The only signal that
+// does is whether something ELSE answered: if some combos answered and this one did not, that is
+// about the route; if none did, that is about the provider.
+//
+// Measured 2026-09-24: twelve consecutive asks for 12137 CSMT-NDLS 3A/GN -- which answered normally
+// on the 23rd and the 24th -- all came back with that 400. Driven through the real `runCrawl` with
+// the shipped six-combo list, five days of it put EVERY GN combo on the stale list on day four, and
+// the runbook tells the operator to delete what lands there.
 // ---------------------------------------------------------------------------
 
+describe("a run in which NO ask answered", () => {
+  /** One strike short of the list the runbook says to delete from. */
+  const NEARLY = { [KEY_ONE]: { next: "2026-10-02", refusals: REFUSALS_BEFORE_STALE - 1 } };
+
+  it("strikes nobody, so somebody else's outage cannot empty the route list", async () => {
+    const { ask } = stubAsk(() => REFUSED);
+    const summary = await run({ ask, cursors: NEARLY });
+
+    expect(summary.stale).toEqual([]);
+  });
+
+  it("HOLDS the count where the last informative run left it, rather than clearing it", async () => {
+    // Clearing would erase a real strike sequence that an outage merely interrupted -- the other
+    // way to lose 12951, and the reason this is a hold and not a reset.
+    const { ask } = stubAsk(() => REFUSED);
+    const summary = await run({ ask, cursors: NEARLY });
+
+    expect(summary.cursors[KEY_ONE]?.refusals).toBe(REFUSALS_BEFORE_STALE - 1);
+  });
+
+  it("still advances the cursor, because the provider did refuse the date it was asked for", async () => {
+    const { ask } = stubAsk(() => REFUSED);
+    const summary = await run({ ask, cursors: NEARLY });
+
+    expect(summary.cursors[KEY_ONE]?.next).toBe("2026-10-06");
+  });
+
+  it("names what it held, so a wall of refusals with no verdict is not read as verdicts still coming", async () => {
+    const { ask } = stubAsk(() => REFUSED);
+    const summary = await run({ ask, cursors: NEARLY });
+
+    expect(summary.blind).toEqual([{ combo: KEY_ONE, date: "2026-10-02", wouldHaveBeen: REFUSALS_BEFORE_STALE, refusals: REFUSALS_BEFORE_STALE - 1 }]);
+    // Not the other two verdicts: nothing was excused, and no gate cost this run a question.
+    expect(summary.excused).toEqual([]);
+    expect(summary.withheld).toEqual([]);
+  });
+
+  it("prints it in its own words, apart from the refusals it is a verdict about", async () => {
+    const { ask } = stubAsk(() => REFUSED);
+    const printed = summarise(await run({ ask, cursors: NEARLY })).join("\n");
+
+    expect(printed).toMatch(/NOTHING IN THIS RUN ANSWERED/);
+    expect(printed).toMatch(/would have been strike 3 of 3/);
+    expect(printed).toMatch(/count held at 2/);
+  });
+
+  // The count is held, not frozen: the moment a run learns something again, it counts again.
+  it("lets the count move again on the first run in which anything answers", async () => {
+    const { ask } = stubAsk(() => REFUSED);
+    const dark = await run({ ask, cursors: NEARLY });
+    const lit = stubAsk((n) => (n < 2 ? REFUSED : OK));
+    const after = await run({ ask: lit.ask, cursors: dark.cursors });
+
+    expect(after.stale).toEqual([`${KEY_ONE} (${REFUSALS_BEFORE_STALE} runs in a row)`]);
+  });
+
+  // `runsWithoutRows` is deliberately NOT held. It says "this combo produced no rows", which is
+  // TRUE in an outage, and its verdict is only *go and look* -- never *delete*. It is also the only
+  // instrument left on a one-combo list, below.
+  it("still lets the produced-no-rows count climb, because an outage is a real hole in the dataset", async () => {
+    const { ask } = stubAsk(() => REFUSED);
+    const summary = await run({ ask, cursors: { [KEY_ONE]: { next: "2026-10-02", refusals: 0, runsWithoutRows: 3 } } });
+
+    expect(summary.cursors[KEY_ONE]?.runsWithoutRows).toBe(4);
+  });
+
+  // The price, named here and in the runbook's blind-spot list rather than left to be discovered:
+  // on a list of one, "nothing answered" and "my only route is dead" are the same observation. This
+  // is the safe direction -- a route kept too long costs a call a run; a route deleted wrongly
+  // costs the dataset -- and the count above still climbs and still reports.
+  it("cannot reach the stale list at all on a ONE-COMBO route list, which is the price of the rule", async () => {
+    const { ask } = stubAsk(() => REFUSED);
+    const summary = await run({ ask, routes: [route()], cursors: NEARLY });
+
+    expect(summary.stale).toEqual([]);
+    expect(summary.cursors[KEY_ONE]?.runsWithoutRows).toBe(1);
+  });
+});
