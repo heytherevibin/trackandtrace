@@ -13,11 +13,11 @@ Codes: `INVALID_INPUT` 400 · `NOT_FOUND` 404 · `UNAUTHENTICATED` 401 · `RATE_
 Body `{ "pnr": "2345678901", "fresh": true }` (`fresh` optional; unknown fields are refused). The PNR travels in the body because request paths and query strings are recorded in platform request logs and bodies are not. Rate limit 20/min/IP. `fresh: true` bypasses the 60-second read cache. Success:
 
 ```json
-{ "ok": true, "source": "live|railkit|rapidapi|fixture", "cached": false, "latencyMs": 12,
+{ "ok": true, "source": "live|fixture", "cached": false, "latencyMs": 12,
   "rate": { "remaining": 19, "limit": 20 }, "data": { /* PnrResult */ } }
 ```
 
-`data` validates against `pnrResultSchema` (src/types/schemas.ts) — snapshot (train, class, journey, chart, passengers), lead status, `checkedAt`.
+`data` validates against `pnrResultSchema` (src/types/schemas.ts) — snapshot (train, class, journey, chart, passengers), lead status, `checkedAt`. `source` is the public one only: `toPublicResult()` maps every provider to `live` before the record leaves the server, and the wire schema accepts nothing else, so a provider is never named to the browser.
 
 ## Result links
 

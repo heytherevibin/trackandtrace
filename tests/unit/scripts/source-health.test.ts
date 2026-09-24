@@ -1,39 +1,40 @@
 import { describe, expect, it } from "vitest";
-import { closingLine, configurationLine, exitCodeFor, mask, plannedProbes, readQuotaMessage, verdict } from "../../../scripts/source-health.mjs";
+import { PROVIDERS, closingLine, configurationLine, exitCodeFor, mask, plannedProbes, readRest, verdict } from "../../../scripts/source-health.mjs";
 
 // ---------------------------------------------------------------------------
 // `npm run source:health` answers "is each configured source alive, and how much is left".
 // Its verdicts, its closing line and its exit code are the load-bearing parts — a check wired
 // to this script is only worth having if a dead source makes it fail — so they are pure and
 // pinned here. The live call is not exercised: no key and no PNR belong in a test run.
+//
+// One provider is configured today, so the second-source path is exercised through a stand-in
+// entry in the provider table. The mechanism is kept for the day a real second provider lands
+// (see PNR_FALLBACK in src/services/env.ts), and a kept mechanism has to stay tested.
 // ---------------------------------------------------------------------------
-
-/** Verbatim, from the probe on 2026-09-23. Every RapidAPI endpoint answered with this. */
-const MONTHLY_GONE = {
-  message: "You have exceeded the MONTHLY quota for Basic on your current plan, BASIC. Upgrade your plan at https://rapidapi.com/IRCTCAPI/api/irctc1",
-};
 
 /** A placeholder, never a key: plannedProbes asks only whether one is set, never what it is. */
 const SOME_KEY = "placeholder";
 
-const bothEnv = {
-  PNR_SOURCE: "railkit",
-  PNR_FALLBACK: "rapidapi",
-  RAILKIT_API_KEY: SOME_KEY,
-  RAPIDAPI_KEY: SOME_KEY,
+/** Stands in for a second provider, which does not exist yet. Never asked: no test makes a request. */
+const SECOND = {
+  key: (env: Record<string, string>) => env.SECOND_API_KEY,
+  request: (pnr: string) => ({ url: `https://second.invalid/pnr/${pnr}`, headers: {} }),
 };
+const WITH_SECOND = { ...PROVIDERS, second: SECOND };
+
+const bothEnv = { PNR_SOURCE: "railkit", PNR_FALLBACK: "second", RAILKIT_API_KEY: SOME_KEY, SECOND_API_KEY: SOME_KEY };
 
 const aloneEnv = { PNR_SOURCE: "railkit", PNR_FALLBACK: "none", RAILKIT_API_KEY: SOME_KEY };
 
 describe("plannedProbes", () => {
-  it("plans the primary and the fallback, primary first — what production actually asks", () => {
-    expect(plannedProbes(bothEnv)).toEqual([
+  it("plans the primary and the fallback, primary first — what a two-source deployment asks", () => {
+    expect(plannedProbes(bothEnv, WITH_SECOND)).toEqual([
       { provider: "railkit", role: "primary", keyed: true },
-      { provider: "rapidapi", role: "fallback", keyed: true },
+      { provider: "second", role: "fallback", keyed: true },
     ]);
   });
 
-  it("plans only the primary when there is no fallback", () => {
+  it("plans only the primary when there is no fallback — what production asks today", () => {
     expect(plannedProbes(aloneEnv)).toEqual([{ provider: "railkit", role: "primary", keyed: true }]);
   });
 
@@ -43,6 +44,11 @@ describe("plannedProbes", () => {
 
   it("plans nothing when the environment says nothing: live is the default", () => {
     expect(plannedProbes({})).toEqual([]);
+  });
+
+  it("plans nothing for a name the provider table does not hold, inherited or invented", () => {
+    expect(plannedProbes({ PNR_SOURCE: "constructor", PNR_FALLBACK: "__proto__" })).toEqual([]);
+    expect(plannedProbes({ PNR_SOURCE: "rapidapi", PNR_FALLBACK: "none" })).toEqual([]);
   });
 
   it("still plans a source whose key is missing, and says the key is missing", () => {
@@ -59,100 +65,99 @@ describe("configurationLine", () => {
   });
 
   it("names both, and which one only covers the other", () => {
-    const line = configurationLine(plannedProbes(bothEnv));
+    const line = configurationLine(plannedProbes(bothEnv, WITH_SECOND), WITH_SECOND);
     expect(line).toContain("railkit");
-    expect(line).toContain("rapidapi");
+    expect(line).toContain("second");
     expect(line).toMatch(/fallback|only while/i);
     expect(line).not.toMatch(/no fallback/i);
   });
 
-  it("says nothing is configured when nothing is", () => {
-    expect(configurationLine([])).toMatch(/no third-party source/i);
+  it("says nothing is configured when nothing is, and names what it looked for", () => {
+    const line = configurationLine([]);
+    expect(line).toMatch(/no third-party source/i);
+    expect(line).toContain("railkit");
   });
 });
 
 describe("verdict", () => {
-  it("calls RailKit alive when it answers with a record, and reports the allowance it sends", () => {
-    const out = verdict("railkit", { status: 200, headers: { "ratelimit-policy": "10000;w=2592000", "ratelimit-remaining": "9412" }, body: { success: true } });
+  it("calls a source alive when it answers with a record, and reports the allowance it sends", () => {
+    const out = verdict({ status: 200, headers: { "ratelimit-policy": "10000;w=2592000", "ratelimit-remaining": "9412" }, body: { success: true } });
     expect(out.alive).toBe(true);
     expect(out.notes.join(" ")).toContain("9412");
     expect(out.notes.join(" ")).toContain("10000;w=2592000");
   });
 
   it("says so when a provider sends no allowance headers at all", () => {
-    expect(verdict("railkit", { status: 200, headers: {}, body: { success: true } }).notes.join(" ")).toMatch(/not sent/i);
+    expect(verdict({ status: 200, headers: {}, body: { success: true } }).notes.join(" ")).toMatch(/not sent/i);
   });
 
-  it("calls RailKit alive when it answers 'no such PNR' — that is an answer", () => {
-    expect(verdict("railkit", { status: 400, headers: {}, body: { success: false, error: "No PNR data found or invalid PNR number" } }).alive).toBe(true);
+  it("calls a source alive when it answers 'no such PNR' — that is an answer", () => {
+    expect(verdict({ status: 400, headers: {}, body: { success: false, error: "No PNR data found or invalid PNR number" } }).alive).toBe(true);
   });
 
   it.each([
     [401, /refus/i],
     [403, /refus/i],
-    [429, /limit|quota/i],
+    [429, /limit|quota|allowance/i],
     [500, /error/i],
     [503, /error/i],
-  ])("calls RailKit unable to answer on HTTP %i", (status, summary) => {
-    const out = verdict("railkit", { status, headers: {}, body: { success: false, error: "nope" } });
+  ])("calls a source unable to answer on HTTP %i", (status, summary) => {
+    const out = verdict({ status, headers: {}, body: { success: false, error: "nope" } });
     expect(out.alive).toBe(false);
     expect(out.summary).toMatch(summary);
   });
 
   it("calls a source unable to answer when the request never completed", () => {
-    expect(verdict("railkit", { failure: "TimeoutError" }).alive).toBe(false);
-    expect(verdict("rapidapi", { failure: "TypeError" }).alive).toBe(false);
-    expect(verdict("railkit", { failure: "TimeoutError" }).summary).toMatch(/time/i);
+    expect(verdict({ failure: "TimeoutError" }).alive).toBe(false);
+    expect(verdict({ failure: "TypeError" }).alive).toBe(false);
+    expect(verdict({ failure: "TimeoutError" }).summary).toMatch(/time/i);
   });
 
-  it("calls RapidAPI alive when it answers, and reports what is left on the plan", () => {
-    const out = verdict("rapidapi", { status: 200, headers: { "x-ratelimit-requests-remaining": "412", "x-ratelimit-requests-limit": "500" }, body: { status: true } });
-    expect(out.alive).toBe(true);
-    expect(out.notes.join(" ")).toContain("412");
-    expect(out.notes.join(" ")).toContain("500");
-  });
-
-  it("reads a spent monthly allowance out of RapidAPI's 429 body, and names the plan", () => {
-    const out = verdict("rapidapi", { status: 429, headers: {}, body: MONTHLY_GONE });
+  it("reads a spent plan out of a 429 that will not refill today, and says it needs a person", () => {
+    const out = verdict({ status: 429, headers: { "ratelimit-policy": "10000;w=2592000", "ratelimit-remaining": "0", "ratelimit-reset": String(18 * 24 * 60 * 60) }, body: { error: "Quota exceeded" } });
     expect(out.alive).toBe(false);
-    expect(out.summary).toMatch(/monthly/i);
-    const said = `${out.summary} ${out.notes.join(" ")}`;
-    expect(said).toContain("BASIC");
-    expect(said).toMatch(/will not|until|upgrade/i);
+    expect(out.summary).toMatch(/spent/i);
+    expect(out.summary).toMatch(/18 days/);
+    expect(out.summary).toMatch(/will not come back/i);
   });
 
   it("keeps a transient 429 apart from a spent plan", () => {
-    const out = verdict("rapidapi", { status: 429, headers: { "retry-after": "12" }, body: { message: "Too many requests" } });
+    const out = verdict({ status: 429, headers: { "retry-after": "12" }, body: { message: "Too many requests" } });
     expect(out.alive).toBe(false);
-    expect(out.summary).not.toMatch(/monthly/i);
+    expect(out.summary).not.toMatch(/spent/i);
     expect(out.notes.join(" ")).toContain("12");
   });
 
   it("masks any ten-digit run before it reaches the operator's terminal", () => {
-    const out = verdict("railkit", { status: 409, headers: {}, body: { success: false, error: "No data for 4949608635" } });
+    const out = verdict({ status: 409, headers: {}, body: { success: false, error: "No data for 4949608635" } });
     expect(`${out.summary} ${out.notes.join(" ")}`).not.toContain("4949608635");
   });
 
   it("says a source with no key cannot be asked at all", () => {
-    const out = verdict("rapidapi", { unkeyed: true });
+    const out = verdict({ unkeyed: true });
     expect(out.alive).toBe(false);
     expect(out.summary).toMatch(/key/i);
   });
 });
 
-describe("readQuotaMessage", () => {
-  it("reads a spent monthly allowance, with the period and the plan", () => {
-    expect(readQuotaMessage(MONTHLY_GONE)).toEqual({ kind: "exhausted", period: "MONTHLY", plan: "BASIC" });
+describe("readRest", () => {
+  it("reads a plan-sized rest as spent: it will not refill within the shift", () => {
+    expect(readRest({ "ratelimit-reset": String(30 * 24 * 60 * 60) })).toEqual({ kind: "exhausted", seconds: 30 * 24 * 60 * 60 });
+    expect(readRest({ "retry-after": String(25 * 60 * 60) })).toEqual({ kind: "exhausted", seconds: 25 * 60 * 60 });
+  });
+
+  it("prefers Retry-After over RateLimit-Reset when the provider sends both", () => {
+    expect(readRest({ "retry-after": "30", "ratelimit-reset": String(30 * 24 * 60 * 60) })).toEqual({ kind: "busy", seconds: 30 });
   });
 
   it.each([
-    ["a daily cap, which comes back on its own", { message: "You have exceeded the DAILY quota for Requests on your current plan, BASIC." }, { kind: "busy", period: "DAILY" }],
-    ["a per-second limit", { message: "Too many requests" }, { kind: "busy" }],
-    ["a body with no message", { status: false }, { kind: "busy" }],
-    ["a body that is not an object", "429 Too Many Requests", { kind: "busy" }],
-    ["nothing at all", null, { kind: "busy" }],
-  ])("reads %s as busy", (_label, body, expected) => {
-    expect(readQuotaMessage(body)).toEqual(expected);
+    ["a per-minute cap, which comes back on its own", { "retry-after": "45" }, { kind: "busy", seconds: 45 }],
+    ["a rest of exactly a day, which is a plan and not a moment", { "retry-after": String(24 * 60 * 60) }, { kind: "exhausted", seconds: 24 * 60 * 60 }],
+    ["no rest headers at all", {}, { kind: "busy" }],
+    ["a header that is not a number", { "retry-after": "Wed, 24 Sep 2026 12:00:00 GMT" }, { kind: "busy" }],
+    ["a zero or negative rest", { "retry-after": "0", "ratelimit-reset": "-5" }, { kind: "busy" }],
+  ])("reads %s", (_label, headers, expected) => {
+    expect(readRest(headers)).toEqual(expected);
   });
 });
 
@@ -172,7 +177,7 @@ describe("exitCodeFor", () => {
 });
 
 describe("closingLine", () => {
-  it("says checks are down when the only source cannot answer", () => {
+  it("says checks are down when the only source cannot answer — today's shape", () => {
     const line = closingLine([{ provider: "railkit", role: "primary", alive: false }]);
     expect(line).toMatch(/down/i);
     expect(line).toMatch(/no fallback|nothing behind/i);
@@ -181,16 +186,16 @@ describe("closingLine", () => {
   it("says the fallback is covering when the primary is the one that is dead", () => {
     const line = closingLine([
       { provider: "railkit", role: "primary", alive: false },
-      { provider: "rapidapi", role: "fallback", alive: true },
+      { provider: "second", role: "fallback", alive: true },
     ]);
-    expect(line).toContain("rapidapi");
+    expect(line).toContain("second");
     expect(line).not.toMatch(/down/i);
   });
 
   it("says checks are down when neither source can answer", () => {
     const line = closingLine([
       { provider: "railkit", role: "primary", alive: false },
-      { provider: "rapidapi", role: "fallback", alive: false },
+      { provider: "second", role: "fallback", alive: false },
     ]);
     expect(line).toMatch(/down/i);
   });
@@ -198,7 +203,7 @@ describe("closingLine", () => {
   it("warns that the cover is gone when only the fallback is dead", () => {
     const line = closingLine([
       { provider: "railkit", role: "primary", alive: true },
-      { provider: "rapidapi", role: "fallback", alive: false },
+      { provider: "second", role: "fallback", alive: false },
     ]);
     expect(line).toMatch(/cover|uncovered|no fallback/i);
     expect(line).not.toMatch(/down/i);

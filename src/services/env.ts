@@ -1,11 +1,18 @@
 import { z } from "zod";
 import type { PnrSource } from "@/types/domain";
 
-/** Providers that are not an official railway source. Server knowledge: travellers only ever see Trakline. */
-export type ThirdPartySource = Extract<PnrSource, "rapidapi" | "railkit">;
+/** The provider that was removed. `PNR_FALLBACK` reads it as `none`; `PNR_SOURCE` refuses it, with a message that says what to do. */
+const RETIRED_PROVIDER = "rapidapi";
+
+/**
+ * Providers that are not an official railway source. Server knowledge: travellers only ever see
+ * Trakline. One member today, RailKit. The breaker, the usage counter and the provider guard are
+ * written over this set rather than over that one name, so a second provider costs them nothing.
+ */
+export type ThirdPartySource = Extract<PnrSource, "railkit">;
 
 export function isThirdPartySource(source: PnrSource): source is ThirdPartySource {
-  return source === "rapidapi" || source === "railkit";
+  return source === "railkit";
 }
 
 // ---------------------------------------------------------------------------
@@ -20,19 +27,35 @@ const envSchema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
     /**
-     * live (default) asks the verified provider seam; railkit reads the third-party RailKit API (railkit.in)
-     * and rapidapi the third-party RapidAPI "IRCTC" API (IRCTCAPI), neither affiliated with IRCTC, and every
-     * result is labelled so; fixture serves labelled sample data and is refused in production.
+     * live (default) asks the verified provider seam; railkit reads the third-party RailKit API
+     * (railkit.in), not affiliated with IRCTC, and every result is labelled so; fixture serves
+     * labelled sample data and is refused in production.
      */
-    PNR_SOURCE: z.enum(["live", "fixture", "rapidapi", "railkit"]).default("live"),
-    /** A second third-party source that answers only while PNR_SOURCE is unavailable. */
-    PNR_FALLBACK: z.enum(["none", "rapidapi", "railkit"]).default("none"),
+    PNR_SOURCE: z.enum(["live", "fixture", "railkit"]).default("live"),
+    /**
+     * A second third-party source, asked only while PNR_SOURCE is unavailable — never on "no
+     * record". It exists for a second provider, and there is no second provider yet: RailKit is
+     * the only one, and no source may be its own fallback, so today `none` is the only setting
+     * that parses. The seam is kept on purpose — one provider is a single point of failure for
+     * every check and for the prediction work behind them — and it opens by itself the day a
+     * second provider joins this enum. Until then a deployment that sets anything else is told
+     * so at boot rather than having it quietly ignored.
+     *
+     * **With one exception: `rapidapi` is read here as `none`, and this is not tidiness.** It was a
+     * valid setting until the source was removed, and a deployment carrying it had no reason to change:
+     * `railkit` as the source and `rapidapi` as the fallback parsed perfectly well for the six days
+     * between one provider replacing the other and this line being written.
+     *
+     * `env()` THROWS on an invalid environment in production. So without this, the deploy that
+     * removed RapidAPI would have taken every traveller PNR check down — over a value that says
+     * "fall back to a source that no longer exists", whose only correct reading is `none`. That is
+     * exactly what removing the source meant, so it is read that way and said out loud at boot
+     * rather than being turned into an outage.
+     *
+     * Delete this line once the variable is gone from every environment.
+     */
+    PNR_FALLBACK: z.preprocess((value) => (value === RETIRED_PROVIDER ? "none" : value), z.enum(["none", "railkit"]).default("none")),
     LIVE_SOURCE_ENABLED: flag.default("0").transform((v) => v === "1"),
-    /** Server only. Never expose with a NEXT_PUBLIC_ prefix. */
-    RAPIDAPI_KEY: z.string().min(16).optional(),
-    RAPIDAPI_HOST: z.string().regex(/^[a-z0-9.-]+\.p\.rapidapi\.com$/).default("irctc1.p.rapidapi.com"),
-    RAPIDAPI_PNR_PATH: z.string().regex(/^\/[A-Za-z0-9/_-]+$/).default("/api/v3/getPNRStatus"),
-    RAPIDAPI_TIMEOUT_MS: z.coerce.number().int().min(1000).max(30000).default(8000),
     /** Server only. A RailKit dashboard key (railkit_…); never expose with a NEXT_PUBLIC_ prefix. */
     RAILKIT_API_KEY: z
       .string()
@@ -82,14 +105,18 @@ const envSchema = z
     CONSOLE_EMAIL_FROM: z.string().min(5).max(120).default("Trakline Console <console@trakline.in>"),
   })
   .superRefine((v, ctx) => {
-    if ((v.PNR_SOURCE === "rapidapi" || v.PNR_FALLBACK === "rapidapi") && !v.RAPIDAPI_KEY) {
-      ctx.addIssue({ code: "custom", path: ["RAPIDAPI_KEY"], message: "RAPIDAPI_KEY is required when RapidAPI is the source or the fallback." });
-    }
     if ((v.PNR_SOURCE === "railkit" || v.PNR_FALLBACK === "railkit") && !v.RAILKIT_API_KEY) {
       ctx.addIssue({ code: "custom", path: ["RAILKIT_API_KEY"], message: "RAILKIT_API_KEY is required when RailKit is the source or the fallback." });
     }
     if (v.PNR_FALLBACK !== "none" && v.PNR_FALLBACK === v.PNR_SOURCE) {
       ctx.addIssue({ code: "custom", path: ["PNR_FALLBACK"], message: "PNR_FALLBACK must name a different source than PNR_SOURCE." });
+    }
+    // Only a third-party source is asked through the fallback seam, so a fallback behind `live` or
+    // `fixture` would never be reached: refused here rather than silently ignored. With one provider
+    // in the enum these two rules together leave `none` as the only setting that parses; both stay
+    // true, and stop being exhaustive, the day a second provider joins it.
+    if (v.PNR_FALLBACK !== "none" && !isThirdPartySource(v.PNR_SOURCE)) {
+      ctx.addIssue({ code: "custom", path: ["PNR_FALLBACK"], message: "PNR_FALLBACK is only asked behind a third-party PNR_SOURCE; nothing would ask it here." });
     }
     if (v.NODE_ENV === "production" && v.PNR_SOURCE === "fixture") {
       ctx.addIssue({ code: "custom", path: ["PNR_SOURCE"], message: "PNR_SOURCE=fixture is refused in production." });
@@ -130,20 +157,36 @@ function withoutBlanks(source: Readonly<Record<string, string | undefined>>): Re
 export function parseEnv(source: Readonly<Record<string, string | undefined>>): ParsedEnv {
   const parsed = envSchema.safeParse(withoutBlanks(source));
   if (parsed.success) return { ok: true, env: parsed.data };
-  return {
-    ok: false,
-    issues: parsed.error.issues.map((issue) => `${issue.path.join(".") || "env"}: ${issue.message}`),
-  };
+  const issues = parsed.error.issues.map((issue) => `${issue.path.join(".") || "env"}: ${issue.message}`);
+  // `PNR_SOURCE` keeps refusing the retired provider rather than guessing a replacement — there is
+  // no correct automatic answer, and this throws at BUILD time, so the deployment simply never
+  // ships and whatever is already live keeps serving. But `expected one of live|fixture|railkit`
+  // does not tell an operator that a provider was removed, which environment they are looking at,
+  // or what to put there instead. A deployment that has been pointed at this provider for months is
+  // exactly the one whose owner will not recognise the name in a schema error.
+  if (source.PNR_SOURCE === RETIRED_PROVIDER) {
+    issues.unshift(
+      `PNR_SOURCE=${RETIRED_PROVIDER} names a provider that was removed. Set PNR_SOURCE=railkit with a RAILKIT_API_KEY to serve real checks, or PNR_SOURCE=live to answer "unavailable" without spending a plan — and check EVERY Vercel environment, because each holds its own value.`,
+    );
+  }
+  return { ok: false, issues };
 }
 
 let cached: Env | null = null;
 let warned = false;
+let warnedRetired = false;
 
 /** Validated environment. Fails loudly in production; falls back to defaults elsewhere. */
 export function env(): Env {
   if (cached) return cached;
   const parsed = parseEnv(process.env);
   if (parsed.ok) {
+    // Said once, wherever it happens, including production: the variable parsed only because it was
+    // read as `none`, and it will keep doing so silently until somebody deletes it.
+    if (process.env.PNR_FALLBACK === RETIRED_PROVIDER && !warnedRetired) {
+      warnedRetired = true;
+      console.warn(`[env] PNR_FALLBACK=${RETIRED_PROVIDER} names a source that was removed; reading it as "none". Delete the variable.`);
+    }
     cached = parsed.env;
     return cached;
   }
@@ -163,6 +206,7 @@ export function env(): Env {
 export function resetEnvCache(): void {
   cached = null;
   warned = false;
+  warnedRetired = false;
 }
 
 export function accountsConfigured(current: Env = env()): boolean {
@@ -188,7 +232,6 @@ export function fixtureAllowed(current: Env = env()): boolean {
 export function activePnrSource(current: Env = env()): PnrSource {
   if (fixtureAllowed(current)) return "fixture";
   if (current.PNR_SOURCE === "railkit" && current.RAILKIT_API_KEY) return "railkit";
-  if (current.PNR_SOURCE === "rapidapi" && current.RAPIDAPI_KEY) return "rapidapi";
   return "live";
 }
 
@@ -197,12 +240,15 @@ export function liveRequestsPerDay(current: Env = env()): number {
   return current.LIVE_REQUESTS_PER_DAY;
 }
 
-/** The source that answers while the active one is unavailable, if one is configured. */
-export function fallbackPnrSource(current: Env = env()): Extract<PnrSource, "rapidapi" | "railkit"> | null {
+/**
+ * The source that answers while the active one is unavailable, if one is configured. Null with one
+ * provider — see PNR_FALLBACK above — and the rules that make it so are written here, not assumed,
+ * so a second provider needs nothing but its own line.
+ */
+export function fallbackPnrSource(current: Env = env()): ThirdPartySource | null {
   const active = activePnrSource(current);
   if (active === "fixture" || current.PNR_FALLBACK === "none" || current.PNR_FALLBACK === active) return null;
   if (current.PNR_FALLBACK === "railkit" && current.RAILKIT_API_KEY) return "railkit";
-  if (current.PNR_FALLBACK === "rapidapi" && current.RAPIDAPI_KEY) return "rapidapi";
   return null;
 }
 

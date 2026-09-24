@@ -1,5 +1,5 @@
 import type { Env } from "@/services/env";
-import { activePnrSource, env, fallbackPnrSource, fixtureAllowed, type ThirdPartySource } from "@/services/env";
+import { activePnrSource, env, fallbackPnrSource, fixtureAllowed, isThirdPartySource, type ThirdPartySource } from "@/services/env";
 import type { PnrDataSource } from "@/services/pnr-source";
 import { providerGuard } from "@/services/shared-store";
 import { createFallbackSource } from "./fallback";
@@ -7,13 +7,14 @@ import { fixtureSource } from "./fixture";
 import { createGuardedSource } from "./guarded";
 import { createLiveSource } from "./live";
 import { createRailkitSource } from "./railkit";
-import { createRapidApiSource } from "./rapidapi";
 
 // Provider registry. The fixture is served only when explicitly requested and
 // never in production; the env schema refuses that combination at boot and this
 // registry refuses it again at call time, so a bypassed guard still fails closed.
 // A third-party source may have a second third-party source behind it, asked only
-// while the first is unavailable.
+// while the first is unavailable. There is one provider today, so `fallbackPnrSource`
+// always answers null and that composition is never reached; it is kept, with its seam
+// and its own tests, for the second provider. See PNR_FALLBACK in services/env.ts.
 
 let refusalLogged = false;
 
@@ -37,7 +38,7 @@ export function resolvePnrSource(current: Env = env()): PnrDataSource {
     return refusedSource;
   }
   const active = activePnrSource(current);
-  if (active === "railkit" || active === "rapidapi") {
+  if (isThirdPartySource(active)) {
     const primary = thirdPartySource(active, current);
     const fallback = fallbackPnrSource(current);
     return primary && fallback ? withFallback(primary, thirdPartySource(fallback, current)) : (primary ?? createLiveSource(current));
@@ -55,15 +56,28 @@ function thirdPartySource(source: ThirdPartySource, current: Env): PnrDataSource
   return adapter ? createGuardedSource(adapter, providerGuard(source, "pnr", current)) : null;
 }
 
+/**
+ * The provider's own adapter, when this deployment holds its key. A second provider adds a branch.
+ *
+ * **Exhaustive on purpose.** With two providers an unhandled one was impossible to write; with one
+ * it is an `if` away. A provider added to `ThirdPartySource` without a branch here would return
+ * `null`, which `resolvePnrSource` reads as "no key for it" and answers with the unavailable `live`
+ * seam — a new provider that silently never gets asked, with nothing in the logs to say so. The
+ * `never` makes that a compile error instead.
+ *
+ * A missing KEY still returns `null`, because that genuinely is "this deployment cannot use it".
+ */
 function providerAdapter(source: ThirdPartySource, current: Env): PnrDataSource | null {
-  if (source === "railkit") {
-    return current.RAILKIT_API_KEY
-      ? createRailkitSource({ key: current.RAILKIT_API_KEY, baseUrl: current.RAILKIT_BASE_URL, timeoutMs: current.RAILKIT_TIMEOUT_MS })
-      : null;
+  switch (source) {
+    case "railkit":
+      return current.RAILKIT_API_KEY
+        ? createRailkitSource({ key: current.RAILKIT_API_KEY, baseUrl: current.RAILKIT_BASE_URL, timeoutMs: current.RAILKIT_TIMEOUT_MS })
+        : null;
+    default: {
+      const unwired: never = source;
+      throw new Error(`no adapter is wired for third-party source ${String(unwired)}`);
+    }
   }
-  return current.RAPIDAPI_KEY
-    ? createRapidApiSource({ key: current.RAPIDAPI_KEY, host: current.RAPIDAPI_HOST, path: current.RAPIDAPI_PNR_PATH, timeoutMs: current.RAPIDAPI_TIMEOUT_MS })
-    : null;
 }
 
 export function getPnrSource(): PnrDataSource {

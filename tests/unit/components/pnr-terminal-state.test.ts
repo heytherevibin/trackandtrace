@@ -116,7 +116,7 @@ describe("result view", () => {
     const base = okResult("2345678901");
     const bare: PnrResult = {
       ...base,
-      snapshot: { ...base.snapshot, source: "rapidapi", train: { number: "12658", from: { code: "SBC" }, to: { code: "MAS" } }, chartTime: undefined, chartAt: undefined },
+      snapshot: { ...base.snapshot, source: "railkit", train: { number: "12658", from: { code: "SBC" }, to: { code: "MAS" } }, chartTime: undefined, chartAt: undefined },
     };
     const facts = Object.fromEntries(factsFor(bare).map((f) => [f.label, f.value]));
     expect(facts["Departs"]).toBe("Not returned");

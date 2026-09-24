@@ -15,9 +15,11 @@ describe("provider usage counters", () => {
     const count = createUsageCounter(kv, "tt:test", () => LATE_EVENING_UTC);
     await count("railkit");
     await count("railkit");
-    await count("rapidapi");
+    // The counter is keyed by whatever provider name it is given. One provider is configured today,
+    // so a second is named here to prove the keys stay apart when one lands.
+    await count("second");
     await expect(kv.get("tt:test:usage:railkit:2026-09-19")).resolves.toBe("2");
-    await expect(kv.get("tt:test:usage:rapidapi:2026-09-19")).resolves.toBe("1");
+    await expect(kv.get("tt:test:usage:second:2026-09-19")).resolves.toBe("1");
     await expect(kv.ttl("tt:test:usage:railkit:2026-09-19")).resolves.toBe(USAGE_TTL_MS);
     expect(USAGE_TTL_MS).toBe(40 * 24 * 60 * 60 * 1000);
   });

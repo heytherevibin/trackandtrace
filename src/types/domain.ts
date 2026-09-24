@@ -72,10 +72,11 @@ export interface Prediction {
 }
 
 /**
- * live: a verified railway provider · railkit: the third-party RailKit API (railkit.in) · rapidapi: the
- * third-party RapidAPI "IRCTC" API · fixture: labelled sample data.
+ * live: a verified railway provider · railkit: the third-party RailKit API (railkit.in) · fixture:
+ * labelled sample data. Third-party providers are added here; `ThirdPartySource` in services/env.ts
+ * is the subset that is not an official source.
  */
-export type PnrSource = "live" | "fixture" | "rapidapi" | "railkit";
+export type PnrSource = "live" | "fixture" | "railkit";
 
 export interface PnrSnapshot {
   pnr: string;

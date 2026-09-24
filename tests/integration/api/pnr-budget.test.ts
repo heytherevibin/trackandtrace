@@ -16,7 +16,7 @@ vi.mock("@/services/upstash", () => ({
 }));
 
 const DATA_KEY = Buffer.alloc(32, 7).toString("base64");
-const FAKE_RAPIDAPI = "fake-rapidapi-0123456789";
+const FAKE_RAILKIT = `railkit_${"a1".repeat(16)}`;
 const PNRS = ["4949608631", "4949608632", "4949608633"] as const;
 const requests = { provider: 0 };
 
@@ -24,30 +24,36 @@ function json(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 }
 
-function rapidApiRecord(pnr: string) {
+function railkitRecord(pnr: string) {
   return {
-    status: true,
-    message: "Success",
+    success: true,
     data: {
-      Pnr: pnr,
-      TrainNo: "12658",
-      TrainName: "SBC MAS SF MAIL",
-      Doj: "25-12-2026",
-      From: "SBC",
-      To: "MAS",
-      Class: "3A",
-      Quota: "GN",
-      PassengerStatus: [{ Number: 1, BookingStatus: "GNWL/12", CurrentStatus: "GNWL 5" }],
+      pnr,
+      train: { number: "12987", name: "SAMPURN K RAJDHANI" },
+      journey: {
+        dateOfJourney: "22 Dec 2026, 04:35:00 pm",
+        class: "3A",
+        quota: "GN",
+        source: { code: "JP", name: "JAIPUR JN" },
+        destination: { code: "NDLS", name: "NEW DELHI" },
+      },
+      chart: { status: "Chart Prepared" },
+      passengers: [{ serialNumber: "Passenger 1", booking: { status: "CNF", coach: "B5", berthNo: 22, berthCode: "LB" }, current: { status: "CNF", coach: "B5", berthNo: 22, berthCode: "LB" } }],
     },
   };
+}
+
+/** RailKit asks by path: GET /api/v1/pnr/<pnr>. */
+function pnrOf(url: string): string {
+  return new URL(url).pathname.split("/").at(-1) ?? "";
 }
 
 async function instance() {
   vi.resetModules();
   vi.stubEnv("NODE_ENV", "test");
-  vi.stubEnv("PNR_SOURCE", "rapidapi");
+  vi.stubEnv("PNR_SOURCE", "railkit");
   vi.stubEnv("PNR_FALLBACK", "none");
-  vi.stubEnv("RAPIDAPI_KEY", FAKE_RAPIDAPI);
+  vi.stubEnv("RAILKIT_API_KEY", FAKE_RAILKIT);
   vi.stubEnv("LIVE_REQUESTS_PER_DAY", "2");
   vi.stubEnv("KV_REST_API_URL", "https://fake.upstash.io");
   vi.stubEnv("KV_REST_API_TOKEN", "fake-token");
@@ -56,7 +62,7 @@ async function instance() {
     "fetch",
     vi.fn(async (input: string | URL) => {
       requests.provider += 1;
-      return json(200, rapidApiRecord(new URL(String(input)).searchParams.get("pnrNumber") ?? ""));
+      return json(200, railkitRecord(pnrOf(String(input))));
     }),
   );
   const { resetEnvCache } = await import("@/services/env");
@@ -102,7 +108,7 @@ describe("POST /api/pnr past the daily live-request budget", () => {
     expect(refused.status).toBe(503);
     expect(refused.body).toMatchObject({ ok: false, code: "SOURCE_UNAVAILABLE" });
     expect(refused.body.message).toMatch(/00:00 IST/);
-    expect(refused.body.message).not.toMatch(/railkit|rapidapi/i);
+    expect(refused.body.message).not.toMatch(/railkit|rapidapi|irctcapi/i);
     const wait = Number(refused.retryAfter);
     expect(wait).toBe(refused.body.retryAfter);
     expect(wait).toBeGreaterThan(0);
