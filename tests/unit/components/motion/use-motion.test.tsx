@@ -98,6 +98,7 @@ describe("SiteMotion", () => {
     expect(screen.getByTestId("probe")).toHaveTextContent("off by device");
     act(() => device.change(false));
     expect(html()).toHaveAttribute("data-motion", "on");
+    expect(screen.getByTestId("probe")).toHaveTextContent(/^on$/);
   });
 
   it("follows the choice made in another tab", () => {
@@ -111,6 +112,20 @@ describe("SiteMotion", () => {
       window.dispatchEvent(new StorageEvent("storage", { key: "tt.motion", newValue: "off" }));
     });
     expect(html()).toHaveAttribute("data-motion", "off");
+  });
+
+  it("follows a store cleared in another tab", () => {
+    html().setAttribute("data-motion", "off");
+    render(
+      <SiteMotion>
+        <Probe />
+      </SiteMotion>,
+    );
+    window.localStorage.clear();
+    act(() => {
+      window.dispatchEvent(new StorageEvent("storage", { key: null }));
+    });
+    expect(html()).toHaveAttribute("data-motion", "on");
   });
 
   it("writes <html data-motion> only when something changes, never on mount", () => {

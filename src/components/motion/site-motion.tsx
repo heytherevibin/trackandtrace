@@ -17,7 +17,8 @@ export function SiteMotion({ children }: { readonly children: ReactNode }) {
     const device = window.matchMedia(REDUCED_MOTION_QUERY);
     const onDevice = () => applyMotion();
     const onStorage = (event: StorageEvent) => {
-      if (event.key === MOTION_STORAGE_KEY) applyMotion();
+      // event.key is null when another tab cleared the whole store (localStorage.clear()), not just this key.
+      if (event.key === null || event.key === MOTION_STORAGE_KEY) applyMotion();
     };
     device.addEventListener("change", onDevice);
     window.addEventListener("storage", onStorage);
