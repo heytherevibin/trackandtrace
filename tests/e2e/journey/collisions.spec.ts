@@ -44,6 +44,22 @@ test.describe("the collision checker", () => {
     expect(await collisionsInView(page, { panels: ["#probe-panel"] })).toContain('panel div#probe-panel × text "Probe line one"');
   });
 
+  test("sees two panels drawn over each other", async ({ page }) => {
+    await gotoReady(page, "/");
+    await page.evaluate(() => {
+      for (const [id, left] of [
+        ["probe-panel-a", 20],
+        ["probe-panel-b", 60],
+      ] as const) {
+        const panel = document.createElement("div");
+        panel.id = id;
+        panel.style.cssText = `position:fixed;left:${left}px;top:300px;width:120px;height:60px;z-index:9999`;
+        document.body.append(panel);
+      }
+    });
+    expect(await collisionsInView(page, { panels: ["#probe-panel-a", "#probe-panel-b"] })).toContain("panel div#probe-panel-a × panel div#probe-panel-b");
+  });
+
   test("does not see the answer inside a closed <details>, only its question", async ({ page }) => {
     await gotoReady(page, "/");
     await drawProbeLines(page, 20);
