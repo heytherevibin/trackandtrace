@@ -25,7 +25,8 @@ export function PageHeader({
   return (
     <header className={cn("flex flex-col gap-4", className)}>
       {back ? (
-        <Link href={back.href} className="legend w-fit text-accent-text no-underline hover:text-accent-soft-ink">
+        // A legend link, not a button: 20px of drawn height, so it takes the coarse-pointer hit area (motion.css).
+        <Link href={back.href} className="legend tap-44 w-fit text-accent-text no-underline hover:text-accent-soft-ink">
           {`← ${back.label}`}
         </Link>
       ) : null}

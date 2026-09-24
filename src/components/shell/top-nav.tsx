@@ -31,7 +31,9 @@ export function TopNav() {
     <header className={cn("border-b border-line bg-surface-0", !minimal && "sticky top-0 z-nav")} style={{ viewTransitionName: "site-header" }}>
       <div className="page-frame flex h-16 items-center gap-x-3 lg:gap-x-5">
         {minimal ? null : <NavMenu pathname={pathname} className="lg:hidden" />}
-        <Link href="/" aria-label={messages.common.productName} className="mr-auto inline-flex h-16 items-center text-ink-1 no-underline hover:text-ink-1 lg:mr-2">
+        {/* The mark alone is 24px wide on a phone. Its hit area grows rightward into the mr-auto gap
+            (motion.css): centred, it would reach back over the menu button beside it. */}
+        <Link href="/" aria-label={messages.common.productName} className="tap-44-start mr-auto inline-flex h-16 items-center text-ink-1 no-underline hover:text-ink-1 lg:mr-2">
           <Wordmark nameFrom={minimal ? undefined : "lg"} />
         </Link>
         {minimal ? null : (
