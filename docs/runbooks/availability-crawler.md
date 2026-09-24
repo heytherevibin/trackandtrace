@@ -158,12 +158,30 @@ not stored anywhere.
 
 ## The two facts an operator gets wrong
 
-**1. The ceiling is per RUN, not per DAY.** `crawl-plan.mjs` gates each run at the provider's daily
-allowance less the reserve held back for live PNR checks. Nothing remembers the previous run, so
-**two runs in one day spend twice the ceiling.** Today that is a human's decision, because a human
-is the scheduler. The moment anything schedules this, it needs a shared daily counter of its own —
-with its own key, because the usage counter cannot say which caller spent what — and that counter
-has to exist *before* the first unattended run, not after the first spent month.
+**1. There are now two ceilings, and the day's is the one that will surprise you.** `crawl-plan.mjs`
+gates each run at the provider's daily allowance less the reserve held back for live PNR checks —
+that is the per-RUN ceiling, and it used to be the only one, so two runs in one day spent twice it.
+A second, per-DAY ceiling now sits over the top: every provider call the crawler makes is written as
+a row in `crawler_provider_calls`, bucketed by IST day by the same expression the observations'
+`observed_on` uses, and a run may spend only the smaller of its own ceiling and what is left of the
+day. The cap is not a new number — it is the same headroom the per-run ceiling is built from.
+
+**So after one full run, a second run the same day refuses.** That is correct for a crawler meant to
+run once a day. It also blocks a legitimate retry after a run a gate cut short, so the refusal names
+the `--only n` that does still fit and what it costs. Read `--only` literally when you use it: it
+takes the FIRST n entries of `routes.json`, in file order, so it retries the head of the list and
+**not** the combos the interrupted run missed. `--reserve` is the other way past, and it widens the
+gate by leaving live PNR checks unprotected — say how many, out loud, when you use it.
+
+**If the counter cannot be read, the run does not start.** An unmeasurable run is the thing the
+counter exists to prevent, so "the ledger was down" refuses rather than assuming a clean day. Each
+call is charged *before* it leaves, so a process killed mid-run still costs the day what it sent;
+the cost of that choice is that a call which never actually goes out is charged anyway, which makes
+this run spend less and never more. Nothing may update or delete a row in that ledger — not even the
+service role — because a spend record that can be rewritten proves nothing.
+
+**This removes the reason scheduling was unsafe. It does not schedule anything**, and deciding to is
+a separate decision.
 
 **2. `scripts/crawl-cursor.json` is this machine's memory of the sweep.** It holds where each
 combo's rolling window got to, and how many runs in a row that combo has refused. It is written
@@ -183,9 +201,14 @@ npm run source:crawl -- --only 2     # ask for the first two combos of the list 
 ```
 
 Before anything is spent it prints the list, the window, the cursor file, the worst case in calls,
-the ceiling and the burst floor, and it refuses to start if the worst case is over the ceiling. A
+the run's ceiling, **what today has already cost and what is left of it**, the burst floor and the
+store it will write to — and it refuses to start if the worst case is over the effective ceiling. A
 malformed route fails that preflight rather than the budget — the guard counts a request before the
 adapter sees it, so a bad entry would otherwise spend quota on a call that never leaves the process.
+
+`--dry-run` asks nothing and charges nothing, and those two day numbers are the reason to reach for
+it: it is how you find out whether today has room before you commit to a run. It does need the
+database, because the counter lives there.
 
 After the run it prints what happened, and then the whole store's coverage, because a run can be
 perfectly whole while the dataset is holed by days nobody ran it. That coverage print is always over
@@ -314,8 +337,11 @@ thing every run until you fix it.
 - `scripts/observations-coverage.mjs` — the gap rule itself, and what it cannot see. Read its header
   before changing what the report counts; `scripts/observations-report.mjs` is only the wiring.
 - `scripts/crawl-window.mjs` — the sampling strategy, and what it does and does not guarantee.
-- `scripts/crawl-plan.mjs` — the preflight and the two quota gates. Read its header before changing
+- `scripts/crawl-plan.mjs` — the preflight and the three quota gates. Read its header before changing
   anything about what a run may spend.
+- `src/services/crawler-budget.ts` — the day's budget: what today has already cost, and the
+  arithmetic that turns it into this run's ceiling. `supabase/migrations/20260924120000_crawler_provider_calls.sql`
+  is the ledger it counts, and says why it is in Postgres rather than Upstash.
 - `scripts/crawl-availability.mjs` — the asks a run makes per combo, and why the pinned one exists.
 - `scripts/crawl-routes.mjs` — the route list, the preflight, and `QUOTAS_OPENING_NEAR_DEPARTURE`:
   which quotas skip the rolling ask, and which of those entries were measured rather than inferred.

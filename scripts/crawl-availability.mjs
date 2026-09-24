@@ -2,7 +2,8 @@
 // Fills the availability observation store: one ask per (train, class, quota, from, to) per stride,
 // one row per day the provider answered for. A human runs this and reads what it says — it is
 // deliberately NOT scheduled, which is a later decision, after a few supervised runs show what it
-// actually costs.
+// actually costs. **The thing that made scheduling unsafe is gone** (a per-run ceiling with no
+// per-day one); deciding to schedule is still a separate decision, and nothing here makes it.
 //
 //   node --env-file=.env.local scripts/crawl-availability.mjs
 //   (or: npm run source:crawl)
@@ -39,6 +40,19 @@
 // was not pointed at (`cursorsForRun`): that was the one way to lose entries silently from inside a
 // run that then reported itself whole.
 //
+// **THE DAY'S BUDGET (gate C).** Before anything is planned, this run reads how many provider calls
+// the crawler has already charged to today — one row per call in `crawler_provider_calls`, bucketed
+// by IST day by the same SQL expression `observed_on` uses — and takes the SMALLER of its own
+// ceiling and what is left of the day. Each call is charged as it is about to leave, never at the
+// end, because a process killed mid-run has still spent what it sent. A count that cannot be read
+// refuses the run outright. See `crawl-plan.mjs`'s header for the gates and
+// `src/services/crawler-budget.ts` for the arithmetic.
+//
+// The consequence an operator will meet: **after one full run, a second run the same day refuses**,
+// because the worst case no longer fits in what is left. That is right for a crawler meant to run
+// once a day, and it also blocks a legitimate retry after a run a gate cut short — so the refusal
+// names the `--only n` that does still fit, and says what `--only` actually selects.
+//
 // Exit: 0 the run was whole · 1 it was not (a refusal, or a gate stopped it) · 2 it was asked
 // wrongly, and nothing was spent.
 //
@@ -47,16 +61,18 @@
 // dataset is holed by days nobody ran it — but a holed store does NOT change the code above.
 // `npm run source:report` is the check with its own threshold and its own exit code.
 //
-// This file is only the wiring. The stride, the route preflight, the two quota gates, the loop and
-// the report all live in `crawl-plan.mjs`, which is pure and tested — **read its header before
-// changing anything about what this run is allowed to spend.**
+// This file is only the wiring. The stride, the route preflight, the quota gates, the loop and the
+// report all live in `crawl-plan.mjs`, `crawl-run.mjs` and `crawl-report.mjs`, which are pure and
+// tested; the day's budget lives in `src/services/crawler-budget.ts` and the TypeScript import hook
+// in `crawl-imports.mjs` — **read `crawl-plan.mjs`'s header before changing anything about what
+// this run is allowed to spend.**
 //
 // The env file is passed in by the operator exactly as this script's siblings take it, and no key is
 // ever read from anywhere else or printed anywhere. Nothing here knows anything about a person.
 
-import { readFileSync, statSync, writeFileSync } from "node:fs";
-import { registerHooks } from "node:module";
+import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { registerAppImports } from "./crawl-imports.mjs";
 import {
   ASKS_PER_COMBO_MAX,
   CALLS_PER_ASK_MAX,
@@ -71,48 +87,11 @@ import {
   rollingAskIsPointless,
 } from "./crawl-plan.mjs";
 import { runCrawl } from "./crawl-run.mjs";
-import { exitCodeFor, summarise } from "./crawl-report.mjs";
+import { dayBudgetLines, exitCodeFor, overBudgetRefusal, summarise } from "./crawl-report.mjs";
 import { DEFAULT_HORIZON_DAYS, DEFAULT_WINDOW_DAYS, cursorsForRun, cycleRuns, isIsoDate, parseCursors } from "./crawl-window.mjs";
 import { coverageReport, parseObservationRows, readObservations, summariseCoverage } from "./observations-coverage.mjs";
 
 const HERE = new URL("./", import.meta.url);
-
-/**
- * Lets this script import the app's own TypeScript — the adapter, the recorder, the guard — rather
- * than growing a second copy of them that would drift. A second copy of the breaker's key layout is
- * exactly how a crawler would end up writing to the PNR fuse by accident.
- *
- * Node strips the types; these two rules are what tsconfig's `paths` and `moduleResolution: bundler`
- * do for the app, and nothing more.
- *
- * Node strips types rather than compiling them, so a TypeScript **parameter property**
- * (`constructor(private readonly x: T) {}`) is a syntax error it cannot get past — and it fails at
- * import, before a single request is spent. `MemoryCache`, `MemoryKv`, `EncryptedRedisCache` and
- * `SharedRateLimiter` therefore assign their fields explicitly. Keep it that way: the alternative is
- * this script carrying its own copy of the shared store's key names.
- */
-function registerAppImports(srcRoot) {
-  const isFile = (url) => {
-    try {
-      return statSync(new URL(url)).isFile();
-    } catch {
-      return false;
-    }
-  };
-  const resolveTs = (url) => [url, `${url}.ts`, `${url}/index.ts`].find(isFile) ?? url;
-
-  registerHooks({
-    resolve(specifier, context, nextResolve) {
-      if (specifier.startsWith("@/")) return nextResolve(resolveTs(new URL(specifier.slice(2), srcRoot).href), context);
-      const from = context.parentURL;
-      if ((specifier.startsWith("./") || specifier.startsWith("../")) && from?.endsWith(".ts")) return nextResolve(resolveTs(new URL(specifier, from).href), context);
-      return nextResolve(specifier, context);
-    },
-    load(url, context, nextLoad) {
-      return url.endsWith(".ts") ? nextLoad(url, { ...context, format: "module-typescript" }) : nextLoad(url, context);
-    },
-  });
-}
 
 function flags(argv) {
   const found = new Map();
@@ -159,15 +138,18 @@ function istToday() {
 }
 
 /**
- * By the time the coverage read runs, the asks are spent and the cursor is written, so a store read
- * that never answers costs this run its verdict for nothing. supabase-js sets no request timeout of
- * its own. This one ABORTS the fetch rather than merely racing it: a race leaves the request in
- * flight, and a request in flight holds the event loop open, so the process would still never exit.
+ * supabase-js sets no request timeout of its own, so a store read that never answers hangs the run.
+ * This one ABORTS the fetch rather than merely racing it: a race leaves the request in flight, and a
+ * request in flight holds the event loop open, so the process would still never exit.
  *
- * Thirty seconds is generous for a read of our own database, and the cost of it firing early is one
- * missing print, never a wrong verdict — `npm run source:report` does the same read unbounded.
+ * It bounds both reads this file makes, and what firing early costs differs between them. On the
+ * coverage read the asks are already spent and the cursor written, so the cost is one missing print
+ * and never a wrong verdict — `npm run source:report` does the same read unbounded. On gate C's
+ * spend read the cost is the whole run, which is the right direction: an unreadable count refuses.
+ *
+ * Thirty seconds is generous for a read of our own database.
  */
-const COVERAGE_READ_TIMEOUT_MS = 30_000;
+const STORE_READ_TIMEOUT_MS = 30_000;
 
 /**
  * What the STORE looks like, after this run has written to it.
@@ -182,7 +164,7 @@ const COVERAGE_READ_TIMEOUT_MS = 30_000;
  */
 async function printStoreCoverage({ db, table, today, listed }) {
   try {
-    const read = await readObservations(db, { table, signal: AbortSignal.timeout(COVERAGE_READ_TIMEOUT_MS) });
+    const read = await readObservations(db, { table, signal: AbortSignal.timeout(STORE_READ_TIMEOUT_MS) });
     if (!read.ok) {
       console.error(`[crawl] the store's coverage could not be read: ${read.reason}`);
       console.error("[crawl] this run is unaffected: its rows are written and its cursor is saved. `npm run source:report` is the check on the store.");
@@ -277,7 +259,7 @@ async function main() {
   // object is written back over the whole cursor file below. See `cursorsForRun`.
   const cursors = cursorsForRun({ stored: readCursors.cursors, keys: routes.map(comboKey), startAt });
 
-  const { ceiling, reason } = crawlCeiling({
+  const { ceiling: runCeiling, headroom, reason } = crawlCeiling({
     dailyAllowance: whole(found, "daily", DEFAULT_DAILY_ALLOWANCE),
     liveReserve: whole(found, "reserve", liveRequestsPerDay(environment)),
     requested: found.has("max-calls") ? whole(found, "max-calls", 0) : undefined,
@@ -290,6 +272,44 @@ async function main() {
   const worstCase = plannedCalls({ routes });
   const pinnedOnly = routes.filter((route) => rollingAskIsPointless(route) !== null);
   const remainingFloor = whole(found, "remaining-floor", DEFAULT_REMAINING_FLOOR);
+
+  // The store, and the crawler's own daily ledger, are proved BEFORE the banner — earlier than they
+  // used to be, because gate C has to be consulted before the run is planned and `--dry-run` has to
+  // be able to print what the day has already spent. Spending calls we cannot store is the same
+  // waste as missing a day, so this order also keeps the older promise.
+  //
+  // A plain select, deliberately. `select("id", { head: true, count: "exact" })` sends a HEAD
+  // request, and a HEAD has no body for the client to read the refusal out of: a table that does
+  // not exist answers 204 with `error: null`, and the preflight passes on a store that cannot take
+  // a single row. Measured 2026-09-23 against a project missing the migration — it cost six calls
+  // to learn.
+  const { recordObservations, OBSERVATION_TABLE } = await import(new URL("services/observations.ts", srcRoot).href);
+  const { CRAWLER_CALL_TABLE, dayCeiling, readCallsToday, recordProviderCall } = await import(new URL("services/crawler-budget.ts", srcRoot).href);
+  const { createAdminSupabase } = await import(new URL("services/supabase/admin.ts", srcRoot).href);
+
+  let db;
+  try {
+    db = createAdminSupabase();
+    const { error } = await db.from(OBSERVATION_TABLE).select("id").limit(1);
+    if (error) throw new Error(`${error.message}${error.code ? ` (${error.code})` : ""}`);
+  } catch (error) {
+    fail(`the observation store cannot take a row, so nothing was asked: ${error.message}`);
+  }
+
+  // GATE C: THE DAY. The effective ceiling is the smaller of gate A's and what is left of today.
+  // The daily cap is `headroom` — `DEFAULT_DAILY_ALLOWANCE` less the live reserve — which is the
+  // very number gate A is built from, so one constant governs both.
+  //
+  // **It fails closed**, inside `dayCeiling` rather than here: a count that cannot be read refuses
+  // the run. An unmeasurable run is exactly the hazard the counter exists to remove, and "the
+  // counter was down" is the one excuse that would let a scheduled crawler spend a month.
+  const day = dayCeiling({
+    perRunCeiling: runCeiling,
+    dailyCap: headroom,
+    spent: await readCallsToday(db, today, { signal: AbortSignal.timeout(STORE_READ_TIMEOUT_MS) }),
+  });
+  if (!day.ok) fail(day.reason);
+  const ceiling = day.ceiling;
 
   console.log(`routes         ${routes.length} combo${routes.length === 1 ? "" : "s"}${limit < parsed.routes.length ? ` (of ${parsed.routes.length}, limited by --only)` : ""}`);
   console.log(`window         rolling ${windowDays} days a run over a ${horizonDays}-day horizon — a sweep takes ${cycleRuns(horizonDays, windowDays)} runs`);
@@ -304,51 +324,48 @@ async function main() {
     `worst case     ${worstCase} calls (${worstCase / CALLS_PER_ASK_MAX} asks × ${CALLS_PER_ASK_MAX} for the guard's one retry: ${routes.length - pinnedOnly.length} combo${routes.length - pinnedOnly.length === 1 ? "" : "s"} × ${ASKS_PER_COMBO_MAX} asks${pinnedOnly.length === 0 ? "" : `, ${pinnedOnly.length} × 1`})`,
   );
   console.log(`ceiling        ${reason}`);
+  for (const line of dayBudgetLines({ today, dailyCap: day.dailyCap, spentToday: day.spentToday, remainingToday: day.remainingToday, reason: day.reason })) console.log(line);
   console.log(`burst floor    stop when the provider's RateLimit-Remaining reaches ${remainingFloor}`);
+  console.log(`store          ${new URL(environment.NEXT_PUBLIC_SUPABASE_URL).host} · ${OBSERVATION_TABLE} · ${CRAWLER_CALL_TABLE}`);
 
-  if (worstCase > ceiling) {
-    fail(
-      `this run's worst case (${worstCase} calls) is over its ceiling (${ceiling}). Nothing was asked.\n` +
-        "Cut the list with --only, or state a wider share of the plan with --reserve — and say out loud how many live checks that leaves unprotected.",
-    );
-  }
+  if (worstCase > ceiling) fail(overBudgetRefusal({ worstCase, ceiling, routes, day }));
   if (found.has("dry-run")) {
-    console.log("\n--dry-run: nothing was asked.");
+    console.log("\n--dry-run: nothing was asked, so nothing was charged to today's budget. The day's numbers above are what it stood at.");
     return;
   }
 
   const { createRailKitAvailabilitySource } = await import(new URL("services/sources/railkit-availability.ts", srcRoot).href);
   const { createGuardedSource } = await import(new URL("services/sources/guarded.ts", srcRoot).href);
   const { providerGuard } = await import(new URL("services/shared-store.ts", srcRoot).href);
-  const { recordObservations, OBSERVATION_TABLE } = await import(new URL("services/observations.ts", srcRoot).href);
-  const { createAdminSupabase } = await import(new URL("services/supabase/admin.ts", srcRoot).href);
-
-  // Spending calls we cannot store is the same waste as missing a day, so the store is proved first.
-  //
-  // A plain select, deliberately. `select("id", { head: true, count: "exact" })` sends a HEAD
-  // request, and a HEAD has no body for the client to read the refusal out of: a table that does
-  // not exist answers 204 with `error: null`, and the preflight passes on a store that cannot take
-  // a single row. Measured 2026-09-23 against a project missing the migration — it cost six calls
-  // to learn.
-  let db;
-  try {
-    db = createAdminSupabase();
-    const { error } = await db.from(OBSERVATION_TABLE).select("id").limit(1);
-    if (error) throw new Error(`${error.message}${error.code ? ` (${error.code})` : ""}`);
-  } catch (error) {
-    fail(`the observation store cannot take a row, so nothing was asked: ${error.message}`);
-  }
-  console.log(`store          ${new URL(environment.NEXT_PUBLIC_SUPABASE_URL).host} · ${OBSERVATION_TABLE}\n`);
+  console.log("");
 
   // Every call the adapter makes passes through here: this is the only honest count of what left the
-  // process, and the only place the provider's own RateLimit headers can be read.
+  // process, the only place the provider's own RateLimit headers can be read, and therefore the only
+  // honest place to charge the day's budget.
+  //
+  // **Charged BEFORE the call leaves, and the run gives the call up if the charge fails.** A process
+  // killed mid-run has still spent what it sent, and a counter that loses those calls is worse than
+  // none: it under-reports exactly when something went wrong. Recording first over-counts a call
+  // that never actually goes out — the safe direction, since this run then spends less, never more
+  // — and it matches what `callsThisAsk` has always counted, which is intent rather than completion.
+  //
+  // A failed charge throws, so nothing is sent and `callsThisAsk` stays where it was: `runCrawl`
+  // then sees an ask that spent no call, holds the cursor, records no strike and files it under
+  // `notAsked`, which is exactly true. The run is not whole and exits 1. If the ledger stays down,
+  // the availability breaker opens on the repeated failures and the run stops of its own accord.
   let callsThisAsk = 0;
   let lastRemaining = null;
+  let uncharged = 0;
   const countingFetch = async (input, init) => {
     if (callsThisAsk >= CALLS_PER_ASK_MAX) {
       // Unreachable while the loop's own arithmetic holds. If it ever fires, that arithmetic is
       // wrong and the run must fail closed rather than keep spending.
       throw Object.assign(new Error("the per-ask call bound was exceeded"), { name: "AbortError" });
+    }
+    const charged = await recordProviderCall(db, new Date().toISOString());
+    if (!charged.ok) {
+      uncharged += 1;
+      throw new Error(`${charged.reason} — so the call was not made: a call this run cannot count is a call the next run will not know about`);
     }
     callsThisAsk += 1;
     const response = await fetch(input, init);
@@ -392,6 +409,12 @@ async function main() {
   }
 
   for (const line of summarise(summary)) console.log(line);
+  // Said here rather than folded into the summary: `runCrawl` is pure and knows nothing about the
+  // ledger, and an ask filed under `notAsked` reads as a resting breaker unless this says otherwise.
+  if (uncharged > 0) {
+    console.error(`\n[crawl] ${uncharged} call${uncharged === 1 ? " was" : "s were"} given up because the day's budget could not be charged, so ${uncharged === 1 ? "it was" : "they were"} never sent.`);
+    console.error("[crawl] Those asks are in the 'never reached the provider' section above, and their cursors held. Fix the ledger before the next run: a run that cannot count itself is the one thing the daily gate exists to prevent.");
+  }
   // The WHOLE route list, never `routes` — that is already cut by `--only`, and a coverage print
   // told a two-combo list would file the other four under "no longer on the route list" (false) and
   // drop them from the fraction, ending a `--only` run with a green coverage line over a holed
