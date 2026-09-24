@@ -1,6 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
-import { gotoReady } from "./helpers";
+import { expectAxeClean, gotoReady } from "./helpers";
 
 // The Motion switch (spec 2026-09-24 §3.A, §3.B). Motion is decided before first paint. Off stills the
 // site's own movements exactly as the device's reduced-motion setting does, on every traveller page.
@@ -117,5 +117,39 @@ test.describe("Motion's own animations follow Motion", () => {
     await expect(page.locator("html")).toHaveAttribute("data-motion", "off");
     await page.emulateMedia({ reducedMotion: "no-preference" });
     await expect(page.locator("html")).toHaveAttribute("data-motion", "on");
+  });
+});
+
+test.describe("the footer's Motion switch", () => {
+  const motionSwitch = (page: Page) => page.getByRole("contentinfo").getByRole("switch", { name: "Motion" });
+
+  test("sits in the landing's footer, on; app pages' one-line footer has none", async ({ page }) => {
+    await gotoReady(page, "/");
+    await expect(motionSwitch(page)).toBeChecked();
+    await gotoReady(page, "/watchlist");
+    await expect(motionSwitch(page)).toHaveCount(0);
+  });
+
+  test("off stills the site and holds across pages and visits; on again forgets it", async ({ page }) => {
+    await gotoReady(page, "/");
+    await motionSwitch(page).click();
+    await expect(motionSwitch(page)).not.toBeChecked();
+    await expect(page.locator("html")).toHaveAttribute("data-motion", "off");
+    await gotoReady(page, "/watchlist");
+    await expect(page.locator("html")).toHaveAttribute("data-motion", "off");
+    await gotoReady(page, "/");
+    await expect(motionSwitch(page)).not.toBeChecked();
+    await motionSwitch(page).click();
+    await expect(page.locator("html")).toHaveAttribute("data-motion", "on");
+    expect(await page.evaluate(() => window.localStorage.getItem("tt.motion"))).toBeNull();
+  });
+
+  test("under the device's reduced motion: off, disabled, says why, and axe is clean", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await gotoReady(page, "/");
+    await expect(motionSwitch(page)).not.toBeChecked();
+    await expect(motionSwitch(page)).toHaveAttribute("aria-disabled", "true");
+    await expect(motionSwitch(page)).toHaveAccessibleDescription("Your device asks for reduced motion");
+    await expectAxeClean(page);
   });
 });

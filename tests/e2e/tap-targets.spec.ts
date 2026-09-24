@@ -30,7 +30,7 @@ interface Undersized {
 async function undersizedTargets(page: import("@playwright/test").Page, within = "body"): Promise<readonly Undersized[]> {
   return page.evaluate(
     ({ min, within }) => {
-      const SELECTOR = 'a[href], button, [role="button"], input:not([type="hidden"]), select, textarea, summary';
+      const SELECTOR = 'a[href], button, [role="button"], [role="switch"], input:not([type="hidden"]), select, textarea, summary';
       const reach = min; // how far the walk may go from the centre before giving up
       const root = document.querySelector(within);
       if (!root) throw new Error(`nothing matches ${within}`);
@@ -38,6 +38,9 @@ async function undersizedTargets(page: import("@playwright/test").Page, within =
       for (const el of root.querySelectorAll<HTMLElement>(SELECTOR)) {
         if (!el.checkVisibility({ checkVisibilityCSS: true, opacityProperty: true })) continue;
         if (el.closest(".sr-only")) continue; // the skip link, revealed only on focus
+        // A form proxy hidden from everyone (Base UI's checkbox beside a switch: aria-hidden, out of the tab
+        // order, clipped to nothing) is not a target. The finger aims at the switch, which is measured.
+        if (el.matches('input[aria-hidden="true"][tabindex="-1"]')) continue;
         if (el.tagName === "A" && el.closest("p, li, dd")) continue; // a link in running text is prose
         const r = el.getBoundingClientRect();
         if (r.width === 0 || r.height === 0) continue;
@@ -53,7 +56,9 @@ async function undersizedTargets(page: import("@playwright/test").Page, within =
         const cy = seen.top + seen.height / 2;
         const answers = (x: number, y: number): boolean => {
           if (x < 0 || y < 0 || x > innerWidth || y > innerHeight) return false;
-          const hit = document.elementFromPoint(x, y);
+          // `next dev` floats its own indicator (<nextjs-portal>) over the bottom-left corner. It is not the app,
+          // and production never renders it (tests/e2e/layout.ts skips it too), so look through it.
+          const hit = document.elementsFromPoint(x, y).find((node) => !node.closest("nextjs-portal")) ?? null;
           return hit === el || el.contains(hit) || hit?.closest(SELECTOR) === el;
         };
         const reachFrom = (dx: number, dy: number): number => {

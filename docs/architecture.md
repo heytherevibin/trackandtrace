@@ -5,6 +5,7 @@
 ```
 Browser
   components (src/components/*)            — the visual world; no fetch logic
+  motion (src/components/motion/*)         — the reader's Motion: html[data-motion] written before first paint (motion-boot.ts, inline in the site layout's <head>), changed by the footer switch (use-motion.ts), followed by motion.css and SiteMotion (MotionConfig)
   stores (src/services/stores/*)           — device state: watchlist, recent, share, install, merge
   api-client (src/services/api-client.ts)  — validated fetch; malformed bodies become errors
 Next.js server

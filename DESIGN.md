@@ -74,7 +74,7 @@ Tracking: `tracking-caps` .08em (legends), `brand` .06em (wordmark, digits), `he
 - **Masthead** (`TopNav`), the same on every page: sticky, `surface-0`, hairline bottom. Wordmark (mark + "TRAKLINE" 18px `tracking-brand`); the nav CHECK A PNR · WATCHLIST · PRE-BOOKING · ACCURACY, each its own hairline box with a Fluent **Filled** icon at 20px beside its 13px capital label (Watchlist = eye), the current page tinted steel (on `/`, Check a PNR is current and jumps to `#terminal`); then, on the right, the theme icon button (one square 36px box showing the active mode's Filled icon; a click cycles System → Day → Night; the mode lives in its accessible name and tooltip) beside SIGN IN (capitals, person icon), or the account menu. Every masthead control shares one 36px box (13px capitals, 20px icons). From `lg` it is one row. Below `lg` it is still one row: a square hamburger box on the left of the logo mark (the name shows from `lg`), with the theme button and SIGN IN on the right; the hamburger opens the nav in a sheet that slides in from the left edge and swipes back to it, holding the same four boxes at 48px. Below `xs` (360px) SIGN IN keeps its icon and moves its label to assistive tech. `/login` is not sticky and shows the brand only.
 
 - **Phone widths.** Nothing is clipped or scrolls sideways at 320px and up (`tests/e2e/responsive.spec.ts` holds this on every route). Data tables — both passenger tables and the watchlist — fold into labelled records below `sm` (the watchlist below `lg`; it has five columns): the row's name across the top, then each cell drawing its column name above its value from `data-label` (CSS generated text with empty alt text, so a screen reader hears the column header once). A restyled table keeps explicit `role` attributes, since changing a table's display drops its semantics. Plate headers give the title its own row below `sm` and let the meta cells share the row beneath.
-- **Footer**: `/` gets the enterprise footer: brand + disclaimer; Sections (How it works, The record, Roadmap, FAQ), Product and Company as plain link columns in one grammar (`footer-styles.ts`); then one bar with ©, a single service-status line (lamp + "All systems operational" / "Some services are unavailable" / "Services are unavailable") and the IST clock. App pages get one line: disclaimer · © and the IST clock.
+- **Footer**: `/` gets the enterprise footer: brand + disclaimer; Sections (How it works, The record, Roadmap, FAQ), Product and Company as plain link columns in one grammar (`footer-styles.ts`); then one bar with ©, a single service-status line (lamp + "All systems operational" / "Some services are unavailable" / "Services are unavailable"), the IST clock and the Motion switch. App pages get one line: disclaimer · © and the IST clock.
 - **Travellers see one service.** No page, message, tag or response names a data provider or shows how sources are wired: results read "Retrieved … from Trakline", failures speak in one neutral voice, and service status shows only what travellers use (PNR checks, accounts and watchlist sync). Landing section 04 is **Reliability** (three promise plates and a PNR-checks status line), and the accuracy page's section 01 is **Service** (a two-row status list). Both replaced the sources board and ledger on 2026-09-18, by the user's direction.
 
 ## Page anatomy
@@ -104,7 +104,17 @@ box (`button`, `[role=button]`, `.press`) settles to 96% while held (90ms in) an
 release (200ms, no overshoot). It is a transform only, so layout never moves; keyboard activation and
 disabled controls never animate (rule in `src/styles/motion.css`, guarded by `tests/e2e/press.spec.ts`).
 The other movements: the theme button's turning icon, the invalid shake, the
-clock's flip, the digit caret, the running sweep, popup fades. All collapse under reduced motion.
+clock's flip, the digit caret, the running sweep, popup fades. All collapse under reduced motion, and under the Motion switch.
+
+**The Motion switch** sits in the landing footer's bar, after the clock, and is on by default. Off means
+what the device's reduced-motion setting means, on every traveller page. `motion.css` applies its
+reduced-motion rules under `html[data-motion="off"]` as well as under the media query, and Motion's own
+animations run reduced (`SiteMotion`, `MotionConfig reducedMotion="always"`). The head script in the site
+layout (`src/components/motion/motion-boot.ts`) writes `data-motion` before first paint, from the stored
+choice (`tt.motion`, only ever `off`) and the device. `SiteMotion` re-applies it when either changes;
+React never writes it on mount. When the device asks for reduced motion, the switch reads off, is disabled,
+and says why. Under both, a held button stays still. That rule is `!important` because the press selector
+outranks it (guarded by `tests/e2e/motion-switch.spec.ts`).
 
 Stability rules (each guarded by `tests/e2e/smoothness.spec.ts`): anchor offsets use `scroll-margin-top`
 on targets, never `scroll-padding` on `<html>` (focusing a masthead control would smooth-scroll the page);
