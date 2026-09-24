@@ -12,19 +12,22 @@ function answering(outcome: PnrOutcome) {
   return { source, check };
 }
 
-function record(label: "railkit" | "rapidapi"): PnrOutcome {
+/** The label the answer carries. Two are needed to tell the primary's answer from the fallback's:
+ *  `railkit` is the one provider configured today, and the second stands for whatever sits behind
+ *  it — this seam is generic over the sources it composes, and never names one. */
+function record(label: "railkit" | "live"): PnrOutcome {
   const built = buildFixtureResult(PNR, new Date("2026-09-17T06:30:00.000Z"));
   if (!built.ok) throw new Error("fixture must build");
   return { ok: true, result: { ...built.result, snapshot: { ...built.result.snapshot, source: label } } };
 }
 
-const down: PnrOutcome = { ok: false, code: "SOURCE_UNAVAILABLE", message: "RailKit did not answer in time." };
+const down: PnrOutcome = { ok: false, code: "SOURCE_UNAVAILABLE", message: "The primary did not answer in time." };
 const noRecord: PnrOutcome = { ok: false, code: "NOT_FOUND", message: "No record." };
 
 describe("createFallbackSource", () => {
   it("answers from the primary when it has a record, without asking the fallback", async () => {
     const primary = answering(record("railkit"));
-    const secondary = answering(record("rapidapi"));
+    const secondary = answering(record("live"));
     const out = await createFallbackSource(primary.source, secondary.source).check(PNR);
     expect(out.ok && out.result.snapshot.source).toBe("railkit");
     expect(secondary.check).not.toHaveBeenCalled();
@@ -36,7 +39,7 @@ describe("createFallbackSource", () => {
     ["our own rate limit", { ok: false, code: "RATE_LIMITED", message: "Slow down.", retryAfter: 5 } as PnrOutcome],
   ])("treats %s from the primary as the answer, never a reason to ask elsewhere", async (_label, outcome) => {
     const primary = answering(outcome);
-    const secondary = answering(record("rapidapi"));
+    const secondary = answering(record("live"));
     const out = await createFallbackSource(primary.source, secondary.source).check(PNR);
     expect(out).toEqual(outcome);
     expect(secondary.check).not.toHaveBeenCalled();
@@ -44,10 +47,10 @@ describe("createFallbackSource", () => {
 
   it("asks the fallback when the primary is unavailable, and labels the answer with the fallback's source", async () => {
     const primary = answering(down);
-    const secondary = answering(record("rapidapi"));
+    const secondary = answering(record("live"));
     const out = await createFallbackSource(primary.source, secondary.source).check(PNR);
     expect(secondary.check).toHaveBeenCalledWith(PNR);
-    expect(out.ok && out.result.snapshot.source).toBe("rapidapi");
+    expect(out.ok && out.result.snapshot.source).toBe("live");
   });
 
   it("passes on the fallback's no-record answer", async () => {
@@ -56,7 +59,7 @@ describe("createFallbackSource", () => {
   });
 
   it("keeps the primary's explanation when both are unavailable", async () => {
-    const secondaryDown: PnrOutcome = { ok: false, code: "SOURCE_UNAVAILABLE", message: "RapidAPI quota used up.", retryAfter: 60 };
+    const secondaryDown: PnrOutcome = { ok: false, code: "SOURCE_UNAVAILABLE", message: "The second source's quota is used up.", retryAfter: 60 };
     const out = await createFallbackSource(answering(down).source, answering(secondaryDown).source).check(PNR);
     expect(out).toEqual(down);
   });

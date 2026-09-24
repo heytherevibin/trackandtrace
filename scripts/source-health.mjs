@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // Is each configured PNR source alive, and how much of its allowance is left? Ask every source
 // this deployment would actually use — the primary, and the fallback if there is one — and say
-// plainly which answered. A source that is structurally dead (a spent monthly plan, a refused
-// key) looks exactly like a source that is briefly busy unless somebody asks, so this is the
-// asking. It exits non-zero the moment one cannot answer, so a check can be wired to it.
+// plainly which answered. A source that is structurally dead (a spent plan, a refused key) looks
+// exactly like a source that is briefly busy unless somebody asks, so this is the asking. It
+// exits non-zero the moment one cannot answer, so a check can be wired to it.
 //
 //   node --env-file=.env.local scripts/source-health.mjs [<10-digit PNR>]
 //   (or: npm run source:health -- [<PNR>])
@@ -13,6 +13,10 @@
 // record", and that answer is what proves the source is alive and the key is accepted. Pass a
 // real PNR to exercise the record path too.
 //
+// One provider is configured today. Everything below reads the PROVIDERS table rather than that
+// one name — the roles, the two-source wording and the closing line all stay — so a second
+// provider is one entry here and nothing else. See PNR_FALLBACK in src/services/env.ts.
+//
 // Like the probes beside it, this prints shapes and statuses only. No key is ever printed, the
 // PNR is never printed, and every line is passed through the same ten-digit mask the server log
 // uses, so the output is safe to paste into an issue.
@@ -21,12 +25,27 @@
 
 import { pathToFileURL } from "node:url";
 
-const PROVIDERS = new Set(["railkit", "rapidapi"]);
+/**
+ * Every third-party provider this product can be pointed at: where its key lives, and how it is
+ * asked for a PNR. The only provider-specific knowledge in the file.
+ */
+export const PROVIDERS = {
+  railkit: {
+    key: (env) => env.RAILKIT_API_KEY,
+    request: (pnr, env) => ({
+      url: `${env.RAILKIT_BASE_URL || "https://api.railkit.in"}/api/v1/pnr/${pnr}`,
+      headers: { "x-api-key": env.RAILKIT_API_KEY, accept: "application/json" },
+    }),
+  },
+};
 
 /** Not a reservation anybody holds. Used only when the operator does not supply one; never printed. */
 const PROBE_PNR = "0000000000";
 
 const TIMEOUT_MS = 15_000;
+
+/** An allowance that does not refill within a day is gone for this shift, not briefly busy. */
+const LONG_REST_SECONDS = 24 * 60 * 60;
 
 /** The same rule the server log follows: a ten-digit run never reaches a terminal or a paste. */
 export function mask(text) {
@@ -37,32 +56,45 @@ export function mask(text) {
 // Reading the answer
 // ---------------------------------------------------------------------------
 
-/**
- * What RapidAPI's 429 body says about itself. A MONTHLY allowance that is spent will not come
- * back until the plan resets or is upgraded; a DAILY or per-second cap refills on its own. The
- * gateway states which in as many words, so the two need never be confused.
- */
-export function readQuotaMessage(body) {
-  const message = body !== null && typeof body === "object" && !Array.isArray(body) && typeof body.message === "string" ? body.message : "";
-  const period = /exceeded the (MONTHLY|DAILY|HOURLY|MINUTELY|SECONDLY) quota/i.exec(message)?.[1]?.toUpperCase();
-  if (!period) return { kind: "busy" };
-  if (period !== "MONTHLY") return { kind: "busy", period };
-  return { kind: "exhausted", period, plan: /on your current plan,\s*([^.]+)/i.exec(message)?.[1]?.trim().toUpperCase() };
-}
-
-/** Refusals that mean the PNR has no record. Mirrors src/services/sources/irctc-record.ts: each needs the PNR in view. */
-const NO_RECORD = [/\bno pnr data\b/i, /\b(?:invalid|not valid|wrong)\b.{0,20}\bpnr\b/i, /\bpnr\b.{0,40}\b(?:not found|invalid|not valid|does not exist|flushed|not yet generated)\b/i, /\bflushed\b/i, /\bnot yet generated\b/i, /\bno (?:reservation )?records? found\b/i];
-
 function header(headers, name) {
   const value = headers?.[name];
   return value === undefined || value === null || value === "" ? "not sent" : String(value);
 }
 
-/** What the provider says is left. RailKit sends the IETF RateLimit headers; RapidAPI its own. */
-function allowanceNotes(provider, headers) {
-  const names = provider === "railkit" ? ["ratelimit-policy", "ratelimit-limit", "ratelimit-remaining", "ratelimit-reset"] : ["x-ratelimit-requests-limit", "x-ratelimit-requests-remaining"];
-  return [...names, "retry-after"].map((name) => `${name}: ${header(headers, name)}`);
+/**
+ * What the provider says is left, read from the IETF RateLimit headers. They are a standard
+ * rather than one provider's convention, so every provider is asked the same question; one that
+ * answers in names of its own would need its own list here.
+ */
+function allowanceNotes(headers) {
+  return ["ratelimit-policy", "ratelimit-limit", "ratelimit-remaining", "ratelimit-reset", "retry-after"].map((name) => `${name}: ${header(headers, name)}`);
 }
+
+function positiveSeconds(value) {
+  const seconds = Number(value);
+  return Number.isFinite(seconds) && seconds > 0 ? Math.floor(seconds) : undefined;
+}
+
+/**
+ * How long a 429 says the allowance is gone for, taken from the headers the provider sends rather
+ * than from any one gateway's prose. A plan-sized rest — RailKit's RateLimit policy window is a
+ * month — will not refill within the shift and needs a person; a per-second or per-minute cap
+ * refills on its own. The two must never be confused: one is an outage, the other is a moment.
+ */
+export function readRest(headers) {
+  const seconds = positiveSeconds(header(headers, "retry-after")) ?? positiveSeconds(header(headers, "ratelimit-reset"));
+  if (seconds === undefined) return { kind: "busy" };
+  return seconds >= LONG_REST_SECONDS ? { kind: "exhausted", seconds } : { kind: "busy", seconds };
+}
+
+/** "6 hours", "31 days": a long rest reads better in days. */
+function restLabel(seconds) {
+  const hours = Math.round(seconds / 3600);
+  return hours >= 48 ? `${Math.round(hours / 24)} days` : `${hours} hours`;
+}
+
+/** Refusals that mean the PNR has no record. Mirrors src/services/sources/irctc-record.ts: each needs the PNR in view. */
+const NO_RECORD = [/\bno pnr data\b/i, /\b(?:invalid|not valid|wrong)\b.{0,20}\bpnr\b/i, /\bpnr\b.{0,40}\b(?:not found|invalid|not valid|does not exist|flushed|not yet generated)\b/i, /\bflushed\b/i, /\bnot yet generated\b/i, /\bno (?:reservation )?records? found\b/i];
 
 function refusalText(body) {
   if (body === null || typeof body !== "object" || Array.isArray(body)) return "";
@@ -73,7 +105,7 @@ function refusalText(body) {
  * One probe's answer turned into a verdict. Alive means the source answered — a record, or an
  * honest "no such PNR". Anything else is a source that cannot answer, whatever the reason.
  */
-export function verdict(provider, answer) {
+export function verdict(answer) {
   if (answer.unkeyed) return { alive: false, summary: "no key is set for it, so it cannot be asked at all", notes: [] };
   if (answer.failure) {
     const timedOut = answer.failure === "TimeoutError" || answer.failure === "AbortError";
@@ -81,19 +113,18 @@ export function verdict(provider, answer) {
   }
 
   const { status, headers = {}, body } = answer;
-  const notes = allowanceNotes(provider, headers);
+  const notes = allowanceNotes(headers);
   const refusal = refusalText(body);
   const said = refusal ? [...notes, `it said: ${mask(JSON.stringify(refusal))}`] : notes;
 
   if (status === 401 || status === 403) return { alive: false, summary: `the key or the plan was refused (HTTP ${status})`, notes: said };
   if (status === 429) {
-    const quota = readQuotaMessage(body);
-    if (quota.kind === "exhausted") {
-      const plan = quota.plan ? `plan ${quota.plan}` : "the plan";
-      return { alive: false, summary: `the MONTHLY allowance for ${plan} is spent — it will not come back until the plan resets or is upgraded (HTTP 429)`, notes: said };
+    const rest = readRest(headers);
+    if (rest.kind === "exhausted") {
+      return { alive: false, summary: `the allowance is spent for the next ${restLabel(rest.seconds)} — it will not come back on its own today (HTTP 429)`, notes: said };
     }
-    const period = quota.period ? `the ${quota.period} cap` : "the rate limit";
-    return { alive: false, summary: `${period} is reached (HTTP ${status})`, notes: said };
+    const refills = rest.seconds === undefined ? "" : `, and refills in ${rest.seconds} s`;
+    return { alive: false, summary: `the rate limit is reached${refills} (HTTP ${status})`, notes: said };
   }
   if (status >= 500) return { alive: false, summary: `it returned an error (HTTP ${status})`, notes: said };
   if (status >= 400) {
@@ -107,20 +138,25 @@ export function verdict(provider, answer) {
 // What this deployment is actually wired to
 // ---------------------------------------------------------------------------
 
+/** Only a name this table holds is a provider: PNR_SOURCE is operator input, not a key to trust. */
+function known(providers, name) {
+  return typeof name === "string" && Object.hasOwn(providers, name);
+}
+
 /** The sources this environment would ask, in the order it would ask them. */
-export function plannedProbes(env) {
+export function plannedProbes(env, providers = PROVIDERS) {
   const source = env.PNR_SOURCE ?? "live";
   const fallback = env.PNR_FALLBACK ?? "none";
-  const keyed = (provider) => Boolean(provider === "railkit" ? env.RAILKIT_API_KEY : env.RAPIDAPI_KEY);
+  const keyed = (name) => Boolean(providers[name].key(env));
   const planned = [];
-  if (PROVIDERS.has(source)) planned.push({ provider: source, role: "primary", keyed: keyed(source) });
-  if (PROVIDERS.has(fallback) && fallback !== source) planned.push({ provider: fallback, role: "fallback", keyed: keyed(fallback) });
+  if (known(providers, source)) planned.push({ provider: source, role: "primary", keyed: keyed(source) });
+  if (known(providers, fallback) && fallback !== source) planned.push({ provider: fallback, role: "fallback", keyed: keyed(fallback) });
   return planned;
 }
 
 /** Said before anything is asked: how many sources there are is a fact an operator should read, not infer. */
-export function configurationLine(planned) {
-  if (planned.length === 0) return "No third-party source is configured: PNR_SOURCE names neither railkit nor rapidapi, so there is nothing to ask.";
+export function configurationLine(planned, providers = PROVIDERS) {
+  if (planned.length === 0) return `No third-party source is configured: PNR_SOURCE names none of ${Object.keys(providers).join(", ")}, so there is nothing to ask.`;
   const [primary, fallback] = planned;
   if (!fallback) return `One source, no fallback: ${primary.provider} answers every check, and nothing answers when it cannot.`;
   return `Two sources: ${primary.provider} answers, and ${fallback.provider} is asked only while ${primary.provider} is unavailable.`;
@@ -148,19 +184,9 @@ export function exitCodeFor(verdicts) {
 // Asking
 // ---------------------------------------------------------------------------
 
-function request(provider, pnr, env) {
-  if (provider === "railkit") {
-    const base = env.RAILKIT_BASE_URL || "https://api.railkit.in";
-    return { url: `${base}/api/v1/pnr/${pnr}`, headers: { "x-api-key": env.RAILKIT_API_KEY, accept: "application/json" } };
-  }
-  const host = env.RAPIDAPI_HOST || "irctc1.p.rapidapi.com";
-  const path = env.RAPIDAPI_PNR_PATH || "/api/v3/getPNRStatus";
-  return { url: `https://${host}${path}?pnrNumber=${pnr}`, headers: { "x-rapidapi-key": env.RAPIDAPI_KEY, "x-rapidapi-host": host, accept: "application/json" } };
-}
-
-async function ask(entry, pnr, env) {
+async function ask(entry, pnr, env, providers = PROVIDERS) {
   if (!entry.keyed) return { unkeyed: true };
-  const { url, headers } = request(entry.provider, pnr, env);
+  const { url, headers } = providers[entry.provider].request(pnr, env);
   const started = Date.now();
   try {
     const response = await fetch(url, { headers, signal: AbortSignal.timeout(TIMEOUT_MS) });
@@ -193,7 +219,7 @@ async function main() {
   const reports = [];
   for (const entry of planned) {
     const answer = await ask(entry, pnr, process.env);
-    const out = verdict(entry.provider, answer);
+    const out = verdict(answer);
     reports.push({ ...entry, ...out });
     const took = answer.ms === undefined ? "" : ` · ${answer.ms} ms`;
     console.log(`${entry.provider} (${entry.role}) — ${out.alive ? "ALIVE" : "CANNOT ANSWER"}${took}`);

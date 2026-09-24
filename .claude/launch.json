@@ -23,20 +23,11 @@
       "port": 3100
     },
     {
-      "name": "start:rapidapi",
-      "runtimeExecutable": "sh",
-      "runtimeArgs": [
-        "-c",
-        "PNR_SOURCE=rapidapi npx next start --port 3200"
-      ],
-      "port": 3200
-    },
-    {
       "name": "dev:railkit",
       "runtimeExecutable": "sh",
       "runtimeArgs": [
         "-c",
-        "PNR_SOURCE=railkit PNR_FALLBACK=rapidapi npx next dev --port 3300"
+        "PNR_SOURCE=railkit npx next dev --port 3300"
       ],
       "port": 3300
     }

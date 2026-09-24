@@ -29,7 +29,7 @@ describe("JourneyDetails", () => {
 
   it("says Not returned for journey facts the source did not send", () => {
     const base = fixtureResult("2345678901");
-    const snapshot = { ...base.snapshot, source: "rapidapi" as const, train: { number: "12658", from: { code: "SBC", city: "KSR Bengaluru" }, to: { code: "MAS" } }, chartAt: undefined, chartTime: undefined };
+    const snapshot = { ...base.snapshot, source: "railkit" as const, train: { number: "12658", from: { code: "SBC", city: "KSR Bengaluru" }, to: { code: "MAS" } }, chartAt: undefined, chartTime: undefined };
     render(<JourneyDetails snapshot={snapshot} quota="GN" />);
     const value = (label: string) => screen.getByText(label, { selector: "dt" }).nextElementSibling;
     expect(value("Train")).toHaveTextContent(/^12658$/);

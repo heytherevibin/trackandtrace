@@ -34,25 +34,19 @@ Production refuses `PNR_SOURCE=fixture` at boot. With `PNR_SOURCE=live` and no p
 
 1. Buy a paid RailKit plan (commercial use needs one) and put the dashboard key in `.env.local`: `RAILKIT_API_KEY=railkit_…` (server only; never commit or paste it anywhere).
 2. Confirm the response shape with your own PNR: `npm run source:probe:railkit -- <PNR>`. It prints field names, types and RailKit's error text only, never record values.
-3. Set `PNR_SOURCE=railkit`, and optionally `PNR_FALLBACK=rapidapi` so RapidAPI answers while RailKit is unavailable (never on "no record"; its answers are labelled RapidAPI).
+3. Run with it: `npm run dev:railkit` (or set `PNR_SOURCE=railkit` in the deployment's environment).
 
-RailKit's terms allow display inside your own app and short caching for performance; they forbid reselling or redistributing its data. An expired paid plan drops to 50 requests a month, and RailKit may suspend keys without notice, which is why the fallback exists.
+Anything the adapter cannot read (an unknown seat status, class, or date) fails closed with an explicit unavailable state. RailKit's terms allow display inside your own app and short caching for performance; they forbid reselling or redistributing its data. The official path is CRIS's Pravah API platform.
 
-### Real data through RapidAPI (third-party, fallback)
+### Only one source
 
-`PNR_SOURCE=rapidapi` reads the RapidAPI **"IRCTC" API by IRCTCAPI** (`irctc1.p.rapidapi.com`, `GET /api/v3/getPNRStatus`). It is a third party, not affiliated with IRCTC or Indian Railways, and not a verified source, so travellers never see its name: results read as Trakline. Its predictions and passenger names are never read; fields it does not send read "Not returned".
-
-1. Subscribe to the API on RapidAPI and put your key in `.env.local`: `RAPIDAPI_KEY=…` (server only; never commit it).
-2. Confirm the response shape with your own PNR: `npm run source:probe -- <PNR>`. It prints field names and types only, never values.
-3. Run with it: `npm run dev:rapidapi` (or set `PNR_SOURCE=rapidapi` in the deployment's environment).
-
-Anything the adapter cannot read (an unknown seat status, class, or date) fails closed with an explicit unavailable state. Check the provider's terms before production use; the official path is CRIS's Pravah API platform.
+RailKit is the only provider. `PNR_FALLBACK` names a second one to ask while the first is unavailable, and there is no second one to name, so `none` is the only value that parses and anything else is refused at boot (`src/services/env.ts`). That makes RailKit a single point of failure: an expired paid plan quietly drops to 50 requests a month, and RailKit may suspend a key without notice. `npm run source:health` is how you find out before travellers do — it asks each configured source once and exits non-zero when one cannot answer. The fallback seam is kept, tested and ready for a second provider.
 
 ## Scripts
 
 | Command | Does |
 | --- | --- |
-| `npm run dev` / `dev:fixture` | Dev server (port 3000), without / with sample data |
+| `npm run dev` / `dev:fixture` / `dev:railkit` | Dev server (port 3000): no source, sample data, or RailKit |
 | `npm run check` | typecheck → lint → unit tests → production build |
 | `npm run test:unit` / `test:e2e` | Vitest / Playwright (desktop 1280 + mobile 390) |
 | `npm run db:start` / `db:reset` / `db:types` | Local Supabase stack, migrations + seed, generated DB types |

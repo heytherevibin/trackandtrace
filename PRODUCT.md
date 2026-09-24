@@ -28,7 +28,7 @@ Only fields returned by the reservation service are shown, each with its retriev
 
 ## Capabilities and Constraints
 
-Confirmed: PNR validation and the 3-3-4 digit entry control; a live third-party source (RailKit, with a RapidAPI fallback) connected behind the source seam, with an honest unavailable state when it does not answer; result surface (status band, passenger table, journey details, provenance timeline); local watchlist with account sync, merge, and undo; recent checks; share and copy of a result link; account export and deletion; pre-booking form with no inventory source; accuracy page with no records; privacy and terms pages.
+Confirmed: PNR validation and the 3-3-4 digit entry control; a live third-party source (RailKit) connected behind the source seam, with an honest unavailable state when it does not answer; result surface (status band, passenger table, journey details, provenance timeline); local watchlist with account sync, merge, and undo; recent checks; share and copy of a result link; account export and deletion; pre-booking form with no inventory source; accuracy page with no records; privacy and terms pages.
 
 Constraints: strict real-only data policy; prediction, trend, and factor fields exist in the type layer but are never rendered; passenger names are never stored or rendered; the third-party providers are wired, and the official path (CRIS Pravah) is under evaluation; English only for now with a locale-ready string structure (Hindi planned for the traveller-features phase).
 
@@ -45,7 +45,7 @@ Stack: Next.js 16 App Router, TypeScript strict, Tailwind CSS v4, Supabase (Auth
 
 ## Evidence on Hand
 
-- No official railway provider is connected. Behind the scenes, PNR checks are answered by RailKit (railkit.in), a third party not affiliated with IRCTC, with the RapidAPI "IRCTC" API (IRCTCAPI) as a fallback while RailKit is unavailable. Travellers see one service: results read "Retrieved … from Trakline", failures speak in one neutral voice, and travellers never see the provider's name. The official path under evaluation is CRIS Pravah.
+- No official railway provider is connected. Behind the scenes, PNR checks are answered by RailKit (railkit.in), a third party not affiliated with IRCTC, and by nothing else: it is the only provider, so an outage on its side is an outage for every check. Travellers see one service: results read "Retrieved … from Trakline", failures speak in one neutral voice, and travellers never see the provider's name. The official path under evaluation is CRIS Pravah.
 - No testimonials, customer names, usage metrics, ratings, or accuracy records exist. None may be fabricated.
 - No logo, icon, or social image assets exist; the mark is designed in this redesign.
 - The development fixture (deterministic sample records keyed by PNR digits) is design and test material only and must never be presented as real.

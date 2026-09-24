@@ -5,20 +5,21 @@ import { UNLIMITED_BUDGET } from "@/services/live-budget";
 import { queryPnr } from "@/services/pnr-query";
 import { MemoryRateLimiter } from "@/services/rate-limit";
 import { singleFlight } from "@/services/single-flight";
-import { createFallbackSource } from "@/services/sources/fallback";
 import { createRailkitSource } from "@/services/sources/railkit";
-import { createRapidApiSource } from "@/services/sources/rapidapi";
 import type { PnrDataSource } from "@/services/pnr-source";
 import type { PnrOutcome } from "@/types/domain";
 
 // ---------------------------------------------------------------------------
-// With one source and no fallback, "the source cannot answer" stops being an edge case and
-// becomes the failure mode. The one thing this product must never do is turn it into "there is
-// no such reservation": a traveller told their ticket does not exist acts on it.
+// One source and no fallback is not a hypothetical: it is what this deployment runs, and it is
+// what `PNR_FALLBACK` can be set to (see src/services/env.ts). So "the source cannot answer"
+// stops being an edge case and becomes the failure mode. The one thing this product must never
+// do is turn it into "there is no such reservation": a traveller told their ticket does not
+// exist acts on it.
 //
 // So every way RailKit can fail is pinned here twice — once at the adapter, once through the
 // query the API route calls — and the boundary is pinned too: a refusal only reads as "no
-// record" when it says so about the PNR. Real adapters, not stubs.
+// record" when it says so about the PNR. Real adapters, not stubs. What a second source behind
+// it would change is the subject of tests/unit/services/sources/fallback.test.ts.
 // ---------------------------------------------------------------------------
 
 const PNR = "4949608635";
@@ -117,48 +118,5 @@ describe("the boundary: what may read as no record", () => {
     if (out.ok) return;
     expect(out.code).toBe("SOURCE_UNAVAILABLE");
     expect(out.message).toBe(OUT.couldNotAnswer);
-  });
-});
-
-describe("today's shape: a primary that is down behind a fallback whose month is spent", () => {
-  /** Verbatim, from the probe on 2026-09-23: every RapidAPI endpoint answered with this. */
-  const MONTHLY_QUOTA_GONE = {
-    message: "You have exceeded the MONTHLY quota for Basic on your current plan, BASIC. Upgrade your plan at https://rapidapi.com/IRCTCAPI/api/irctc1",
-  };
-
-  function spentFallback() {
-    const fetchImpl = vi.fn(async () => json(429, MONTHLY_QUOTA_GONE));
-    const source = createRapidApiSource(
-      { key: "test-key-0123456789abcdef", host: "irctc1.p.rapidapi.com", path: "/api/v3/getPNRStatus", timeoutMs: 8_000 },
-      { fetch: fetchImpl as unknown as typeof fetch, now: () => NOW },
-    );
-    return { source, fetchImpl };
-  }
-
-  it.each(FAILURES)("%s still reads as unavailable when the fallback has nothing left", async (_label, fetchImpl) => {
-    const fallback = spentFallback();
-    const out = await createFallbackSource(railkit(fetchImpl), fallback.source).check(PNR);
-    expect(out.ok).toBe(false);
-    if (out.ok) return;
-    expect(out.code).toBe("SOURCE_UNAVAILABLE");
-    expect(out.code).not.toBe("NOT_FOUND");
-    expect(fallback.fetchImpl).toHaveBeenCalledTimes(1);
-  });
-
-  it("keeps the primary's explanation, not the spent plan's", async () => {
-    const out = await createFallbackSource(railkit(async () => json(500, { success: false, error: "Internal error" })), spentFallback().source).check(PNR);
-    expect(out.ok).toBe(false);
-    if (out.ok) return;
-    expect(out.message).toBe(OUT.error);
-    expect(out.message).not.toBe(OUT.noRecord);
-  });
-
-  it("still answers from the fallback while it has room", async () => {
-    const answered = createRapidApiSource(
-      { key: "test-key-0123456789abcdef", host: "irctc1.p.rapidapi.com", path: "/api/v3/getPNRStatus", timeoutMs: 8_000 },
-      { fetch: (async () => json(200, { status: false, message: "Flushed PNR / PNR not yet generated" })) as unknown as typeof fetch, now: () => NOW },
-    );
-    const out = await createFallbackSource(railkit(async () => json(500, { success: false, error: "Internal error" })), answered).check(PNR);
-    expect(out).toMatchObject({ ok: false, code: "NOT_FOUND" });
   });
 });

@@ -3,6 +3,9 @@ import { parseEnv, type Env } from "@/services/env";
 import { resetLocalState } from "@/services/shared-store";
 import { resolvePnrSource } from "@/services/sources";
 
+/** Shaped like a RailKit key so the env schema accepts it; assembled, never written out. */
+const FAKE_KEY = `railkit_${"0123456789abcdef".repeat(2)}`;
+
 // Breaker state lives in this instance's memory here; each test starts closed.
 afterEach(() => resetLocalState());
 
@@ -46,53 +49,37 @@ describe("resolvePnrSource", () => {
     expect(out.message).toMatch(/not connected/i);
   });
 
-  it("selects the RapidAPI adapter when PNR_SOURCE=rapidapi, labelled third-party", async () => {
-    const current = envOf({ NODE_ENV: "production", PNR_SOURCE: "rapidapi", RAPIDAPI_KEY: "test-key-0123456789abcdef" });
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ status: false, message: "Flushed PNR" }), { status: 200 }));
-    vi.stubGlobal("fetch", fetchMock);
-    const out = await resolvePnrSource(current).check("4949608635");
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(String((fetchMock.mock.calls[0] as unknown as [string])[0])).toContain("irctc1.p.rapidapi.com");
-    expect(out).toMatchObject({ ok: false, code: "NOT_FOUND" });
-    vi.unstubAllGlobals();
-  });
-
   it("selects the RailKit adapter when PNR_SOURCE=railkit, with its key in x-api-key", async () => {
-    const key = "railkit_0123456789abcdef0123456789abcdef";
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({ success: false, error: "PNR not found" }), { status: 404 }));
     vi.stubGlobal("fetch", fetchMock);
-    const out = await resolvePnrSource(envOf({ NODE_ENV: "production", PNR_SOURCE: "railkit", RAILKIT_API_KEY: key })).check("5827194603");
+    const out = await resolvePnrSource(envOf({ NODE_ENV: "production", PNR_SOURCE: "railkit", RAILKIT_API_KEY: FAKE_KEY })).check("5827194603");
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("https://api.railkit.in/api/v1/pnr/5827194603");
-    expect(new Headers(init.headers).get("x-api-key")).toBe(key);
+    expect(new Headers(init.headers).get("x-api-key")).toBe(FAKE_KEY);
     expect(out).toMatchObject({ ok: false, code: "NOT_FOUND" });
     vi.unstubAllGlobals();
   });
 
-  it("falls back to RapidAPI only while RailKit is unavailable", async () => {
-    const current = envOf({
-      NODE_ENV: "production",
-      PNR_SOURCE: "railkit",
-      RAILKIT_API_KEY: "railkit_0123456789abcdef0123456789abcdef",
-      PNR_FALLBACK: "rapidapi",
-      RAPIDAPI_KEY: "test-key-0123456789abcdef",
-    });
+  // The registry can compose a second source behind the first, and there is no second provider to
+  // compose: `PNR_FALLBACK` can only be `none` (see src/services/env.ts), so what this pins is what
+  // production does — one source, asked twice on a safe failure, and then nobody else. The
+  // composition itself is covered by tests/unit/services/sources/fallback.test.ts.
+  it("asks no second source when the only one is unavailable: today there is nothing behind it", async () => {
+    const current = envOf({ NODE_ENV: "production", PNR_SOURCE: "railkit", RAILKIT_API_KEY: FAKE_KEY });
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const hosts: string[] = [];
     vi.stubGlobal(
       "fetch",
       vi.fn(async (url: string) => {
         hosts.push(new URL(url).host);
-        return url.includes("railkit")
-          ? new Response("<html>Bad gateway</html>", { status: 502 })
-          : new Response(JSON.stringify({ status: false, message: "Flushed PNR" }), { status: 200 });
+        return new Response("<html>Bad gateway</html>", { status: 502 });
       }),
     );
     const out = await resolvePnrSource(current).check("5827194603");
-    // A 502 is a safe failure: RailKit is asked once more before the fallback.
-    expect(hosts).toEqual(["api.railkit.in", "api.railkit.in", "irctc1.p.rapidapi.com"]);
-    expect(out).toMatchObject({ ok: false, code: "NOT_FOUND" });
+    // A 502 is a safe failure: RailKit is asked once more, and then nothing else is asked at all.
+    expect(hosts).toEqual(["api.railkit.in", "api.railkit.in"]);
+    expect(out).toMatchObject({ ok: false, code: "SOURCE_UNAVAILABLE" });
 
     hosts.length = 0;
     vi.stubGlobal(

@@ -1,11 +1,15 @@
 import { z } from "zod";
 import type { PnrSource } from "@/types/domain";
 
-/** Providers that are not an official railway source. Server knowledge: travellers only ever see Trakline. */
-export type ThirdPartySource = Extract<PnrSource, "rapidapi" | "railkit">;
+/**
+ * Providers that are not an official railway source. Server knowledge: travellers only ever see
+ * Trakline. One member today, RailKit. The breaker, the usage counter and the provider guard are
+ * written over this set rather than over that one name, so a second provider costs them nothing.
+ */
+export type ThirdPartySource = Extract<PnrSource, "railkit">;
 
 export function isThirdPartySource(source: PnrSource): source is ThirdPartySource {
-  return source === "rapidapi" || source === "railkit";
+  return source === "railkit";
 }
 
 // ---------------------------------------------------------------------------
@@ -20,19 +24,22 @@ const envSchema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
     /**
-     * live (default) asks the verified provider seam; railkit reads the third-party RailKit API (railkit.in)
-     * and rapidapi the third-party RapidAPI "IRCTC" API (IRCTCAPI), neither affiliated with IRCTC, and every
-     * result is labelled so; fixture serves labelled sample data and is refused in production.
+     * live (default) asks the verified provider seam; railkit reads the third-party RailKit API
+     * (railkit.in), not affiliated with IRCTC, and every result is labelled so; fixture serves
+     * labelled sample data and is refused in production.
      */
-    PNR_SOURCE: z.enum(["live", "fixture", "rapidapi", "railkit"]).default("live"),
-    /** A second third-party source that answers only while PNR_SOURCE is unavailable. */
-    PNR_FALLBACK: z.enum(["none", "rapidapi", "railkit"]).default("none"),
+    PNR_SOURCE: z.enum(["live", "fixture", "railkit"]).default("live"),
+    /**
+     * A second third-party source, asked only while PNR_SOURCE is unavailable — never on "no
+     * record". It exists for a second provider, and there is no second provider yet: RailKit is
+     * the only one, and no source may be its own fallback, so today `none` is the only setting
+     * that parses. The seam is kept on purpose — one provider is a single point of failure for
+     * every check and for the prediction work behind them — and it opens by itself the day a
+     * second provider joins this enum. Until then a deployment that sets anything else is told
+     * so at boot rather than having it quietly ignored.
+     */
+    PNR_FALLBACK: z.enum(["none", "railkit"]).default("none"),
     LIVE_SOURCE_ENABLED: flag.default("0").transform((v) => v === "1"),
-    /** Server only. Never expose with a NEXT_PUBLIC_ prefix. */
-    RAPIDAPI_KEY: z.string().min(16).optional(),
-    RAPIDAPI_HOST: z.string().regex(/^[a-z0-9.-]+\.p\.rapidapi\.com$/).default("irctc1.p.rapidapi.com"),
-    RAPIDAPI_PNR_PATH: z.string().regex(/^\/[A-Za-z0-9/_-]+$/).default("/api/v3/getPNRStatus"),
-    RAPIDAPI_TIMEOUT_MS: z.coerce.number().int().min(1000).max(30000).default(8000),
     /** Server only. A RailKit dashboard key (railkit_…); never expose with a NEXT_PUBLIC_ prefix. */
     RAILKIT_API_KEY: z
       .string()
@@ -82,14 +89,18 @@ const envSchema = z
     CONSOLE_EMAIL_FROM: z.string().min(5).max(120).default("Trakline Console <console@trakline.in>"),
   })
   .superRefine((v, ctx) => {
-    if ((v.PNR_SOURCE === "rapidapi" || v.PNR_FALLBACK === "rapidapi") && !v.RAPIDAPI_KEY) {
-      ctx.addIssue({ code: "custom", path: ["RAPIDAPI_KEY"], message: "RAPIDAPI_KEY is required when RapidAPI is the source or the fallback." });
-    }
     if ((v.PNR_SOURCE === "railkit" || v.PNR_FALLBACK === "railkit") && !v.RAILKIT_API_KEY) {
       ctx.addIssue({ code: "custom", path: ["RAILKIT_API_KEY"], message: "RAILKIT_API_KEY is required when RailKit is the source or the fallback." });
     }
     if (v.PNR_FALLBACK !== "none" && v.PNR_FALLBACK === v.PNR_SOURCE) {
       ctx.addIssue({ code: "custom", path: ["PNR_FALLBACK"], message: "PNR_FALLBACK must name a different source than PNR_SOURCE." });
+    }
+    // Only a third-party source is asked through the fallback seam, so a fallback behind `live` or
+    // `fixture` would never be reached: refused here rather than silently ignored. With one provider
+    // in the enum these two rules together leave `none` as the only setting that parses; both stay
+    // true, and stop being exhaustive, the day a second provider joins it.
+    if (v.PNR_FALLBACK !== "none" && !isThirdPartySource(v.PNR_SOURCE)) {
+      ctx.addIssue({ code: "custom", path: ["PNR_FALLBACK"], message: "PNR_FALLBACK is only asked behind a third-party PNR_SOURCE; nothing would ask it here." });
     }
     if (v.NODE_ENV === "production" && v.PNR_SOURCE === "fixture") {
       ctx.addIssue({ code: "custom", path: ["PNR_SOURCE"], message: "PNR_SOURCE=fixture is refused in production." });
@@ -188,7 +199,6 @@ export function fixtureAllowed(current: Env = env()): boolean {
 export function activePnrSource(current: Env = env()): PnrSource {
   if (fixtureAllowed(current)) return "fixture";
   if (current.PNR_SOURCE === "railkit" && current.RAILKIT_API_KEY) return "railkit";
-  if (current.PNR_SOURCE === "rapidapi" && current.RAPIDAPI_KEY) return "rapidapi";
   return "live";
 }
 
@@ -197,12 +207,15 @@ export function liveRequestsPerDay(current: Env = env()): number {
   return current.LIVE_REQUESTS_PER_DAY;
 }
 
-/** The source that answers while the active one is unavailable, if one is configured. */
-export function fallbackPnrSource(current: Env = env()): Extract<PnrSource, "rapidapi" | "railkit"> | null {
+/**
+ * The source that answers while the active one is unavailable, if one is configured. Null with one
+ * provider — see PNR_FALLBACK above — and the rules that make it so are written here, not assumed,
+ * so a second provider needs nothing but its own line.
+ */
+export function fallbackPnrSource(current: Env = env()): ThirdPartySource | null {
   const active = activePnrSource(current);
   if (active === "fixture" || current.PNR_FALLBACK === "none" || current.PNR_FALLBACK === active) return null;
   if (current.PNR_FALLBACK === "railkit" && current.RAILKIT_API_KEY) return "railkit";
-  if (current.PNR_FALLBACK === "rapidapi" && current.RAPIDAPI_KEY) return "rapidapi";
   return null;
 }
 

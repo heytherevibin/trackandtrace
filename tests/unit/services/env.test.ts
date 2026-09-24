@@ -3,6 +3,9 @@ import { accountsConfigured, fixtureAllowed, googleSignInEnabled, liveRequestsPe
 
 const dev = { NODE_ENV: "development" } as const;
 
+/** Shaped like a RailKit key so the env schema accepts it; assembled, never written out. */
+const FAKE_KEY = `railkit_${"0123456789abcdef".repeat(2)}`;
+
 describe("parseEnv", () => {
   it("defaults PNR_SOURCE to live and rate limiting to auto", () => {
     const parsed = parseEnv(dev);
@@ -115,39 +118,32 @@ describe("derived flags", () => {
   });
 });
 
-describe("RapidAPI source configuration", () => {
-  it("requires a key when PNR_SOURCE=rapidapi", () => {
-    const parsed = parseEnv({ NODE_ENV: "production", PNR_SOURCE: "rapidapi" });
-    expect(parsed.ok).toBe(false);
-    if (parsed.ok) return;
-    expect(parsed.issues.join(" ")).toMatch(/RAPIDAPI_KEY/);
-  });
+describe("the active source", () => {
+  const of = (source: Record<string, string>) => {
+    const parsed = parseEnv(source);
+    if (!parsed.ok) throw new Error(parsed.issues.join("; "));
+    return parsed.env;
+  };
 
-  it("defaults the host, path, and timeout to the IRCTC API", () => {
-    const parsed = parseEnv({ NODE_ENV: "production", PNR_SOURCE: "rapidapi", RAPIDAPI_KEY: "test-key-0123456789abcdef" });
-    expect(parsed.ok).toBe(true);
-    if (!parsed.ok) return;
-    expect(parsed.env.RAPIDAPI_HOST).toBe("irctc1.p.rapidapi.com");
-    expect(parsed.env.RAPIDAPI_PNR_PATH).toBe("/api/v3/getPNRStatus");
-    expect(parsed.env.RAPIDAPI_TIMEOUT_MS).toBe(8000);
-  });
-
-  it("names the active source for provenance: fixture, rapidapi, or live", async () => {
+  it("names the active source for provenance: fixture, a third party, or live", async () => {
     const { activePnrSource } = await import("@/services/env");
-    const of = (source: Record<string, string>) => {
-      const parsed = parseEnv(source);
-      if (!parsed.ok) throw new Error(parsed.issues.join("; "));
-      return parsed.env;
-    };
     expect(activePnrSource(of({ NODE_ENV: "development", PNR_SOURCE: "fixture" }))).toBe("fixture");
-    expect(activePnrSource(of({ NODE_ENV: "production", PNR_SOURCE: "rapidapi", RAPIDAPI_KEY: "test-key-0123456789abcdef" }))).toBe("rapidapi");
+    expect(activePnrSource(of({ NODE_ENV: "production", PNR_SOURCE: "railkit", RAILKIT_API_KEY: FAKE_KEY }))).toBe("railkit");
     expect(activePnrSource(of({ NODE_ENV: "production" }))).toBe("live");
+  });
+
+  it("falls back to live when a third-party source is named without its key", async () => {
+    const { activePnrSource, isThirdPartySource } = await import("@/services/env");
+    const current = { ...of({ NODE_ENV: "production", PNR_SOURCE: "railkit", RAILKIT_API_KEY: FAKE_KEY }), RAILKIT_API_KEY: undefined };
+    expect(activePnrSource(current)).toBe("live");
+    expect(isThirdPartySource("live")).toBe(false);
+    expect(isThirdPartySource("fixture")).toBe(false);
+    expect(isThirdPartySource("railkit")).toBe(true);
   });
 });
 
-
 describe("RailKit source configuration", () => {
-  const KEY = "railkit_0123456789abcdef0123456789abcdef";
+  const KEY = FAKE_KEY;
   const of = (source: Record<string, string>) => {
     const parsed = parseEnv(source);
     if (!parsed.ok) throw new Error(parsed.issues.join("; "));
@@ -189,20 +185,35 @@ describe("RailKit source configuration", () => {
     },
   );
 
-  it("accepts RapidAPI as the fallback only with its key, and never the primary as its own fallback", () => {
-    expect(parseEnv({ NODE_ENV: "production", PNR_SOURCE: "railkit", RAILKIT_API_KEY: KEY, PNR_FALLBACK: "rapidapi" }).ok).toBe(false);
-    expect(
-      parseEnv({ NODE_ENV: "production", PNR_SOURCE: "railkit", RAILKIT_API_KEY: KEY, PNR_FALLBACK: "rapidapi", RAPIDAPI_KEY: "test-key-0123456789abcdef" }).ok,
-    ).toBe(true);
+  it("never lets a source be its own fallback", () => {
     const self = parseEnv({ NODE_ENV: "production", PNR_SOURCE: "railkit", RAILKIT_API_KEY: KEY, PNR_FALLBACK: "railkit" });
     expect(self.ok).toBe(false);
     if (self.ok) return;
     expect(self.issues.join(" ")).toMatch(/PNR_FALLBACK/);
   });
 
-  it("accepts RailKit as the fallback behind RapidAPI", () => {
-    const current = of({ NODE_ENV: "production", PNR_SOURCE: "rapidapi", RAPIDAPI_KEY: "test-key-0123456789abcdef", PNR_FALLBACK: "railkit", RAILKIT_API_KEY: KEY });
-    expect(current.PNR_FALLBACK).toBe("railkit");
+  it.each([["live"], ["fixture"]])("refuses a fallback behind PNR_SOURCE=%s, which would never ask it", (source) => {
+    const parsed = parseEnv({ NODE_ENV: "development", PNR_SOURCE: source, PNR_FALLBACK: "railkit", RAILKIT_API_KEY: KEY });
+    expect(parsed.ok).toBe(false);
+    if (parsed.ok) return;
+    expect(parsed.issues.join(" ")).toMatch(/PNR_FALLBACK/);
+  });
+
+  // The fallback seam is kept for a second provider and there is not one yet, so those two rules
+  // leave `none` as the only setting that parses. Pinned so the day it stops being true is a day
+  // somebody chose, not a day somebody discovered. See PNR_FALLBACK in src/services/env.ts.
+  it("leaves `none` as the only fallback that parses while one provider is configured", () => {
+    const settings = ["none", "railkit", "live", "fixture", "rapidapi"];
+    const accepted = settings.filter((fallback) => parseEnv({ NODE_ENV: "production", PNR_SOURCE: "railkit", RAILKIT_API_KEY: KEY, PNR_FALLBACK: fallback }).ok);
+    expect(accepted).toEqual(["none"]);
+  });
+
+  it("no longer knows the retired third-party source, by either of its names", () => {
+    expect(parseEnv({ NODE_ENV: "production", PNR_SOURCE: "rapidapi" }).ok).toBe(false);
+    // Its leftover variables are unknown keys, not errors: a deployment still carrying them boots.
+    const current = of({ NODE_ENV: "production", PNR_SOURCE: "railkit", RAILKIT_API_KEY: KEY, RAPIDAPI_KEY: "unused", RAPIDAPI_HOST: "irctc1.p.rapidapi.com" });
+    expect(current.PNR_SOURCE).toBe("railkit");
+    expect(Object.keys(current).filter((name) => name.startsWith("RAPIDAPI"))).toEqual([]);
   });
 });
 
