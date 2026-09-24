@@ -64,12 +64,13 @@ export function ThemeToggle({ className }: { readonly className?: string }) {
       onClick={() => switchTheme(setTheme, next.value)}
       aria-label={mounted ? label : messages.shell.theme.label}
       title={mounted ? label : undefined}
-      className={cn(MASTHEAD_CONTROL, MASTHEAD_ICON_CONTROL, "overflow-hidden", className)}
+      className={cn(MASTHEAD_CONTROL, MASTHEAD_ICON_CONTROL, className)}
     >
       {/* Entering and leaving icons overlap in one grid cell (no popLayout, which lifted the leaving icon out
-          of flow and flashed it outside the button on its last frame). The button clips its content, so a
-          turning icon is never painted past the box, whatever layers an engine composites it on. */}
-      <span aria-hidden="true" className="grid size-5 place-items-center">
+          of flow and flashed it outside the button on its last frame). The clip sits on this span, filling the
+          button's content box: same geometry as clipping the button did, but the button keeps its coarse-pointer
+          hit overlay, which overflow-hidden would have cut off with it (motion.css). */}
+      <span aria-hidden="true" className="grid size-full place-items-center overflow-hidden">
         <AnimatePresence initial={false}>
           {mounted ? (
             <m.span

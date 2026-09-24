@@ -74,6 +74,36 @@
   transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
 }
 
+/* A finger is not a cursor. On a touch screen every pressable answers across 44px, and the drawing
+   does not change: the overlay is transparent, centred on the control and out of flow, so nothing
+   moves and nothing is repainted. It is the control's own pseudo-element, so a hit on it IS a hit
+   on the control. The same family as the press above, plus .tap-44 for a link that is not dressed
+   as a button (the watchlist's sync link, 20px of drawn height). Both selectors are :where(), so an
+   explicit position or inset utility on a control still outranks them. Fields are replaced elements
+   and take no pseudo-element, so they are drawn at 40px and stay there — tests/e2e/tap-targets.spec.ts
+   says so out loud. A control that clips its own content clips this too, so the clip belongs on a
+   child (see ThemeToggle).
+   .tap-44-start grows from the inline start edge instead of the centre, for a narrow control with
+   a neighbour close on that side: centred, it would reach across the gap and answer in its place. */
+@media (pointer: coarse) {
+  :where(button, [role="button"], .press, .tap-44, .tap-44-start) {
+    position: relative;
+  }
+  :where(button, [role="button"], .press, .tap-44, .tap-44-start)::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    translate: -50% -50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+  }
+  :where(.tap-44-start)::after {
+    left: 0;
+    translate: 0 -50%;
+  }
+}
+
 /* During a theme switch every colour lands at once; only the press keeps easing (see ThemeToggle). */
 html[data-theme-switching] *,
 html[data-theme-switching] *::before,

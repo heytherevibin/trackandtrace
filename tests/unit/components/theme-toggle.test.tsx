@@ -18,8 +18,13 @@ describe("ThemeToggle", () => {
     expect(screen.getAllByRole("button")).toHaveLength(1);
     expect(button).toHaveAttribute("title", "Theme: System. Switch to Day");
     expect(button).toHaveClass("size-9");
-    // The turning icons are painted inside the box in every engine, whatever it composites.
-    expect(button).toHaveClass("overflow-hidden");
+    // The turning icons are painted inside the box in every engine, whatever it composites. The clip
+    // is on the icon's own span, filling the button's content box: on the button it would also cut
+    // off the coarse-pointer hit overlay, which is a pseudo-element reaching past the box (motion.css).
+    expect(button).not.toHaveClass("overflow-hidden");
+    const clip = button.firstElementChild;
+    expect(clip).toHaveClass("overflow-hidden");
+    expect(clip).toHaveClass("size-full");
     expect(button.textContent).toBe("");
     expect(button.querySelectorAll("svg")).toHaveLength(1);
   });
