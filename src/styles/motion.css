@@ -171,7 +171,8 @@ html[data-theme-switching] *::after {
 }
 
 /* Motion off (the landing footer's switch; html[data-motion], written before first paint): exactly the rules
-   above, on every traveller page, whatever the device says. Keep the two blocks identical. */
+   above, on every traveller page, whatever the device says.
+   tests/unit/styles/motion.contract.test.ts holds the two blocks to each other. */
 html[data-motion="off"],
 html[data-motion="off"] *,
 html[data-motion="off"] ::before,
