@@ -77,3 +77,45 @@ test.describe("Motion off stills the site's own movements", () => {
     });
   }
 });
+
+/** Clicks the theme button in the page and returns the most distinct transforms any icon took over 30 frames. */
+async function mostTurnsOfThemeIcon(page: Page): Promise<number> {
+  return page.evaluate(
+    () =>
+      new Promise<number>((done) => {
+        const seen = new Map<Element, Set<string>>();
+        const sample = (frame: number) => {
+          for (const icon of document.querySelectorAll('header button[aria-label^="Theme"] > span > span')) {
+            seen.set(icon, (seen.get(icon) ?? new Set<string>()).add(getComputedStyle(icon).transform));
+          }
+          if (frame < 30) requestAnimationFrame(() => sample(frame + 1));
+          else done(Math.max(0, ...[...seen.values()].map((values) => values.size)));
+        };
+        document.querySelector<HTMLButtonElement>('header button[aria-label^="Theme"]')!.click();
+        requestAnimationFrame(() => sample(1));
+      }),
+  );
+}
+
+test.describe("Motion's own animations follow Motion", () => {
+  // The control: it passes before SiteMotion exists, and proves the sampler can see a turn at all.
+  test("with Motion on, the theme icon turns through many frames as it changes", async ({ page }) => {
+    await gotoReady(page, "/watchlist");
+    expect(await mostTurnsOfThemeIcon(page)).toBeGreaterThan(3);
+  });
+
+  test("with Motion off, the icon changes at once, without turning", async ({ page }) => {
+    await page.addInitScript(() => window.localStorage.setItem("tt.motion", "off"));
+    await gotoReady(page, "/watchlist");
+    expect(await mostTurnsOfThemeIcon(page)).toBeLessThanOrEqual(2);
+    await expect(page.locator("html")).toHaveAttribute("data-theme", /light|dark/);
+  });
+
+  test("the page follows the device setting changing while it is open", async ({ page }) => {
+    await gotoReady(page, "/");
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await expect(page.locator("html")).toHaveAttribute("data-motion", "off");
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await expect(page.locator("html")).toHaveAttribute("data-motion", "on");
+  });
+});

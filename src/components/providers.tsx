@@ -1,8 +1,9 @@
 "use client";
 
-import { LazyMotion, MotionConfig, domAnimation } from "motion/react";
+import { LazyMotion, domAnimation } from "motion/react";
 import type { ReactNode } from "react";
 import { HydrationMarker } from "@/components/hydration-marker";
+import { SiteMotion } from "@/components/motion/site-motion";
 import { SessionProvider } from "@/components/session/session-provider";
 import { ThemeProvider } from "@/components/theme/theme-provider";
 import { ToastHost } from "@/components/ui/toast";
@@ -13,11 +14,11 @@ export function Providers({ userPromise, children }: { readonly userPromise: Pro
     <ThemeProvider>
       <SessionProvider userPromise={userPromise}>
         <LazyMotion features={domAnimation} strict>
-          <MotionConfig reducedMotion="user">
+          <SiteMotion>
             <HydrationMarker />
             {children}
             <ToastHost />
-          </MotionConfig>
+          </SiteMotion>
         </LazyMotion>
       </SessionProvider>
     </ThemeProvider>
