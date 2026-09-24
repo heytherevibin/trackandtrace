@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { QUOTAS_OPENING_NEAR_DEPARTURE, loadRouteFile, parseRouteFile, plannedCalls, preflight, rollingAskIsPointless } from "../../../scripts/crawl-plan.mjs";
+import { DEFAULT_DAILY_ALLOWANCE, QUOTAS_OPENING_NEAR_DEPARTURE, crawlCeiling, loadRouteFile, parseRouteFile, plannedCalls, preflight, rollingAskIsPointless } from "../../../scripts/crawl-plan.mjs";
 import { bookingClassSchema, quotaSchema } from "@/types/schemas";
 
 // ---------------------------------------------------------------------------
@@ -101,10 +101,19 @@ describe("the shipped route list", () => {
     expect(routes.map((r) => r.trainNo)).not.toContain("12951");
   });
 
-  it("costs 20 calls a run at worst, not 24: its two Tatkal combos make the pinned ask only", () => {
-    // Four combos × 2 asks + two Tatkal combos × 1 ask = 10 asks, each allowed the guard's one retry.
-    expect(plannedCalls({ routes })).toBe(20);
+  it("costs 28 calls a run at worst: its two Tatkal combos make the pinned ask only", () => {
+    // Six combos × 2 asks + two Tatkal combos × 1 ask = 14 asks, each allowed the guard's one retry.
+    expect(plannedCalls({ routes })).toBe(28);
     expect(routes.filter((r) => rollingAskIsPointless(r) !== null)).toHaveLength(2);
+  });
+
+  // The exact number above is a tripwire — it fires on any addition, which is how 12123 and 12621
+  // BPL-NDLS were noticed. This is the assertion that says why the number matters: the run REFUSES
+  // TO START when its worst case exceeds the ceiling, so a list that outgrows the gate does not
+  // crawl badly, it does not crawl at all. The gap is the headroom left for the next entry.
+  it("still fits under the default ceiling, which is what the number above is really about", () => {
+    const { ceiling } = crawlCeiling({ dailyAllowance: DEFAULT_DAILY_ALLOWANCE, liveReserve: 300, requested: undefined });
+    expect(plannedCalls({ routes })).toBeLessThanOrEqual(ceiling);
   });
 });
 
