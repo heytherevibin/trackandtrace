@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { runCrawl } from "../../../scripts/crawl-plan.mjs";
+import { runCrawl } from "../../../scripts/crawl-run.mjs";
 import { exitCodeFor, summarise } from "../../../scripts/crawl-report.mjs";
 
 // ---------------------------------------------------------------------------

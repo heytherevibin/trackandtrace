@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { REFUSALS_BEFORE_STALE, runCrawl } from "../../../scripts/crawl-plan.mjs";
+import { REFUSALS_BEFORE_STALE} from "../../../scripts/crawl-plan.mjs";
+import { runCrawl } from "../../../scripts/crawl-run.mjs";
 
 // ---------------------------------------------------------------------------
 // Split out of `crawl-run.test.ts` when that file crossed the repo's 500-line contract. The rest of

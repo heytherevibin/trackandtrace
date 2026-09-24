@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { REFUSALS_BEFORE_STALE, planAsks, runCrawl } from "../../../scripts/crawl-plan.mjs";
+import { REFUSALS_BEFORE_STALE, planAsks} from "../../../scripts/crawl-plan.mjs";
+import { runCrawl } from "../../../scripts/crawl-run.mjs";
 
 // ---------------------------------------------------------------------------
 // The loop that walks the plan and spends the calls. `ask` and `record` are injected, so every case

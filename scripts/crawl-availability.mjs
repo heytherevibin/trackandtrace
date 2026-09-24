@@ -69,8 +69,8 @@ import {
   plannedCalls,
   preflight,
   rollingAskIsPointless,
-  runCrawl,
 } from "./crawl-plan.mjs";
+import { runCrawl } from "./crawl-run.mjs";
 import { exitCodeFor, summarise } from "./crawl-report.mjs";
 import { DEFAULT_HORIZON_DAYS, DEFAULT_WINDOW_DAYS, cursorsForRun, cycleRuns, isIsoDate, parseCursors } from "./crawl-window.mjs";
 import { coverageReport, parseObservationRows, readObservations, summariseCoverage } from "./observations-coverage.mjs";
