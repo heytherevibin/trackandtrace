@@ -145,8 +145,10 @@ describe("runCrawl", () => {
 
   // The cursor is AWAY from today deliberately: a rolling ask that falls on today is the step a wrap
   // merged with the pinned one, and a refusal there takes no strike — `crawl-run-verdicts.test.ts`.
+  // And KEY_TWO answers deliberately: a run in which NOTHING answered strikes nobody at all, so the
+  // count only moves in a run that learnt something — `crawl-run-invariant.test.ts`.
   it("counts consecutive refusals ACROSS runs, because one run is now one rolling ask", async () => {
-    const { ask } = stubAsk(() => REFUSED);
+    const { ask } = stubAsk((n) => (n < 2 ? REFUSED : OK));
     const summary = await run({ ask, cursors: { [KEY_ONE]: { next: "2026-10-02", refusals: 2 } } });
     expect(summary.cursors[KEY_ONE]?.refusals).toBe(3);
   });

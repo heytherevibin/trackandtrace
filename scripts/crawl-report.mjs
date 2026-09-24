@@ -33,6 +33,12 @@
 //     demonstrably knows that route, so its rolling refusal is not evidence of a bad list entry and
 //     `runCrawl` clears the count. A counter that silently does not move is exactly the sort of
 //     thing an operator later calls a bug, so the run names every refusal it excused and why.
+//   * **A rolling refusal nothing in the run could weigh.** A provider outage refuses in the same
+//     words a route the provider has never heard of does, and spends a call doing it — so a run in
+//     which nothing at all answered cannot tell them apart and strikes nobody. It has to say that
+//     out loud: an operator seeing a wall of refusals and no verdict otherwise assumes the verdicts
+//     are still coming, and four days of somebody else's outage would otherwise have told them to
+//     delete every GN combo on the shipped list.
 //   * **A rolling refusal the run had no standing to settle.** When a gate stops the run before the
 //     same combo's other ask, the evidence that would have excused it was forfeited, so the count
 //     moves NEITHER way and the next complete run decides. An operator reading a stopped run must
@@ -168,6 +174,20 @@ export function summarise(summary) {
       lines.push(`  ${one.combo}  ${one.date}  would have been strike ${one.wouldHaveBeen} of ${REFUSALS_BEFORE_STALE} · count held at ${one.refusals} · next ${summary.cursors[one.combo]?.next ?? "?"} · ${one.because}`);
     }
     lines.push("  Nothing above is a bad list entry and nothing above is cleared: this run simply does not know. Run again once the provider has recovered.");
+  }
+
+  if (summary.blind.length > 0) {
+    lines.push(
+      "",
+      `${summary.blind.length} rolling refusal${s(summary.blind.length)} took NO staleness strike, because NOTHING IN THIS RUN ANSWERED. A strike says "the provider does not know this route" — and a route the provider has never heard of and a provider that is down refuse in the SAME words, so the only thing that tells them apart is whether something else answered. Nothing did. The count therefore did NOT move either way; it stands where the last run that learnt anything left it, and the next run in which anything answers decides:`,
+    );
+    for (const one of summary.blind) {
+      lines.push(`  ${one.combo}  ${one.date}  would have been strike ${one.wouldHaveBeen} of ${REFUSALS_BEFORE_STALE} · count held at ${one.refusals} · next ${summary.cursors[one.combo]?.next ?? "?"}`);
+    }
+    lines.push(
+      "  Nothing above is a bad list entry and nothing above is cleared. Check the PROVIDER before you check the list: a whole run of refusals and no verdict is what an outage looks like from in here.",
+      "  The cursors did move on — the provider refused the dates it was asked for — and the produced-no-rows count below still climbs, because a day nothing answered is a real hole in the dataset whoever caused it.",
+    );
   }
 
   if (summary.pinnedFailures.length > 0) {

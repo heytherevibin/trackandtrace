@@ -4,8 +4,9 @@
     "A confirmation model learns the trains it was shown. Three Rajdhanis give a model that predicts Rajdhanis and is confidently wrong about a branch passenger train, because premium AC stock, sleeper Mail/Express and short-haul seating clear their waitlists on completely different curves. Every entry below was chosen to widen the spread, not to be interesting.",
     "The spread this list aims at, and why each axis matters: train kind (Rajdhani, Superfast Mail/Express, ordinary Express), class (AC berth, sleeper berth, and a seating class, which is not a berth at all), quota (GN opens 60 days out and drains slowly; TQ opens one day out and drains in minutes, so it is a different process, not a busier version of the same one), leg length, and region (northern, southern and western zones fill differently).",
     "HOW EACH ENTRY IS SAMPLED, because it is not the same for all of them. A GN combo gets two asks a run: the rolling four-day window that walks the sixty-day horizon, and one pinned at today for the days_out = 0 outcome row. A TQ combo gets the PINNED ASK ONLY. Measured 2026-09-23 and 2026-09-24 on 12301 HWH-NDLS 2A/TQ: the pinned ask answered 2 rows both days while the rolling ask refused at 4 and at 7 days out, because Tatkal is not on sale that far ahead. So a TQ entry here is a sample of the last few days before departure and nothing else — which is the whole of what that quota has to say, and is what makes the GN/TQ pair below a contrast rather than two copies. See QUOTAS_OPENING_NEAR_DEPARTURE in scripts/crawl-routes.mjs.",
-    "What is missing, stated so it is not mistaken for a complete sample: no Vande Bharat, no Garib Rath, no festival-season special, no genuinely short branch line, and only one intermediate-station leg. Add those before anyone fits a model to this.",
-    "These entries are UNVERIFIED against the provider. The preflight only checks their shape; the first real run is what checks whether the provider knows them. 12951 is deliberately absent: it answered `Unable to process your request` for every class and date tried on 2026-09-23, which is a bad list entry wearing a failure's clothes. A combo the crawler reports as always-refusing belongs here too — deleted, not retried daily forever.",
+    "What is missing, stated so it is not mistaken for a complete sample: no Vande Bharat, no Garib Rath, no festival-season special, and STILL no genuinely short BRANCH LINE. 12123 CSMT-PUNE closes the short-leg gap and the chair-car gap, but Mumbai-Pune is a dense trunk corridor, not a branch — a branch line is a different demand shape again and is still owed. The second intermediate-station leg is now here (12621 BPL-NDLS). Add the rest before anyone fits a model to this.",
+    "HOW AN ENTRY GETS HERE, since the first six arrived unverified and one guess had already gone wrong. Ask the provider for the exact combo before adding it — `/api/v1/seats/:train/:from/:to/:date/:class/:quota` is the same question the crawler asks, and the only one that settles whether the train, the leg, the class and the quota all exist together. `/api/v1/trains/:no` returns a name and nothing else, so it confirms a train number but cannot confirm a leg. AND ASK A KNOWN-GOOD COMBO IN THE SAME BREATH: on 2026-09-24 every candidate refused with a 400, which reads exactly like four bad entries, until 12137 CSMT-NDLS — on this list and answering for two days — refused identically. The upstream was down. Without that control four good candidates would have been thrown away as dead.",
+    "The first six entries were UNVERIFIED against the provider when they were added. The preflight only checks their shape; the first real run is what checks whether the provider knows them. 12951 is deliberately absent: it answered `Unable to process your request` for every class and date tried on 2026-09-23, which is a bad list entry wearing a failure's clothes. A combo the crawler reports as always-refusing belongs here too — deleted, not retried daily forever.",
     "Only the `Refused N runs in a row` list means that. A combo whose pinned ask ANSWERS is one the provider knows, whatever its rolling ask did, and the run no longer counts a strike against it — which is what stopped both TQ entries below from being deleted after two runs for being Tatkal. And a combo that makes the pinned ask only can never appear on that list at all: watch the run's pinned-failure section for one that fails there every single day."
   ],
   "horizonDays": 60,
@@ -57,6 +58,22 @@
       "travelClass": "2S",
       "quota": "GN",
       "note": "Dadar–Madgaon Jan Shatabdi — a day train in a seating class, not a berth. 2S clears on a different curve entirely, and without one the model would only ever have seen overnight berths."
+    },
+    {
+      "trainNo": "12123",
+      "from": "CSMT",
+      "to": "PUNE",
+      "travelClass": "CC",
+      "quota": "GN",
+      "note": "Deccan Queen — a SHORT leg, about 192 km and three and a half hours, against a list otherwise made of overnight hauls of ten hours and up. A commuter-weighted corridor fills within days rather than over weeks, which is a clearance curve nothing else here has. Also the list's only reserved chair car: 2S on 12051 is seating too, but unreserved-grade seating fills differently from CC. Validated against the provider 2026-09-24: 4 dated entries, first AVAILABLE."
+    },
+    {
+      "trainNo": "12621",
+      "from": "BPL",
+      "to": "NDLS",
+      "travelClass": "SL",
+      "quota": "GN",
+      "note": "Tamil Nadu Express again, same class and quota — but boarding at Bhopal, an INTERMEDIATE station, rather than at Chennai where it starts. That is the whole point of the entry: it is identical to the 12621 MAS-NDLS row in every axis except leg position, so the pair isolates what a mid-route leg does to a waitlist from everything else that might explain it. Intermediate legs hold a smaller quota and clear on their own schedule. Validated against the provider 2026-09-24: 4 dated entries, first WAITLIST."
     }
   ]
 }

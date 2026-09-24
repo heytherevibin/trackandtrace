@@ -200,8 +200,9 @@ describe("an ask that spent no call", () => {
 
   it("still advances the cursor when the provider DID see the request and refused it", async () => {
     // The guard against over-correcting: a real refusal is evidence about the date, and the band
-    // comes round again next sweep, closer in.
-    const { ask } = stubAsk(() => REFUSED);
+    // comes round again next sweep, closer in. KEY_TWO answers so the run learnt something: a run in
+    // which nothing answered holds every strike — `crawl-run-invariant.test.ts`.
+    const { ask } = stubAsk((n) => (n < 2 ? REFUSED : OK));
     const summary = await run({ ask, cursors: AWAY });
 
     expect(summary.notAsked).toEqual([]);

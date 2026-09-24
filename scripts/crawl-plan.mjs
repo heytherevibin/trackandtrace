@@ -178,6 +178,12 @@ export const RUNS_WITHOUT_ROWS_BEFORE_NOTICE = 7;
  * count, left exactly where the last complete run put it.
  */
 /** @typedef {{ combo: string, date: string, wouldHaveBeen: number, refusals: number, because: string }} Withheld */
+/**
+ * A rolling refusal held because NOTHING IN THE RUN ANSWERED. A dead route and a dead provider
+ * arrive in the same words, so a run that heard nothing cannot tell them apart. Same fields as
+ * `Withheld` less `because`: every entry has the same reason, and the section says it once.
+ */
+/** @typedef {{ combo: string, date: string, wouldHaveBeen: number, refusals: number }} Blind */
 /** A combo that has produced no rows for `RUNS_WITHOUT_ROWS_BEFORE_NOTICE` runs or more. NOT the stale list. */
 /** @typedef {{ combo: string, runs: number }} WithoutRows */
 /** @typedef {{ combo: string, kind: AskKind, date: string, code: string, why: string, rested: boolean }} NotAsked */
@@ -193,7 +199,7 @@ export const RUNS_WITHOUT_ROWS_BEFORE_NOTICE = 7;
  *   today: string, horizonDays: number, windowDays: number,
  *   listed: number, planned: number, combos: number, asks: number, calls: number, rows: number,
  *   asked: Asked[], failures: Failure[], pinnedFailures: Failure[], notAsked: NotAsked[], forfeited: Forfeited[],
- *   shortWindows: ShortWindow[], excused: Excused[], withheld: Withheld[], withoutRows: WithoutRows[],
+ *   shortWindows: ShortWindow[], excused: Excused[], withheld: Withheld[], blind: Blind[], withoutRows: WithoutRows[],
  *   wrapped: string[], restarted: Restart[], stale: string[], cursors: Cursors, stopped: string | null,
  *   remaining: number | null, whole: boolean
  * }} Summary
