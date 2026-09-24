@@ -6,7 +6,10 @@ import { PNR, gotoReady } from "./helpers";
 // a control keeps its drawn size and carries a transparent overlay (the coarse-pointer rule in
 // motion.css), so the only honest test is to hit-test real points and see what answers.
 
-const ROUTES = ["/", "/watchlist", "/pre-booking", "/accuracy", "/privacy", "/tos", "/login", "/account", `/pnr#${PNR.mixed}`, "/offline"] as const;
+// /pnr#<notFound> settles on the PageHeader's back link, which a found record shows only while it
+// is still resolving: CI measured that moment and this machine did not, so the link's missing hit
+// area reached review and not the suite. The list is the axe scan's, so the two stay comparable.
+const ROUTES = ["/", "/watchlist", "/pre-booking", "/accuracy", "/privacy", "/tos", "/login", "/account", `/pnr#${PNR.mixed}`, `/pnr#${PNR.notFound}`, "/pnr/abc", "/nowhere", "/offline"] as const;
 
 const MIN = 44;
 
