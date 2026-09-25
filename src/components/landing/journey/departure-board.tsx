@@ -35,7 +35,9 @@ export function DepartureBoard() {
               <tr key={station.id}>
                 <td className="board-code">{station.code}</td>
                 <td className="board-name">
-                  <a href={`#${station.id}`}>{station.name}</a>
+                  <a href={`#${station.id}`} className="tap-44">
+                    {station.name}
+                  </a>
                 </td>
                 <td className="board-km tnum">{kmFigure(station.km)}</td>
               </tr>

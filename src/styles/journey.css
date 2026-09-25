@@ -85,6 +85,10 @@
   .board-km { display: none; }
   .board-code { width: 3rem; }
 }
+/* A finger is not a cursor: on touch screens each row is at least 44px, so every destination answers across 44px. */
+@media (pointer: coarse) {
+  .board-table td { padding-top: 12px; padding-bottom: 12px; }
+}
 
 /* ---- The hero dial: behind the check plate, only where the plate stands beside the words (two columns). Its
    left side fades out before the words, and the hero clips its width (hero.tsx), so it never scrolls the page. */
