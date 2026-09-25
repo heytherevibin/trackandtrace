@@ -18,6 +18,21 @@ async function waitForScrollSettled(page: Page): Promise<void> {
   }
 }
 
+/** Scrolls instantly so #how's top sits `by` px above the window's top (negative: below it), then lets the
+ * place guard's scroll listener, a throttled task here, record the position. */
+async function intoHow(page: Page, by: number): Promise<void> {
+  await page.evaluate((px) => {
+    const how = document.getElementById("how")!;
+    window.scrollTo({ top: how.getBoundingClientRect().top + window.scrollY + px, behavior: "instant" });
+  }, by);
+  await page.waitForTimeout(300);
+}
+
+/** How far #how's top is from its scroll-margin landing under the masthead. */
+function howOffLanding(page: Page): Promise<number> {
+  return page.locator("#how").evaluate((el) => Math.abs(el.getBoundingClientRect().top - Number.parseFloat(getComputedStyle(el).scrollMarginTop)));
+}
+
 async function throughHow(page: Page, fractions: readonly number[]): Promise<string[]> {
   const found: string[] = [];
   for (const f of fractions) {
@@ -194,5 +209,53 @@ test.describe("02 · the chapters, pinned", () => {
     await waitForJourney(page);
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
     await expect(page.locator("#how")).toHaveClass(/is-pinned/);
+  });
+  test("a window that turns wide and tall with the reader just inside a plain 02 keeps them at 02's start", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 360 });
+    await page.goto("/");
+    await waitForJourney(page);
+    await expect(page.locator("#how")).not.toHaveClass(/is-pinned/);
+    await intoHow(page, 60);
+    await page.setViewportSize({ width: 800, height: 1000 });
+    await page.waitForTimeout(600);
+    expect(await howOffLanding(page)).toBeLessThanOrEqual(4);
+  });
+
+  test("a pinned 02 that changes height below a reader above it never moves them", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.goto("/");
+    await waitForJourney(page);
+    await page.setViewportSize({ width: 800, height: 1000 });
+    await page.waitForTimeout(600);
+    await expect(page.locator("#how")).toHaveClass(/is-pinned/);
+    await intoHow(page, -100);
+    const before = await page.evaluate(() => window.scrollY);
+    await page.setViewportSize({ width: 800, height: 900 });
+    await page.waitForTimeout(600);
+    expect(Math.abs((await page.evaluate(() => window.scrollY)) - before)).toBeLessThanOrEqual(4);
+  });
+
+  test("the device reducing motion mid-02 lands the reader at 02's start", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/");
+    await waitForJourney(page);
+    await expect(page.locator("#how")).toHaveClass(/is-pinned/);
+    const middle = await page.locator("#how").evaluate((el) => (el.getBoundingClientRect().height - window.innerHeight) / 2);
+    await intoHow(page, middle);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.waitForTimeout(600);
+    await expect(page.locator("#how")).not.toHaveClass(/is-pinned/);
+    expect(await howOffLanding(page)).toBeLessThanOrEqual(4);
+  });
+
+  test("a phone turned upright with the reader inside a pinned 02 lands them at its start", async ({ page }) => {
+    await page.setViewportSize({ width: 844, height: 390 });
+    await page.goto("/");
+    await waitForJourney(page);
+    await expect(page.locator("#how")).toHaveClass(/is-pinned/);
+    await intoHow(page, 60);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.waitForTimeout(600);
+    expect(await howOffLanding(page)).toBeLessThanOrEqual(4);
   });
 });

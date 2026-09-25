@@ -29,21 +29,31 @@ function span(el: Element | null): Span | null {
   return { top: r.top, bottom: r.bottom };
 }
 
-// Keeps the reader's eye in place across the one resize #how makes while they are below it: Motion off
-// collapses the pinned height by the CSS selector alone (it needs html[data-motion="on"] as well as
-// .is-pinned), the instant <html data-motion> is rewritten, before any module's teardown gets a turn. The
-// collapse lands in two frames: the height at once, then the section's padding one frame later (Motion off's
-// 0.01ms transitions, motion.css), which only the border box shows. By then the browser has already moved
-// window.scrollY for the same reflow, so the reader's position is kept one step behind, off "scroll" events.
-let placeHeight = 0;
-let placeDocTop = 0;
+// Keeps the reader in the part of the page they were in whenever #how changes size: Motion off (the footer
+// switch, the device, another tab) collapses the pinned height by the CSS selector alone, before any module's
+// teardown gets a turn, and a resize or a turned phone refits it. The collapse lands in two frames: the height
+// at once, then the padding one frame later (Motion off's 0.01ms transitions, motion.css), which only the
+// border box shows. #how is measured afresh each time, against the box this guard last saw (its document top
+// moves with the window's width). By then the browser has already moved window.scrollY for the same reflow,
+// so the reader's position is kept one step behind, off "scroll" events.
+let placeBox: Span = { top: 0, bottom: 0 };
 let lastScrollY = 0;
 
+/** #how's box in document coordinates, measured now. */
+function docBox(section: HTMLElement): Span {
+  const r = section.getBoundingClientRect();
+  return { top: r.top + window.scrollY, bottom: r.bottom + window.scrollY };
+}
+
+/** Above 02's old start: nothing. Inside it: 02's new start, at its landing under the masthead. At or past its
+ * old end: the same distance past its new end (the height's change, plus its top's when the width moved it). */
 function settlePlace(section: HTMLElement): void {
-  const height = section.getBoundingClientRect().height;
-  const delta = height - placeHeight;
-  placeHeight = height;
-  if (delta !== 0 && lastScrollY > placeDocTop) window.scrollTo({ top: lastScrollY + delta, behavior: "instant" });
+  const was = placeBox;
+  const now = docBox(section);
+  placeBox = now;
+  const y = lastScrollY;
+  if (y >= was.bottom) window.scrollTo({ top: y + now.bottom - was.bottom, behavior: "instant" });
+  else if (y > was.top) window.scrollTo({ top: now.top - Number.parseFloat(getComputedStyle(section).scrollMarginTop), behavior: "instant" });
   lastScrollY = window.scrollY;
 }
 
@@ -52,9 +62,7 @@ function settlePlace(section: HTMLElement): void {
 export function startPlaceGuard(): Teardown {
   const section = document.getElementById("how");
   if (!section) return () => {};
-  const box = section.getBoundingClientRect();
-  placeHeight = box.height;
-  placeDocTop = box.top + window.scrollY;
+  placeBox = docBox(section);
   lastScrollY = window.scrollY;
   const onScroll = () => (lastScrollY = window.scrollY);
   window.addEventListener("scroll", onScroll, { passive: true });
