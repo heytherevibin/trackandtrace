@@ -73,7 +73,7 @@ export const journey = {
       retrieved: "retrieved",
     },
     party: (n: number, status: string, seat: string | null) => (seat ? `P${n} · ${status} · ${seat}` : `P${n} · ${status}`),
-    partyOf: (count: number) => `${NUMBER_WORDS[count] ?? String(count)} passengers`,
+    partyOf: (count: number) => `${NUMBER_WORDS[count] ?? String(count)} ${count === 1 ? "passenger" : "passengers"}`,
     time: (time: string) => `${time} IST`,
     stamp: (time: string) => `Retrieved ${time} IST · Sample data`,
   },

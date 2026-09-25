@@ -5,6 +5,7 @@ import { drawStrokes } from "@/components/landing/journey/drawing";
 import { HeroDial } from "@/components/landing/journey/hero-dial";
 import { startHero } from "@/components/landing/journey/hero";
 import { RESULT_EVENT, type ResultDetail } from "@/components/landing/journey/journey-events";
+import { keep } from "@/components/landing/journey/start-journey";
 
 // A drawn stroke's teardown (svg.createDrawable): the handle is cancelled, never reverted, and everything
 // drawable.js wrote is removed, so a rebuild finds the server's stroke and not a hidden "0 0" one.
@@ -65,7 +66,7 @@ describe("the hero dial's strokes", () => {
 
   it("are the server's again after the intro's rings are torn down", () => {
     const { container } = mount();
-    const stop = startHero({ motion: true, intro: true });
+    const stop = startHero({ motion: true, intro: true, result: keep<ResultDetail | null>(null) });
     const rings = [...container.querySelectorAll(".hero-dial svg > .dial-ring")];
     expect(rings).toHaveLength(3);
     stop();
@@ -74,7 +75,7 @@ describe("the hero dial's strokes", () => {
 
   it("are the server's again after the chart face's arc is torn down", () => {
     const { container } = mount();
-    const stop = startHero({ motion: true, intro: false });
+    const stop = startHero({ motion: true, intro: false, result: keep<ResultDetail | null>(null) });
     window.dispatchEvent(new CustomEvent<ResultDetail>(RESULT_EVENT, { detail: { hero: true, kind: "ok", chartAt: new Date(Date.now() + 3 * 3_600_000).toISOString() } }));
     const arc = container.querySelector(".dial-arc")!;
     expect(arc.getAttribute("d")).toMatch(/^M/);
@@ -87,7 +88,7 @@ describe("the berth plan's strokes", () => {
   it("carry no drawn state once torn down", () => {
     document.body.innerHTML = `<figure class="berth-plan"><svg><rect class="plan-line"/><line class="plan-line is-faint"/><rect class="plan-line plan-berth is-lit"/></svg></figure>`;
     // Off screen in jsdom (an empty box), so the entrance arms: every stroke is held hidden, at "0 0".
-    const stop = startBerths({ motion: true, intro: false });
+    const stop = startBerths({ motion: true, intro: false, result: keep<ResultDetail | null>(null) });
     const strokes = [...document.querySelectorAll(".plan-line")];
     expect(strokes.every((s) => s.getAttribute("draw") === "0 0")).toBe(true);
     stop();

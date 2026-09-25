@@ -216,7 +216,8 @@ function startDriver(section: HTMLElement, dial: SVGSVGElement): Teardown {
     drive.revert();
     observer.revert();
     ring?.revert();
-    for (const f of flourish) f.revert();
+    // Newest first: a re-entered stop's flourish takes the last one's landed value as its "original".
+    for (const f of [...flourish].reverse()) f.revert();
     utils.remove([...segs, ...bars]);
     items.forEach((li) => li.classList.remove("is-current"));
     arcs.forEach((a) => a.classList.remove("is-on"));

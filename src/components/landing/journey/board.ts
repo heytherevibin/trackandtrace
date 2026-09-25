@@ -58,6 +58,9 @@ export function startBoard({ motion }: JourneyContext): Teardown {
   const names = rows.map((row) => row.querySelector<HTMLElement>(".board-name a"));
   const values = new Map<HTMLElement, BoardStatus>();
   let station = 0;
+  // Every build starts from station 0, and the strip's first announcement is where the board already stood
+  // before it (a rebuild, a reload partway down): set, never flipped. Only a station reached after it flips.
+  let arrived = false;
 
   const text = (status: BoardStatus) => (status ? LABELS[status] : "");
   const paint = (flip: boolean) => {
@@ -75,7 +78,8 @@ export function startBoard({ motion }: JourneyContext): Teardown {
   };
   const onStation = (event: Event) => {
     station = (event as CustomEvent<StationDetail>).detail.index;
-    paint(true);
+    paint(arrived);
+    arrived = true;
   };
   window.addEventListener(STATION_EVENT, onStation);
   paint(false);

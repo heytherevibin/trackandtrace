@@ -7,7 +7,7 @@ import { startClock } from "./clock";
 import { startCursor } from "./cursor";
 import { startHero } from "./hero";
 import { introWanted, startIntro } from "./intro";
-import { LAYOUT_EVENT, REBUILD_EVENT } from "./journey-events";
+import { LAYOUT_EVENT, REBUILD_EVENT, type ResultDetail } from "./journey-events";
 import { JOURNEY_CHUNK_MARK } from "./journey-mark";
 import { refreshAll, untrackAll } from "./observers";
 import { startRoute } from "./route";
@@ -21,11 +21,29 @@ import { startStrip } from "./strip";
 
 export { JOURNEY_CHUNK_MARK };
 
+/** A value startJourney holds for its whole lifetime, across every rebuild. */
+export interface Kept<T> {
+  get(): T;
+  set(value: T): void;
+}
+
+export function keep<T>(initial: T): Kept<T> {
+  let value = initial;
+  return {
+    get: () => value,
+    set: (next) => {
+      value = next;
+    },
+  };
+}
+
 export interface JourneyContext {
   /** Motion on: things may move. Off: only true readings update, drawn still. */
   readonly motion: boolean;
   /** True only in the build that plays the once-per-visit intro. */
   readonly intro: boolean;
+  /** The hero plate's last result while it still shows it: its chart face is a true reading, so each build redraws it. */
+  readonly result: Kept<ResultDetail | null>;
 }
 export type Teardown = () => void;
 export type JourneyModule = (ctx: JourneyContext) => Teardown;
@@ -38,6 +56,7 @@ export function startJourney(): Teardown {
   let teardowns: Teardown[] = [];
   let resizeTimer = 0;
   let introPlayed = false;
+  const result = keep<ResultDetail | null>(null);
 
   const stopAll = () => {
     for (const t of teardowns.reverse()) t();
@@ -49,7 +68,7 @@ export function startJourney(): Teardown {
     const motion = html.getAttribute("data-motion") !== "off";
     const intro = !introPlayed && introWanted(motion);
     introPlayed = true;
-    const ctx: JourneyContext = { motion, intro };
+    const ctx: JourneyContext = { motion, intro, result };
     try {
       if (intro) teardowns.push(startIntro());
       for (const start of MODULES) teardowns.push(start(ctx));
@@ -104,3 +123,4 @@ export function startJourney(): Teardown {
     if (html.getAttribute("data-journey") === "on") html.removeAttribute("data-journey");
   };
 }
+

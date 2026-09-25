@@ -14,7 +14,7 @@ import type { JourneyContext, Teardown } from "./start-journey";
 // state is drawn at once. The rings' and the arc's draws are Drawings (drawing.ts): cancelled and cleared, never
 // reverted, so a rebuild finds them as the server drew them.
 
-export function startHero({ motion, intro }: JourneyContext): Teardown {
+export function startHero({ motion, intro, result }: JourneyContext): Teardown {
   const dial = document.querySelector<SVGSVGElement>(".hero-dial svg");
   const host = document.querySelector<HTMLElement>(".dial-host");
   if (!dial || !host) return () => {};
@@ -74,13 +74,14 @@ export function startHero({ motion, intro }: JourneyContext): Teardown {
     mark?.setAttribute("cy", "-352");
     if (readout) readout.textContent = "";
   };
-  const enterFace = (chartAt: string) => {
+  /** Draws the face; `fresh` only for a result just in, never for one a rebuild finds still on the plate. */
+  const enterFace = (chartAt: string, fresh: boolean) => {
     exitFace();
     face = { chartAt, timer: window.setInterval(paintFace, 20_000) };
     shell.classList.add("is-face");
     host.classList.add("is-face");
     paintFace();
-    if (motion) arcDraw.play({ draw: ["0 0", "0 1"], duration: T.draw, delay: T.fast, ease: ease.inOut() });
+    if (motion && fresh) arcDraw.play({ draw: ["0 0", "0 1"], duration: T.draw, delay: T.fast, ease: ease.inOut() });
   };
 
   const onPlate = (event: Event) => {
@@ -91,6 +92,7 @@ export function startHero({ motion, intro }: JourneyContext): Teardown {
     // face; the post-result echo of this same event carries `done: true`, so it never undoes the face onResult
     // just entered.
     if (!busy && !done) {
+      result.set(null);
       exitFace();
       stopSweep();
     }
@@ -107,10 +109,12 @@ export function startHero({ motion, intro }: JourneyContext): Teardown {
     spin = animate(sweep, { rotate: [0, 360], opacity: [0, 1, 1, 0], duration: 1200, loop: true, ease: ease.inOut() });
   };
   const onResult = (event: Event) => {
-    const { hero, chartAt } = (event as CustomEvent<ResultDetail>).detail;
+    const detail = (event as CustomEvent<ResultDetail>).detail;
+    const { hero, chartAt } = detail;
     if (!hero) return;
+    result.set(detail);
     stopSweep();
-    if (chartAt) enterFace(chartAt);
+    if (chartAt) enterFace(chartAt, true);
     else if (motion) running.push(animate(segs, { opacity: [1, 0.4, 1], duration: 580, delay: stagger(26), ease: ease.out() }));
   };
   const fine = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
@@ -123,6 +127,9 @@ export function startHero({ motion, intro }: JourneyContext): Teardown {
   // Start from what the plate already holds: the journey may have arrived after the reader began typing.
   lit = document.querySelectorAll('[data-testid="hero-instrument"] [data-cell][data-filled]').length;
   setDigits(lit);
+  // A rebuild (the Motion switch, a refit) while the plate still shows a result: its face is a true reading.
+  const shown = result.get()?.chartAt;
+  if (shown) enterFace(shown, false);
   window.addEventListener(PLATE_EVENT, onPlate);
   window.addEventListener(RUN_EVENT, onRun);
   window.addEventListener(RESULT_EVENT, onResult);
@@ -139,7 +146,9 @@ export function startHero({ motion, intro }: JourneyContext): Teardown {
     window.removeEventListener(RUN_EVENT, onRun);
     window.removeEventListener(RESULT_EVENT, onResult);
     window.removeEventListener("pointermove", onPointer);
-    for (const a of running) a.revert();
+    // Newest first: a tween's "original" is whatever an older one had written, so only this order ends on the
+    // server's value (the dashed ring's digit nudges ride its slow turn).
+    for (const a of [...running].reverse()) a.revert();
     stopSweep();
     exitFace();
     rings.clear();

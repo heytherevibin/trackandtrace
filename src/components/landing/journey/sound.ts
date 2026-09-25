@@ -68,7 +68,11 @@ export function startSound(): Teardown {
     if (step.level !== null) clack(audio, step.level);
   };
   const onChoice = (event: Event) => {
-    if (!(event as CustomEvent<SoundDetail>).detail.on) return;
+    if (!(event as CustomEvent<SoundDetail>).detail.on) {
+      // Off lets the audio device sleep; the next "on" (wake) resumes it.
+      void audio?.ctx.suspend().catch(() => undefined);
+      return;
+    }
     const a = wake();
     if (a) clack(a, 0.12);
   };
