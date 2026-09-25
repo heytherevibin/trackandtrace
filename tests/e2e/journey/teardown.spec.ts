@@ -19,8 +19,7 @@ interface Live {
   readonly drop: readonly string[];
 }
 
-/** Live values only: true readings that differ by the moment they are read, never by what a teardown left
- * (and one transform React's Motion owns). */
+/** Live values only: true readings that differ by the moment they are read, never by what a teardown left. */
 const LIVE: readonly Live[] = [
   // The station clock names the current minute, which moves between the two runs.
   { selector: ".station-clock", drop: ["aria-label"] },
@@ -36,8 +35,6 @@ const LIVE: readonly Live[] = [
   { selector: "td.board-status", drop: ["text"] },
   // The check legitimately adds a recent chip: the plate's own record, not the journey's.
   { selector: '[data-testid="recent-strip"]', drop: ["subtree"] },
-  // The plates' morph (React's Motion, plate-morph.tsx) owns its face's transform; the check remounts that face.
-  { selector: ".plate-morph > div", drop: ["style"] },
   // The plate announces its last result to assistive tech, and keeps it once cleared: React's, not the journey's.
   { selector: '[data-testid="hero-instrument"] [aria-live]', drop: ["text"] },
 ];
