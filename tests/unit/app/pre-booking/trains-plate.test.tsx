@@ -74,7 +74,7 @@ function plate(rows: readonly TrainRow[]): RouteAvailabilityAnswer {
 }
 
 function draw(rows: readonly TrainRow[], extra: { readonly sampleData?: boolean } = {}) {
-  render(<TrainsPlate answer={plate(rows)} refusal={null} sampleData={extra.sampleData ?? false} />);
+  render(<TrainsPlate answer={plate(rows)} refusal={null} sampleData={extra.sampleData ?? false} quota="GN" />);
 }
 
 describe("the route's trains", () => {
@@ -145,6 +145,7 @@ describe("the route's trains", () => {
         answer={null}
         refusal={{ ok: false, code: "SOURCE_UNAVAILABLE", message: "The reservation service could not answer." }}
         sampleData={false}
+        quota="GN"
       />,
     );
     expect(screen.queryByTestId("train-row")).not.toBeInTheDocument();
@@ -160,6 +161,7 @@ describe("the route's trains", () => {
         answer={plate([row()])}
         refusal={{ ok: false, code: "RATE_LIMITED", message: "Too many searches just now." }}
         sampleData={false}
+        quota="GN"
       />,
     );
     expect(screen.queryByTestId("train-row")).not.toBeInTheDocument();

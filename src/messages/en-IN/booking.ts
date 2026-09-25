@@ -75,7 +75,13 @@ export const booking = {
     /** How many days a week, never which ones: the provider's day mask has an unverified order. */
     runsDays: (days: number) => (days === 7 ? "Runs every day" : days === 1 ? "Runs 1 day a week" : `Runs ${days} days a week`),
     more: "More classes and dates",
+    opening: "Asking…",
     notAsked: (classes: string) => `${classes} not asked yet`,
+    /** Asked and unanswered — a fact about the request, never confused with "Not carried". */
+    classFailed: (classes: string) => `${classes} could not be answered`,
+    /** Over rows already in hand: neither sorting nor filtering spends a request. */
+    sort: { label: "Sort", departure: "Departure", duration: "Duration", fare: "Fare" },
+    onlyBookable: "Only what I can book",
     notCarried: "Not carried",
     /** Which class every row carries. Said aloud because a column nobody chose reads as arbitrary. */
     leadsWith: (cls: string) => `${cls} first`,

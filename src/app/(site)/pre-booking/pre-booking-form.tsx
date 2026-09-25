@@ -259,7 +259,7 @@ export function PreBookingForm() {
       </form>
 
       <div role="status" aria-live="polite">
-        {read === "ok" || read === "error" ? <TrainsPlate answer={answer} refusal={refusal} sampleData={sampleData} /> : null}
+        {read === "ok" || read === "error" ? <TrainsPlate answer={answer} refusal={refusal} sampleData={sampleData} quota={asked?.quota ?? quota} todayIso={minDate} /> : null}
       </div>
 
       <section className="blueprint mt-[28px]" aria-labelledby={`${ids}-lifecycle`}>
