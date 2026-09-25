@@ -1,16 +1,39 @@
 import type { MessageTree } from "../types";
 
-// Copy transcribed from the Claude Design sheet "Pre-booking B".
+// Copy for Form TL-02, transcribed from the Claude Design sheet "Pre-booking Availability".
+//
+// The form starts at the stations because nothing can turn a train number into a route: the source
+// has no train-to-route lookup, and the availability endpoint needs a station pair. So From and To
+// come first, and the train is chosen from what that route answers.
+//
+// Two sentences carry the most weight, and neither may ever be softened into the other:
+// `route.none` means "that pair has no trains" — a fact about the railway. Everything in
+// `messages.source` means "we could not ask". A traveller acts differently on each.
 
 export const booking = {
   title: "Availability before booking",
-  lead: "Pick class, quota, and date. Live availability appears here only when a timetable and inventory source is connected.",
+  lead: "Pick the stations, the train and the date. Trakline answers from the live reservation chart.",
   form: { title: "Availability request", sheet: "Form TL-02" },
-  train: { label: "Train", notConnected: "Train search: not connected" },
+  from: "From",
+  to: "To",
+  stationPlaceholder: "Code",
+  train: {
+    label: "Train",
+    waiting: "Enter From and To",
+    none: "No trains to choose",
+    looking: "Looking for trains…",
+  },
+  route: {
+    found: (count: number, from: string, to: string) => `${count === 1 ? "1 train runs" : `${count} trains run`} ${from} → ${to}.`,
+    none: (from: string, to: string) => `No trains run ${from} → ${to}. Check both codes — they are station codes, not names.`,
+    /** Shown beside a chosen train, from the route answer's own fields. Never assembled from a guess. */
+    detail: (departs: string, travelTime: string) => `Departs ${departs}, takes ${travelTime}.`,
+  },
   cls: "Class",
   quota: "Quota",
   date: "Journey date",
   submit: "Check availability",
+  checking: "Reading the chart…",
   classes: {
     "1A": "1A · First AC",
     "2A": "2A · AC 2-tier",
@@ -29,23 +52,46 @@ export const booking = {
     TQ: "TQ · Tatkal",
   },
   pastDate: "Pick today or a later date.",
+  availability: {
+    title: "Availability",
+    retrieved: (time: string) => `Retrieved ${time} IST from Trakline.`,
+    window: "Four dates come back at a time.",
+    columns: { date: "Date", availability: "Availability", fare: "Fare" },
+    /** The queue's two ends: where it started when booking opened, and where it is now. */
+    waitlistOf: (opened: number) => `of ${opened} when booking opened`,
+    nobodyCleared: "nobody has cleared yet",
+    closed: "Booking closed",
+    closedNote: "The chart is prepared. This is how it finished.",
+    today: "Today",
+    fare: (total: number) => `₹${total.toLocaleString("en-IN")}`,
+  },
   result: {
     title: "No availability returned",
-    detail: "No timetable or inventory source is connected. Nothing was estimated.",
-    requested: (cls: string, quota: string, date: string) => `Requested: ${cls} · ${quota} · ${date}.`,
+    requested: (train: string, cls: string, quota: string, date: string) => `Requested: ${train} · ${cls} · ${quota} · ${date}.`,
     responseLabel: "Response",
-    responseValue: "Not received",
+    responseValue: "Unavailable",
     provenanceLabel: "Provenance",
-    provenanceValue: "None",
+    provenanceValue: "Trakline",
     fallbackLabel: "Fallback",
-    fallbackValue: "Not used",
+    fallbackValue: "None",
   },
   lifecycle: "Availability request lifecycle",
-  steps: { input: "Request entered", validate: "Request validated", source: "Inventory source", result: "Result" },
+  steps: { input: "Request entered", train: "Train resolved", chart: "Reservation chart read", result: "Result" },
   stepStates: {
-    waiting: "Waiting for a request",
-    done: "Done",
-    pending: "Awaiting a connected source",
-    unavailable: "Unavailable until connected",
+    waitingRoute: "Waiting for a route",
+    waitingTrain: "Waiting for a train",
+    waitingDate: "Waiting for a date",
+    waitingRequest: "Waiting for a request",
+    lookingUp: "Looking for trains",
+    noTrains: (from: string, to: string) => `No trains run ${from} → ${to}`,
+    chosen: (name: string, from: string, to: string) => `${name}, ${from} → ${to}`,
+    asked: (train: string, cls: string, quota: string, date: string) => `${train} · ${cls} · ${quota} · ${date}`,
+    reading: "Reading the chart",
+    returned: (count: number, time: string) => `${count} dates returned at ${time} IST`,
+    refused: (time: string) => `Refused at ${time} IST`,
+    notReached: "Not reached — nothing was asked",
+    shownAbove: "Shown above",
+    none: "None",
+    tryAgain: "None — try again shortly",
   },
 } as const satisfies MessageTree;

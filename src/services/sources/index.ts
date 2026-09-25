@@ -106,6 +106,15 @@ export function getPnrSource(): PnrDataSource {
 }
 
 /**
+ * Whether what this deployment serves is sample data. Every surface that shows an answer has to be
+ * able to say so — the product's standing rule is that a fixture is always labelled — and a client
+ * component cannot read the env, so the answer travels with the answer.
+ */
+export function servingSampleData(current: Env = env()): boolean {
+  return current.PNR_SOURCE === "fixture" && fixtureAllowed(current);
+}
+
+/**
  * Which trains run between two stations — the seam availability cannot be asked without.
  *
  * It follows `resolvePnrSource`'s rules rather than inventing its own: the fixture only when it is

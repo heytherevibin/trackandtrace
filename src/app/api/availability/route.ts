@@ -4,6 +4,7 @@ import { jsonError, jsonOk } from "@/services/api-response";
 import { queryAvailability } from "@/services/availability-query";
 import { clientIp } from "@/services/rate-limit";
 import { readBody } from "@/services/request-body";
+import { servingSampleData } from "@/services/sources";
 import { bookingClassSchema, quotaSchema } from "@/types/schemas";
 
 export const dynamic = "force-dynamic";
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     if (!outcome.ok) return jsonError(outcome);
     // `days` is the answer. There is no branch here that can produce it empty from a failure: an
     // outcome that is not ok never reaches this line.
-    return jsonOk({ ok: true, remaining, ...outcome.answer });
+    return jsonOk({ ok: true, remaining, sampleData: servingSampleData(), ...outcome.answer });
   } catch (err) {
     return jsonError(err);
   }
