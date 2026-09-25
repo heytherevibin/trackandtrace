@@ -93,3 +93,26 @@ html[data-motion="on"][data-journey="on"] .clock-hand.is-second { display: inlin
 /* ---- 05 · the route: a sleeper fades in as the line is laid; a row lights as the train passes its stop */
 html[data-motion="on"][data-journey="on"] .route-sleeper { transition: opacity 160ms var(--ease-out); }
 html[data-journey="on"] #roadmap li.is-passed { background: var(--accent-wash); }
+
+/* ---- The registration-mark cursor (fine pointer, Motion on): the native cursor gives way, except for the
+   caret in text fields */
+html.has-reg-cursor, html.has-reg-cursor * { cursor: none !important; }
+html.has-reg-cursor :is(input, textarea, [contenteditable="true"]) { cursor: text !important; }
+.reg-cursor { position: fixed; left: 0; top: 0; z-index: var(--z-sheet); pointer-events: none; width: 0; height: 0; color: var(--accent); }
+.reg-cursor.is-off { opacity: 0; }
+.reg-cross { position: absolute; left: -11px; top: -11px; width: 22px; height: 22px; transition: opacity 120ms var(--ease-out); }
+.reg-cross::before, .reg-cross::after { content: ""; position: absolute; background: currentColor; }
+.reg-cross::before { left: 10.5px; top: 0; width: 1px; height: 100%; }
+.reg-cross::after { top: 10.5px; left: 0; height: 1px; width: 100%; }
+.reg-cursor.is-snapped .reg-cross { opacity: 0; }
+.reg-frame { position: absolute; left: 0; top: 0; width: 22px; height: 22px; transform: translate(-50%, -50%); opacity: 0; transition: opacity 120ms var(--ease-out); }
+.reg-cursor.is-snapped .reg-frame { opacity: 1; }
+.reg-mark { position: absolute; width: 9px; height: 9px; }
+.reg-mark::before, .reg-mark::after { content: ""; position: absolute; background: currentColor; }
+.reg-mark::before { left: 4px; top: 0; width: 1px; height: 100%; }
+.reg-mark::after { top: 4px; left: 0; height: 1px; width: 100%; }
+.reg-mark.tl { left: -5px; top: -5px; }
+.reg-mark.tr { right: -5px; top: -5px; }
+.reg-mark.bl { left: -5px; bottom: -5px; }
+.reg-mark.br { right: -5px; bottom: -5px; }
+.reg-cursor.is-down .reg-cross { transform: scale(0.8); }
