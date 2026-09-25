@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "../fixtures";
 import { PNR } from "../helpers";
 import { blockJourneyChunk, waitForJourney } from "./journey-helpers";
 
@@ -12,6 +13,24 @@ async function waitForScrollSettled(page: Page): Promise<void> {
     last = y;
     await page.waitForTimeout(50);
   }
+}
+
+/** Whether the focused element is actually hidden: something else paints over its centre. A fixed overlay
+ * drawn on top (the skip link, above the masthead by z-index) is never "hidden" just because its box sits in
+ * the masthead's own vertical band — only `elementFromPoint` returning neither the element nor one of its
+ * own descendants (an icon inside a button, say) counts as a real cover. The cursor and every drawing have
+ * `pointer-events: none`, so a drawing on top never trips this either. `nextjs-portal` hosts the dev-only
+ * toolbar (collisions.ts ignores it too, spec 2026-09-24 §5); it never ships to production and a reader never
+ * tabs to anything inside it. Evaluated in the page, not called from Node. */
+function coveredFocusLabel(): string | null {
+  const el = document.activeElement;
+  if (!el || el === document.body || el.tagName === "NEXTJS-PORTAL") return null;
+  const r = el.getBoundingClientRect();
+  const x = Math.min(Math.max(r.left + r.width / 2, 0), window.innerWidth - 1);
+  const y = Math.min(Math.max(r.top + r.height / 2, 0), window.innerHeight - 1);
+  const top = document.elementFromPoint(x, y);
+  const covered = top !== null && top !== el && !el.contains(top);
+  return covered ? `${el.tagName} ${el.textContent?.trim().slice(0, 40)}` : null;
 }
 
 test.describe("the journey island", () => {
@@ -45,7 +64,11 @@ for (const blocked of [false, true]) {
     for (const pnr of [PNR.cnf, PNR.rac, PNR.wl, PNR.mixed, PNR.notFound]) {
       await plate.getByRole("textbox").fill(pnr);
       await plate.getByRole("button", { name: /run/i }).click();
-      await expect(page.getByTestId("terminal-result")).toBeVisible();
+      const result = page.getByTestId("terminal-result");
+      await expect(result).toBeVisible();
+      // Visible alone also passes for limited, refused and unavailable: this proves the record was actually
+      // read, not just that some terminal state rendered.
+      await expect(result).toHaveAttribute("data-kind", pnr === PNR.notFound ? "notfound" : "ok");
       await page.getByRole("button", { name: /check another pnr/i }).click();
     }
   });
@@ -59,20 +82,26 @@ test("Tab never leaves focus under the masthead or behind a pinned piece", async
   for (let i = 0; i < 80; i += 1) {
     await page.keyboard.press("Tab");
     await waitForScrollSettled(page);
-    const hidden = await page.evaluate(() => {
-      const el = document.activeElement;
-      // nextjs-portal hosts the dev-only toolbar (collisions.ts ignores it too, spec 2026-09-24 §5); it never
-      // ships to production and a reader never tabs to anything inside it.
-      if (!el || el === document.body || el.tagName === "NEXTJS-PORTAL") return null;
-      const r = el.getBoundingClientRect();
-      const header = document.querySelector("header")!.getBoundingClientRect().bottom;
-      const x = Math.min(Math.max(r.left + r.width / 2, 0), window.innerWidth - 1);
-      const y = Math.min(Math.max(r.top + r.height / 2, 0), window.innerHeight - 1);
-      const top = document.elementFromPoint(x, y);
-      const inMasthead = el.closest("header") !== null;
-      const covered = !inMasthead && (r.bottom <= header || (top !== null && top !== el && !el.contains(top)));
-      return covered ? `${el.tagName} ${el.textContent?.trim().slice(0, 40)}` : null;
-    });
-    expect(hidden).toBeNull();
+    expect(await page.evaluate(coveredFocusLabel)).toBeNull();
   }
+});
+
+test("the check still catches a real cover: an in-flow link scrolled in under the sticky masthead", async ({ page, isMobile }) => {
+  test.skip(isMobile, "keyboard");
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  // Focusable elements never get base.css's scroll-margin-top (deliberately — see its own comment), so an
+  // ordinary in-flow link can sit flush behind the sticky masthead once focused. Scrolled and focused directly
+  // here, rather than by tabbing there, so the scenario is exact instead of depending on tab order. The link
+  // is Reliability's "Read the data policy" — mid-page, with plenty of section below it to scroll through, so
+  // the target scroll position is never clamped by the document's end (unlike a footer link, which is at the
+  // very bottom and cannot be scrolled any higher than its own resting place).
+  await page.evaluate(() => {
+    const link = document.querySelector('#reliability a[href="/accuracy"]') as HTMLElement;
+    const headerBottom = document.querySelector("header")!.getBoundingClientRect().bottom;
+    const linkTop = link.getBoundingClientRect().top;
+    window.scrollTo({ top: window.scrollY + linkTop - headerBottom / 2, behavior: "instant" });
+    link.focus();
+  });
+  expect(await page.evaluate(coveredFocusLabel)).not.toBeNull();
 });

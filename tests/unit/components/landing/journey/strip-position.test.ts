@@ -31,7 +31,6 @@ describe("the strip's position", () => {
   it("holds the train inside a 390px rail: a 22px glyph's left edge sits at 0% at fraction 0, its right edge at 100% at fraction 1", () => {
     const [glyphWidth, trackWidth] = [22, 390];
     const halfPercent = (glyphWidth / 2 / trackWidth) * 100;
-    expect(trainLeft(0, glyphWidth, trackWidth)).toBeCloseTo(halfPercent);
     expect(trainLeft(0, glyphWidth, trackWidth) - halfPercent).toBeCloseTo(0);
     expect(trainLeft(1, glyphWidth, trackWidth) + halfPercent).toBeCloseTo(100);
   });

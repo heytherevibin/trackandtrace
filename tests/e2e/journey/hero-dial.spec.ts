@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../fixtures";
 import { PNR } from "../helpers";
 import { motionOff, waitForJourney } from "./journey-helpers";
 
