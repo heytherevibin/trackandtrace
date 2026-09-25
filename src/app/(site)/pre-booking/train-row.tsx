@@ -14,7 +14,7 @@ import { cn } from "@/utils/cn";
 const m = messages.booking.list;
 
 const BTN =
-  "press relative inline-flex min-h-8 cursor-pointer select-none items-center justify-center gap-1.5 whitespace-nowrap border border-line bg-transparent px-2.5 py-1 font-display text-label font-semibold leading-none text-ink-1 hover:bg-ink-1/7 disabled:cursor-not-allowed disabled:opacity-45";
+  "press relative inline-flex min-h-8 cursor-pointer select-none items-center justify-center gap-1.5 whitespace-nowrap border border-line bg-transparent px-2.5 py-1 font-display text-label font-semibold leading-none text-ink-1 hover:bg-ink-1/7 disabled:cursor-not-allowed disabled:opacity-45 max-sm:h-11";
 
 /**
  * How many days a week, never which ones.

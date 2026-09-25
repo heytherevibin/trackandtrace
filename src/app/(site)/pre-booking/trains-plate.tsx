@@ -23,8 +23,11 @@ import { cn } from "@/utils/cn";
 
 const m = messages.booking.list;
 const CELL = "font-display text-label font-semibold uppercase leading-6 tracking-caps";
+// 44px on a phone, and the drawn height on a desk. Same reason as the class chips: a row of chips
+// eight pixels apart leaves each coarse-pointer overlay about four pixels before its neighbour
+// answers instead, so the size has to be real rather than borrowed.
 const CHIP =
-  "press relative inline-flex min-h-8 cursor-pointer select-none items-center justify-center whitespace-nowrap border px-2.5 py-1 font-display text-label font-semibold leading-none";
+  "press relative inline-flex min-h-8 cursor-pointer select-none items-center justify-center whitespace-nowrap border px-2.5 py-1 font-display text-label font-semibold leading-none max-sm:h-11";
 const ON = "border-accent bg-accent-soft text-accent-soft-ink";
 const OFF = "border-line bg-transparent text-ink-1 hover:bg-ink-1/7";
 
