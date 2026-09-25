@@ -58,3 +58,67 @@ test("the availability endpoint refuses a journey it cannot read, before spendin
     expect(res.ok()).toBe(false);
   }
 });
+
+const SEARCH = { from: "SBC", to: "NDLS", journeyDate: "2026-10-15", quota: "GN", classes: ["SL", "3A", "2A"] };
+
+test("the search endpoint answers every train on the pair, each with the lead class", async ({ request }) => {
+  const res = await request.post("/api/route-availability", { data: SEARCH });
+  expect(res.ok()).toBe(true);
+  const body = (await res.json()) as {
+    ok: boolean;
+    leadClass: string;
+    rows: { train: { trainNo: string }; answers: Record<string, unknown>; pending: string[] }[];
+  };
+  expect(body.ok).toBe(true);
+  // 2A leads because the enum declares it first, not because it was named last.
+  expect(body.leadClass).toBe("2A");
+  expect(body.rows.length).toBeGreaterThan(0);
+  for (const row of body.rows) {
+    expect(row.train.trainNo).toMatch(/^\d{5}$/);
+    // Every row carries the same class, which is what lets the list be ranked at all.
+    expect(Object.keys(row.answers)).toEqual(row.answers["2A"] ? ["2A"] : []);
+    expect(row.pending).toEqual(["3A", "SL"]);
+  }
+});
+
+test("a pair with no trains is an answer here too, with no rows", async ({ request }) => {
+  const res = await request.post("/api/route-availability", { data: { ...SEARCH, to: "XXXX" } });
+  expect(res.ok()).toBe(true);
+  const body = (await res.json()) as { ok: boolean; rows: unknown[] };
+  expect(body.ok).toBe(true);
+  expect(body.rows).toEqual([]);
+});
+
+test("the search endpoint refuses a body it cannot read, before spending anything", async ({ request }) => {
+  for (const bad of [
+    { ...SEARCH, classes: [] },
+    { ...SEARCH, classes: ["ZZ"] },
+    { ...SEARCH, journeyDate: "15-10-2026" },
+    { ...SEARCH, trainNo: "12627" },
+  ]) {
+    const res = await request.post("/api/route-availability", { data: bad });
+    expect(res.ok(), JSON.stringify(bad)).toBe(false);
+  }
+});
+
+test("a repeated class is one class, not a way past the cap", async ({ request }) => {
+  const res = await request.post("/api/route-availability", { data: { ...SEARCH, classes: Array.from({ length: 8 }, () => "SL") } });
+  expect(res.ok()).toBe(true);
+  expect((await res.json()) as { leadClass: string }).toMatchObject({ leadClass: "SL" });
+});
+
+test("opening a row asks for several classes at once", async ({ request }) => {
+  const res = await request.post("/api/availability", { data: { trainNo: "12627", from: "SBC", to: "NDLS", journeyDate: "2026-10-15", quota: "GN", travelClasses: ["3A", "2A"] } });
+  expect(res.ok()).toBe(true);
+  const body = (await res.json()) as { ok: boolean; answers: Record<string, { days: unknown[] }>; failedClasses: string[] };
+  expect(body.ok).toBe(true);
+  // A class that could not be answered is NAMED, never left out: an absent class on the list reads
+  // as "not carried", which is a fact about the train and not about the request.
+  for (const cls of Object.keys(body.answers)) expect(body.answers[cls]!.days.length).toBeGreaterThan(0);
+  expect([...Object.keys(body.answers), ...body.failedClasses].sort()).toEqual(["2A", "3A"]);
+});
+
+test("a journey that names both a class and a class list is refused", async ({ request }) => {
+  const res = await request.post("/api/availability", { data: { ...JOURNEY, travelClasses: ["2A"] } });
+  expect(res.ok()).toBe(false);
+});
