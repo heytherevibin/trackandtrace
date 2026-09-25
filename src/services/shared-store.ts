@@ -112,7 +112,7 @@ export function liveBudget(current: Env = env()): LiveBudget {
  * own breaker, over one shared provider-wide fuse for a refused key or a spent
  * plan. See `breaker.ts`.
  */
-export type GuardEndpoint = "pnr" | "availability";
+export type GuardEndpoint = "pnr" | "availability" | "route";
 
 /** One breaker per provider *and caller*, one usage counter per provider, shared by every check in this environment. */
 export function providerGuard(source: ThirdPartySource, endpoint: GuardEndpoint, current: Env = env()): GuardDeps {

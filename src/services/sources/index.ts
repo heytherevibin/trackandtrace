@@ -1,12 +1,16 @@
 import type { Env } from "@/services/env";
+import { messages } from "@/messages";
 import { activePnrSource, env, fallbackPnrSource, fixtureAllowed, isThirdPartySource, type ThirdPartySource } from "@/services/env";
 import type { PnrDataSource } from "@/services/pnr-source";
+import type { RouteSource } from "@/services/route-source";
 import { providerGuard } from "@/services/shared-store";
 import { createFallbackSource } from "./fallback";
 import { fixtureSource } from "./fixture";
+import { fixtureRouteSource } from "./fixture-route";
 import { createGuardedSource } from "./guarded";
 import { createLiveSource } from "./live";
 import { createRailkitSource } from "./railkit";
+import { createRailKitRouteSource } from "./railkit-route";
 
 // Provider registry. The fixture is served only when explicitly requested and
 // never in production; the env schema refuses that combination at boot and this
@@ -25,6 +29,13 @@ const refusedSource: PnrDataSource = {
       code: "SOURCE_UNAVAILABLE",
       message: "Sample data is disabled in production. No result was generated.",
     };
+  },
+};
+
+/** No provider key, or sample data refused: the route is unavailable, never an empty list of trains. */
+const refusedRouteSource: RouteSource = {
+  async check() {
+    return { ok: false, code: "SOURCE_UNAVAILABLE", message: messages.source.route.couldNotAnswer };
   },
 };
 
@@ -82,4 +93,24 @@ function providerAdapter(source: ThirdPartySource, current: Env): PnrDataSource 
 
 export function getPnrSource(): PnrDataSource {
   return resolvePnrSource(env());
+}
+
+/**
+ * Which trains run between two stations — the seam availability cannot be asked without.
+ *
+ * It follows `resolvePnrSource`'s rules rather than inventing its own: the fixture only when it is
+ * chosen AND allowed, the provider's adapter behind the same breaker and usage counter, and a
+ * deployment with no key answering "unavailable" instead of pretending the route is empty. Its own
+ * guard key ("route") keeps a route outage off the PNR fuse, the way the crawler's does.
+ */
+export function resolveRouteSource(current: Env = env()): RouteSource {
+  if (current.PNR_SOURCE === "fixture") return fixtureAllowed(current) ? fixtureRouteSource : refusedRouteSource;
+  const active = activePnrSource(current);
+  if (!isThirdPartySource(active) || !current.RAILKIT_API_KEY) return refusedRouteSource;
+  const adapter = createRailKitRouteSource({ key: current.RAILKIT_API_KEY, baseUrl: current.RAILKIT_BASE_URL, timeoutMs: current.RAILKIT_TIMEOUT_MS });
+  return createGuardedSource(adapter, providerGuard(active, "route", current));
+}
+
+export function getRouteSource(): RouteSource {
+  return resolveRouteSource(env());
 }
