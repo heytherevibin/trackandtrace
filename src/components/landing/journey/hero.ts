@@ -1,7 +1,8 @@
-import { animate, createAnimatable, stagger, svg, utils, type JSAnimation } from "animejs";
+import { animate, createAnimatable, stagger, utils, type JSAnimation } from "animejs";
 import { messages } from "@/messages";
 import { formatTime } from "@/utils/datetime";
 import { chartFace } from "./chart-countdown";
+import { drawStrokes } from "./drawing";
 import { ease } from "./ease";
 import { PLATE_EVENT, RESULT_EVENT, RUN_EVENT, type PlateDetail, type ResultDetail, type RunDetail } from "./journey-events";
 import { STAGGER, T } from "./motion-tokens";
@@ -10,7 +11,8 @@ import type { JourneyContext, Teardown } from "./start-journey";
 // The hero dial while the journey runs (spec §3.A, Hero): a segment lights per digit typed; a sweep rides the
 // ring while a check runs; a result with the record's chart time turns it into a 24-hour IST face with the
 // needle on now. On a fine pointer with Motion on, the needle otherwise follows the pointer. Motion off: every
-// state is drawn at once.
+// state is drawn at once. The rings' and the arc's draws are Drawings (drawing.ts): cancelled and cleared, never
+// reverted, so a rebuild finds them as the server drew them.
 
 export function startHero({ motion, intro }: JourneyContext): Teardown {
   const dial = document.querySelector<SVGSVGElement>(".hero-dial svg");
@@ -24,6 +26,8 @@ export function startHero({ motion, intro }: JourneyContext): Teardown {
   const mark = dial.querySelector<SVGCircleElement>(".dial-chart-mark");
   const needle = dial.querySelector<SVGGElement>(".dial-needle");
   const readout = host.querySelector<HTMLElement>(".dial-readout");
+  const rings = drawStrokes([...dial.querySelectorAll<SVGGeometryElement>(":scope > .dial-ring")]);
+  const arcDraw = drawStrokes(arc ? [arc] : []);
   const running: JSAnimation[] = [];
   let lit = 0;
   let spin: JSAnimation | null = null;
@@ -64,6 +68,7 @@ export function startHero({ motion, intro }: JourneyContext): Teardown {
     face = null;
     shell.classList.remove("is-face");
     host.classList.remove("is-face");
+    arcDraw.clear();
     arc?.setAttribute("d", "");
     mark?.setAttribute("cx", "0");
     mark?.setAttribute("cy", "-352");
@@ -75,7 +80,7 @@ export function startHero({ motion, intro }: JourneyContext): Teardown {
     shell.classList.add("is-face");
     host.classList.add("is-face");
     paintFace();
-    if (motion && arc) running.push(animate(svg.createDrawable(arc), { draw: ["0 0", "0 1"], duration: T.draw, delay: T.fast, ease: ease.inOut() }));
+    if (motion) arcDraw.play({ draw: ["0 0", "0 1"], duration: T.draw, delay: T.fast, ease: ease.inOut() });
   };
 
   const onPlate = (event: Event) => {
@@ -124,7 +129,7 @@ export function startHero({ motion, intro }: JourneyContext): Teardown {
   if (motion && fine) window.addEventListener("pointermove", onPointer, { passive: true });
   if (motion && intro) {
     running.push(animate(dial.querySelectorAll(".dial-bezel .dial-tick"), { opacity: [0, 1], duration: 500, delay: stagger(STAGGER.tick, { start: 200 }), ease: ease.out() }));
-    running.push(animate(svg.createDrawable(dial.querySelectorAll(":scope > .dial-ring")), { draw: ["0 0", "0 1"], duration: T.draw, delay: 300, ease: ease.inOut() }));
+    rings.play({ draw: ["0 0", "0 1"], duration: T.draw, delay: 300, ease: ease.inOut() });
     running.push(animate(segs, { opacity: [0, 1], duration: 400, delay: stagger(STAGGER.seg, { start: 700 }), ease: ease.out() }));
   }
   if (motion && dashed) running.push(animate(dashed, { rotate: "-=360", duration: 90_000, loop: true, ease: "linear" }));
@@ -137,6 +142,7 @@ export function startHero({ motion, intro }: JourneyContext): Teardown {
     for (const a of running) a.revert();
     stopSweep();
     exitFace();
+    rings.clear();
     turn?.revert();
     if (needle) utils.remove(needle);
     needle?.style.removeProperty("transform");
