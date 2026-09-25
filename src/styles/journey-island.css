@@ -116,3 +116,6 @@ html.has-reg-cursor :is(input, textarea, [contenteditable="true"]) { cursor: tex
 .reg-mark.bl { left: -5px; bottom: -5px; }
 .reg-mark.br { right: -5px; bottom: -5px; }
 .reg-cursor.is-down .reg-cross { transform: scale(0.8); }
+
+/* ---- The footer's Sound switch: only the journey can sound */
+html[data-journey="on"] .sound-toggle { display: inline-flex; }

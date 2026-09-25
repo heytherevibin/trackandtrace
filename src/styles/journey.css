@@ -209,3 +209,6 @@ main:has(.hero-dial) { overflow-x: clip; } /* the landing clips the dial at the 
 .chapter-card pre b { color: var(--accent-text); font-weight: 600; }
 .rail-marker { position: absolute; top: -3px; left: 0; width: 30px; height: 12px; color: var(--accent); transform: translateX(-50%); }
 .rail-marker svg { display: block; width: 100%; height: 100%; }
+
+/* ---- The footer's Sound switch: shown only once the journey can sound it (journey-island.css) */
+.sound-toggle { display: none; }
