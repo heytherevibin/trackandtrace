@@ -29,7 +29,12 @@ function readDate(iso: string, todayIso: string): string {
 function format(iso: string): string {
   const [y, mo, d] = iso.split("-").map(Number);
   if (!y || !mo || !d) return iso;
-  return new Date(Date.UTC(y, mo - 1, d)).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+  // Assembled rather than formatted whole: en-IN's long form puts a comma before the year
+  // ("Fri, 16 Oct, 2026") and the sheets draw one comma, after the weekday.
+  const at = new Date(Date.UTC(y, mo - 1, d));
+  const weekday = at.toLocaleDateString("en-IN", { weekday: "short", timeZone: "UTC" });
+  const month = at.toLocaleDateString("en-IN", { month: "short", timeZone: "UTC" });
+  return `${weekday}, ${d} ${month} ${y}`;
 }
 
 /**
