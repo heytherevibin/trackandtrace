@@ -1,6 +1,15 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const PORT = 4210;
+/**
+ * `E2E_PORT` overrides it, because 4210 is not reliably ours.
+ *
+ * `reuseExistingServer` is on outside CI, so a dev server another WORKTREE left on this port is
+ * silently adopted and the whole suite then tests that branch's app. It happened on 2026-09-26:
+ * a sibling worktree's server answered, and the run reported a page that no longer exists on this
+ * branch. Nothing in the output says which tree served it — the only symptom is assertions failing
+ * for reasons the diff cannot explain.
+ */
+const PORT = Number(process.env.E2E_PORT ?? 4210);
 // E2E_BASE_URL points the suite at a deployed site instead (no local server starts).
 const remote = process.env.E2E_BASE_URL;
 const baseURL = remote ?? `http://localhost:${PORT}`;

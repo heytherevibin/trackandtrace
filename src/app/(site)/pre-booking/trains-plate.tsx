@@ -26,8 +26,10 @@ const CELL = "font-display text-label font-semibold uppercase leading-6 tracking
 // 44px on a phone, and the drawn height on a desk. Same reason as the class chips: a row of chips
 // eight pixels apart leaves each coarse-pointer overlay about four pixels before its neighbour
 // answers instead, so the size has to be real rather than borrowed.
+// Set in caps like every other control on the sheet. `uppercase` is CSS, not copy: the accessible
+// name stays "Only what I can book", so a screen reader and a test both still read the sentence.
 const CHIP =
-  "press relative inline-flex min-h-8 cursor-pointer select-none items-center justify-center whitespace-nowrap border px-2.5 py-1 font-display text-label font-semibold leading-none max-sm:h-11";
+  "press relative inline-flex min-h-8 cursor-pointer select-none items-center justify-center whitespace-nowrap border px-2.5 py-1 font-display text-label font-semibold uppercase leading-none tracking-caps max-sm:h-11";
 const ON = "border-accent bg-accent-soft text-accent-soft-ink";
 const OFF = "border-line bg-transparent text-ink-1 hover:bg-ink-1/7";
 
@@ -56,17 +58,25 @@ export function TrainsPlate({
 
   function open(train: TrainRow["train"], pending: readonly string[]): void {
     const trainNo = train.trainNo;
-    // Each press costs provider requests, so a row already open is not asked again.
-    if (!answer || opened[trainNo]) return;
+    if (!answer) return;
+    const already = opened[trainNo];
+    // A row that has already been fetched costs nothing to show again, so the press is a toggle
+    // from here on. The answers stay in state either way — hiding must not throw away requests
+    // that were already spent, or the next press would buy them a second time.
+    if (already) {
+      if (already.phase === "loading") return;
+      setOpened((was) => ({ ...was, [trainNo]: { ...already, shown: !already.shown } }));
+      return;
+    }
     // Nothing pending means nothing to ask: the other dates are already in the payload, so opening
     // the row is a toggle. Marked done without a request.
     if (pending.length === 0) {
-      setOpened((was) => ({ ...was, [trainNo]: { phase: "done", answers: {}, failedClasses: [], message: "" } }));
+      setOpened((was) => ({ ...was, [trainNo]: { phase: "done", answers: {}, failedClasses: [], message: "", shown: true } }));
       return;
     }
-    setOpened((was) => ({ ...was, [trainNo]: { phase: "loading", answers: {}, failedClasses: [], message: "" } }));
+    setOpened((was) => ({ ...was, [trainNo]: { phase: "loading", answers: {}, failedClasses: [], message: "", shown: true } }));
     void (async () => {
-      const failed = (message: string) => setOpened((was) => ({ ...was, [trainNo]: { phase: "error", answers: {}, failedClasses: [], message } }));
+      const failed = (message: string) => setOpened((was) => ({ ...was, [trainNo]: { phase: "error", answers: {}, failedClasses: [], message, shown: true } }));
       try {
         const res = await fetch("/api/availability", {
           method: "POST",
@@ -88,7 +98,7 @@ export function TrainsPlate({
         }
         setOpened((was) => ({
           ...was,
-          [trainNo]: { phase: "done", answers: body.answers ?? {}, failedClasses: body.failedClasses ?? [], message: "" },
+          [trainNo]: { phase: "done", answers: body.answers ?? {}, failedClasses: body.failedClasses ?? [], message: "", shown: true },
         }));
       } catch {
         failed(messages.source.availability.couldNotAnswer);

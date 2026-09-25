@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { AvailabilityPlate } from "./availability-plate";
 import { ClassBlock } from "./class-block";
 import { messages } from "@/messages";
@@ -14,7 +15,7 @@ import { cn } from "@/utils/cn";
 const m = messages.booking.list;
 
 const BTN =
-  "press relative inline-flex min-h-8 cursor-pointer select-none items-center justify-center gap-1.5 whitespace-nowrap border border-line bg-transparent px-2.5 py-1 font-display text-label font-semibold leading-none text-ink-1 hover:bg-ink-1/7 disabled:cursor-not-allowed disabled:opacity-45 max-sm:h-11";
+  "press relative inline-flex min-h-8 cursor-pointer select-none items-center justify-center gap-1.5 whitespace-nowrap border border-line bg-transparent px-2.5 py-1 font-display text-label font-semibold uppercase leading-none tracking-caps text-ink-1 hover:bg-ink-1/7 disabled:cursor-not-allowed disabled:opacity-45 max-sm:h-11";
 
 /**
  * How many days a week, never which ones.
@@ -40,6 +41,15 @@ export interface Opened {
   readonly answers: Readonly<Record<string, AvailabilityAnswer>>;
   readonly failedClasses: readonly string[];
   readonly message: string;
+  /**
+   * Whether the dates are currently drawn.
+   *
+   * Separate from "has been opened" so collapsing keeps what was fetched. The button used to be
+   * one-shot — it was a FETCH, and a second press would have spent the requests again — but every
+   * chosen class now arrives with the search, so pressing it is only showing and hiding rows
+   * already in hand. A control that greys out after one press, having cost nothing, reads as broken.
+   */
+  readonly shown: boolean;
 }
 
 export function TrainRowView({
@@ -66,14 +76,20 @@ export function TrainRowView({
   // A class that came back on the expand is no longer pending; one that failed there is named on
   // its own line rather than dropped back into "not asked", which would be a different claim.
   const pending = row.pending.filter((cls) => !(cls in answers) && !(opened?.failedClasses ?? []).includes(cls));
-  const lead = answers[leadClass] ?? Object.values(answers)[0];
+  // Which class the date table is for. Unset until the reader picks one, and then it is theirs —
+  // the lead is only the default, and a row where every class answered has four equal candidates.
+  const [picked, setPicked] = useState<string | null>(null);
+  const pickable = picked !== null && picked in answers ? picked : leadClass in answers ? leadClass : (Object.keys(answers)[0] ?? null);
+  const lead = pickable === null ? undefined : answers[pickable];
   // Four dates came back with every ask, and the list shows one. Opening a row stops hiding the
   // other three, and when every chosen class is already in hand that costs NOTHING — there is
   // nothing left to request, so the button is a toggle and not a fetch.
   const hasMoreDates = (lead?.days.length ?? 0) > 1;
-  const showDates = opened !== undefined && opened.phase !== "error" && hasMoreDates;
+  const showDates = opened !== undefined && opened.shown && opened.phase !== "error" && hasMoreDates;
   const dates = showDates ? lead : null;
-  const offer = pending.length > 0 ? m.more : hasMoreDates ? m.moreDates : null;
+  const offer = showDates ? m.fewerDates : pending.length > 0 ? m.more : hasMoreDates ? m.moreDates : null;
+  // The cards only become choices once there is a table for them to steer.
+  const choosing = showDates && asked.length > 1;
 
   return (
     <div data-testid="train-row" className={cn("px-5 py-4", last ? "" : "border-b border-line")}>
@@ -95,9 +111,16 @@ export function TrainRowView({
           three-up it is meant to look like. `auto-fill` keeps the empty tracks, so one block is
           exactly one column and stays that width as more arrive. */}
       {asked.length === 0 && notCarried.length === 0 ? null : (
-        <div className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(min(100%,260px),1fr))] gap-3">
+        <div className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(min(100%,150px),1fr))] gap-2">
           {asked.map(([cls, answer]) => (
-            <ClassBlock key={cls} cls={cls} day={answer.days[0] ?? null} fareTotal={answer.fare?.total ?? null} />
+            <ClassBlock
+              key={cls}
+              cls={cls}
+              day={answer.days[0] ?? null}
+              fareTotal={answer.fare?.total ?? null}
+              selected={choosing ? cls === pickable : undefined}
+              onSelect={choosing ? () => setPicked(cls) : undefined}
+            />
           ))}
           {/* Drawn, not omitted. A class left out reads as one nobody asked about; this one WAS
               asked, and the train's answer is that it does not carry it. */}
@@ -112,9 +135,17 @@ export function TrainRowView({
       ) : null}
       {opened?.phase === "error" ? <div className="mt-2 text-sm text-ink-1/78">{opened.message}</div> : null}
 
-      {dates ? (
-        <div className="-mx-5 mt-3">
-          <AvailabilityPlate answer={dates} todayIso={todayIso} retrievedAt="" sampleData={false} bare />
+      {dates && pickable ? (
+        <div className="mt-3">
+          {/* Captioned, always. The fares repeat down the column, so a table read as the wrong class
+              looks perfectly consistent — there is nothing in it to catch the mistake. */}
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <span className="legend-sm">{m.datesFor(pickable)}</span>
+            {choosing ? <span className="text-label text-ink-1/70">{m.pickClassForDates}</span> : null}
+          </div>
+          <div className="-mx-5 mt-2">
+            <AvailabilityPlate answer={dates} todayIso={todayIso} retrievedAt="" sampleData={false} bare />
+          </div>
         </div>
       ) : null}
 
@@ -122,8 +153,10 @@ export function TrainRowView({
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
           {/* A row the cap stopped it asking is not offered an expand: the button would spend the
               request the cap exists to withhold. */}
+          {/* Disabled only while a request is actually in flight. Once the rows are in hand the
+              press costs nothing, so it stays live and reads "Hide dates" on the way back. */}
           {row.beyondCap ? null : (
-            <button type="button" className={BTN} disabled={opened !== undefined} onClick={onOpen}>
+            <button type="button" className={BTN} aria-expanded={showDates} disabled={opened?.phase === "loading"} onClick={onOpen}>
               {opened?.phase === "loading" ? m.opening : offer}
             </button>
           )}

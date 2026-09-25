@@ -114,6 +114,21 @@ describe("searching a route", () => {
     expect(calls).toHaveLength(0);
   });
 
+  it("swaps the two stations, so a return journey is not retyped", async () => {
+    stubFetch();
+    render(<PreBookingForm />);
+    await enterPair();
+    expect(screen.getByLabelText(m.from)).toHaveValue("SBC");
+    expect(screen.getByLabelText(m.to)).toHaveValue("NDLS");
+
+    fireEvent.click(screen.getByRole("button", { name: m.swap }));
+    await settle();
+    // The way back is the same two codes the other way round. Both move at once — an exchange that
+    // wrote one field before reading the other would leave the same code in both.
+    expect(screen.getByLabelText(m.from)).toHaveValue("NDLS");
+    expect(screen.getByLabelText(m.to)).toHaveValue("SBC");
+  });
+
   it("looks up the route once a pair reads like a pair, and not before", async () => {
     const { calls } = stubFetch();
     render(<PreBookingForm />);

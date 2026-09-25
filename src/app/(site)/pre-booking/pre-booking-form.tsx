@@ -6,6 +6,7 @@ import { TrainsPlate } from "./trains-plate";
 import { ClassChips, inOrder } from "@/components/pre-booking/class-chips";
 import { Button } from "@/components/ui/button";
 import { Corners } from "@/components/ui/corners";
+import { DateField } from "@/components/ui/date-field";
 import { NativeSelect } from "@/components/ui/native-select";
 import { PLATE_TITLE_STACK, plateCellClass } from "@/components/ui/plate";
 import { Timeline } from "@/components/ui/timeline";
@@ -173,56 +174,76 @@ export function PreBookingForm() {
           <span className={cn(CELL, "whitespace-nowrap border-l border-line px-5 py-2.5 text-ink-1/70", plateCellClass(0))}>{m.form.sheet}</span>
         </div>
         <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,180px),1fr))] items-end gap-4 p-5">
-          <div className={FIELD}>
-            <label htmlFor={`${ids}-from`} className={FIELD_LABEL}>
-              {m.from}
-            </label>
-            <input
-              id={`${ids}-from`}
-              className="well h-10 w-full px-2.5 uppercase"
-              autoCapitalize="characters"
-              placeholder={m.stationPlaceholder}
-              value={from}
-              onChange={(event) => setFrom(event.target.value.toUpperCase())}
-            />
+          {/* From, swap, To as ONE cell of the outer grid: the pair belongs together, and the arrow
+              has to sit between them at every width rather than wrapping off on its own. */}
+          <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2 sm:col-span-2">
+            <div className={FIELD}>
+              <label htmlFor={`${ids}-from`} className={FIELD_LABEL}>
+                {m.from}
+              </label>
+              <input
+                id={`${ids}-from`}
+                className="well h-10 w-full px-2.5 uppercase"
+                autoCapitalize="characters"
+                placeholder={m.stationPlaceholder}
+                value={from}
+                onChange={(event) => setFrom(event.target.value.toUpperCase())}
+              />
+            </div>
+            {/* The return journey is these two the other way round. Typing them again is the kind of
+                work a form should do for the reader. */}
+            <button
+              type="button"
+              title={m.swap}
+              aria-label={m.swap}
+              className="press inline-flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center border border-line text-ink-1 hover:bg-ink-1/7 max-sm:h-11 max-sm:w-11"
+              onClick={() => {
+                setFrom(to);
+                setTo(from);
+              }}
+            >
+              <svg viewBox="0 0 16 16" aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M2 5.5h10M9.5 3l2.5 2.5L9.5 8M14 10.5H4M6.5 8L4 10.5 6.5 13" strokeLinecap="square" />
+              </svg>
+            </button>
+            <div className={FIELD}>
+              <label htmlFor={`${ids}-to`} className={FIELD_LABEL}>
+                {m.to}
+              </label>
+              <input
+                id={`${ids}-to`}
+                className="well h-10 w-full px-2.5 uppercase"
+                autoCapitalize="characters"
+                placeholder={m.stationPlaceholder}
+                aria-invalid={route === "none" || undefined}
+                aria-describedby={route === "none" ? `${ids}-route` : undefined}
+                value={to}
+                onChange={(event) => setTo(event.target.value.toUpperCase())}
+              />
+            </div>
           </div>
-          <div className={FIELD}>
-            <label htmlFor={`${ids}-to`} className={FIELD_LABEL}>
-              {m.to}
-            </label>
-            <input
-              id={`${ids}-to`}
-              className="well h-10 w-full px-2.5 uppercase"
-              autoCapitalize="characters"
-              placeholder={m.stationPlaceholder}
-              aria-invalid={route === "none" || undefined}
-              aria-describedby={route === "none" ? `${ids}-route` : undefined}
-              value={to}
-              onChange={(event) => setTo(event.target.value.toUpperCase())}
-            />
-          </div>
-          <div className={FIELD}>
-            <label htmlFor={`${ids}-date`} className={FIELD_LABEL}>
-              {m.date}
-            </label>
-            <input
-              id={`${ids}-date`}
-              name="date"
-              type="date"
-              min={minDate || undefined}
-              value={date}
-              onChange={(event) => setDate(event.target.value)}
-              aria-invalid={pastDate || undefined}
-              aria-describedby={pastDate ? `${ids}-past` : undefined}
-              className="well h-10 w-full px-2.5"
-            />
-          </div>
+          {/* Our calendar, not Chrome's. The input inside is still `type="date"`, so typing, `min`
+              and validation are untouched — only the popup changed. */}
+          <DateField
+            id={`${ids}-date`}
+            name="date"
+            label={m.date}
+            labelClassName={FIELD_LABEL}
+            value={date}
+            min={minDate || undefined}
+            todayIso={minDate}
+            invalid={pastDate}
+            describedBy={pastDate ? `${ids}-past` : undefined}
+            onChange={setDate}
+          />
           <div className={FIELD}>
             <label htmlFor={`${ids}-quota`} className={FIELD_LABEL}>
               {m.quota}
             </label>
             <NativeSelect
               id={`${ids}-quota`}
+              // The closed select only; the open list is drawn by the OS and takes no styling.
+              className="uppercase tracking-caps"
               value={quota}
               onChange={(event) => {
                 if (isQuota(event.target.value)) setQuota(event.target.value);
@@ -241,7 +262,7 @@ export function PreBookingForm() {
             </span>
             <ClassChips value={classes} onChange={setClasses} labelledBy={`${ids}-cls`} />
           </div>
-          <Button type="submit" variant="primary" className="h-10" disabled={!ready || read === "reading"}>
+          <Button type="submit" variant="primary" className="h-10 uppercase tracking-caps" disabled={!ready || read === "reading"}>
             {read === "reading" ? m.checking : m.submit}
           </Button>
         </div>
