@@ -18,6 +18,7 @@ export const journey = {
   strip: {
     label: "Route through this page",
     stop: (code: string, name: string) => `${code} · ${name}`,
+    km: (figure: string) => `KM ${figure}`,
   },
   board: {
     title: "Departures · Platform 3",
