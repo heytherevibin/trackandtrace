@@ -2,7 +2,7 @@ import { messages } from "@/messages";
 import { LAYOUT_EVENT, STATION_EVENT, type StationDetail } from "./journey-events";
 import type { JourneyContext, Teardown } from "./start-journey";
 import { STATIONS, kmFigure, stopName } from "./stations";
-import { leanStep, odometer, stationTops, stripFraction, stripPlace } from "./strip-position";
+import { leanStep, odometer, stationTops, stripFraction, stripPlace, trainLeft } from "./strip-position";
 
 // The strip while the journey runs (spec §3.A, Masthead): the train runs right as the page scrolls and leans
 // into speed; the odometer counts; the current stop is aria-current and named. Motion off: it moves, no lean.
@@ -34,8 +34,11 @@ export function startStrip({ motion }: JourneyContext): Teardown {
   const paint = (announce: boolean) => {
     paintFrame = 0;
     const place = stripPlace(tops, window.scrollY);
-    const left = `${(stripFraction(place, STATIONS.length) * 100).toFixed(3)}%`;
-    for (const t of trains) t.style.left = left;
+    const fraction = stripFraction(place, STATIONS.length);
+    for (const t of trains) {
+      const track = t.offsetParent as HTMLElement | null;
+      t.style.left = `${trainLeft(fraction, t.offsetWidth, track?.clientWidth ?? 0).toFixed(3)}%`;
+    }
     if (odo) odo.textContent = messages.journey.strip.km(kmFigure(odometer(place, KMS)));
     if (place.i === last && !announce) return;
     last = place.i;

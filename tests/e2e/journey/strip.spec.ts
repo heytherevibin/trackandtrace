@@ -53,5 +53,13 @@ test.describe("the route strip, moving", () => {
       await scrollToId(page, "roadmap");
       await expect.poll(() => page.locator(".phone-rail .strip-train").evaluate((el) => parseFloat(el.style.left))).toBeGreaterThan(40);
     });
+
+    test("at rest (DEP, before any scroll), the train never draws past the screen edge", async ({ page }) => {
+      await page.goto("/");
+      await waitForJourney(page);
+      const box = await page.locator(".phone-rail .strip-train").boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.x).toBeGreaterThanOrEqual(0);
+    });
   });
 });
