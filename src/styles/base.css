@@ -74,6 +74,31 @@
     }
   }
 
+  /* The date field's own calendar button.
+
+     Chrome draws it from `color-scheme`, which is set correctly on both themes — so it was never
+     missing, it was 12px of low-contrast glyph at the far edge of a wide field and read as absent.
+     Given a real size, full opacity and a pointer, it becomes a control rather than a smudge.
+
+     The popup it opens belongs to the browser and cannot be styled from here at all. */
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    width: 1.05rem;
+    height: 1.05rem;
+    padding: 0;
+    margin-left: 0.25rem;
+    cursor: pointer;
+    opacity: 0.85;
+    transition: opacity var(--duration-fast) var(--ease-out);
+  }
+  input[type="date"]::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
+  }
+  /* Keyboard users get the same ring the field does, rather than nothing. */
+  input[type="date"]::-webkit-calendar-picker-indicator:focus-visible {
+    outline: 1px solid var(--accent);
+    outline-offset: 1px;
+  }
+
   ::selection {
     background: var(--selection-bg);
     color: var(--selection-fg);
