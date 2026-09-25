@@ -7,6 +7,14 @@ import type { JourneyContext, Teardown } from "./start-journey";
 // 03 · the berth plan while the journey runs (spec §3.A): whenever it comes into view it draws itself, line by
 // line, then the sample passenger's berth lights with one bright pulse. Out of sight it waits undrawn and unlit.
 // Motion off: drawn and lit, as the server made it.
+//
+// A stroke's drawn state is never reverted: svg.createDrawable's proxy captures whatever "draw" value is current
+// on the element as its animation's own "original" (drawable.js), so reverting play()'s completed draw after
+// arm() already hid it would restore the hidden "0 0" state, not the server's markup — leaving the plan invisible
+// after any rebuild once it has played (Motion toggled, a resize). Instead, stop() cancels any running draw tween
+// with utils.remove and clears exactly what createDrawable writes to a stroke (drawable.js): the `pathLength`
+// attribute it sets once, and the `stroke-dasharray`/`stroke-dashoffset` attributes it sets on every draw. Neither
+// is ever written as an inline style, so nothing else needs clearing.
 
 export function startBerths({ motion }: JourneyContext): Teardown {
   const drawing = document.querySelector<SVGSVGElement>(".berth-plan svg");
@@ -15,9 +23,18 @@ export function startBerths({ motion }: JourneyContext): Teardown {
   const lit = [...drawing.querySelectorAll<SVGElement>(".is-lit")];
   const berth = drawing.querySelector<SVGRectElement>(".plan-berth.is-lit");
   let running: (JSAnimation | Timer)[] = [];
+  const clearDraw = () => {
+    utils.remove(strokes);
+    for (const el of strokes) {
+      el.removeAttribute("pathLength");
+      el.removeAttribute("stroke-dasharray");
+      el.removeAttribute("stroke-dashoffset");
+    }
+  };
   const stop = () => {
     for (const a of running) a.revert();
     running = [];
+    clearDraw();
   };
   const light = (on: boolean) => lit.forEach((el) => el.classList.toggle("is-lit", on));
   return watchEntrances([
@@ -27,10 +44,10 @@ export function startBerths({ motion }: JourneyContext): Teardown {
       arm: () => {
         stop();
         light(false);
-        running.push(utils.set(svg.createDrawable(strokes), { draw: "0 0" }));
+        utils.set(svg.createDrawable(strokes), { draw: "0 0" });
       },
       play: () => {
-        running.push(animate(svg.createDrawable(strokes), { draw: ["0 0", "0 1"], duration: T.draw, delay: stagger(10), ease: ease.inOut() }));
+        animate(svg.createDrawable(strokes), { draw: ["0 0", "0 1"], duration: T.draw, delay: stagger(10), ease: ease.inOut() });
         running.push(createTimer({ duration: T.draw + 300, onComplete: () => light(true) }));
         if (berth) running.push(animate(berth, { strokeWidth: [{ to: 3, duration: 200, delay: T.draw + 320 }, { to: 1.5, duration: 500 }], ease: ease.out() }));
       },
