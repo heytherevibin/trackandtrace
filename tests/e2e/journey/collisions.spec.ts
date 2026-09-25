@@ -1,7 +1,8 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "../fixtures";
-import { gotoReady } from "../helpers";
+import { PNR, gotoReady } from "../helpers";
 import { collisionsInView, collisionsTopToBottom } from "./collisions";
+import { waitForJourney } from "./journey-helpers";
 
 /** Draws two probe lines, the second `gap` px below the first, fixed where the window shows them. */
 async function drawProbeLines(page: Page, gap: number): Promise<void> {
@@ -255,5 +256,20 @@ test.describe("the landing at 390×844 under the device's reduced motion", () =>
     // never rendered at all.
     await expect(page.getByText("Your device asks for reduced motion")).toBeVisible();
     expect(await collisionsTopToBottom(page, INSTRUMENTS)).toEqual([]);
+  });
+});
+
+test.describe("the hero dial's chart readout", () => {
+  test("the chart readout never touches the board", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.clock.setFixedTime(new Date("2026-09-17T06:30:00.000Z"));
+    await page.goto("/");
+    await waitForJourney(page);
+    const plate = page.getByTestId("hero-instrument");
+    await plate.getByRole("textbox").fill(PNR.cnf);
+    await plate.getByRole("button", { name: /run/i }).click();
+    await expect(page.locator(".dial-readout")).toBeVisible();
+    await page.locator(".dial-readout").scrollIntoViewIfNeeded();
+    expect(await collisionsInView(page, INSTRUMENTS)).toEqual([]);
   });
 });

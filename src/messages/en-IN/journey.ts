@@ -32,6 +32,7 @@ export const journey = {
   },
   dial: {
     groups: [{ label: "1–3" }, { label: "4–6" }, { label: "7–10" }],
+    readout: (time: string, when: string) => `Chart ${time} IST · ${when}`,
   },
   berths: {
     title: (coach: string, cls: string) => `Coach ${coach} · ${cls} · plan`,

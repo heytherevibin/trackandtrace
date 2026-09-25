@@ -34,3 +34,11 @@ html[data-journey="on"] .board-table tr.is-here td { background: var(--accent-wa
 html[data-journey="on"] .board-table tr.is-here .board-status { color: var(--accent-text); }
 html[data-journey="on"] .board-table tr.is-next .board-status { color: var(--ink-1); }
 html[data-journey="on"] .board-table .flap-char { display: inline-block; transform-origin: 50% 55%; backface-visibility: hidden; }
+
+/* ---- The hero dial after a result: the digit ring gives way to the 24-hour face, and the readout shows */
+html[data-journey="on"] .hero-dial.is-face .dial-face { opacity: 1; }
+html[data-journey="on"] .hero-dial.is-face .dial-seg { opacity: 0; }
+@media (min-width: 64rem) {
+  html[data-journey="on"] .dial-host.is-face > .dial-readout { display: block; }
+}
+html[data-journey="on"] .hero-dial .is-dashed { transform-box: view-box; transform-origin: 0 0; }

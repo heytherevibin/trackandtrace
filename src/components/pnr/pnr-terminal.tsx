@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { PLATE_EVENT, RESULT_EVENT, RUN_EVENT, emit, type PlateDetail, type ResultDetail, type RunDetail } from "@/components/landing/journey/journey-events";
 import { TERMINAL_ID } from "@/components/shell/nav-config";
 import { Plate } from "@/components/ui/plate";
 import { SweepBar } from "@/components/ui/sweep-bar";
@@ -35,7 +36,7 @@ async function request(pnr: string): Promise<PnrOutcome> {
   }
 }
 
-function useCheckPlate(sampleMode: boolean, connected: boolean) {
+function useCheckPlate(sampleMode: boolean, connected: boolean, hero: boolean) {
   const [digits, setDigits] = useState("");
   const [attempted, setAttempted] = useState(false);
   const [phase, setPhase] = useState<Phase>("entry");
@@ -60,6 +61,11 @@ function useCheckPlate(sampleMode: boolean, connected: boolean) {
     inputRef.current.focus();
   });
 
+  // The hero dial (the landing journey) follows the plate through these; nothing here waits on it.
+  useEffect(() => {
+    emit<PlateDetail>(PLATE_EVENT, { hero, digits: digits.length, running: phase === "running" });
+  }, [hero, digits.length, phase]);
+
   const status = fieldStatus({ digits, attempted, running: phase === "running" });
   const focus = () => inputRef.current?.focus();
 
@@ -75,6 +81,7 @@ function useCheckPlate(sampleMode: boolean, connected: boolean) {
     runId.current = id;
     const attemptedAt = new Date();
     setPhase("running");
+    emit<RunDetail>(RUN_EVENT, { hero });
     setAnnouncement("");
     const [outcome] = await Promise.all([request(pnr), wait(MIN_RUNNING_MS)]);
     if (runId.current !== id) return;
@@ -82,6 +89,7 @@ function useCheckPlate(sampleMode: boolean, connected: boolean) {
     recentStore.push(view.recent);
     setResult(view);
     setPhase("done");
+    emit<ResultDetail>(RESULT_EVENT, { hero, kind: view.kind, chartAt: view.chartAt });
     setAnnouncement(messages.check.result.announce(view.statusShort, formatPnr(pnr)));
   };
 
@@ -121,7 +129,7 @@ function useCheckPlate(sampleMode: boolean, connected: boolean) {
 
 /** The hero plate: "PNR check — live request · Form TL-01", with the recent strip along its foot. */
 export function PnrTerminal({ sampleMode, connected = false }: { readonly sampleMode: boolean; readonly connected?: boolean }) {
-  const plate = useCheckPlate(sampleMode, connected);
+  const plate = useCheckPlate(sampleMode, connected, true);
   const m = messages.check;
   return (
     <Plate
@@ -178,7 +186,7 @@ export function PnrClosingTerminal({
   readonly meta: string;
   readonly lead: string;
 }) {
-  const plate = useCheckPlate(sampleMode, connected);
+  const plate = useCheckPlate(sampleMode, connected, false);
   const running = plate.phase === "running";
   return (
     <Plate as="div" title={title} meta={[meta]} cells="wide" padding="lg" className={cn(plate.shaking && "shake")} onAnimationEnd={plate.onAnimationEnd}>
