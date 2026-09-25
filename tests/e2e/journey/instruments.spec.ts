@@ -62,3 +62,12 @@ test.describe("the berth plan", () => {
     await expect(plan).toContainText("berth B1 · 12 LB, lit.");
   });
 });
+
+test.describe("the station clock", () => {
+  test("shows the time in India beside Reliability's heading", async ({ page }) => {
+    await gotoReady(page, "/");
+    const clock = page.locator("#reliability").getByRole("img", { name: /^Station clock: \d{2}:\d{2} IST$/ });
+    await expect(clock).toBeVisible();
+    await expect(clock.locator(".clock-hand.is-minute")).toHaveAttribute("transform", /^rotate\(\d+(\.\d+)?\)$/);
+  });
+});

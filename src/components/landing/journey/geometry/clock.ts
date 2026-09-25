@@ -1,0 +1,37 @@
+import { type Tick, polar } from "./dial";
+
+// The station clock's geometry, from prototype v3's clock.js: a face 200 drawing units across, centred on 0,0.
+
+export interface IstTime {
+  readonly h: number;
+  readonly m: number;
+}
+
+const IST = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Kolkata" });
+
+/** The hour (0–23) and minute in India at this instant. */
+export function istTime(now: Date): IstTime {
+  const parts = Object.fromEntries(IST.formatToParts(now).map((part) => [part.type, part.value]));
+  return { h: Number(parts.hour) % 24, m: Number(parts.minute) };
+}
+
+/** Hand angles in degrees clockwise from twelve: the hour hand moves on through its hour. */
+export function handAngles({ h, m }: IstTime): { readonly hour: number; readonly minute: number } {
+  return { hour: ((h % 12) + m / 60) * 30, minute: m * 6 };
+}
+
+/** Rounded to 2dp: Math.cos/sin can differ in their last bit between the server's V8 and the browser's, and an
+ * unrounded coordinate would carry that bit into the SSR-ed attribute, mismatching on hydration. */
+function round(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+/** Sixty minute marks, every fifth a longer hour mark. */
+export function clockTicks(): readonly Tick[] {
+  return Array.from({ length: 60 }, (_, i) => {
+    const major = i % 5 === 0;
+    const [x1, y1] = polar(major ? 76 : 82, i * 6);
+    const [x2, y2] = polar(88, i * 6);
+    return { x1: round(x1), y1: round(y1), x2: round(x2), y2: round(y2), major };
+  });
+}

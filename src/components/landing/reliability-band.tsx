@@ -5,6 +5,7 @@ import { Corners } from "@/components/ui/corners";
 import { Led } from "@/components/ui/led";
 import { messages } from "@/messages";
 import type { ComponentState } from "@/services/service-status";
+import { StationClock } from "@/components/landing/journey/station-clock";
 import { BODY, H2, SectionKicker } from "./sheet-type";
 
 /**
@@ -16,11 +17,14 @@ export function ReliabilityBand({ checks }: { readonly checks: ComponentState })
   return (
     <section id="reliability" aria-labelledby="reliability-title" className="section-pad">
       <SectionKicker rule="mb-6">{m.kicker}</SectionKicker>
-      <div className="max-w-[56ch]">
-        <h2 id="reliability-title" className={H2}>
-          {m.title}
-        </h2>
-        <p className={`mt-3.5 ${BODY}`}>{m.lead}</p>
+      <div className="rel-head">
+        <div className="max-w-[56ch]">
+          <h2 id="reliability-title" className={H2}>
+            {m.title}
+          </h2>
+          <p className={`mt-3.5 ${BODY}`}>{m.lead}</p>
+        </div>
+        <StationClock />
       </div>
       <dl className="blueprint mt-8 grid grid-cols-1 md:grid-cols-3">
         <Corners />

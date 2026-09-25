@@ -130,3 +130,22 @@
 .plan-tag.is-lit { fill: var(--accent-text); }
 .berth-cap { margin: 0; padding: 8px 12px 10px; border-top: 1px solid var(--line); font-size: var(--text-label); line-height: 1.25rem; color: var(--ink-2); }
 .berth-cap b { font-weight: 600; color: var(--accent-text); }
+
+/* ---- 04 · the station clock, beside Reliability's heading */
+.rel-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 20px 40px; }
+.rel-head > div { flex: 1 1 22rem; }
+.station-clock { margin: 0; width: 168px; height: 168px; flex: 0 0 auto; }
+.station-clock svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.clock-ring { fill: none; stroke: var(--line-strong); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.clock-ring.is-faint { stroke: var(--line); }
+.clock-tick { stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.clock-tick.is-major { stroke: var(--ink-1); stroke-width: 1.5; }
+.clock-num { fill: var(--ink-1); font-family: var(--font-display); font-weight: 600; font-size: 15px; /* drawing units */ }
+.clock-label { fill: var(--ink-3); font-family: var(--font-display); font-weight: 600; font-size: 8px; /* drawing units */ letter-spacing: 0.12em; }
+.clock-hand { stroke: var(--ink-1); stroke-linecap: butt; }
+.clock-hand.is-hour { stroke-width: 3.5; }
+.clock-hand.is-minute { stroke-width: 2.2; }
+.clock-cap { fill: var(--surface-0); stroke: var(--ink-1); stroke-width: 1.5; }
+@media (max-width: 39.99rem) {
+  .station-clock { width: 124px; height: 124px; }
+}
