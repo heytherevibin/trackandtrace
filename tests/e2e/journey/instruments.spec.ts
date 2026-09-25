@@ -25,11 +25,11 @@ test.describe("the route strip", () => {
     await expect(page.getByRole("navigation", { name: "Route through this page" })).toHaveCount(0);
   });
 
-  test("on a phone, is a rail in the masthead's bottom edge with no labels", async ({ page, isMobile }) => {
+  test("on a phone, there is no route strip: it waits for J3, with the train that keeps it true", async ({ page, isMobile }) => {
     test.skip(!isMobile, "phone layout");
     await gotoReady(page, "/");
-    await expect(page.locator("#route-strip .strip-stops")).toBeHidden();
-    await expect(page.locator("#route-strip .strip-train")).toBeVisible();
+    await expect(page.locator("#route-strip")).toBeHidden();
+    await expect(page.getByRole("navigation", { name: "Route through this page" })).toHaveCount(0);
   });
 });
 

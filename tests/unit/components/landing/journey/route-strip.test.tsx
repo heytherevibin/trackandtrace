@@ -9,14 +9,14 @@ describe("RouteStrip", () => {
     const links = within(strip).getAllByRole("link");
     expect(links.map((l) => l.textContent)).toEqual(["DEP", "01", "02", "03", "04", "05", "06", "07", "08", "END"]);
     expect(within(strip).getByRole("link", { name: "03 · The record you get" })).toHaveAttribute("href", "#record");
-    expect(within(strip).getByRole("link", { name: "Platform 3 · Departures" })).toHaveAttribute("href", "#top");
+    expect(within(strip).getByRole("link", { name: "DEP · Platform 3 · Departures" })).toHaveAttribute("href", "#top");
   });
 
-  it("stands at DEP, kilometre zero, with the train drawn but hidden from assistive tech", () => {
+  it("is only the rail and its stations: no odometer, no station reading, no train, until J3 moves it", () => {
     const { container } = render(<RouteStrip />);
-    expect(screen.getByText("KM 000")).toHaveAttribute("aria-hidden", "true");
-    expect(screen.getByText("DEP · Platform 3 · Departures")).toBeInTheDocument();
-    expect(container.querySelector(".strip-train")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.queryByText("KM 000")).toBeNull();
+    expect(screen.queryByText("DEP · Platform 3 · Departures")).toBeNull();
+    expect(container.querySelector(".strip-train")).toBeNull();
     expect(container.querySelector(".strip-stops li:last-child")!.getAttribute("style")).toMatch(/left:\s*100(\.0+)?%/);
   });
 });

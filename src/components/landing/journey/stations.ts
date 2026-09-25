@@ -37,7 +37,8 @@ export function kmFigure(km: number): string {
   return String(km).padStart(3, "0");
 }
 
-/** A stop's accessible name: "01 · Operating principles" for numbered stops, the name alone for DEP and END. */
+/** A stop's accessible name: "01 · Operating principles", "DEP · Platform 3 · Departures" — every stop is named
+ * by its code, then its name, so a voice user can say what they see. */
 export function stopName(station: Station): string {
-  return /^\d/.test(station.code) ? messages.journey.strip.stop(station.code, station.name) : station.name;
+  return messages.journey.strip.stop(station.code, station.name);
 }

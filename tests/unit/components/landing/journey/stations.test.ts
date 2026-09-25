@@ -21,10 +21,10 @@ describe("the route through the landing", () => {
     expect(kmFigure(781)).toBe("781");
   });
 
-  it("names a numbered stop with its number, and DEP and END by name alone", () => {
+  it("names every stop with its visible code first, then its name", () => {
     const byCode = (code: string) => STATIONS.find((s) => s.code === code)!;
     expect(stopName(byCode("01"))).toBe("01 · Operating principles");
-    expect(stopName(byCode("DEP"))).toBe("Platform 3 · Departures");
-    expect(stopName(byCode("END"))).toBe("Run a check");
+    expect(stopName(byCode("DEP"))).toBe("DEP · Platform 3 · Departures");
+    expect(stopName(byCode("END"))).toBe("END · Run a check");
   });
 });
