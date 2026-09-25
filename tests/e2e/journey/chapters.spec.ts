@@ -103,7 +103,10 @@ test.describe("02 · the chapters, pinned", () => {
       window.dispatchEvent(new Event("tt:motion"));
     });
     await page.waitForTimeout(300);
-    await expect(page.locator("#how")).toHaveClass(/is-pinned/);
+    // Motion re-enabling does not, by itself, re-pin #how here: the reader is still below its start (at
+    // #features), and pinning is deferred until they scroll back above it (spec §3.A) — the point of that
+    // deferral is exactly that this toggle must not grow #how under them, so nothing moves either way.
+    await expect(page.locator("#how")).not.toHaveClass(/is-pinned/);
     top = await page.locator("#features").evaluate((el) => el.getBoundingClientRect().top);
     expect(Math.abs(top - target)).toBeLessThanOrEqual(4);
   });
@@ -129,5 +132,14 @@ test.describe("02 · the chapters, pinned", () => {
     await waitForJourney(page);
     const top = await page.locator("#roadmap").evaluate((el) => el.getBoundingClientRect().top);
     expect(Math.abs(top - target)).toBeLessThanOrEqual(4);
+  });
+
+  test("02 pins once the reader scrolls back above it", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/#faq");
+    await waitForJourney(page);
+    await expect(page.locator("#how")).not.toHaveClass(/is-pinned/);
+    await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+    await expect(page.locator("#how")).toHaveClass(/is-pinned/);
   });
 });
