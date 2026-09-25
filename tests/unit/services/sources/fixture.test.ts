@@ -46,6 +46,11 @@ describe("buildFixtureResult", () => {
     expect(r.snapshot.pax.map((p) => p.currentStatus)).toEqual(["CNF", "RAC", "WL"]);
   });
 
+  it("books the mixed specimen (last digit 9) in 3A, since its lead sits in B1 at 12 LB", () => {
+    const r = ok("2345678909");
+    expect(r.snapshot.cls).toBe("3A");
+  });
+
   it("returns NOT_FOUND for a PNR ending in 00", () => {
     const outcome = buildFixtureResult("2345678900", NOW);
     expect(outcome.ok).toBe(false);

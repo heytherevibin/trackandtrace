@@ -108,8 +108,9 @@ export function buildFixtureResult(pnr: string, now: Date = new Date()): PnrOutc
   const prev = digitAt(pnr, 8);
   const trainIndex = digitAt(pnr, 6) % FIXTURE_TRAINS.length;
   const train: FixtureTrain = FIXTURE_TRAINS[trainIndex] ?? FIXTURE_TRAINS[0]!;
-  const cls = classFor(trainIndex, digitAt(pnr, 7));
   const mixed = last === 9;
+  // The mixed specimen's lead holds a 3A berth (B1, 12 LB), so its class must say so.
+  const cls = mixed ? "3A" : classFor(trainIndex, digitAt(pnr, 7));
   const lead: LeadShape = mixed ? { status: "CNF", quota: "GN", position: null, coach: "B1", berth: "12 LB" } : leadFor(last, prev);
   const passengerCount = mixed ? 3 : 1 + (prev % 4);
   const pax = passengersFor(lead, passengerCount, mixed);
