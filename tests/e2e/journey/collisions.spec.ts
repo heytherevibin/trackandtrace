@@ -135,8 +135,31 @@ test.describe("the collision checker", () => {
     expect(await collisionsInView(page)).toContain('text "Probe masthead one" × text "Probe masthead two"');
   });
 
+  test("keeps a collision in the strip just below the masthead when a line straddles its edge", async ({ page }) => {
+    await gotoReady(page, "/");
+    // Body-level probes (z-index 9999, appended after the masthead) paint above it, so this overlap is really
+    // visible to a reader — the clip must only cut the straddling line's hidden sliver, not erase the pair.
+    await page.evaluate(() => {
+      const header = document.querySelector("header");
+      if (!header) throw new Error("no header found");
+      const mastheadBottom = header.getBoundingClientRect().bottom;
+      for (const [text, top] of [
+        ["Probe strip one", mastheadBottom - 12],
+        ["Probe strip two", mastheadBottom],
+      ] as const) {
+        const line = document.createElement("p");
+        line.textContent = text;
+        line.style.cssText = `position:fixed;left:40px;top:${top}px;margin:0;font:16px/20px sans-serif;z-index:9999`;
+        document.body.append(line);
+      }
+    });
+    expect(await collisionsInView(page)).toContain('text "Probe strip one" × text "Probe strip two"');
+  });
+
   test("does not report page content straddling the masthead's bottom edge against masthead text", async ({ page }) => {
     await gotoReady(page, "/");
+    // Guard: if the hero's copy ever changes, this must fail loudly instead of silently testing nothing.
+    await expect(page.locator("#hero-title")).toContainText("Your PNR,");
     // The exact offset that straddles the masthead's own text glyphs shifts with viewport and the hero's fluid
     // font, so this sweeps the h1's top from 5 to 60px above the masthead's bottom edge in 5px steps, collecting
     // every finding across all of them, rather than trusting one offset to land in the danger zone.
@@ -157,8 +180,12 @@ test.describe("the collision checker", () => {
         base.scrollY + (base.h1Top - (base.mastheadBottom - above)),
       );
       found.push(...(await collisionsInView(page)));
+      // The h1 as a panel: its whole box, not just one line's glyphs, must also stay clear of the masthead's
+      // own labels once clipped.
+      found.push(...(await collisionsInView(page, { panels: ["#hero-title"] })));
     }
     expect(found.some((finding) => finding.includes('"Your PNR,"'))).toBe(false);
+    expect(found.some((finding) => finding.startsWith("panel") && (finding.includes('"Trakline"') || finding.includes('"Check a PNR"')))).toBe(false);
   });
 
   test("does not report page text wholly hidden under the masthead", async ({ page }) => {

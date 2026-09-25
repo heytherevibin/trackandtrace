@@ -4,9 +4,11 @@ import type { Page } from "@playwright/test";
 // its general part. It measures what a person sees. Each line of text counts as its line-height band (tight
 // display leading is not a collision), cut by any ancestor that clips it, below the sticky masthead and inside
 // the window. Every box outside the masthead is also cut to the masthead's own bottom edge, so a line or panel
-// the masthead paints over never counts as colliding with what nobody can see it touch. "Panels" are boxes that
-// must never cover text outside themselves, nor each other. Findings name both parties. The journey's own checks
-// (leader lines, the drawing's box, the dial ring) join this file in the PRs that draw those pieces.
+// the masthead paints over never counts as colliding with what nobody can see it touch. An overlay actually
+// painted above the masthead (a sheet, dialog or popover) is cut at the same edge regardless — the checker
+// only knows it isn't inside <header>, not that it is drawn on top. "Panels" are boxes that must never cover
+// text outside themselves, nor each other. Findings name both parties. The journey's own checks (leader lines,
+// the drawing's box, the dial ring) join this file in the PRs that draw those pieces.
 
 export interface CollisionOptions {
   /** Boxes that must never cover text outside themselves, nor each other. */
@@ -75,8 +77,8 @@ export async function collisionsInView(page: Page, options: CollisionOptions = {
       // it is compared against anything, so a line or panel straddling that edge is judged only on the sliver a
       // reader can actually see. A box inside the masthead is exempt from the cut and is checked against the
       // window's top edge instead, by inView.
-      // Rebuilds the box explicitly rather than spreading it: a DOMRect's right/bottom/left are prototype
-      // getters, not own properties, so `{ ...box }` silently drops them.
+      // Rebuilds the box explicitly rather than spreading it: all four of a DOMRect's sides (top, right,
+      // bottom, left) are getters on its prototype, not own properties, so `{ ...box }` keeps none of them.
       const belowMasthead = (box: Box, insideMasthead: boolean): Box =>
         insideMasthead ? box : { left: box.left, right: box.right, top: Math.max(box.top, mastheadBottom), bottom: box.bottom };
       const inView = (r: Box, insideMasthead: boolean) => r.right - r.left > 1 && r.bottom - r.top > 1 && r.bottom > (insideMasthead ? 0 : mastheadBottom + 2) && r.top < vh && r.right > 0 && r.left < vw;
@@ -152,7 +154,8 @@ export async function collisionsTopToBottom(page: Page, options: CollisionOption
   // covered. A page that keeps growing forever would otherwise run into the test timeout instead of failing
   // with a clear reason, so a hard step cap throws first.
   let max = await measureMax();
-  for (let y = 0, steps = 0; ; y += step) {
+  let y = 0;
+  for (let steps = 0; ; ) {
     if (++steps > SWEEP_STEP_CAP) throw new Error(`collisionsTopToBottom: the page kept growing past ${SWEEP_STEP_CAP} positions (last max: ${max})`);
     const at = Math.min(y, max);
     // An instant jump, then two frames: style, layout and anything that follows the scroll have settled.
@@ -167,6 +170,9 @@ export async function collisionsTopToBottom(page: Page, options: CollisionOption
     for (const finding of await collisionsInView(page, options)) if (!found.has(finding)) found.set(finding, at);
     max = await measureMax();
     if (at >= max) break;
+    // Steps from the position actually visited, not from the pre-clamp y: a clamp followed by more growth
+    // must not leave an unvisited strip between the clamped position and the next step.
+    y = at + step;
   }
   return [...found].map(([finding, y]) => `@${y}: ${finding}`);
 }
