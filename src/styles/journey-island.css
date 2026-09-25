@@ -27,3 +27,10 @@ html[data-journey="on"] :is(.strip-odo, .route-strip .strip-train) { display: bl
   html[data-journey="on"] .phone-rail::before { content: ""; position: absolute; left: 0; right: 0; top: 5px; height: 1px; background: var(--line); }
   html[data-journey="on"] .phone-rail .strip-train { display: block; top: 1px; width: 22px; height: 9px; }
 }
+
+/* ---- The board: the status column follows the scroll; the page's own row is at the platform */
+html[data-journey="on"] .board-status { display: table-cell; }
+html[data-journey="on"] .board-table tr.is-here td { background: var(--accent-wash); }
+html[data-journey="on"] .board-table tr.is-here .board-status { color: var(--accent-text); }
+html[data-journey="on"] .board-table tr.is-next .board-status { color: var(--ink-1); }
+html[data-journey="on"] .board-table .flap-char { display: inline-block; transform-origin: 50% 55%; backface-visibility: hidden; }

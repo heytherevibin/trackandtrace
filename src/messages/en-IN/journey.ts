@@ -27,6 +27,8 @@ export const journey = {
     stn: "Stn",
     destination: "Destination",
     km: "Km",
+    status: "Status",
+    statuses: { departed: "Departed", here: "At platform", next: "Next" },
   },
   dial: {
     groups: [{ label: "1–3" }, { label: "4–6" }, { label: "7–10" }],

@@ -73,11 +73,13 @@
 .board-name a { color: var(--ink-1); text-decoration: none; }
 .board-name a:hover { color: var(--accent-text); }
 .board-km { width: 4.5rem; color: var(--ink-3); }
+.board-status { display: none; width: 9rem; color: var(--ink-3); white-space: nowrap; }
 @media (max-width: 39.99rem) {
   .board-table th,
   .board-table td { padding: 6px 12px; font-size: var(--text-label); }
   .board-km { display: none; }
   .board-code { width: 3rem; }
+  .board-status { width: 6.75rem; }
 }
 /* A finger is not a cursor: on touch screens each row is at least 44px, so every destination answers across 44px. */
 @media (pointer: coarse) {

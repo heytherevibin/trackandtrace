@@ -13,7 +13,15 @@ describe("DepartureBoard", () => {
     expect(within(rows[0]!).getByRole("link", { name: "Operating principles" })).toHaveAttribute("href", "#principles");
     expect(within(rows[0]!).getByText("064")).toBeInTheDocument();
     expect(within(rows.at(-1)!).getByRole("link", { name: "Run a check" })).toHaveAttribute("href", "#terminus");
-    expect(within(table).getAllByRole("columnheader").map((h) => h.textContent)).toEqual(["Stn", "Destination", "Km"]);
+    expect(within(table).getAllByRole("columnheader").map((h) => h.textContent)).toEqual(["Stn", "Destination", "Km", "Status"]);
+  });
+
+  it("carries a status column for the journey to fill, one row per stop", () => {
+    const { container } = render(<DepartureBoard />);
+    expect(screen.getByRole("columnheader", { name: "Status" })).toBeInTheDocument();
+    const rows = container.querySelectorAll("tbody tr");
+    expect([...rows].map((r) => r.getAttribute("data-stop"))).toEqual(["1", "2", "3", "4", "5", "6", "7", "8", "9"]);
+    for (const row of rows) expect(row.querySelector("td.board-status")).toHaveTextContent("");
   });
 });
 
