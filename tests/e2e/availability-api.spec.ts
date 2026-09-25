@@ -61,23 +61,25 @@ test("the availability endpoint refuses a journey it cannot read, before spendin
 
 const SEARCH = { from: "SBC", to: "NDLS", journeyDate: "2026-10-15", quota: "GN", classes: ["SL", "3A", "2A"] };
 
-test("the search endpoint answers every train on the pair, each with the lead class", async ({ request }) => {
+test("the search endpoint answers every chosen class of every train on the pair", async ({ request }) => {
   const res = await request.post("/api/route-availability", { data: SEARCH });
   expect(res.ok()).toBe(true);
   const body = (await res.json()) as {
     ok: boolean;
     leadClass: string;
-    rows: { train: { trainNo: string }; answers: Record<string, unknown>; pending: string[] }[];
+    rows: { train: { trainNo: string }; answers: Record<string, unknown>; pending: string[]; notCarried: string[] }[];
   };
   expect(body.ok).toBe(true);
-  // 2A leads because the enum declares it first, not because it was named last.
+  // 2A leads because the enum declares it first, not because it was named last. The list is still
+  // sorted and filtered by one class, so one of them still has to be named.
   expect(body.leadClass).toBe("2A");
   expect(body.rows.length).toBeGreaterThan(0);
   for (const row of body.rows) {
     expect(row.train.trainNo).toMatch(/^\d{5}$/);
-    // Every row carries the same class, which is what lets the list be ranked at all.
-    expect(Object.keys(row.answers)).toEqual(row.answers["2A"] ? ["2A"] : []);
-    expect(row.pending).toEqual(["3A", "SL"]);
+    // Every chosen class is accounted for exactly once: answered, not carried by that train, or
+    // still askable because the ask did not land. A class in none of the three would be one the
+    // page could never explain.
+    expect([...Object.keys(row.answers), ...row.notCarried, ...row.pending].sort()).toEqual(["2A", "3A", "SL"]);
   }
 });
 

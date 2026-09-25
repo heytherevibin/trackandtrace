@@ -37,9 +37,10 @@ test("lists every train on the route, each carrying one class", async ({ page })
   await expect(rows.first()).toBeVisible();
   const count = await rows.count();
   expect(count).toBeGreaterThan(0);
-  // Every row carries the same class, which is what lets the list be ranked at all, and names the
-  // ones it has not spent a request on.
-  await expect(page.getByText(/not asked yet/).first()).toBeVisible();
+  // Every chosen class is answered for every train, so nothing is left "not asked yet" — and the
+  // sample Rajdhani carries no sleeper, which the page says rather than leaving the class out.
+  await expect(page.getByText(/not asked yet/)).toHaveCount(0);
+  await expect(page.getByText("Not carried").first()).toBeVisible();
 });
 
 test("says which class the list leads with, so the column is not arbitrary", async ({ page }) => {
