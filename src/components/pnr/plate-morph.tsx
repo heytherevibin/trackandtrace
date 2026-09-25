@@ -36,6 +36,11 @@ export function PlateMorph({ face, children }: { readonly face: string; readonly
     seen.current = { face, height: measured };
     if (!before || before.face === face) return;
 
+    // Every face change starts clean: a still-running tween from the last one would otherwise keep writing
+    // stale heights and fire a second, stale `tt:layout` from its own `onComplete`.
+    controls.current?.stop();
+    controls.current = null;
+
     const box = outer.current;
     if (!on || before.height === measured) {
       height.set("auto");
@@ -46,11 +51,11 @@ export function PlateMorph({ face, children }: { readonly face: string; readonly
 
     height.set(before.height);
     if (box) box.style.overflow = "clip";
-    controls.current?.stop();
     controls.current = animate(height, measured, {
       duration: MORPH_S,
       ease: EXPO,
       onComplete: () => {
+        controls.current = null;
         height.set("auto");
         if (box) box.style.overflow = "";
         window.dispatchEvent(new Event(LAYOUT_EVENT));
