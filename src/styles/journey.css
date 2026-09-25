@@ -149,3 +149,19 @@
 @media (max-width: 39.99rem) {
   .station-clock { width: 124px; height: 124px; }
 }
+
+/* ---- 05 · the roadmap's track (hidden on phones, as in v3) */
+.route-map { margin-top: 24px; }
+.route-map svg { display: block; width: 100%; height: auto; overflow: visible; }
+.route-path-ghost { fill: none; stroke: var(--line); stroke-width: 1; stroke-dasharray: 3 6; vector-effect: non-scaling-stroke; }
+.route-path { fill: none; stroke: var(--line-strong); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.route-sleeper { stroke: var(--line-strong); stroke-width: 1; opacity: 0; vector-effect: non-scaling-stroke; }
+.route-sleeper.is-laid { opacity: 1; }
+.route-stop { fill: var(--surface-0); stroke: var(--line-strong); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.route-num { fill: var(--ink-3); font-family: var(--font-display); font-weight: 600; font-size: 12px; /* drawing units */ letter-spacing: var(--tracking-caps); }
+.is-passed > .route-stop { fill: var(--accent); stroke: var(--accent); }
+.is-passed > .route-num { fill: var(--accent-text); }
+.route-train { color: var(--accent); }
+@media (max-width: 39.99rem) {
+  .route-map { display: none; }
+}

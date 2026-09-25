@@ -71,3 +71,12 @@ test.describe("the station clock", () => {
     await expect(clock.locator(".clock-hand.is-minute")).toHaveAttribute("transform", /^rotate\(\d+(\.\d+)?\)$/);
   });
 });
+
+test.describe("the route map", () => {
+  test("lays the roadmap's track above its rows on a wide screen, and steps aside on a phone", async ({ page, isMobile }) => {
+    await gotoReady(page, "/");
+    const map = page.locator("#roadmap .route-map");
+    if (isMobile) await expect(map).toBeHidden();
+    else await expect(map.locator(".route-stop")).toHaveCount(7);
+  });
+});
