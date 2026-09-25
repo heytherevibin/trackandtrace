@@ -1,0 +1,61 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { startJourney } from "@/components/landing/journey/start-journey";
+
+// A module that throws on the journey's first build: startJourney throws before it can hand back its teardown,
+// so it must stop everything it started itself — the place guard above all, which would otherwise keep
+// scrolling a reader inside #how on a page marked "failed".
+
+vi.mock("@/components/landing/journey/chapters", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/components/landing/journey/chapters")>()),
+  startChapters: () => {
+    throw new Error("boom");
+  },
+}));
+
+type Listener = EventListenerOrEventListenerObject;
+
+describe("startJourney, when its first build throws", () => {
+  const observing = new Set<object>();
+  const listening: { readonly type: string; readonly listener: Listener }[] = [];
+  const stub = window.ResizeObserver;
+
+  beforeEach(() => {
+    document.body.innerHTML = `<section id="how"></section>`;
+    document.documentElement.removeAttribute("data-journey");
+    class Observer {
+      observe(): void {
+        observing.add(this);
+      }
+      unobserve(): void {}
+      disconnect(): void {
+        observing.delete(this);
+      }
+    }
+    window.ResizeObserver = Observer as unknown as typeof ResizeObserver;
+    const add = window.addEventListener.bind(window);
+    const remove = window.removeEventListener.bind(window);
+    vi.spyOn(window, "addEventListener").mockImplementation((type: string, listener: Listener | null, options?: boolean | AddEventListenerOptions) => {
+      if (!listener) return;
+      listening.push({ type, listener });
+      add(type, listener, options);
+    });
+    vi.spyOn(window, "removeEventListener").mockImplementation((type: string, listener: Listener | null, options?: boolean | EventListenerOptions) => {
+      const k = listening.findIndex((l) => l.type === type && l.listener === listener);
+      if (k >= 0) listening.splice(k, 1);
+      if (listener) remove(type, listener, options);
+    });
+  });
+  afterEach(() => {
+    window.ResizeObserver = stub;
+    observing.clear();
+    listening.length = 0;
+    document.body.replaceChildren();
+  });
+
+  it("rethrows, marks the journey failed, and leaves nothing listening or observing", () => {
+    expect(() => startJourney()).toThrow("boom");
+    expect(document.documentElement.getAttribute("data-journey")).toBe("failed");
+    expect(observing.size).toBe(0);
+    expect(listening.map((l) => l.type)).toEqual([]);
+  });
+});

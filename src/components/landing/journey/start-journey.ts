@@ -80,7 +80,15 @@ export function startJourney(): Teardown {
   const stopPlaceGuard = startPlaceGuard();
 
   html.setAttribute("data-journey", "on");
-  build();
+  try {
+    build();
+  } catch (error) {
+    // No teardown reaches the caller when the first build throws, so everything started here stops here:
+    // the guard would otherwise keep moving a reader inside #how on a page marked "failed".
+    window.clearTimeout(resizeTimer);
+    stopPlaceGuard();
+    throw error;
+  }
   window.addEventListener(MOTION_EVENT, rebuild);
   window.addEventListener(REBUILD_EVENT, rebuild);
   window.addEventListener("resize", onResize);
