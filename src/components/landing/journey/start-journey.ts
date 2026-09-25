@@ -9,6 +9,7 @@ import { introWanted, startIntro } from "./intro";
 import { LAYOUT_EVENT, REBUILD_EVENT } from "./journey-events";
 import { JOURNEY_CHUNK_MARK } from "./journey-mark";
 import { refreshAll, untrackAll } from "./observers";
+import { startRoute } from "./route";
 import { startStrip } from "./strip";
 
 // The journey chunk's entry (spec §3.B). JourneyLoader imports this file after hydration, when the page is
@@ -28,7 +29,7 @@ export type Teardown = () => void;
 export type JourneyModule = (ctx: JourneyContext) => Teardown;
 
 /** In start order. Later tasks append their modules here. */
-export const MODULES: readonly JourneyModule[] = [startArrivals, startBoard, startStrip, startHero, startChapters, startBerths, startClock];
+export const MODULES: readonly JourneyModule[] = [startArrivals, startBoard, startStrip, startHero, startChapters, startBerths, startClock, startRoute];
 
 export function startJourney(): Teardown {
   const html = document.documentElement;
