@@ -33,7 +33,6 @@ export function startJourney(): Teardown {
   let teardowns: Teardown[] = [];
   let resizeTimer = 0;
   let introPlayed = false;
-  let hashSettled = false;
 
   const stopAll = () => {
     for (const t of teardowns.reverse()) t();
@@ -54,18 +53,7 @@ export function startJourney(): Teardown {
       html.setAttribute("data-journey", "failed");
       throw error;
     }
-    requestAnimationFrame(() => {
-      // A piece the first build pins (02's chapters) can grow the page well past a still page's height; a
-      // reader who arrived with a URL fragment landed at the browser's pre-journey position, now short of the
-      // target. Corrected once, instantly, so no reader ever lands stranded above the section they followed a
-      // link to; never repeated on a later rebuild, which must not hijack a scroll the reader has since made.
-      if (!hashSettled) {
-        hashSettled = true;
-        const id = decodeURIComponent(location.hash.slice(1));
-        if (id) document.getElementById(id)?.scrollIntoView({ block: "start", behavior: "instant" });
-      }
-      window.dispatchEvent(new Event(LAYOUT_EVENT));
-    });
+    requestAnimationFrame(() => window.dispatchEvent(new Event(LAYOUT_EVENT)));
   };
   const rebuild = () => {
     if (html.getAttribute("data-journey") !== "on") return;

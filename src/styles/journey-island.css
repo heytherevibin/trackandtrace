@@ -70,6 +70,9 @@ html[data-motion="on"][data-journey="on"] .is-pinned .chapters-steps > li.is-cur
 }
 /* Short windows: only the current stop's words. */
 @media (min-width: 64rem) and (max-height: 760px) {
+  html[data-motion="on"][data-journey="on"] .is-pinned .chapters-pin { min-height: 0; }
+  html[data-motion="on"][data-journey="on"] .is-pinned .chapters-copy > :is(span, hr, .chapters-rail) { display: none; }
+  html[data-motion="on"][data-journey="on"] .is-pinned .chapters-copy h2 { font-size: var(--text-3xl); line-height: var(--text-3xl--line-height); }
   html[data-motion="on"][data-journey="on"] .is-pinned .chapters-steps { gap: 12px; margin-top: 14px; }
   html[data-motion="on"][data-journey="on"] .is-pinned .chapters-steps > li:not(.is-current) p { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   html[data-motion="on"][data-journey="on"] .is-pinned .chapters-dial { width: min(100%, calc(100svh - var(--header-height) - 11rem), 520px); }

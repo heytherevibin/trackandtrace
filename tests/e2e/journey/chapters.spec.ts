@@ -54,4 +54,42 @@ test.describe("02 · the chapters, pinned", () => {
     await expect(page.locator("#how")).not.toHaveClass(/is-pinned/);
     await expect(page.locator("#how .chapters-instrument")).toBeHidden();
   });
+
+  test("switching Motion keeps the reader where they were", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/");
+    await waitForJourney(page);
+    await expect(page.locator("#how")).toHaveClass(/is-pinned/);
+    await page.waitForTimeout(300);
+    const headerBottom = await page.locator("header").evaluate((h) => Math.round(h.getBoundingClientRect().bottom));
+    const target = headerBottom + 100;
+    await scrollToId(page, "features", target);
+    // Lets chapters.ts's scroll-position tracker (guardPlace) catch up: it learns the reader's position off
+    // the window's own "scroll" event, which this environment delivers as a throttled task rather than on
+    // this frame, so the toggle below must wait for it to land before it can rely on that position.
+    await page.waitForTimeout(200);
+
+    // Drives Motion the way chooseMotion (use-motion.ts) does, without the footer switch: that control sits at
+    // the very foot of the page, and Playwright's click auto-scrolls it into view first, which would confound
+    // the very position this test is checking.
+    await page.evaluate(() => {
+      window.localStorage.setItem("tt.motion", "off");
+      document.documentElement.setAttribute("data-motion", "off");
+      window.dispatchEvent(new Event("tt:motion"));
+    });
+    await page.waitForTimeout(300);
+    await expect(page.locator("#how")).not.toHaveClass(/is-pinned/);
+    let top = await page.locator("#features").evaluate((el) => el.getBoundingClientRect().top);
+    expect(Math.abs(top - target)).toBeLessThanOrEqual(4);
+
+    await page.evaluate(() => {
+      window.localStorage.removeItem("tt.motion");
+      document.documentElement.setAttribute("data-motion", "on");
+      window.dispatchEvent(new Event("tt:motion"));
+    });
+    await page.waitForTimeout(300);
+    await expect(page.locator("#how")).toHaveClass(/is-pinned/);
+    top = await page.locator("#features").evaluate((el) => el.getBoundingClientRect().top);
+    expect(Math.abs(top - target)).toBeLessThanOrEqual(4);
+  });
 });

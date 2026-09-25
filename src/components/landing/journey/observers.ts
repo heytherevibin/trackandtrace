@@ -23,7 +23,15 @@ export function refreshAll(): void {
     queued = 0;
     for (const o of live) {
       if (o.reverted) live.delete(o);
-      else o.refresh();
+      // An observer's target is assigned lazily, on the frame after it is created; skip one that has not
+      // settled yet rather than crash on it, and never let one observer's failure stop the rest refreshing.
+      else if (o.target) {
+        try {
+          o.refresh();
+        } catch (error) {
+          console.error(error);
+        }
+      }
     }
   });
 }

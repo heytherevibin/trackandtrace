@@ -25,6 +25,74 @@ function span(el: Element | null): Span | null {
   return { top: r.top, bottom: r.bottom };
 }
 
+// Keeps the reader's eye in place across any resize #how's pinning causes, however it happens. The pinned
+// rule needs both html[data-motion="on"] and .is-pinned, so a Motion toggle collapses the height by the CSS
+// selector alone, the instant <html data-motion> is rewritten — before this module's own teardown (which
+// runs later, off the same tt:motion event) ever gets a turn to measure a "before". A ResizeObserver watches
+// #how directly instead, reacting to a resize whatever caused it (this module's own fit toggle, the CSS
+// selector on its own, or the browser's own hash landing before the journey ever ran). Its own live
+// window.scrollY can no longer be trusted for "before" either, by the same problem one level up: the browser
+// already adjusts the scroll position itself (anchoring or the plain physical clamp to a now-shorter page)
+// as part of the very reflow the observer is reacting to, before its callback ever runs. So scrollY is kept
+// one step behind instead, off the window's own "scroll" event, which reliably fires before the observer's
+// callback: the value it holds when that event fires is still the reader's true, undisturbed position. Set
+// up once per page and left running (#how never leaves the DOM).
+let placeGuard: ResizeObserver | null = null;
+let placeHeight = 0;
+let placeDocTop = 0;
+let lastScrollY = 0;
+let placeSettle = 0;
+let hashChecked = false;
+
+/** A reader who follows a link straight to a section below #how has the browser's own fragment scroll land
+ * before the journey ever runs (it resolves against the still-server-rendered, unpinned page): the first
+ * resize here can leave it short, with the reader not yet past #how's own start at all — the general
+ * "already past it" compensation below has nothing to correct, since there is nothing yet to preserve.
+ * Settled once, the first time #how resizes, never again (a later toggle must not re-hijack a scroll the
+ * reader has since made on their own). */
+function settleHash(): void {
+  if (hashChecked) return;
+  hashChecked = true;
+  const id = decodeURIComponent(location.hash.slice(1));
+  const target = id ? document.getElementById(id) : null;
+  target?.scrollIntoView({ block: "start", behavior: "instant" });
+}
+
+/** Re-measures #how against the last known height and compensates for whatever changed. Called from the
+ * observer, and once more shortly after: the static layout the CSS collapses to does not always finish
+ * settling within the same pass the observer catches (a second, small reflow can follow, uncaught by the
+ * observer itself), so one follow-up check catches that tail without polling forever. */
+function settlePlace(section: HTMLElement): void {
+  const now = section.getBoundingClientRect();
+  if (now.height === placeHeight) return;
+  const delta = now.height - placeHeight;
+  if (lastScrollY > placeDocTop) {
+    lastScrollY += delta;
+    // Set synchronously, not left for the "scroll" listener below: that event is delivered late (a
+    // throttled task, not this frame), and #how can resize again within that window — a second correction
+    // must add to where this one already put the reader, not silently to the stale, pre-correction position.
+    window.scrollTo({ top: lastScrollY, behavior: "instant" });
+  }
+  placeHeight = now.height;
+  settleHash();
+  lastScrollY = window.scrollY;
+}
+
+function guardPlace(section: HTMLElement): void {
+  if (placeGuard) return;
+  const box = section.getBoundingClientRect();
+  placeHeight = box.height;
+  placeDocTop = box.top + window.scrollY;
+  lastScrollY = window.scrollY;
+  window.addEventListener("scroll", () => (lastScrollY = window.scrollY), { passive: true });
+  placeGuard = new ResizeObserver(() => {
+    settlePlace(section);
+    window.clearTimeout(placeSettle);
+    placeSettle = window.setTimeout(() => settlePlace(section), 150);
+  });
+  placeGuard.observe(section);
+}
+
 /** Pins the section, opens each stop in turn, and keeps the pin only if every stop fits the window. */
 function fitsPinned(section: HTMLElement): boolean {
   section.classList.add("is-pinned");
@@ -47,7 +115,9 @@ function fitsPinned(section: HTMLElement): boolean {
 export function startChapters({ motion }: JourneyContext): Teardown {
   const section = document.getElementById("how");
   const dial = section?.querySelector<SVGSVGElement>(".chapters-dial svg");
-  if (!section || !dial || !motion) return () => {};
+  if (!section || !dial) return () => {};
+  guardPlace(section);
+  if (!motion) return () => {};
   const pinned = fitsPinned(section);
   let refitTimer = 0;
   const onLayout = () => {
