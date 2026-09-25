@@ -1,6 +1,7 @@
 import { Corners } from "@/components/ui/corners";
 import { PLATE_TITLE_STACK, plateCellClass } from "@/components/ui/plate";
-import { STACKED_ROLES as R, stackedTable } from "@/components/ui/stacked-table";
+import { stackedTable, STACKED_ROLES as R } from "@/components/ui/stacked-table";
+import { statusTone } from "@/components/ui/status-tone";
 import { messages } from "@/messages";
 import type { AvailabilityAnswer, AvailabilityDay } from "@/services/availability-source";
 import { cn } from "@/utils/cn";
@@ -38,26 +39,12 @@ function format(iso: string): string {
 }
 
 /**
- * Status colour, keyed to what the source said and to nothing else.
- *
- * `canBook` outranks the status word: a day the source will not sell is closed however it is
- * labelled. Below that, a queue is a queue — a waitlist of 9 and a waitlist of 148 wear the same
- * amber, because a colour that eased towards green as the queue shortened would be a prediction,
- * and this product does not make one. The figure beside the chip does the ranking.
- */
-function tone(day: Pick<AvailabilityDay, "canBook"> & { readonly wlCurrent: number | null }) {
-  if (!day.canBook) return { chip: "bg-closed-soft text-closed-soft-ink", figure: "text-closed-soft-ink" };
-  if (day.wlCurrent !== null) return { chip: "bg-queued-soft text-queued-soft-ink", figure: "text-queued-soft-ink" };
-  return { chip: "bg-open-soft text-open-soft-ink", figure: "text-open-soft-ink" };
-}
-
-/**
  * One day's answer. A waitlist with both ends shows its movement; a day that cannot be booked says
  * so beside its status, because WAITLIST alone reads as a queue you may still join.
  */
 function Day({ day }: { readonly day: AvailabilityDay & { readonly wlBooking: number | null; readonly wlCurrent: number | null } }) {
   const waitlisted = day.wlCurrent !== null;
-  const colour = tone(day);
+  const colour = statusTone(day);
   return (
     <>
       <div className="flex flex-wrap items-center gap-2">
