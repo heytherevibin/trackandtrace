@@ -1,0 +1,5 @@
+/* The landing journey while it runs (spec 2026-09-24 §3.B): every rule here applies only under
+   html[data-journey="on"], so a page whose journey never starts is the still page journey.css draws. */
+
+/* ---- Entrances: a kicker's characters turn on their own axis, so each is its own box */
+html[data-journey="on"] [data-flap] :is(span) { display: inline-block; transform-origin: 50% 55%; backface-visibility: hidden; }
