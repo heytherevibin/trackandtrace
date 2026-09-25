@@ -41,6 +41,10 @@ test("lists every train on the route, each carrying one class", async ({ page })
   // sample Rajdhani carries no sleeper, which the page says rather than leaving the class out.
   await expect(page.getByText(/not asked yet/)).toHaveCount(0);
   await expect(page.getByText("Not carried").first()).toBeVisible();
+  // And the sample special is closed for booking, which the page says in its own words. "Could not
+  // answer" would be the opposite claim: one means try again, this means pick another date.
+  await expect(page.getByText("This train cannot be booked for this date.")).toBeVisible();
+  await expect(page.getByText(/could not answer for this train/i)).toHaveCount(0);
 });
 
 test("says which class the list leads with, so the column is not arbitrary", async ({ page }) => {

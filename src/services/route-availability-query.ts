@@ -150,6 +150,7 @@ export async function queryRouteAvailability(
     const notCarried: BookingClass[] = [];
     const pending: BookingClass[] = [];
     let missed = false;
+    let notBookable = false;
 
     // Every chosen class, one after another for this train. Sequential within a train and parallel
     // across trains: four trains at once is already the whole concurrency budget, and a burst of
@@ -182,6 +183,13 @@ export async function queryRouteAvailability(
           notCarried.push(travelClass);
           continue;
         }
+        // "Not bookable on this date" is about the train and the date, and names no class — so
+        // every class still to be asked would be refused the same way. Stop here: the answer is
+        // already in hand, and the remaining asks would spend requests to be told it again.
+        if (outcome.code === "INVALID" && outcome.message === messages.source.availability.notBookableOnDate) {
+          notBookable = true;
+          break;
+        }
         // Anything else stays askable, so opening the row can try it again.
         pending.push(travelClass);
         missed = true;
@@ -196,7 +204,11 @@ export async function queryRouteAvailability(
     // A row is "failed" only when it answered NOTHING. One class that could not be reached beside
     // three that could is a gap in the row, not a train the source could not answer for, and
     // saying otherwise would put a refusal above three real answers.
-    return { train, answers, pending, notCarried, beyondCap: false, failed: missed && Object.keys(answers).length === 0 };
+    // A train that cannot be booked on the date has ANSWERED, so nothing about it is pending and
+    // nothing failed: the classes the break left unasked would each be refused the same way, and
+    // offering them for retry would promise a request that can only come back here.
+    if (notBookable) return { train, answers, pending: [], notCarried, notBookable: true, beyondCap: false, failed: false };
+    return { train, answers, pending, notCarried, notBookable: false, beyondCap: false, failed: missed && Object.keys(answers).length === 0 };
   });
 
   const beyond: TrainRow[] = trains.slice(limit).map((train: RouteTrain) => ({
@@ -204,6 +216,7 @@ export async function queryRouteAvailability(
     answers: {},
     pending: chosen,
     notCarried: [],
+    notBookable: false,
     beyondCap: true,
     failed: false,
   }));
