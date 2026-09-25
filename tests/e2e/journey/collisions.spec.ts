@@ -116,6 +116,70 @@ test.describe("the collision checker", () => {
     });
     expect(await collisionsInView(page)).toContain('text "Probe parent" × text "Probe child"');
   });
+
+  test("sees overlapping lines drawn inside the real masthead", async ({ page }) => {
+    await gotoReady(page, "/");
+    await page.evaluate(() => {
+      const header = document.querySelector("header");
+      if (!header) throw new Error("no header found");
+      for (const [text, top] of [
+        ["Probe masthead one", 4],
+        ["Probe masthead two", 8],
+      ] as const) {
+        const line = document.createElement("p");
+        line.textContent = text;
+        line.style.cssText = `position:absolute;left:4px;top:${top}px;margin:0;font:16px/20px sans-serif;z-index:9999`;
+        header.append(line);
+      }
+    });
+    expect(await collisionsInView(page)).toContain('text "Probe masthead one" × text "Probe masthead two"');
+  });
+
+  test("does not report page content straddling the masthead's bottom edge against masthead text", async ({ page }) => {
+    await gotoReady(page, "/");
+    // The exact offset that straddles the masthead's own text glyphs shifts with viewport and the hero's fluid
+    // font, so this sweeps the h1's top from 5 to 60px above the masthead's bottom edge in 5px steps, collecting
+    // every finding across all of them, rather than trusting one offset to land in the danger zone.
+    const base = await page.evaluate(() => {
+      const header = document.querySelector("header");
+      const h1 = document.querySelector("#hero-title") ?? document.querySelector("main h1");
+      if (!header || !h1) throw new Error("missing header or hero h1");
+      return { mastheadBottom: header.getBoundingClientRect().bottom, h1Top: h1.getBoundingClientRect().top, scrollY: window.scrollY };
+    });
+    const found: string[] = [];
+    for (let above = 5; above <= 60; above += 5) {
+      await page.evaluate(
+        (top) =>
+          new Promise<void>((done) => {
+            window.scrollTo({ top, behavior: "instant" });
+            requestAnimationFrame(() => requestAnimationFrame(() => done()));
+          }),
+        base.scrollY + (base.h1Top - (base.mastheadBottom - above)),
+      );
+      found.push(...(await collisionsInView(page)));
+    }
+    expect(found.some((finding) => finding.includes('"Your PNR,"'))).toBe(false);
+  });
+
+  test("does not report page text wholly hidden under the masthead", async ({ page }) => {
+    await gotoReady(page, "/");
+    // The landing h1's bottom ends up above the masthead's bottom edge: the whole heading is tucked out of
+    // sight behind the sticky masthead.
+    await page.evaluate(
+      () =>
+        new Promise<void>((done) => {
+          const header = document.querySelector("header");
+          const h1 = document.querySelector("#hero-title") ?? document.querySelector("main h1");
+          if (!header || !h1) throw new Error("missing header or hero h1");
+          const mastheadBottom = header.getBoundingClientRect().bottom;
+          const h1Bottom = h1.getBoundingClientRect().bottom;
+          window.scrollTo({ top: window.scrollY + (h1Bottom - (mastheadBottom - 10)), behavior: "instant" });
+          requestAnimationFrame(() => requestAnimationFrame(() => done()));
+        }),
+    );
+    const found = await collisionsInView(page);
+    expect(found.some((finding) => finding.includes('"Your PNR,"'))).toBe(false);
+  });
 });
 
 // Today's landing, before the journey adds anything: the baseline every journey PR must keep.
@@ -148,6 +212,9 @@ test.describe("the landing at 390×844 under the device's reduced motion", () =>
   test("nothing collides, top to bottom", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await gotoReady(page, "/");
+    // Proves the sweep actually covers the note: without this, the sweep would still pass green if the note
+    // never rendered at all.
+    await expect(page.getByText("Your device asks for reduced motion")).toBeVisible();
     expect(await collisionsTopToBottom(page)).toEqual([]);
   });
 });

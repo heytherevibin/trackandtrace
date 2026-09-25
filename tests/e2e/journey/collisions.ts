@@ -3,9 +3,10 @@ import type { Page } from "@playwright/test";
 // The landing journey's shared collision checker (spec 2026-09-24 §5), prototype v3's in-page gate cut down to
 // its general part. It measures what a person sees. Each line of text counts as its line-height band (tight
 // display leading is not a collision), cut by any ancestor that clips it, below the sticky masthead and inside
-// the window. "Panels" are boxes that must never cover text outside themselves, nor each other. Findings name
-// both parties. The journey's own checks (leader lines, the drawing's box, the dial ring) join this file in the
-// PRs that draw those pieces.
+// the window. Every box outside the masthead is also cut to the masthead's own bottom edge, so a line or panel
+// the masthead paints over never counts as colliding with what nobody can see it touch. "Panels" are boxes that
+// must never cover text outside themselves, nor each other. Findings name both parties. The journey's own checks
+// (leader lines, the drawing's box, the dial ring) join this file in the PRs that draw those pieces.
 
 export interface CollisionOptions {
   /** Boxes that must never cover text outside themselves, nor each other. */
@@ -70,8 +71,14 @@ export async function collisionsInView(page: Page, options: CollisionOptions = {
         }
         return clip;
       };
-      // Below the masthead and inside the window; content inside the masthead itself is exempt from the
-      // masthead cut and is checked against the window's top edge instead.
+      // The masthead paints over anything below it; a box outside the masthead is cut to its bottom edge before
+      // it is compared against anything, so a line or panel straddling that edge is judged only on the sliver a
+      // reader can actually see. A box inside the masthead is exempt from the cut and is checked against the
+      // window's top edge instead, by inView.
+      // Rebuilds the box explicitly rather than spreading it: a DOMRect's right/bottom/left are prototype
+      // getters, not own properties, so `{ ...box }` silently drops them.
+      const belowMasthead = (box: Box, insideMasthead: boolean): Box =>
+        insideMasthead ? box : { left: box.left, right: box.right, top: Math.max(box.top, mastheadBottom), bottom: box.bottom };
       const inView = (r: Box, insideMasthead: boolean) => r.right - r.left > 1 && r.bottom - r.top > 1 && r.bottom > (insideMasthead ? 0 : mastheadBottom + 2) && r.top < vh && r.right > 0 && r.left < vw;
       const overlap = (a: Box, b: Box) => Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) * Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
       const related = (a: Element, b: Element) => a === b || a.contains(b) || b.contains(a);
@@ -97,15 +104,18 @@ export async function collisionsInView(page: Page, options: CollisionOptions = {
         for (const line of range.getClientRects()) {
           const middle = (line.top + line.bottom) / 2;
           const half = Math.min(line.height, leading) / 2;
-          const box = { left: Math.max(line.left, clip.left), right: Math.min(line.right, clip.right), top: Math.max(middle - half, clip.top), bottom: Math.min(middle + half, clip.bottom) };
+          const box = belowMasthead({ left: Math.max(line.left, clip.left), right: Math.min(line.right, clip.right), top: Math.max(middle - half, clip.top), bottom: Math.min(middle + half, clip.bottom) }, insideMasthead);
           if (inView(box, insideMasthead)) texts.push({ box, owner, block: blockOf(owner), text: words.slice(0, 40) });
         }
       }
       const drawn = panels.length
         ? [...document.querySelectorAll(panels.join(", "))]
             .filter((el) => !el.closest(ignored) && visible(el))
-            .map((el) => ({ el, box: el.getBoundingClientRect() }))
-            .filter(({ el, box }) => inView(box, masthead ? masthead.contains(el) : false))
+            .map((el) => {
+              const insideMasthead = masthead ? masthead.contains(el) : false;
+              return { el, box: belowMasthead(el.getBoundingClientRect(), insideMasthead), insideMasthead };
+            })
+            .filter(({ box, insideMasthead }) => inView(box, insideMasthead))
         : [];
 
       const found: string[] = [];
@@ -127,15 +137,23 @@ export async function collisionsInView(page: Page, options: CollisionOptions = {
   );
 }
 
+/** Positions visited before {@link collisionsTopToBottom} gives up on a page that never stops growing. */
+const SWEEP_STEP_CAP = 400;
+
 /** Scrolls from top to bottom in steps of 45% of the window; each finding once, with the scroll position it was seen at. */
 export async function collisionsTopToBottom(page: Page, options: CollisionOptions = {}): Promise<string[]> {
   const height = await page.evaluate(() => window.innerHeight);
   const step = Math.max(1, Math.round(height * 0.45));
   const found = new Map<string, number>();
-  // max can grow as later sections (pinned scenes) change scrollHeight, so it is re-measured every step;
-  // each y is clamped to that latest max, which makes the final visited position max itself.
-  for (let y = 0; ; y += step) {
-    const max = await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight);
+  const measureMax = () => page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight);
+  // max can grow as later sections (pinned scenes, content that settles in after a scroll) change scrollHeight,
+  // so it is re-measured after every check, not just before the scroll it clamps: the sweep stops only once the
+  // visited position has caught up with that freshest max, so a page that grows at its very end is still
+  // covered. A page that keeps growing forever would otherwise run into the test timeout instead of failing
+  // with a clear reason, so a hard step cap throws first.
+  let max = await measureMax();
+  for (let y = 0, steps = 0; ; y += step) {
+    if (++steps > SWEEP_STEP_CAP) throw new Error(`collisionsTopToBottom: the page kept growing past ${SWEEP_STEP_CAP} positions (last max: ${max})`);
     const at = Math.min(y, max);
     // An instant jump, then two frames: style, layout and anything that follows the scroll have settled.
     await page.evaluate(
@@ -147,6 +165,7 @@ export async function collisionsTopToBottom(page: Page, options: CollisionOption
       at,
     );
     for (const finding of await collisionsInView(page, options)) if (!found.has(finding)) found.set(finding, at);
+    max = await measureMax();
     if (at >= max) break;
   }
   return [...found].map(([finding, y]) => `@${y}: ${finding}`);
