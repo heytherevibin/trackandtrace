@@ -83,6 +83,9 @@ test.describe("the berth plan", () => {
     await gotoReady(page, "/");
     const plan = page.locator("#record figure.berth-plan");
     await expect(plan).toBeVisible();
+    // In view, so the reading holds whenever the journey starts: below the fold (a phone), a running journey
+    // arms the plan unlit until it is seen, then draws it and lights the berth.
+    await plan.scrollIntoViewIfNeeded();
     await expect(plan.locator(".plan-tag.is-lit")).toHaveText("12 LB");
     await expect(plan).toContainText("berth B1 · 12 LB, lit.");
   });
