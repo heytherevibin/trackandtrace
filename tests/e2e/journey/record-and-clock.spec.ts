@@ -70,4 +70,23 @@ test.describe("03 and 04, moving", () => {
       expect(computed, "computed stroke-dasharray").not.toMatch(/^0(\.\d+)?(px)?[ ,]/);
     }
   });
+
+  test("a rebuild mid-draw leaves the plan drawn and lit", async ({ page }) => {
+    await page.goto("/");
+    await waitForJourney(page);
+    await scrollToId(page, "terminus");
+    await scrollToId(page, "record", 40);
+    // Catches the draw animation still running: T.draw is 1100ms, plus a small per-stroke stagger.
+    await page.waitForTimeout(300);
+    await page.evaluate(() => {
+      window.localStorage.setItem("tt.motion", "off");
+      document.documentElement.setAttribute("data-motion", "off");
+      window.dispatchEvent(new Event("tt:motion"));
+    });
+    await page.waitForTimeout(2_000);
+    const dasharrays = await page.locator(".berth-plan .plan-line, .berth-plan .plan-berth").evaluateAll((els) => els.map((el) => el.getAttribute("stroke-dasharray")));
+    expect(dasharrays.length).toBeGreaterThan(0);
+    for (const attr of dasharrays) expect(attr).toBeNull();
+    await expect(page.locator(".berth-plan .plan-berth.is-lit")).toHaveCount(1);
+  });
 });
