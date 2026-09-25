@@ -25,6 +25,7 @@ test.describe("the departure board's status", () => {
     await page.goto("/");
     await waitForJourney(page);
     await scrollToId(page, "terminus");
+    await expect.poll(() => page.locator("#departures .flap-char").count()).toBeGreaterThan(0);
     await scrollToId(page, "departures");
     await expect.poll(() => page.locator("#departures .flap-char").count(), { timeout: 3_000 }).toBe(0);
     await expect(page.locator("#departures .board-name a").first()).toHaveText("Operating principles");
