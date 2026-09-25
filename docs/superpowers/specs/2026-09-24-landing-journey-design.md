@@ -87,6 +87,14 @@ Top to bottom, as in v3:
 | Footer (landing) | Motion switch (on; off and disabled with a note under reduced motion) and Sound switch (off). | — |
 | Page-wide | Registration-mark cursor (fine pointer, motion on). Night falls: the theme switch sweeps the new theme out from the button in a circle (same-document View Transition). | Instant theme switch |
 
+**Section entrances replay** (decided 2026-09-25). Four entrances play every time their section scrolls
+back into view, not once per load: the section kickers flipping in, rows rising into place (01, 03, 04, 05,
+06, 08), registration marks snapping onto plates, and the departure board's rows flipping in. Each resets
+out of sight once its section has fully left the window, so nothing moves while a reader can see it. The
+hero headline's letters play once per load, and the plotter intro once per visit. Everything tied to the
+scroll position (the drawing chapter, strip, dial, run, route and berths) already follows the scroll both
+ways. Motion off: static, as before.
+
 Every pinned piece (drawing chapter, chapters dial, run) measures its content against the visible window and
 falls back to its static layout when it cannot fit: short windows show only the current stop's words, phones
 on their side put the dial beside its stops and the parts list beside the drawing, very large text lists the
@@ -119,10 +127,11 @@ The plate morph (a result growing out of the plate) uses Motion's layout animati
 (`live`/`still`). CSS pins sections only under `html[data-motion="on"]` and draws live only under
 `html[data-drawing="live"]`, so the no-JS default is static. The journey adds `data-journey` and
 `data-drawing-why`. Events on `window`: `tt:layout`, `tt:theme`, `tt:station`, `tt:depart`, `tt:drawing`,
-`tt:webgl`. One shared registry of scroll observers is refreshed on `tt:layout`; one-shot arrivals are
-checked live against boxes, so jumps and reloads never strand anything. Proposed (to confirm, §7): Motion
-off also applies the site's reduced-motion rules (motion.css) to the whole page, so the switch means the same
-thing everywhere.
+`tt:webgl`. One shared registry of scroll observers is refreshed on `tt:layout`. Section entrances are
+checked live against boxes, so jumps and reloads never strand anything. Each one resets when its section
+leaves the window entirely and plays again when the section comes back (§3.A). Motion off also applies the site's
+reduced-motion rules (motion.css) to every traveller page, so the switch means the same thing everywhere
+(confirmed, §7; built in J1).
 
 **Module map** (all TypeScript, strict, each file < 500 lines; path `src/components/landing/journey/`):
 
