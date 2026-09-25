@@ -8,8 +8,10 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
+import { PreBookingForm } from "../src/app/(site)/pre-booking/pre-booking-form.tsx";
 import { TrainsPlate } from "../src/app/(site)/pre-booking/trains-plate.tsx";
 
 const OUT = process.argv[2] ?? join(dirname(fileURLToPath(import.meta.url)), "..", ".render", "trains-list.html");
@@ -77,7 +79,11 @@ const ROWS = [
   row(train("00629", "YPR-ICOD TKD PCET", "10:15", "06:30", "44h 15m", 1), null, null, { beyondCap: true, pending: ["SL", "3A", "2A"] }),
 ];
 
-const body = renderToStaticMarkup(
+// The form renders at its opening state: this is React's static renderer, so no effect has run and
+// nothing has been fetched. It is the shape of the page, not a working one.
+const form = renderToStaticMarkup(createElement(PreBookingForm));
+
+const list = renderToStaticMarkup(
   TrainsPlate({
     answer: { from: "SBC", to: "NDLS", journeyDate: "2026-10-16", leadClass: "SL", rows: ROWS, retrievedAt: "14:09" },
     refusal: null,
@@ -92,7 +98,12 @@ const html = `<!doctype html>
 <style>body{margin:0;font-family:Barlow,ui-sans-serif,system-ui,sans-serif;font-size:16px;line-height:1.5}</style>
 </head>
 <body class="bg-surface-0 text-ink-1" data-theme="dark" style="color-scheme:dark">
-<section class="page-frame page-body">${body}</section>
+<section class="page-frame page-body">
+<div class="max-w-[60ch]">
+<h1 class="optical-hang text-page tracking-display text-pretty">Availability before booking</h1>
+<p class="mt-3.5 text-base text-ink-1/78">Pick the stations, the date and the classes you would travel in. Every train on that route answers at once.</p>
+</div>
+${form}${list}</section>
 </body></html>`;
 
 mkdirSync(dirname(OUT), { recursive: true });

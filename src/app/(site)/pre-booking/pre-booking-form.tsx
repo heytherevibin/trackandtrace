@@ -1,37 +1,36 @@
 "use client";
 
 import { useEffect, useId, useState, useSyncExternalStore, type FormEvent } from "react";
+import { lifecycleSteps, type ReadPhase, type RoutePhase } from "./availability-lifecycle";
+import { TrainsPlate } from "./trains-plate";
+import { ClassChips, inOrder } from "@/components/pre-booking/class-chips";
 import { Button } from "@/components/ui/button";
 import { Corners } from "@/components/ui/corners";
 import { NativeSelect } from "@/components/ui/native-select";
 import { PLATE_TITLE_STACK, plateCellClass } from "@/components/ui/plate";
 import { Timeline } from "@/components/ui/timeline";
 import { messages } from "@/messages";
-import type { AvailabilityAnswer } from "@/services/availability-source";
+import type { RouteAvailabilityAnswer } from "@/services/route-availability";
 import type { RouteTrain } from "@/services/route-source";
+import type { SourceFailure } from "@/services/sources/outcome";
 import { QUOTA_VALUES, type FormClass, type FormQuota } from "@/types/booking";
 import { cn } from "@/utils/cn";
-import { AvailabilityPlate } from "./availability-plate";
-import { lifecycleSteps, type ReadPhase, type RoutePhase } from "./availability-lifecycle";
 
-// Form TL-02, transcribed from the Claude Design sheet "Pre-booking Availability".
+// Form TL-02 v2, transcribed from the Claude Design sheet "Pre-booking Trains List".
 //
-// Stations first, then the train. That order is not a preference: the source has no train-to-route
-// lookup, and the availability endpoint needs a station pair, so a train chosen from anywhere else
-// could never be asked about. See `route-source.ts`.
+// Stations first, and the train is not chosen at all: the source has no train-to-route lookup, and
+// availability exists only per train per class, so the only question that can be asked is "which
+// trains run this pair, and what does each of them say". See `route-availability-query.ts`.
 //
-// Nothing is estimated here and no day is ever invented. When the chart cannot be read the result
-// plate says so — there is no branch that renders a table with no rows in it.
+// Nothing is estimated here and no train is ever invented. A search that could not be made renders
+// a refusal — there is no branch that draws a list with nothing in it.
 
 const CELL = "font-display text-label font-semibold uppercase leading-6 tracking-caps text-pretty";
 const FIELD_LABEL = "font-display text-xs font-semibold uppercase leading-normal tracking-caps text-accent-text";
 const FIELD = "flex min-w-0 flex-col gap-1.5";
-const FACT_LABEL = "font-display text-2xs font-semibold uppercase leading-normal tracking-caps text-ink-1/70";
-const FACT_VALUE = "font-display text-base font-semibold leading-normal tracking-head";
 
-const DRAWN_CLASSES: readonly FormClass[] = ["1A", "2A", "3A", "SL", "CC", "EC", "2S"];
+const DEFAULT_CLASSES: readonly FormClass[] = ["SL", "3A", "2A"];
 const STATION = /^[A-Za-z]{2,5}$/;
-const isClass = (value: string): value is FormClass => DRAWN_CLASSES.some((c) => c === value);
 const isQuota = (value: string): value is FormQuota => QUOTA_VALUES.some((q) => q === value);
 
 /** Today in IST as YYYY-MM-DD. */
@@ -46,8 +45,7 @@ function istClock(iso: string): string {
 }
 
 interface Asked {
-  readonly trainNo: string;
-  readonly cls: FormClass;
+  readonly classes: readonly string[];
   readonly quota: FormQuota;
   readonly date: string;
 }
@@ -58,14 +56,13 @@ export function PreBookingForm() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [lookup, setLookup] = useState<{ readonly key: string; readonly phase: RoutePhase; readonly trains: readonly RouteTrain[] }>({ key: "", phase: "idle", trains: [] });
-  const [picked, setPicked] = useState("");
-  const [cls, setCls] = useState<FormClass>("3A");
+  const [classes, setClasses] = useState<readonly FormClass[]>(DEFAULT_CLASSES);
   const [quota, setQuota] = useState<FormQuota>("GN");
   const [date, setDate] = useState("");
   const [asked, setAsked] = useState<Asked | null>(null);
   const [read, setRead] = useState<ReadPhase>("idle");
-  const [answer, setAnswer] = useState<AvailabilityAnswer | null>(null);
-  const [failure, setFailure] = useState<string>("");
+  const [answer, setAnswer] = useState<RouteAvailabilityAnswer | null>(null);
+  const [refusal, setRefusal] = useState<SourceFailure | null>(null);
   const [sampleData, setSampleData] = useState(false);
   const minDate = useSyncExternalStore(subscribeNever, todayIst, noDateOnServer);
   const pastDate = date.length > 0 && minDate.length > 0 && date < minDate;
@@ -91,7 +88,7 @@ export function PreBookingForm() {
         const [askedFrom, askedTo] = key.split("-");
         try {
           const res = await fetch(`/api/trains?from=${encodeURIComponent(askedFrom ?? "")}&to=${encodeURIComponent(askedTo ?? "")}`, { signal: controller.signal });
-          const body = (await res.json()) as { ok?: boolean; sampleData?: boolean; trains?: readonly RouteTrain[] };
+          const body = (await res.json()) as { ok?: boolean; trains?: readonly RouteTrain[] };
           if (!res.ok || body.ok !== true || !Array.isArray(body.trains)) {
             setLookup({ key, phase: "error", trains: [] });
             return;
@@ -113,35 +110,40 @@ export function PreBookingForm() {
   const route: RoutePhase = key === "" ? "idle" : fresh ? lookup.phase : "looking";
   const trains = fresh ? lookup.trains : [];
 
-  // The first train of a route is the one offered until the reader picks another.
-  const chosen = trains.find((t) => t.trainNo === picked) ?? trains[0] ?? null;
-  const ready = chosen !== null && date.length > 0 && !pastDate;
+  // A pair the railway has no trains for is a complete answer already. Searching it would spend a
+  // request to learn nothing, so the button is not offered.
+  const ready = route === "found" && date.length > 0 && !pastDate && classes.length > 0;
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!ready || !chosen) return;
-    const request = { trainNo: chosen.trainNo, cls, quota, date };
-    setAsked(request);
+    if (!ready) return;
+    const ordered = inOrder(classes);
+    setAsked({ classes: ordered, quota, date });
     setRead("reading");
     setAnswer(null);
+    setRefusal(null);
     void (async () => {
       try {
-        const res = await fetch("/api/availability", {
+        const res = await fetch("/api/route-availability", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ trainNo: chosen.trainNo, from: chosen.fromCode, to: chosen.toCode, journeyDate: date, travelClass: cls, quota }),
+          body: JSON.stringify({ from: upperFrom, to: upperTo, journeyDate: date, quota, classes: ordered }),
         });
-        const body = (await res.json()) as { ok?: boolean; message?: string; sampleData?: boolean } & Partial<AvailabilityAnswer>;
-        if (!res.ok || body.ok !== true || !Array.isArray(body.days)) {
-          setFailure(typeof body.message === "string" ? body.message : messages.source.availability.couldNotAnswer);
+        const body = (await res.json()) as { ok?: boolean; message?: string; code?: string; sampleData?: boolean } & Partial<RouteAvailabilityAnswer>;
+        if (!res.ok || body.ok !== true || !Array.isArray(body.rows)) {
+          setRefusal({
+            ok: false,
+            code: "SOURCE_UNAVAILABLE",
+            message: typeof body.message === "string" ? body.message : messages.source.availability.couldNotAnswer,
+          });
           setRead("error");
           return;
         }
         setSampleData(body.sampleData === true);
-        setAnswer(body as AvailabilityAnswer);
+        setAnswer(body as RouteAvailabilityAnswer);
         setRead("ok");
       } catch {
-        setFailure(messages.source.availability.couldNotAnswer);
+        setRefusal({ ok: false, code: "SOURCE_UNAVAILABLE", message: messages.source.availability.couldNotAnswer });
         setRead("error");
       }
     })();
@@ -153,17 +155,12 @@ export function PreBookingForm() {
     read,
     from: upperFrom,
     to: upperTo,
-    train: chosen ? { name: chosen.trainName, fromCode: chosen.fromCode, toCode: chosen.toCode } : null,
-    asked: asked ? { trainNo: asked.trainNo, cls: asked.cls, quota: asked.quota, date: asked.date } : null,
-    days: answer?.days.length ?? 0,
+    trains: trains.length,
+    asked,
+    rows: answer?.rows.length ?? 0,
     at,
     hasDate: date.length > 0,
   });
-
-  const trainOptions =
-    trains.length > 0
-      ? trains.map((t) => ({ value: t.trainNo, label: `${t.trainNo} · ${t.trainName}` }))
-      : [{ value: "", label: route === "none" ? m.train.none : route === "looking" ? m.train.looking : m.train.waiting }];
 
   return (
     <>
@@ -204,40 +201,6 @@ export function PreBookingForm() {
               onChange={(event) => setTo(event.target.value)}
             />
           </div>
-          {/* Two columns from sm up: a train reads "12602 · MAQ CHENNAI MAIL", and in one column
-              of this grid it is cut mid-word and collides with the select's own arrow. */}
-          <div className={cn(FIELD, "sm:col-span-2")}>
-            <label htmlFor={`${ids}-train`} className={FIELD_LABEL}>
-              {m.train.label}
-            </label>
-            <NativeSelect id={`${ids}-train`} value={chosen?.trainNo ?? ""} disabled={trains.length === 0} onChange={(event) => setPicked(event.target.value)} options={trainOptions} />
-          </div>
-          <div className={FIELD}>
-            <label htmlFor={`${ids}-cls`} className={FIELD_LABEL}>
-              {m.cls}
-            </label>
-            <NativeSelect
-              id={`${ids}-cls`}
-              value={cls}
-              onChange={(event) => {
-                if (isClass(event.target.value)) setCls(event.target.value);
-              }}
-              options={DRAWN_CLASSES.map((value) => ({ value, label: m.classes[value] }))}
-            />
-          </div>
-          <div className={FIELD}>
-            <label htmlFor={`${ids}-quota`} className={FIELD_LABEL}>
-              {m.quota}
-            </label>
-            <NativeSelect
-              id={`${ids}-quota`}
-              value={quota}
-              onChange={(event) => {
-                if (isQuota(event.target.value)) setQuota(event.target.value);
-              }}
-              options={QUOTA_VALUES.map((value) => ({ value, label: m.quotas[value] }))}
-            />
-          </div>
           <div className={FIELD}>
             <label htmlFor={`${ids}-date`} className={FIELD_LABEL}>
               {m.date}
@@ -254,6 +217,30 @@ export function PreBookingForm() {
               className="well h-10 w-full px-2.5"
             />
           </div>
+          <div className={FIELD}>
+            <label htmlFor={`${ids}-quota`} className={FIELD_LABEL}>
+              {m.quota}
+            </label>
+            <NativeSelect
+              id={`${ids}-quota`}
+              value={quota}
+              onChange={(event) => {
+                if (isQuota(event.target.value)) setQuota(event.target.value);
+              }}
+              options={QUOTA_VALUES.map((value) => ({ value, label: m.quotas[value] }))}
+            />
+          </div>
+        </div>
+        {/* One row, not a stacked block: the label sits inline with the chips and the submit closes
+            the row. Stacked, the label opened a second rhythm inside a form that already has one,
+            and seven short chips left two thirds of the band empty. */}
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-3 border-t border-line px-5 py-3">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2">
+            <span id={`${ids}-cls`} className={FIELD_LABEL}>
+              {m.cls}
+            </span>
+            <ClassChips value={classes} onChange={setClasses} labelledBy={`${ids}-cls`} />
+          </div>
           <Button type="submit" variant="primary" className="h-10" disabled={!ready || read === "reading"}>
             {read === "reading" ? m.checking : m.submit}
           </Button>
@@ -263,12 +250,7 @@ export function PreBookingForm() {
             {m.route.none(upperFrom, upperTo)}
           </p>
         ) : null}
-        {route === "found" && chosen ? (
-          <p className="px-5 pb-4 text-sm text-ink-1/70">
-            {m.route.found(trains.length, upperFrom, upperTo)}{" "}
-            {chosen.departs && chosen.travelTime ? m.route.detail(chosen.departs, chosen.travelTime) : null}
-          </p>
-        ) : null}
+        {route === "found" ? <p className="px-5 pb-4 text-sm text-ink-1/70">{m.route.found(trains.length, upperFrom, upperTo)}</p> : null}
         {pastDate ? (
           <p id={`${ids}-past`} className="px-5 pb-4 text-sm text-accent-soft-ink">
             {m.pastDate}
@@ -277,28 +259,7 @@ export function PreBookingForm() {
       </form>
 
       <div role="status" aria-live="polite">
-        {read === "ok" && answer ? <AvailabilityPlate answer={answer} todayIso={minDate} retrievedAt={at} sampleData={sampleData} /> : null}
-        {read === "error" && asked ? (
-          <div className="blueprint mt-[28px] p-6">
-            <Corners />
-            <h2 className="text-3xl leading-[1.12] tracking-head text-pretty">{m.result.title}</h2>
-            <p className="mt-2.5 max-w-[64ch] text-body text-ink-1/78">
-              {failure} {m.result.requested(asked.trainNo, asked.cls, asked.quota, asked.date)}
-            </p>
-            <dl className="mt-[18px] grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3 border-t border-line pt-3.5">
-              {[
-                { label: m.result.responseLabel, value: m.result.responseValue },
-                { label: m.result.provenanceLabel, value: m.result.provenanceValue },
-                { label: m.result.fallbackLabel, value: m.result.fallbackValue },
-              ].map((fact) => (
-                <div key={fact.label}>
-                  <dt className={FACT_LABEL}>{fact.label}</dt>
-                  <dd className={FACT_VALUE}>{fact.value}</dd>
-                </div>
-              ))}
-            </dl>
-          </div>
-        ) : null}
+        {read === "ok" || read === "error" ? <TrainsPlate answer={answer} refusal={refusal} sampleData={sampleData} /> : null}
       </div>
 
       <section className="blueprint mt-[28px]" aria-labelledby={`${ids}-lifecycle`}>

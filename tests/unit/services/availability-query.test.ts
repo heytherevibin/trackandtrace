@@ -119,10 +119,21 @@ describe("the fixture's drawn states", () => {
     expect(waitlisted.length).toBeGreaterThan(1);
     expect(new Set(waitlisted.map((d) => d.wlCurrent)).size).toBeGreaterThan(1);
 
-    const closed = await fixtureAvailabilitySource.check({ ...JOURNEY, trainNo: "22691" });
+    // 22691 arrives at NZM, not NDLS. The pair has to be its own — the fixture used to ignore the
+    // stations entirely, which is how the route fan-out shipped asking every train about the pair
+    // the traveller typed.
+    const closed = await fixtureAvailabilitySource.check({ ...JOURNEY, trainNo: "22691", to: "NZM" });
     expect(closed.ok).toBe(true);
     if (!closed.ok) return;
     expect(closed.answer.days.some((d) => !d.canBook && d.status === "WAITLIST")).toBe(true);
+  });
+
+  it("refuses a train asked about a pair it does not serve", async () => {
+    // What the real provider does, and what this fixture did not do until 2026-09-25.
+    const wrongPair = await fixtureAvailabilitySource.check({ ...JOURNEY, trainNo: "22691" });
+    expect(wrongPair.ok).toBe(false);
+    if (wrongPair.ok) return;
+    expect(wrongPair).not.toHaveProperty("days");
   });
 
   it("refuses a train it has no sample for, rather than answering with no days", async () => {

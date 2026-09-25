@@ -134,10 +134,16 @@ export async function queryRouteAvailability(
   const rest = chosen.filter((cls) => cls !== lead);
 
   const asked = await pooled(asking, CONCURRENCY, async (train): Promise<TrainRow> => {
+    // The stations THAT TRAIN calls at, not the pair the traveller typed.
+    //
+    // "Bengaluru to Delhi" is served from SBC and from YPR, and arrives at NDLS, NZM, DEE or TKD.
+    // Production answers SBC → NDLS with eight trains of which SEVEN call at neither of those two
+    // stations, and asking them about SBC → NDLS refuses for all seven. `RouteTrain.fromCode` and
+    // `toCode` are that train's own segment on this pair, which is exactly what must be asked.
     const ask: AvailabilityRequest = {
       trainNo: train.trainNo,
-      from: request.from,
-      to: request.to,
+      from: train.fromCode,
+      to: train.toCode,
       journeyDate: request.journeyDate,
       travelClass: lead,
       quota: request.quota,

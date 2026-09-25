@@ -15,6 +15,16 @@ import { readRunningDays } from "./railkit-route-parse";
 interface SampleTrain {
   readonly trainNo: string;
   readonly trainName: string;
+  /**
+   * The stations THIS train calls at on the pair — usually not the pair itself.
+   *
+   * Until 2026-09-25 every sample train borrowed the asked-for codes, so a reader of the fixture
+   * could not tell the two apart and neither could a test. Production answered SBC → NDLS with
+   * eight trains of which seven call at neither station, and the route fan-out asked all of them
+   * about SBC → NDLS and was refused seven times.
+   */
+  readonly fromCode: string;
+  readonly toCode: string;
   readonly departs: string;
   readonly arrives: string;
   readonly travelTime: string;
@@ -24,8 +34,9 @@ interface SampleTrain {
 }
 
 const SBC_NDLS: readonly SampleTrain[] = [
-  { trainNo: "12627", trainName: "KARNATAKA EXP", departs: "20:00", arrives: "06:10", travelTime: "34:10 hrs", runningDays: "1111111", halts: 31, distanceKm: 2444 },
-  { trainNo: "22691", trainName: "RAJDHANI EXP", departs: "20:20", arrives: "05:30", travelTime: "33:10 hrs", runningDays: "1011010", halts: 9, distanceKm: 2365 },
+  { trainNo: "12627", trainName: "KARNATAKA EXP", fromCode: "SBC", toCode: "NDLS", departs: "20:00", arrives: "06:10", travelTime: "34:10 hrs", runningDays: "1111111", halts: 31, distanceKm: 2444 },
+  // Boards at SBC and arrives at NZM, as the real 22691 does: the sample pair is not its pair.
+  { trainNo: "22691", trainName: "RAJDHANI EXP", fromCode: "SBC", toCode: "NZM", departs: "20:20", arrives: "05:30", travelTime: "33:10 hrs", runningDays: "1011010", halts: 9, distanceKm: 2365 },
 ];
 
 const ROUTES: Readonly<Record<string, readonly SampleTrain[]>> = { "SBC-NDLS": SBC_NDLS };
@@ -44,14 +55,14 @@ export const fixtureRouteSource: RouteSource = {
         trains: sample.map((train) => ({
           trainNo: train.trainNo,
           trainName: train.trainName,
-          fromCode: from,
-          fromName: from,
-          toCode: to,
-          toName: to,
-          originCode: from,
-          originName: from,
-          destinationCode: to,
-          destinationName: to,
+          fromCode: train.fromCode,
+          fromName: train.fromCode,
+          toCode: train.toCode,
+          toName: train.toCode,
+          originCode: train.fromCode,
+          originName: train.fromCode,
+          destinationCode: train.toCode,
+          destinationName: train.toCode,
           departs: train.departs,
           arrives: train.arrives,
           travelTime: train.travelTime,

@@ -71,17 +71,33 @@ function janShatabdi(now: Date): AvailabilityAnswer {
   };
 }
 
-const ANSWERS: Readonly<Record<string, (now: Date) => AvailabilityAnswer>> = {
-  "12627": karnataka,
-  "22691": janShatabdi,
+interface SampleJourney {
+  readonly build: (now: Date) => AvailabilityAnswer;
+  /** The stations this train calls at. Asked about any other pair, it refuses — as the real one does. */
+  readonly from: string;
+  readonly to: string;
+}
+
+const ANSWERS: Readonly<Record<string, SampleJourney>> = {
+  "12627": { build: karnataka, from: "SBC", to: "NDLS" },
+  "22691": { build: janShatabdi, from: "SBC", to: "NZM" },
 };
 
 export const fixtureAvailabilitySource: AvailabilitySource = {
   async check(request: AvailabilityRequest): Promise<AvailabilityOutcome> {
-    const build = ANSWERS[request.trainNo.trim()];
+    const journey = ANSWERS[request.trainNo.trim()];
     // Not a sample train: the sample provider could not answer. Never an empty day list, which is
     // the one shape that would read as "there are no berths".
-    if (!build) return unavailable(messages.source.availability.couldNotAnswer, "server");
-    return { ok: true, answer: build(new Date()) };
+    if (!journey) return unavailable(messages.source.availability.couldNotAnswer, "server");
+    // The stations matter, and until 2026-09-25 this fixture ignored them.
+    //
+    // A provider refuses a train asked about a pair it does not serve, and pretending otherwise let
+    // the route fan-out ship asking every train about the pair the traveller typed. Seven of eight
+    // trains on SBC → NDLS call at neither of those stations; production refused all seven, and
+    // every test here had passed.
+    const from = request.from.trim().toUpperCase();
+    const to = request.to.trim().toUpperCase();
+    if (from !== journey.from || to !== journey.to) return unavailable(messages.source.availability.notOnRoute, "server");
+    return { ok: true, answer: journey.build(new Date()) };
   },
 };
