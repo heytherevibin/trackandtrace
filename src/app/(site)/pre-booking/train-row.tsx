@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { AvailabilityPlate } from "./availability-plate";
 import { ClassBlock } from "./class-block";
+import { TrainRoutePopover } from "./train-route-strip";
 import { messages } from "@/messages";
 import type { AvailabilityAnswer } from "@/services/availability-source";
 import type { TrainRow } from "@/services/route-availability";
@@ -93,10 +94,14 @@ export function TrainRowView({
 
   return (
     <div data-testid="train-row" className={cn("px-5 py-4", last ? "" : "border-b border-line")}>
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <span className="font-data">{row.train.trainNo}</span>
-        <span className="text-ink-1">{row.train.trainName}</span>
-        <span className="text-sm text-ink-1/70">{journey(row.train)}</span>
+      <div className="flex items-start gap-3">
+        <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-1">
+          <span className="font-data">{row.train.trainNo}</span>
+          <span className="text-ink-1">{row.train.trainName}</span>
+          <span className="text-sm text-ink-1/70">{journey(row.train)}</span>
+        </div>
+        {/* The run, in the corner. Costs nothing: every field it uses arrived with the search. */}
+        <TrainRoutePopover train={row.train} className="shrink-0" />
       </div>
       {runs ? <div className="mt-1 text-label text-ink-1/70">{runs}</div> : null}
 
