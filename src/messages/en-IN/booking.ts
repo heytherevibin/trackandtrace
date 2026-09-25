@@ -61,7 +61,13 @@ export const booking = {
     waitlistOf: (opened: number) => `of ${opened} when booking opened`,
     nobodyCleared: "nobody has cleared yet",
     closed: "Booking closed",
-    closedNote: "The chart is prepared. This is how it finished.",
+    /**
+     * Says only what the source said: `canBook` is false. It used to say "The chart is prepared.
+     * This is how it finished." — which production disproved on 2026-09-25, answering canBook false
+     * for a date twenty-one days out, where no chart exists yet. The reason is not measured, so no
+     * reason is given.
+     */
+    closedNote: "Booking is closed for this date.",
     today: "Today",
     fare: (total: number) => `₹${total.toLocaleString("en-IN")}`,
   },

@@ -34,9 +34,25 @@ test("finds the route's trains, then reads the chart for the one chosen", async 
   await expect(table).toBeVisible();
   await expect(table.getByRole("row")).toHaveCount(5); // a head row and four dates
   await expect(page.getByText("of 244 when booking opened").first()).toBeVisible();
+
+  // One comma, after the weekday. en-IN's own long form adds a second before the year.
+  await expect(table.getByRole("cell").first()).toHaveText(/^[A-Z][a-z]{2}, \d{1,2} [A-Z][a-z]{2} \d{4}$/);
 });
 
-test("says a queue cannot be joined once the chart is prepared", async ({ page }) => {
+test("the train field is wide enough for a train's name", async ({ page, isMobile }) => {
+  test.skip(isMobile, "one column on a phone, so every field is already full width");
+  await gotoReady(page, "/pre-booking");
+  await pickRoute(page, "SBC", "NDLS");
+  await expect(page.getByLabel("Train", { exact: true })).toBeEnabled();
+
+  // A train reads "12602 · MAQ CHENNAI MAIL". In one column of this grid it was cut mid-word and
+  // ran into the select's own arrow, which read as the arrow being out of place.
+  const train = await page.getByLabel("Train", { exact: true }).boundingBox();
+  const cls = await page.getByLabel("Class", { exact: true }).boundingBox();
+  expect(train!.width).toBeGreaterThan(cls!.width * 1.8);
+});
+
+test("says a date cannot be booked, without claiming to know why", async ({ page }) => {
   await gotoReady(page, "/pre-booking");
   await pickRoute(page, "SBC", "NDLS");
   await page.getByLabel("Train", { exact: true }).selectOption("22691");
@@ -44,6 +60,9 @@ test("says a queue cannot be joined once the chart is prepared", async ({ page }
   await page.getByRole("button", { name: "Check availability" }).click();
 
   await expect(page.getByText("Booking closed")).toBeVisible();
+  // The note used to say the chart was prepared. Production answered canBook false twenty-one days
+  // out, where no chart exists, so the page no longer offers a reason it cannot stand behind.
+  await expect(page.getByText(/chart is prepared/i)).toHaveCount(0);
 });
 
 test("a pair with no trains says so, and leaves the train field empty", async ({ page }) => {

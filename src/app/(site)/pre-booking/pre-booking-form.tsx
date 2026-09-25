@@ -204,7 +204,9 @@ export function PreBookingForm() {
               onChange={(event) => setTo(event.target.value)}
             />
           </div>
-          <div className={FIELD}>
+          {/* Two columns from sm up: a train reads "12602 · MAQ CHENNAI MAIL", and in one column
+              of this grid it is cut mid-word and collides with the select's own arrow. */}
+          <div className={cn(FIELD, "sm:col-span-2")}>
             <label htmlFor={`${ids}-train`} className={FIELD_LABEL}>
               {m.train.label}
             </label>
