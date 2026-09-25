@@ -6,6 +6,7 @@ import { Features } from "@/components/landing/features";
 import { Hero } from "@/components/landing/hero";
 import { HowItWorks } from "@/components/landing/how-it-works";
 import { DepartureBoard } from "@/components/landing/journey/departure-board";
+import { JourneyLoader } from "@/components/landing/journey/journey-loader";
 import { PhotoSplit } from "@/components/landing/photo-split";
 import { PrinciplesSheet } from "@/components/landing/principles-sheet";
 import { Roadmap } from "@/components/landing/roadmap";
@@ -43,6 +44,7 @@ export default async function HomePage() {
       <PhotoSplit />
       <Faq />
       <ClosingCta sampleMode={sampleMode} connected={connected} />
+      <JourneyLoader />
     </div>
   );
 }
