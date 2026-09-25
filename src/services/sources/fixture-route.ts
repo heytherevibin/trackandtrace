@@ -37,6 +37,10 @@ const SBC_NDLS: readonly SampleTrain[] = [
   { trainNo: "12627", trainName: "KARNATAKA EXP", fromCode: "SBC", toCode: "NDLS", departs: "20:00", arrives: "06:10", travelTime: "34:10 hrs", runningDays: "1111111", halts: 31, distanceKm: 2444 },
   // Boards at SBC and arrives at NZM, as the real 22691 does: the sample pair is not its pair.
   { trainNo: "22691", trainName: "RAJDHANI EXP", fromCode: "SBC", toCode: "NZM", departs: "20:20", arrives: "05:30", travelTime: "33:10 hrs", runningDays: "1011010", halts: 9, distanceKm: 2365 },
+  // A special, listed on the pair and closed for booking — the third answer a row can carry, beside
+  // a berth count and a class the train does not run. Production answers exactly this for 00629
+  // YPR → TKD, measured 2026-09-26, and without a sample that does it no test could see the row.
+  { trainNo: "00629", trainName: "YPR TKD SPECIAL", fromCode: "SBC", toCode: "TKD", departs: "23:45", arrives: "08:15", travelTime: "32:30 hrs", runningDays: "0000100", halts: 12, distanceKm: 2401 },
 ];
 
 const ROUTES: Readonly<Record<string, readonly SampleTrain[]>> = { "SBC-NDLS": SBC_NDLS };

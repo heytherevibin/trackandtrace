@@ -64,6 +64,7 @@ function row(over: Partial<TrainRow> = {}): TrainRow {
     answers: { SL: answerFor([day({ status: "WL", wlBooking: 136, wlCurrent: 44 })], 765) },
     pending: ["3A", "2A"],
     notCarried: [],
+    notBookable: false,
     beyondCap: false,
     failed: false,
     ...over,

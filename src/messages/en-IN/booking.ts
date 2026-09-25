@@ -88,6 +88,12 @@ export const booking = {
     /** Which class every row carries. Said aloud because a column nobody chose reads as arbitrary. */
     leadsWith: (cls: string) => `${cls} first`,
     trainFailed: "Trakline could not answer for this train. Nothing is shown in its place.",
+    /**
+     * An ANSWER, and it must not borrow the words above. "Could not answer" says we failed to ask;
+     * this says the railway answered, and told us the train is closed for booking on this date. A
+     * traveller acts on the difference: one means try again, the other means pick another date.
+     */
+    trainNotBookable: "This train cannot be booked for this date.",
     /** The store has the column and nothing writes it yet, so this says so rather than inventing a number. */
     noHistory: "Not enough history yet",
   },

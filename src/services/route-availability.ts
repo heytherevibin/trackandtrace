@@ -53,6 +53,16 @@ export interface TrainRow {
    * same way, and calling it a failure would say "we could not ask", which is a different thing.
    */
   readonly notCarried: readonly BookingClass[];
+  /**
+   * This train cannot be booked on this date — a fact about the TRAIN AND THE DATE, and an answer.
+   *
+   * A flag and not a class list, because the provider's refusal ("Sorry, this train is not
+   * available for booking for this date", measured 2026-09-26 on 00629 YPR → TKD) names neither a
+   * class nor anything a different class could change. Every class asked would be refused the same
+   * way, so the fan-out stops at the first one — and the row carries no pending classes, because
+   * there is nothing left worth asking.
+   */
+  readonly notBookable: boolean;
   readonly beyondCap: boolean;
   readonly failed: boolean;
 }

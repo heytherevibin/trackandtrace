@@ -67,7 +67,7 @@ test("the search endpoint answers every chosen class of every train on the pair"
   const body = (await res.json()) as {
     ok: boolean;
     leadClass: string;
-    rows: { train: { trainNo: string }; answers: Record<string, unknown>; pending: string[]; notCarried: string[] }[];
+    rows: { train: { trainNo: string }; answers: Record<string, unknown>; pending: string[]; notCarried: string[]; notBookable: boolean }[];
   };
   expect(body.ok).toBe(true);
   // 2A leads because the enum declares it first, not because it was named last. The list is still
@@ -76,11 +76,22 @@ test("the search endpoint answers every chosen class of every train on the pair"
   expect(body.rows.length).toBeGreaterThan(0);
   for (const row of body.rows) {
     expect(row.train.trainNo).toMatch(/^\d{5}$/);
-    // Every chosen class is accounted for exactly once: answered, not carried by that train, or
-    // still askable because the ask did not land. A class in none of the three would be one the
-    // page could never explain.
+    // A train closed for booking answers for the whole row at once, so it carries no per-class
+    // verdicts at all — and must not, because "pending" would offer a retry that can only be
+    // refused the same way.
+    if (row.notBookable) {
+      expect([...Object.keys(row.answers), ...row.notCarried, ...row.pending]).toEqual([]);
+      continue;
+    }
+    // Otherwise every chosen class is accounted for exactly once: answered, not carried by that
+    // train, or still askable because the ask did not land. A class in none of the three would be
+    // one the page could never explain.
     expect([...Object.keys(row.answers), ...row.notCarried, ...row.pending].sort()).toEqual(["2A", "3A", "SL"]);
   }
+  // The sample route carries one of each, so this file would notice if a verdict stopped being
+  // reachable rather than merely stopped being produced.
+  expect(body.rows.filter((r) => r.notBookable)).toHaveLength(1);
+  expect(body.rows.filter((r) => r.notCarried.length > 0)).toHaveLength(1);
 });
 
 test("a pair with no trains is an answer here too, with no rows", async ({ request }) => {

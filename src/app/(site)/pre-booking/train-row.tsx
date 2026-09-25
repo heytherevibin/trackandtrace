@@ -86,6 +86,8 @@ export function TrainRowView({
 
       {/* Asked and refused is not the same as never asked, and must not borrow its words. */}
       {row.failed ? <div className="mt-3 text-sm text-ink-1/70">{m.trainFailed}</div> : null}
+      {/* Nor is "we could not ask" the same as "the railway says no". This one is an answer. */}
+      {row.notBookable ? <div className="mt-3 text-sm text-ink-1/70">{m.trainNotBookable}</div> : null}
 
       {/* One grid, always, with the tracks KEPT rather than collapsed.
           `auto-fit` would give a single block the whole row, so the collapsed state was held to a

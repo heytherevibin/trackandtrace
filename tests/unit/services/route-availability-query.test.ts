@@ -65,7 +65,7 @@ function answer(request: AvailabilityRequest): AvailabilityAnswer {
 }
 
 /** A source that records every ask, and can be told which trains to refuse. */
-function countingSource(failFor: readonly string[] = [], notCarriedFor: readonly string[] = []) {
+function countingSource(failFor: readonly string[] = [], notCarriedFor: readonly string[] = [], notBookableFor: readonly string[] = []) {
   const calls: AvailabilityRequest[] = [];
   const source: AvailabilitySource = {
     async check(request): Promise<AvailabilityOutcome> {
@@ -74,6 +74,12 @@ function countingSource(failFor: readonly string[] = [], notCarriedFor: readonly
       // provider says so distinctly and the breaker ignores it. Measured 2026-09-25.
       if (notCarriedFor.includes(request.trainNo)) {
         return { ok: false, code: "INVALID", message: "This train does not carry that class." };
+      }
+      // A date this train cannot be booked for. Also INVALID, also measured — 00629 YPR → TKD on
+      // 2026-10-10, probed 2026-09-26 — and about the TRAIN AND THE DATE, so every class it is
+      // asked gets the same answer.
+      if (notBookableFor.includes(request.trainNo)) {
+        return { ok: false, code: "INVALID", message: "This train cannot be booked for that date." };
       }
       if (failFor.includes(request.trainNo)) {
         return { ok: false, code: "SOURCE_UNAVAILABLE", message: "nope", cause: "server" };
@@ -219,6 +225,33 @@ describe("asking a whole route", () => {
     expect(row.failed).toBe(false);
     expect(row.notCarried).toEqual(["2A", "3A", "SL"]);
     expect(row.pending).toEqual([]);
+  });
+
+  it("says a train cannot be booked on that date, rather than calling the ask a failure", async () => {
+    const { calls, source } = countingSource([], [], ["00629"]);
+    const { deps } = setup({ source });
+    const { outcome } = await queryRouteAvailability(REQUEST, IP, deps);
+    if (!outcome.ok) throw new Error("expected an answer");
+    const row = outcome.answer.rows.find((r) => r.train.trainNo === "00629")!;
+    // The provider answered, and its answer is about the train and the date together. Rendering it
+    // as "could not answer" would say the opposite of what happened — and would put the classes
+    // back in the queue for a retry that can only be refused the same way.
+    expect(row.failed).toBe(false);
+    expect(row.notBookable).toBe(true);
+    expect(row.pending).toEqual([]);
+    expect(row.notCarried).toEqual([]);
+    // And it stops asking. Every remaining class carries the same date, so the answer is already in
+    // hand — two requests saved on every special and every weekly train in the list.
+    expect(calls.filter((c) => c.trainNo === "00629")).toHaveLength(1);
+  });
+
+  it("leaves the other trains untouched when one cannot be booked on the date", async () => {
+    const { source } = countingSource([], [], ["00629"]);
+    const { deps } = setup({ source });
+    const { outcome } = await queryRouteAvailability(REQUEST, IP, deps);
+    if (!outcome.ok) throw new Error("expected an answer");
+    expect(outcome.answer.rows.filter((r) => r.notBookable)).toHaveLength(1);
+    expect(outcome.answer.rows.filter((r) => Object.keys(r.answers).length === 3)).toHaveLength(7);
   });
 
   it("refuses the whole search before asking anything when the day's budget cannot cover it", async () => {
