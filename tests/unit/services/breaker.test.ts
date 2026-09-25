@@ -118,6 +118,39 @@ describe("the circuit breaker", () => {
     await expect(breaker.admit()).resolves.toEqual({ open: false });
   });
 
+  it("stays closed when a fan-out's failures are a minority of what it asked", async () => {
+    const { breaker } = setup();
+    // One route search: twenty-four asks, nineteen answered and five refused. Four flaky trains out
+    // of eight is an ordinary day on the railway — a COUNT of five says the provider is sick only
+    // when five is most of what was asked, which is true of a PNR check and false of a fan-out.
+    for (let i = 0; i < 19; i += 1) await breaker.record(answered);
+    await failTimes(breaker, 5);
+    await expect(breaker.admit()).resolves.toEqual({ open: false });
+  });
+
+  it("still opens when most of what a fan-out asked failed", async () => {
+    const { breaker } = setup();
+    for (let i = 0; i < 4; i += 1) await breaker.record(answered);
+    await failTimes(breaker, 20);
+    await expect(breaker.admit()).resolves.toMatchObject({ open: true });
+  });
+
+  it("needs the failures to be both many and most: neither alone opens it", async () => {
+    const few = setup();
+    // Most of very little is not enough — four failures and nothing else never reaches the floor.
+    await failTimes(few.breaker, 4);
+    await expect(few.breaker.admit()).resolves.toEqual({ open: false });
+
+    const diluted = setup();
+    // Many, but not most: five refusals against six answers in the same minute is a provider
+    // having a moment, not one that has stopped. The sixth failure carries it.
+    for (let i = 0; i < 6; i += 1) await diluted.breaker.record(answered);
+    await failTimes(diluted.breaker, 5);
+    await expect(diluted.breaker.admit()).resolves.toEqual({ open: false });
+    await diluted.breaker.record(fail());
+    await expect(diluted.breaker.admit()).resolves.toMatchObject({ open: true });
+  });
+
   it("forgets trips after 30 quiet minutes", async () => {
     const { breaker, tick } = setup();
     await failTimes(breaker, 5);
@@ -148,6 +181,16 @@ describe("a wrong question", () => {
     // The next real failure is still the second trip, so the window doubles rather than restarting.
     await breaker.record(fail());
     await expect(breaker.admit()).resolves.toEqual({ open: true, retryAfterSeconds: 60 });
+  });
+
+  it("does not dilute the failure rate either: it is no more evidence of health than of sickness", async () => {
+    const { breaker } = setup();
+    // Twenty wrong questions answered correctly are still "neither a sick provider nor proof of a
+    // well one" — so they must not sit in the denominator and hold the fuse closed through five
+    // real failures. A refusal the breaker ignores is ignored on BOTH sides of the rate.
+    for (let i = 0; i < 20; i += 1) await breaker.record(notOnRoute);
+    await failTimes(breaker, 5);
+    await expect(breaker.admit()).resolves.toEqual({ open: true, retryAfterSeconds: 30 });
   });
 
   it("stays invisible to the breaker while a provider that really refuses everything does not", async () => {

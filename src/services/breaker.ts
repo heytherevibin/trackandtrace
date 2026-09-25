@@ -18,8 +18,21 @@ import type { SourceFailure } from "./sources/outcome";
 // must rest everyone. `admit` consults both; `record` writes to exactly one.
 
 export const BREAKER = {
-  /** Counting failures within `failureWindowMs` that open the breaker. */
+  /** The floor: fewer failures than this never open it, however small the sample. */
   threshold: 5,
+  /**
+   * And the share: the failures must also be at least this much of what was ASKED in the window.
+   *
+   * A count alone reads a burst of parallel asks as a sick provider. A live PNR check makes one
+   * request at a time, so five failures there really is five in a row — but a route search asks one
+   * class of every train at once, and five refusals out of twenty-four is an ordinary day on the
+   * railway. Before this, one such search rested availability for everyone, the single-journey
+   * chart included; measured on production 2026-09-26.
+   *
+   * At a half, the PNR path is unchanged — five consecutive failures are five out of five — while a
+   * fan-out must fail most of what it asked. That is the property to preserve if this number moves.
+   */
+  failureRate: 0.5,
   failureWindowMs: 60_000,
   /** The first window; each repeat trip doubles it, up to `maxOpenMs`. */
   baseOpenMs: 30_000,
@@ -92,9 +105,18 @@ interface SharedKeys {
   readonly probe: string;
 }
 
-/** A caller's own fuse counts as well: failures inside one window, and the trips it has earned. */
+/**
+ * A caller's own fuse counts as well: failures inside one window, what it ASKED in that same
+ * window, and the trips it has earned.
+ *
+ * `asks` is the denominator of the rate, and it holds only the asks that carry evidence about the
+ * provider's health — an answer, or a failure. A wrong question is in neither, on purpose: it is
+ * "neither a sick provider nor proof of a well one", so counting it below the line would let a
+ * crawler's refusals hold the fuse closed through real trouble.
+ */
 interface CountingKeys extends SharedKeys {
   readonly fails: string;
+  readonly asks: string;
   readonly trips: string;
 }
 
@@ -103,7 +125,7 @@ function sharedKeys(base: string): SharedKeys {
 }
 
 function countingKeys(base: string): CountingKeys {
-  return { ...sharedKeys(base), fails: `${base}:fails`, trips: `${base}:trips` };
+  return { ...sharedKeys(base), fails: `${base}:fails`, asks: `${base}:asks`, trips: `${base}:trips` };
 }
 
 export function createBreaker(kv: Kv, scope: BreakerScope, options: { readonly onChange?: (event: BreakerEvent) => void } = {}): Breaker {
@@ -122,8 +144,10 @@ export function createBreaker(kv: Kv, scope: BreakerScope, options: { readonly o
     const trips = await kv.incr(endpoint.trips, BREAKER.tripMemoryMs, true);
     await openFor(endpoint, "endpoint", Math.min(BREAKER.baseOpenMs * 2 ** (trips - 1), BREAKER.maxOpenMs), "failures");
     // The window that just tripped is spent; the next one counts from zero. After the open, so no
-    // concurrent check can ever read a cleared counter while the fuse still looks closed.
-    await kv.del(endpoint.fails);
+    // concurrent check can ever read a cleared counter while the fuse still looks closed. Both
+    // sides of the rate go together — a surviving denominator would make the next window's first
+    // failures look diluted by asks the last window already answered for.
+    await Promise.all([kv.del(endpoint.fails), kv.del(endpoint.asks)]);
   }
 
   /**
@@ -175,14 +199,24 @@ export function createBreaker(kv: Kv, scope: BreakerScope, options: { readonly o
       // Checks admitted before the breaker opened answer late; they say nothing new.
       if ((await restingMs()) > 0) return;
 
-      if (outcome.ok) return recovered();
       // A wrong question. The provider read it, refused it correctly and quickly, and told us
       // why: that is neither a sick provider nor proof of a well one, so the breaker learns
       // nothing from it. A crawler walking an unverified route list produces thousands, and a
       // provider that really starts refusing everything still reaches the counter below,
       // because an unrecognised refusal is classified `unreadable` and not `INVALID`.
-      if (outcome.code === "INVALID") return;
-      if (outcome.code !== "SOURCE_UNAVAILABLE") return recovered();
+      //
+      // It is left out of `asks` for the same reason it is left out of `fails`: a refusal that is
+      // no evidence of sickness is no evidence of health either, and putting it in the denominator
+      // would let a route full of wrong questions hold the fuse closed through real trouble.
+      if (!outcome.ok && outcome.code === "INVALID") return;
+
+      // The provider answered — with a record, or with "no such record". Counted as an ask, and
+      // concurrently with the probe reads so the hot path of every live PNR check gains a command
+      // but not a round trip.
+      if (outcome.ok || outcome.code !== "SOURCE_UNAVAILABLE") {
+        await Promise.all([kv.incr(endpoint.asks, BREAKER.failureWindowMs), recovered()]);
+        return;
+      }
 
       // A refused key and a spent plan are facts about the provider, not this endpoint: they rest
       // every caller. They leave this endpoint's own failure count standing — it says nothing about
@@ -191,8 +225,13 @@ export function createBreaker(kv: Kv, scope: BreakerScope, options: { readonly o
       if (outcome.cause === "quota") return openFor(provider, "provider", (outcome.retryAfter ?? BREAKER.quotaOpenMs / 1000) * 1000, "quota");
 
       if (await probing()) return trip();
-      const failures = await kv.incr(endpoint.fails, BREAKER.failureWindowMs);
-      if (failures >= BREAKER.threshold) await trip();
+      const [failures, asks] = await Promise.all([
+        kv.incr(endpoint.fails, BREAKER.failureWindowMs),
+        kv.incr(endpoint.asks, BREAKER.failureWindowMs),
+      ]);
+      // Many AND most. Multiplied rather than divided so the comparison never meets a zero
+      // denominator: this failure is in `asks` too, so `asks` is at least one by the time it reads.
+      if (failures >= BREAKER.threshold && failures >= asks * BREAKER.failureRate) await trip();
     },
   };
 }
