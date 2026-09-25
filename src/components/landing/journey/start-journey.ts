@@ -1,7 +1,7 @@
 import { MOTION_EVENT } from "@/components/motion/use-motion";
 import { startArrivals } from "./arrivals";
 import { startBoard } from "./board";
-import { startChapters } from "./chapters";
+import { startChapters, startPlaceGuard } from "./chapters";
 import { startHero } from "./hero";
 import { introWanted, startIntro } from "./intro";
 import { LAYOUT_EVENT, REBUILD_EVENT } from "./journey-events";
@@ -68,6 +68,12 @@ export function startJourney(): Teardown {
     resizeTimer = window.setTimeout(() => window.dispatchEvent(new Event(LAYOUT_EVENT)), 150);
   };
 
+  // Started here, once, rather than by startChapters on every build: a Motion toggle rewrites <html
+  // data-motion> and collapses #how's pinned height by the CSS selector alone, before any module's own
+  // teardown or the next build's modules get a turn — this guard must already be watching when that
+  // happens, and must survive the rebuild it is reacting to, not be one of the things stopAll() tears down.
+  const stopPlaceGuard = startPlaceGuard();
+
   html.setAttribute("data-journey", "on");
   build();
   window.addEventListener(MOTION_EVENT, rebuild);
@@ -81,6 +87,7 @@ export function startJourney(): Teardown {
     window.removeEventListener(LAYOUT_EVENT, refreshAll);
     window.clearTimeout(resizeTimer);
     stopAll();
+    stopPlaceGuard();
     if (html.getAttribute("data-journey") === "on") html.removeAttribute("data-journey");
   };
 }
