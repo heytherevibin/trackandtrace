@@ -23,7 +23,7 @@
 .strip-stops a[aria-current="location"] { color: var(--accent-text); }
 /* The strip makes the landing's masthead taller: anchors stop below it (base.css reads --header-height). */
 @media (min-width: 48rem) {
-  :root:has(#route-strip) { --header-height: 5.9375rem; /* 4rem row + 1px rule + 30px strip */ }
+  :root:has(#route-strip) { --header-height: calc(4rem + 32px); /* the row, its rule, and the 30px strip with its rule */ }
 }
 @media (max-width: 47.99rem) {
   .route-strip { display: none; }

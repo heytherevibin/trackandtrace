@@ -137,9 +137,9 @@ reduced-motion rules (motion.css) to every traveller page, so the switch means t
 
 | Group | Modules |
 |---|---|
-| Server markup | `route-strip.tsx`, `departure-board.tsx`, `hero-dial.tsx`, `drawing-chapter.tsx`, `chapters-instrument.tsx`, `berth-plan.tsx`, `station-clock.tsx`, `route-map.tsx`, `window-run.tsx`, `terminus-stage.tsx`, `journey-switches.tsx` |
-| Pure geometry and logic (unit-tested) | `geometry/dial.ts`, `geometry/berths.ts`, `geometry/route.ts`, `geometry/run.ts`, `pose.ts` (anatomy and terminus poses), `governor.ts`, `labels-layout.ts`, `strip-position.ts`, `drawing-mode.ts`, `fit.ts`, `chart-countdown.ts` |
-| Client island | `journey-loader.tsx`, `start-journey.ts`, `observers.ts`, `motion-tokens.ts`, `intro.ts`, `strip.ts`, `board.ts`, `hero.ts`, `chapters.ts`, `berths.ts`, `clock.ts`, `route.ts`, `run.ts`, `arrivals.ts`, `cursor.ts`, `sound.ts`, `drawing.ts`, `still.ts`, `theme-sweep.ts` |
+| Server markup | `route-strip.tsx`, `departure-board.tsx`, `hero-dial.tsx`, `drawing-chapter.tsx`, `chapters-instrument.tsx`, `berth-plan.tsx`, `route-map.tsx`, `window-run.tsx`, `terminus-stage.tsx`, `journey-switches.tsx` |
+| Pure geometry and logic (unit-tested) | `geometry/dial.ts`, `geometry/clock.ts`, `geometry/berths.ts`, `geometry/route.ts`, `geometry/run.ts`, `pose.ts` (anatomy and terminus poses), `governor.ts`, `labels-layout.ts`, `strip-position.ts`, `drawing-mode.ts`, `fit.ts`, `chart-countdown.ts` |
+| Client island | `journey-loader.tsx`, `start-journey.ts`, `observers.ts`, `motion-tokens.ts`, `intro.ts`, `strip.ts`, `board.ts`, `hero.ts`, `chapters.ts`, `berths.ts`, `station-clock.tsx`, `clock.ts`, `route.ts`, `run.ts`, `arrivals.ts`, `cursor.ts`, `sound.ts`, `drawing.ts`, `still.ts`, `theme-sweep.ts` |
 | Scene (three.js) | `scene/engine.ts`, `scene/rig.ts`, `scene/rig-parts.ts`, `scene/lines.ts`, `scene/line-world.ts`, `scene/departure.ts`, `scene/beam.ts`, `scene/scan.ts`, `scene/fit.ts`, `scene/apply-pose.ts`, `scene/palette.ts`, `scene/journey.ts` |
 | Build-time | `scripts/bake-train-stills.mjs`, generated `still-manifest.ts` |
 

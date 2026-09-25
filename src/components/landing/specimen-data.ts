@@ -28,8 +28,8 @@ export interface Specimen {
   readonly seats: SpecimenSeats | null;
 }
 
-export function buildSpecimen(now: Date): Specimen | null {
-  const outcome = buildFixtureResult(SPECIMEN_PNR, now);
+export function buildSpecimen(now: Date, pnr: string = SPECIMEN_PNR): Specimen | null {
+  const outcome = buildFixtureResult(pnr, now);
   if (!outcome.ok) return null;
   const { snapshot, lead, checkedAt } = outcome.result;
   const m = messages.home.record;

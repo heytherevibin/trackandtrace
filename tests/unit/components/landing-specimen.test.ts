@@ -18,8 +18,10 @@ describe("buildSpecimen", () => {
     });
   });
 
-  it("carries the lead passenger's seat for the berth plan, and who is still waiting", () => {
-    const specimen = buildSpecimen(new Date("2026-09-17T06:30:00.000Z"))!;
-    expect(specimen.seats).toEqual({ cls: "3A", coach: "B1", berth: "12 LB", status: "CNF", waiting: [{ index: 2, label: "RAC 4" }, { index: 3, label: "WL 9" }] });
+  it("has no seats for a specimen whose class is not 3A, even with a full berth", () => {
+    // 2345644001: train index 4 (Shatabdi) carries only CC/EC, never 3A; last digit 1 is CNF with a full
+    // coach and berth. The berth plan draws a 3A coach, so a full berth in another class still guards to null.
+    const specimen = buildSpecimen(new Date("2026-09-17T06:30:00.000Z"), "2345644001")!;
+    expect(specimen.seats).toBeNull();
   });
 });
