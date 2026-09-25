@@ -16,6 +16,27 @@ test.describe("the registration-mark cursor", () => {
     expect(await page.getByTestId("hero-instrument").getByRole("textbox").evaluate((el) => getComputedStyle(el).cursor)).toBe("text");
   });
 
+  test("the cursor stacks above every overlay", async ({ page, isMobile }) => {
+    test.skip(isMobile, "fine pointers only");
+    await page.goto("/");
+    await waitForJourney(page);
+    const cursor = page.locator(".reg-cursor");
+    const zIndex = await cursor.evaluate((el) => Number(getComputedStyle(el).zIndex));
+    const { dialog, popover, toast, skip } = await page.evaluate(() => {
+      const s = getComputedStyle(document.documentElement);
+      return {
+        dialog: Number(s.getPropertyValue("--z-dialog")),
+        popover: Number(s.getPropertyValue("--z-popover")),
+        toast: Number(s.getPropertyValue("--z-toast")),
+        skip: Number(s.getPropertyValue("--z-skip")),
+      };
+    });
+    expect(zIndex).toBeGreaterThan(dialog);
+    expect(zIndex).toBeGreaterThan(popover);
+    expect(zIndex).toBeGreaterThan(toast);
+    expect(zIndex).toBeLessThan(skip);
+  });
+
   test("none on a touch screen", async ({ page, isMobile }) => {
     test.skip(!isMobile, "touch only");
     await page.goto("/");

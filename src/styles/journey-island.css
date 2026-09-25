@@ -98,7 +98,7 @@ html[data-journey="on"] #roadmap li.is-passed { background: var(--accent-wash); 
    caret in text fields */
 html.has-reg-cursor, html.has-reg-cursor * { cursor: none !important; }
 html.has-reg-cursor :is(input, textarea, [contenteditable="true"]) { cursor: text !important; }
-.reg-cursor { position: fixed; left: 0; top: 0; z-index: var(--z-sheet); pointer-events: none; width: 0; height: 0; color: var(--accent); }
+.reg-cursor { position: fixed; left: 0; top: 0; z-index: var(--z-cursor); pointer-events: none; width: 0; height: 0; color: var(--accent); }
 .reg-cursor.is-off { opacity: 0; }
 .reg-cross { position: absolute; left: -11px; top: -11px; width: 22px; height: 22px; transition: opacity 120ms var(--ease-out); }
 .reg-cross::before, .reg-cross::after { content: ""; position: absolute; background: currentColor; }
