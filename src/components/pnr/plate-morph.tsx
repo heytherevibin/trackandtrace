@@ -52,10 +52,20 @@ export function PlateMorph({ face, children }: { readonly face: string; readonly
     controls.current = null;
 
     const box = outer.current;
-    if (!on || before.height === measured) {
+    // The height is the content's again. Written to the node as well as the motion value: `animate`'s
+    // top-level `onComplete` runs from its `finished` promise, after the frame that rendered the tween's last
+    // height, and Motion can still read that frame's time then, so it treats the render as already done and
+    // never paints "auto" (the plate was left at its tween's last pixel height).
+    const settle = () => {
       height.set("auto");
-      if (box) box.style.overflow = "";
+      if (box) {
+        box.style.height = "auto";
+        box.style.overflow = "";
+      }
       window.dispatchEvent(new Event(LAYOUT_EVENT));
+    };
+    if (!on || before.height === measured) {
+      settle();
       return;
     }
 
@@ -66,9 +76,7 @@ export function PlateMorph({ face, children }: { readonly face: string; readonly
       ease: EXPO,
       onComplete: () => {
         controls.current = null;
-        height.set("auto");
-        if (box) box.style.overflow = "";
-        window.dispatchEvent(new Event(LAYOUT_EVENT));
+        settle();
       },
     });
   });
