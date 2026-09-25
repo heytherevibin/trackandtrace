@@ -71,6 +71,23 @@ export const booking = {
     today: "Today",
     fare: (total: number) => `₹${total.toLocaleString("en-IN")}`,
   },
+  /**
+   * The route list. Two phrases carry weight and must never be swapped: a class NOT ASKED is a
+   * choice the reader has not spent a request on; a train that FAILED was asked and could not be
+   * answered. Neither may borrow the other's sentence.
+   */
+  list: {
+    title: "Trains on this route",
+    count: (trains: number, cls: string) => `${trains === 1 ? "1 train" : `${trains} trains`} · ${cls}`,
+    /** How many days a week, never which ones: the provider's day mask has an unverified order. */
+    runsDays: (days: number) => (days === 7 ? "Runs every day" : days === 1 ? "Runs 1 day a week" : `Runs ${days} days a week`),
+    more: "More classes and dates",
+    notAsked: (classes: string) => `${classes} not asked yet`,
+    notCarried: "Not carried",
+    trainFailed: "Trakline could not answer for this train. Nothing is shown in its place.",
+    /** The store has the column and nothing writes it yet, so this says so rather than inventing a number. */
+    noHistory: "Not enough history yet",
+  },
   result: {
     title: "No availability returned",
     requested: (train: string, cls: string, quota: string, date: string) => `Requested: ${train} · ${cls} · ${quota} · ${date}.`,
