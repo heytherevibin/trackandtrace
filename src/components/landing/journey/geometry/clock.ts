@@ -29,3 +29,9 @@ export function clockTicks(): readonly Tick[] {
     return { x1: round2(x1), y1: round2(y1), x2: round2(x2), y2: round2(y2), major };
   });
 }
+
+/** The second hand's angle, sweeping: 6° a second, through the milliseconds. IST is a whole number of minutes
+ * from UTC, so the seconds are the same. */
+export function secondAngle(now: Date): number {
+  return round2((now.getUTCSeconds() + now.getUTCMilliseconds() / 1000) * 6);
+}

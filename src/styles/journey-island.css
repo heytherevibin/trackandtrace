@@ -87,3 +87,5 @@ html[data-motion="on"][data-journey="on"] .is-pinned .chapters-steps > li.is-cur
 }
 html[data-motion="on"][data-journey="on"] .is-pinned .chapters-dial .is-dashed,
 html[data-motion="on"][data-journey="on"] .is-pinned .dial-sweep { transform-box: view-box; transform-origin: 0 0; }
+/* ---- 04 · the station clock's second hand sweeps, while the journey runs with Motion on */
+html[data-motion="on"][data-journey="on"] .clock-hand.is-second { display: inline; }
