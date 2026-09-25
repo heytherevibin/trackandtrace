@@ -7,7 +7,7 @@ import { Corners } from "@/components/ui/corners";
 import { PLATE_TITLE_STACK, plateCellClass } from "@/components/ui/plate";
 import { messages } from "@/messages";
 import type { AvailabilityAnswer } from "@/services/availability-source";
-import type { RouteAvailabilityAnswer } from "@/services/route-availability";
+import type { RouteAvailabilityAnswer, TrainRow } from "@/services/route-availability";
 import type { SourceFailure } from "@/services/sources/outcome";
 import { cn } from "@/utils/cn";
 
@@ -54,7 +54,8 @@ export function TrainsPlate({
   const [onlyBookable, setOnlyBookable] = useState(false);
   const [opened, setOpened] = useState<Readonly<Record<string, Opened>>>({});
 
-  function open(trainNo: string, pending: readonly string[]): void {
+  function open(train: TrainRow["train"], pending: readonly string[]): void {
+    const trainNo = train.trainNo;
     // Each press costs provider requests, so a row already asking is not asked again.
     if (!answer || opened[trainNo] || pending.length === 0) return;
     setOpened((was) => ({ ...was, [trainNo]: { phase: "loading", answers: {}, failedClasses: [], message: "" } }));
@@ -64,7 +65,10 @@ export function TrainsPlate({
         const res = await fetch("/api/availability", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ trainNo, from: answer.from, to: answer.to, journeyDate: answer.journeyDate, quota, travelClasses: [...pending] }),
+          // The stations THIS train calls at, not the pair the traveller typed — the same rule the
+          // fan-out follows, and for the same reason: a train asked about a pair it does not serve
+          // is refused.
+          body: JSON.stringify({ trainNo, from: train.fromCode, to: train.toCode, journeyDate: answer.journeyDate, quota, travelClasses: [...pending] }),
         });
         const body = (await res.json()) as {
           ok?: boolean;
@@ -143,7 +147,7 @@ export function TrainsPlate({
               leadClass={answer.leadClass}
               todayIso={todayIso}
               opened={opened[row.train.trainNo]}
-              onOpen={() => open(row.train.trainNo, row.pending)}
+              onOpen={() => open(row.train, row.pending)}
               last={i === rows.length - 1}
             />
           ))}

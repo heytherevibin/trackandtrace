@@ -16,14 +16,14 @@ function train(trainNo: string, over: Partial<RouteTrain> = {}): RouteTrain {
   return {
     trainNo,
     trainName: `TRAIN ${trainNo}`,
-    fromCode: "SBC",
-    fromName: "SBC",
-    toCode: "NDLS",
-    toName: "NDLS",
     originCode: "SBC",
     originName: "SBC",
     destinationCode: "NDLS",
     destinationName: "NDLS",
+    fromCode: "YPR",
+    fromName: "YPR",
+    toCode: "NZM",
+    toName: "NZM",
     departs: "12:00",
     arrives: "09:00",
     travelTime: "10h 00m",
@@ -117,7 +117,9 @@ describe("opening a row", () => {
     await waitFor(() => expect(screen.getAllByTestId("class-block")).toHaveLength(3));
 
     const sent = JSON.parse(String((fetchMock.mock.calls[0] as unknown as [string, { body: string }])[1].body));
-    expect(sent).toEqual({ trainNo: "12627", from: "SBC", to: "NDLS", journeyDate: "2026-10-16", quota: "GN", travelClasses: ["3A", "2A"] });
+    // The train's own stations, not the pair the search was for: 12627 here calls at YPR and NZM,
+    // and a train asked about a pair it does not serve is refused.
+    expect(sent).toEqual({ trainNo: "12627", from: "YPR", to: "NZM", journeyDate: "2026-10-16", quota: "GN", travelClasses: ["3A", "2A"] });
     expect(screen.queryByText(/not asked yet/)).not.toBeInTheDocument();
   });
 
