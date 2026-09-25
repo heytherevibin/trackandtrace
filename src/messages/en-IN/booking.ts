@@ -75,6 +75,8 @@ export const booking = {
     /** How many days a week, never which ones: the provider's day mask has an unverified order. */
     runsDays: (days: number) => (days === 7 ? "Runs every day" : days === 1 ? "Runs 1 day a week" : `Runs ${days} days a week`),
     more: "More classes and dates",
+    /** Nothing left to ask: the other three dates arrived with the search and are being unhidden. */
+    moreDates: "Three more dates",
     opening: "Asking…",
     notAsked: (classes: string) => `${classes} not asked yet`,
     /** Asked and unanswered — a fact about the request, never confused with "Not carried". */

@@ -57,10 +57,12 @@ const answer = (d, total) => ({
   retrievedAt: "2026-10-16T08:39:00.000Z",
 });
 
+// Every chosen class, as a search now answers them: some carried, some not.
 const row = (t, d, total, over = {}) => ({
   train: t,
-  answers: d ? { SL: answer(d, total) } : {},
-  pending: ["3A", "2A"],
+  answers: d ? { "2A": answer(d, total), "3A": answer(d, Math.round(total * 0.7)), SL: answer(d, Math.round(total * 0.3)) } : {},
+  pending: [],
+  notCarried: [],
   beyondCap: false,
   failed: false,
   ...over,
@@ -71,12 +73,12 @@ const row = (t, d, total, over = {}) => ({
 const ROWS = [
   row(train("12649", "SAMPARK KRANTI", "13:30", "04:10", "42h 40m", 2), day("WL", true, 136, 44), 710),
   row(train("12629", "SAMPARK KRANTI", "13:30", "04:10", "38h 40m", 2), day("AVAILABLE", true, null, null), 710),
-  row(train("22685", "CDG SKRANTI EXP", "13:30", "04:10", "44h 10m", 1), day("WL", true, 136, 96), 745),
+  row(train("22685", "CDG SKRANTI EXP", "13:30", "04:10", "44h 10m", 1), day("WL", true, 136, 96), 745, { notCarried: ["SL"], answers: { "2A": answer(day("WL", true, 136, 96), 2830), "3A": answer(day("AVAILABLE", true, null, null), 1960) } }),
   row(train("12627", "KARNATAKA EXP", "19:20", "09:00", "37h 40m", 7), day("WAITLIST", false, null, null), 765),
-  row(train("22691", "RAJDHANI EXP", "20:00", "05:30", "33h 30m", 4), null, null, { failed: true, pending: ["3A", "2A"] }),
+  row(train("22691", "RAJDHANI EXP", "20:00", "05:30", "33h 30m", 4), null, null, { failed: true, pending: ["2A", "3A", "SL"] }),
   row(train("12647", "KONGU SF EXP", "21:00", "09:45", "36h 45m", 1), day("WL", true, 136, 148), 735),
   row(train("12213", "YPR DEE DURONTO", "23:00", "09:15", "34h 15m", 2), day("AVAILABLE", true, null, null), 800),
-  row(train("00629", "YPR-ICOD TKD PCET", "10:15", "06:30", "44h 15m", 1), null, null, { beyondCap: true, pending: ["SL", "3A", "2A"] }),
+  row(train("00629", "YPR-ICOD TKD PCET", "10:15", "06:30", "44h 15m", 1), null, null, { beyondCap: true, pending: ["2A", "3A", "SL"] }),
 ];
 
 // The form renders at its opening state: this is React's static renderer, so no effect has run and
@@ -85,7 +87,7 @@ const form = renderToStaticMarkup(createElement(PreBookingForm));
 
 const list = renderToStaticMarkup(
   createElement(TrainsPlate, {
-    answer: { from: "SBC", to: "NDLS", journeyDate: "2026-10-16", leadClass: "SL", rows: ROWS, retrievedAt: "14:09" },
+    answer: { from: "SBC", to: "NDLS", journeyDate: "2026-10-16", leadClass: "2A", rows: ROWS, retrievedAt: "14:09" },
     refusal: null,
     sampleData: true,
     quota: "GN",
