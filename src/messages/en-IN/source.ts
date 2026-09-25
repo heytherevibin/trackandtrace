@@ -23,6 +23,15 @@ export const source = {
     notOnRoute: "This train does not run between those two stations. Check the stations and try again.",
     dateNotAccepted: "That journey date could not be read. Nothing was shown in its place.",
     invalidRequest: "That journey could not be checked. Check the train number, the stations and the date.",
+    /**
+     * Facts about the railway, not failures — both measured 2026-09-25.
+     *
+     * The provider names them distinctly, so the app says them rather than hiding them behind
+     * "could not answer". A traveller acts on each: one means pick another class, the other means
+     * pick another date.
+     */
+    classNotCarried: "This train does not carry that class.",
+    notBookableOnDate: "This train cannot be booked for that date.",
   },
   // Which trains run between two stations. "No trains run that pair" is an ANSWER and is written by
   // the page, not here; every sentence in this block means the question could not be asked at all.

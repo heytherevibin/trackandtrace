@@ -179,11 +179,11 @@ export function PreBookingForm() {
             </label>
             <input
               id={`${ids}-from`}
-              className="well h-10 w-full px-2.5"
+              className="well h-10 w-full px-2.5 uppercase"
               autoCapitalize="characters"
               placeholder={m.stationPlaceholder}
               value={from}
-              onChange={(event) => setFrom(event.target.value)}
+              onChange={(event) => setFrom(event.target.value.toUpperCase())}
             />
           </div>
           <div className={FIELD}>
@@ -192,13 +192,13 @@ export function PreBookingForm() {
             </label>
             <input
               id={`${ids}-to`}
-              className="well h-10 w-full px-2.5"
+              className="well h-10 w-full px-2.5 uppercase"
               autoCapitalize="characters"
               placeholder={m.stationPlaceholder}
               aria-invalid={route === "none" || undefined}
               aria-describedby={route === "none" ? `${ids}-route` : undefined}
               value={to}
-              onChange={(event) => setTo(event.target.value)}
+              onChange={(event) => setTo(event.target.value.toUpperCase())}
             />
           </div>
           <div className={FIELD}>

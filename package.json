@@ -31,8 +31,9 @@
     "db:config": "npx supabase@2.117.0 config push",
     "db:migration": "npx supabase@2.117.0 migration new",
     "db:test": "npx supabase@2.117.0 test db",
-    "source:probe:railkit": "node --env-file=.env.local scripts/probe-railkit.mjs",
-    "source:probe:availability": "node --env-file=.env.local scripts/probe-railkit-availability.mjs",
+    "source:probe:railkit": "node --env-file-if-exists=.env.local --env-file-if-exists=../../../.env.local scripts/probe-railkit.mjs",
+    "source:probe:availability": "node --env-file-if-exists=.env.local --env-file-if-exists=../../../.env.local scripts/probe-railkit-availability.mjs",
+    "source:probe:refusals": "node --env-file-if-exists=.env.local --env-file-if-exists=../../../.env.local scripts/probe-railkit-refusals.mjs",
     "source:health": "node --env-file-if-exists=.env.local scripts/source-health.mjs",
     "source:crawl": "node --env-file=.env.local scripts/crawl-availability.mjs",
     "source:report": "node --env-file=.env.local scripts/observations-report.mjs"

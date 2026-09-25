@@ -58,6 +58,9 @@ export function TrainRowView({
   readonly last?: boolean;
 }) {
   const runs = runsLine(row.train.runsOn);
+  // The row arrives from the wire through a cast, so a field a older deployment did not send is
+  // `undefined` at runtime whatever the type says. One `??` here is cheaper than a blank page.
+  const notCarried = row.notCarried ?? [];
   const answers = { ...row.answers, ...(opened?.answers ?? {}) };
   const asked = Object.entries(answers);
   // A class that came back on the expand is no longer pending; one that failed there is named on
@@ -83,10 +86,15 @@ export function TrainRowView({
           fixed 480px — a number that matched no track at any width, and read wider than the
           three-up it is meant to look like. `auto-fill` keeps the empty tracks, so one block is
           exactly one column and stays that width as more arrive. */}
-      {asked.length === 0 ? null : (
+      {asked.length === 0 && notCarried.length === 0 ? null : (
         <div className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(min(100%,260px),1fr))] gap-3">
           {asked.map(([cls, answer]) => (
             <ClassBlock key={cls} cls={cls} day={answer.days[0] ?? null} fareTotal={answer.fare?.total ?? null} />
+          ))}
+          {/* Drawn, not omitted. A class left out reads as one nobody asked about; this one WAS
+              asked, and the train's answer is that it does not carry it. */}
+          {notCarried.map((cls) => (
+            <ClassBlock key={cls} cls={cls} day={null} fareTotal={null} notCarried />
           ))}
         </div>
       )}

@@ -64,11 +64,16 @@ function answer(request: AvailabilityRequest): AvailabilityAnswer {
 }
 
 /** A source that records every ask, and can be told which trains to refuse. */
-function countingSource(failFor: readonly string[] = []) {
+function countingSource(failFor: readonly string[] = [], notCarriedFor: readonly string[] = []) {
   const calls: AvailabilityRequest[] = [];
   const source: AvailabilitySource = {
     async check(request): Promise<AvailabilityOutcome> {
       calls.push(request);
+      // A train that does not carry the class comes back INVALID, not SOURCE_UNAVAILABLE — the
+      // provider says so distinctly and the breaker ignores it. Measured 2026-09-25.
+      if (notCarriedFor.includes(request.trainNo)) {
+        return { ok: false, code: "INVALID", message: "This train does not carry that class." };
+      }
       if (failFor.includes(request.trainNo)) {
         return { ok: false, code: "SOURCE_UNAVAILABLE", message: "nope", cause: "server" };
       }
@@ -171,6 +176,20 @@ describe("asking a whole route", () => {
     expect(failed.pending).toEqual(["2A", "3A", "SL"]);
     // And one bad train costs no other train its answer.
     expect(outcome.answer.rows.filter((r) => !r.failed)).toHaveLength(7);
+  });
+
+  it("says a train does not carry the class, rather than calling the ask a failure", async () => {
+    const { source } = countingSource([], ["22685"]);
+    const { deps } = setup({ source });
+    const { outcome } = await queryRouteAvailability(REQUEST, IP, deps);
+    if (!outcome.ok) throw new Error("expected an answer");
+    const row = outcome.answer.rows.find((r) => r.train.trainNo === "22685")!;
+    // Not a failure: the provider answered, correctly and quickly, that this train has no 2A.
+    // Calling it failed would say "we could not ask", which is a different thing, and would put
+    // the class back in the queue for a retry that can only be refused the same way again.
+    expect(row.failed).toBe(false);
+    expect(row.notCarried).toEqual(["2A"]);
+    expect(row.pending).toEqual(["3A", "SL"]);
   });
 
   it("refuses the whole search before asking anything when the day's budget cannot cover it", async () => {
