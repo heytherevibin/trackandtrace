@@ -1,15 +1,18 @@
 import type { Env } from "@/services/env";
 import { messages } from "@/messages";
 import { activePnrSource, env, fallbackPnrSource, fixtureAllowed, isThirdPartySource, type ThirdPartySource } from "@/services/env";
+import type { AvailabilitySource } from "@/services/availability-source";
 import type { PnrDataSource } from "@/services/pnr-source";
 import type { RouteSource } from "@/services/route-source";
 import { providerGuard } from "@/services/shared-store";
 import { createFallbackSource } from "./fallback";
 import { fixtureSource } from "./fixture";
+import { fixtureAvailabilitySource } from "./fixture-availability";
 import { fixtureRouteSource } from "./fixture-route";
 import { createGuardedSource } from "./guarded";
 import { createLiveSource } from "./live";
 import { createRailkitSource } from "./railkit";
+import { createRailKitAvailabilitySource } from "./railkit-availability";
 import { createRailKitRouteSource } from "./railkit-route";
 
 // Provider registry. The fixture is served only when explicitly requested and
@@ -36,6 +39,13 @@ const refusedSource: PnrDataSource = {
 const refusedRouteSource: RouteSource = {
   async check() {
     return { ok: false, code: "SOURCE_UNAVAILABLE", message: messages.source.route.couldNotAnswer };
+  },
+};
+
+/** The same refusal for availability — and here an empty `days` would read as a sold-out train. */
+const refusedAvailabilitySource: AvailabilitySource = {
+  async check() {
+    return { ok: false, code: "SOURCE_UNAVAILABLE", message: messages.source.availability.couldNotAnswer };
   },
 };
 
@@ -113,4 +123,24 @@ export function resolveRouteSource(current: Env = env()): RouteSource {
 
 export function getRouteSource(): RouteSource {
   return resolveRouteSource(env());
+}
+
+/**
+ * Seat availability for one journey, by the same rules as the route seam above: the fixture only
+ * when it is chosen AND allowed, the provider's adapter behind its own breaker and usage counter,
+ * and a deployment with no key answering "we could not ask".
+ *
+ * That last branch matters more here than anywhere else in this file. The one shape this seam must
+ * never produce is an empty day list, because a traveller reads it as "no berths" and acts on it.
+ */
+export function resolveAvailabilitySource(current: Env = env()): AvailabilitySource {
+  if (current.PNR_SOURCE === "fixture") return fixtureAllowed(current) ? fixtureAvailabilitySource : refusedAvailabilitySource;
+  const active = activePnrSource(current);
+  if (!isThirdPartySource(active) || !current.RAILKIT_API_KEY) return refusedAvailabilitySource;
+  const adapter = createRailKitAvailabilitySource({ key: current.RAILKIT_API_KEY, baseUrl: current.RAILKIT_BASE_URL, timeoutMs: current.RAILKIT_TIMEOUT_MS });
+  return createGuardedSource(adapter, providerGuard(active, "availability", current));
+}
+
+export function getAvailabilitySource(): AvailabilitySource {
+  return resolveAvailabilitySource(env());
 }
