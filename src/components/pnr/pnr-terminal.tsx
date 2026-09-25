@@ -63,7 +63,7 @@ function useCheckPlate(sampleMode: boolean, connected: boolean, hero: boolean) {
 
   // The hero dial (the landing journey) follows the plate through these; nothing here waits on it.
   useEffect(() => {
-    emit<PlateDetail>(PLATE_EVENT, { hero, digits: digits.length, running: phase === "running" });
+    emit<PlateDetail>(PLATE_EVENT, { hero, digits: digits.length, running: phase === "running", done: phase === "done" });
   }, [hero, digits.length, phase]);
 
   const status = fieldStatus({ digits, attempted, running: phase === "running" });

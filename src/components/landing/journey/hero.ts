@@ -65,6 +65,8 @@ export function startHero({ motion, intro }: JourneyContext): Teardown {
     shell.classList.remove("is-face");
     host.classList.remove("is-face");
     arc?.setAttribute("d", "");
+    mark?.setAttribute("cx", "0");
+    mark?.setAttribute("cy", "-352");
     if (readout) readout.textContent = "";
   };
   const enterFace = (chartAt: string) => {
@@ -77,12 +79,13 @@ export function startHero({ motion, intro }: JourneyContext): Teardown {
   };
 
   const onPlate = (event: Event) => {
-    const { hero, digits, running: busy } = (event as CustomEvent<PlateDetail>).detail;
+    const { hero, digits, running: busy, done } = (event as CustomEvent<PlateDetail>).detail;
     if (!hero) return;
-    // The plate re-fires this on every phase change, including running → done with the same digit count: that
-    // echo must not undo the face onResult just entered. Only a genuine retype or clear (digits actually
-    // changing) leaves the face.
-    if (!busy && digits !== lit) {
+    // The plate states its own phase, so this never has to guess from the digit count: a picked recent check
+    // (or a fresh retype) lands back at entry with `done: false`, whatever its digit count, and must leave the
+    // face; the post-result echo of this same event carries `done: true`, so it never undoes the face onResult
+    // just entered.
+    if (!busy && !done) {
       exitFace();
       stopSweep();
     }

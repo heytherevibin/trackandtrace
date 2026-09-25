@@ -21,6 +21,8 @@ export interface PlateDetail {
   readonly hero: boolean;
   readonly digits: number;
   readonly running: boolean;
+  /** The plate is showing a result (its phase is "done"). */
+  readonly done: boolean;
 }
 export interface RunDetail {
   readonly hero: boolean;

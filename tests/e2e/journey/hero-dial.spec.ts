@@ -38,4 +38,25 @@ test.describe("the hero dial", () => {
     await expect(page.locator(".hero-dial")).toHaveClass(/is-face/);
     expect(await page.locator(".dial-face").evaluate((el) => getComputedStyle(el).opacity)).toBe("1");
   });
+
+  test("a check picked from the recent list takes the face away", async ({ page }) => {
+    await page.clock.setFixedTime(new Date("2026-09-17T06:30:00.000Z"));
+    await page.goto("/");
+    await waitForJourney(page);
+    const plate = page.getByTestId("hero-instrument");
+    await plate.getByRole("textbox").fill(PNR.cnf);
+    await plate.getByRole("button", { name: /run/i }).click();
+    await expect(page.locator(".hero-dial")).toHaveClass(/is-face/);
+
+    await plate.getByRole("button", { name: "Check another PNR" }).click();
+    await plate.getByRole("textbox").fill(PNR.rac);
+    await plate.getByRole("button", { name: /run/i }).click();
+    await expect(page.locator(".hero-dial")).toHaveClass(/is-face/);
+
+    await plate.getByTestId("recent-item").filter({ hasText: "234 567 8901" }).click();
+    await expect(page.locator(".hero-dial")).not.toHaveClass(/is-face/);
+    await expect(page.locator(".dial-readout")).toHaveText("");
+    await expect(page.locator(".dial-chart-mark")).toHaveAttribute("cx", "0");
+    await expect(page.locator(".dial-chart-mark")).toHaveAttribute("cy", "-352");
+  });
 });
