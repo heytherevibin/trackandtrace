@@ -239,6 +239,13 @@ test.describe("the landing at 390×844 under the device's reduced motion", () =>
   test("nothing collides, top to bottom", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await gotoReady(page, "/");
+    // The note renders only on MotionToggle's post-hydration re-render (useMotion's deviceReduced starts as
+    // the server's false), which lands after gotoReady's html[data-hydrated] wait — an unrelated component sets
+    // that. So this waits on the signals the note actually depends on, in order, instead of racing straight to
+    // the note itself.
+    await expect(page.locator("html")).toHaveAttribute("data-motion", "off");
+    // MotionToggle's own corrected render; 15s is the same hydration budget gotoReady already allows.
+    await expect(page.getByRole("contentinfo").getByRole("switch", { name: "Motion" })).toHaveAttribute("aria-disabled", "true", { timeout: 15_000 });
     // Proves the sweep actually covers the note: without this, the sweep would still pass green if the note
     // never rendered at all.
     await expect(page.getByText("Your device asks for reduced motion")).toBeVisible();
