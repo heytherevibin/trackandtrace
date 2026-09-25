@@ -1,6 +1,7 @@
 import { expect, test } from "../fixtures";
 import { gotoReady } from "../helpers";
 import { STATIONS } from "@/components/landing/journey/stations";
+import { blockJourneyChunk } from "./journey-helpers";
 
 // The journey's instruments, drawn still (spec 2026-09-24 §3.A, J2). Each test names the instrument it holds.
 
@@ -102,5 +103,16 @@ test.describe("the route map", () => {
     const map = page.locator("#roadmap .route-map");
     if (isMobile) await expect(map).toBeHidden();
     else await expect(map.locator(".route-stop")).toHaveCount(7);
+  });
+});
+
+test.describe("the chapters instrument", () => {
+  test("02 is a plain section until the journey pins it: three stops side by side, no instrument", async ({ page, isMobile }) => {
+    await blockJourneyChunk(page);
+    await page.goto("/");
+    await expect(page.locator("html")).toHaveAttribute("data-journey", "failed", { timeout: 15_000 });
+    await expect(page.locator("#how .chapters-instrument")).toBeHidden();
+    const tops = await page.locator("#how li[data-chapter]").evaluateAll((lis) => lis.map((li) => Math.round(li.getBoundingClientRect().top)));
+    if (!isMobile) expect(new Set(tops).size).toBe(1);
   });
 });

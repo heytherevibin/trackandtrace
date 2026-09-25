@@ -176,3 +176,33 @@ main:has(.hero-dial) { overflow-x: clip; } /* the landing clips the dial at the 
 @media (max-width: 39.99rem) {
   .route-map { display: none; }
 }
+
+/* ---- 02 · the chapters instrument: drawn still, the section is plain and the instrument is not shown; the
+   journey pins it (journey-island.css). The dial reuses the hero dial's classes. */
+.chapters-pin { display: block; }
+.chapters-instrument, .rail-marker { display: none; }
+.chapters-steps {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 32px clamp(20px, 3vw, 48px); margin: 20px 0 0; padding: 0; list-style: none;
+}
+.chapters-dial { position: relative; aspect-ratio: 1; }
+.chapters-dial svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.chapter-arc { fill: none; stroke: var(--line); stroke-width: 7; }
+.chapter-arc.is-on { stroke: var(--accent); }
+.chapter-label { font-size: 15px; /* drawing units */ }
+.dial-label.is-steel { fill: var(--accent-text); }
+.chapter-digits { font-size: 64px; /* drawing units */ letter-spacing: 0.06em; }
+.chapter-status { font-size: 54px; /* drawing units */ }
+.chapter-party { font-size: 17px; /* drawing units */ }
+.dial-dot { fill: var(--accent); }
+.chapter-rail { stroke: var(--line-strong); }
+.chapter-pulse { fill: none; stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.chapter-layer:not(.is-current), .chapter-card pre:not(.is-current) { display: none; }
+.chapter-card { position: relative; align-self: flex-end; width: 17.5rem; z-index: 2; }
+.chapter-card pre {
+  margin: 0; padding: 12px 14px; font-family: var(--font-display); font-weight: 500; font-size: var(--text-label);
+  line-height: 1.35rem; letter-spacing: 0.04em; color: var(--ink-2); white-space: pre-wrap; font-variant-numeric: tabular-nums;
+}
+.chapter-card pre b { color: var(--accent-text); font-weight: 600; }
+.rail-marker { position: absolute; top: -3px; left: 0; width: 30px; height: 12px; color: var(--accent); transform: translateX(-50%); }
+.rail-marker svg { display: block; width: 100%; height: 100%; }
