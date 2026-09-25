@@ -4,10 +4,12 @@ import type { ReactNode } from "react";
 import { hydrateRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { MOTION_EVENT } from "@/components/motion/use-motion";
 import { PlateMorph } from "@/components/pnr/plate-morph";
 
 // The plate's face rises 8px only when it changes after mount, and only with Motion on (ruling J3-13). The
-// first face never rises: not in the server's markup, not at hydration, whatever the Motion setting.
+// first face never rises: not in the server's markup, not at hydration, whatever the Motion setting. Motion
+// switched off mid-rise stops the face where it rests.
 
 function Tree({ face }: { readonly face: string }): ReactNode {
   return (
@@ -20,6 +22,12 @@ function Tree({ face }: { readonly face: string }): ReactNode {
 }
 
 const faceOf = (root: ParentNode): HTMLElement => root.querySelector<HTMLElement>(".plate-morph > div")!;
+
+/** Motion as the footer switch leaves it: <html data-motion> rewritten, then the page told. */
+function setMotion(motion: "on" | "off"): void {
+  document.documentElement.setAttribute("data-motion", motion);
+  window.dispatchEvent(new Event(MOTION_EVENT));
+}
 
 afterEach(() => {
   document.documentElement.removeAttribute("data-motion");
@@ -73,6 +81,15 @@ describe("a change of face", () => {
     const { container, rerender } = render(<Tree face={from} />);
     rerender(<Tree face={to} />);
     expect(faceOf(container).textContent).toBe(to);
+    expect(faceOf(container).style.transform).not.toMatch(/translateY/);
+  });
+
+  it("stops where it rests when Motion is switched off mid-rise", () => {
+    document.documentElement.setAttribute("data-motion", "on");
+    const { container, rerender } = render(<Tree face="entry" />);
+    rerender(<Tree face="record" />);
+    expect(faceOf(container).style.transform).toMatch(/translateY\(8px\)/);
+    act(() => setMotion("off"));
     expect(faceOf(container).style.transform).not.toMatch(/translateY/);
   });
 });

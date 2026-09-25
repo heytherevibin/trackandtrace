@@ -149,6 +149,52 @@ test.describe("the plate morph", () => {
     await expect(page.getByTestId("terminal-result")).toHaveCount(0);
   });
 
+  test("Motion switched off mid-rise stops the face where it rests", async ({ page }) => {
+    await page.goto("/");
+    await fill(page);
+    // All in the page, frame-timed: catch the record face mid-rise (moving, between its start and rest), flip
+    // the footer's switch, read the face's own inline transform at once, then its drawn offset every frame for
+    // longer than the rest of the rise's 420ms. The face must never move on from where the switch found it:
+    // every frame reads that offset or rest, and it ends at rest. (The drawn value can hold for a frame or
+    // two after the inline transform is cleared: the site's Motion-off rule gives every element a 0.01ms
+    // transition, motion.css, which the browser only starts and ends on later frames.)
+    const run = page.getByTestId("hero-instrument").getByRole("button", { name: /run/i });
+    const toggle = await page.getByRole("contentinfo").getByRole("switch", { name: "Motion" }).elementHandle();
+    const read = page.evaluate(
+      (motionSwitch) =>
+        new Promise<{ readonly before: number; readonly inline: string; readonly after: number[] }>((resolve) => {
+          const offset = (el: Element) => new DOMMatrixReadOnly(getComputedStyle(el).transform).m42;
+          const face = () => document.querySelector<HTMLElement>('[data-testid="hero-instrument"] .plate-morph > div');
+          const sample = (before: number, inline: string, after: number[], end: number) => {
+            const now = face();
+            if (now) after.push(offset(now));
+            if (performance.now() < end) requestAnimationFrame(() => sample(before, inline, after, end));
+            else resolve({ before, inline, after });
+          };
+          const waitForRise = () => {
+            const el = face();
+            const y = el?.querySelector('[data-testid="terminal-result"]') ? offset(el) : 0;
+            if (!el || y <= 0.5 || y >= 7.5) return requestAnimationFrame(waitForRise);
+            (motionSwitch as HTMLElement).click();
+            const inline = el.style.transform;
+            requestAnimationFrame(() => sample(y, inline, [], performance.now() + 600));
+          };
+          requestAnimationFrame(waitForRise);
+        }),
+      toggle,
+    );
+    await run.click();
+    const { before, inline, after } = await read;
+    await expect(page.getByTestId("terminal-result")).toHaveAttribute("data-kind", "ok");
+    await expect(page.locator("html")).toHaveAttribute("data-motion", "off");
+    expect(before).toBeGreaterThan(0.5);
+    expect(inline).toBe("");
+    expect(after.length).toBeGreaterThanOrEqual(10);
+    expect(after.filter((y) => y !== before && y !== 0)).toEqual([]);
+    expect(after.slice(after.indexOf(0))).toEqual(after.slice(after.indexOf(0)).map(() => 0));
+    expect(after.at(-1)).toBe(0);
+  });
+
   test("under a slow CPU the plate still ends at its content's own height", async ({ page }) => {
     test.setTimeout(90_000);
     // The morph once left the plate at its tween's last pixel height when the tween's completion landed
