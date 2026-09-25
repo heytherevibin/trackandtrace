@@ -32,3 +32,23 @@ test.describe("the route strip", () => {
     await expect(page.locator("#route-strip .strip-train")).toBeVisible();
   });
 });
+
+test.describe("the departure board and the hero dial", () => {
+  test("the board sits under the hero, and its destinations jump to their sections", async ({ page }) => {
+    await gotoReady(page, "/");
+    const board = page.getByRole("region", { name: "Departures · Platform 3" });
+    await expect(board).toBeVisible();
+    const heroBottom = await page.locator("section[aria-labelledby='hero-title']").evaluate((el) => el.getBoundingClientRect().bottom);
+    expect((await board.boundingBox())!.y).toBeGreaterThanOrEqual(heroBottom - 1);
+    await board.getByRole("link", { name: "Questions" }).click();
+    await expect(page).toHaveURL(/#faq$/);
+  });
+
+  test("the dial stands behind the plate on a wide screen, hidden on a phone, and never scrolls the page", async ({ page, isMobile }) => {
+    await gotoReady(page, "/");
+    const dial = page.locator(".hero-dial");
+    if (isMobile) await expect(dial).toBeHidden();
+    else await expect(dial).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  });
+});

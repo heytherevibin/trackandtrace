@@ -75,7 +75,7 @@
   --leading-relaxed: 1.6;
   --leading-stack: 1.15; /* wordmark with descriptor */
 
-  /* The wireframe world is square. Only lamps and route stops are round. */
+  /* The wireframe world is square. Only lamps, route stops and the journey's instruments (dials, the station clock, the route map) are round. */
   --radius-none: 0;
   --radius-full: 9999px;
 

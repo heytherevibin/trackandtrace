@@ -1,3 +1,4 @@
+import { HeroDial } from "@/components/landing/journey/hero-dial";
 import { PnrTerminal } from "@/components/pnr/pnr-terminal";
 import { SheetTag } from "@/components/pnr/pnr-terminal-tags";
 import { messages } from "@/messages";
@@ -9,7 +10,7 @@ export function Hero({ sampleMode, connected = false }: { readonly sampleMode: b
   return (
     <section
       aria-labelledby="hero-title"
-      className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] items-start gap-x-[clamp(24px,4vw,64px)] gap-y-12 pb-[72px] pt-[clamp(48px,7vw,96px)]"
+      className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] items-start gap-x-[clamp(24px,4vw,64px)] gap-y-12 pb-[72px] pt-[clamp(48px,7vw,96px)] lg:-mx-2 lg:overflow-x-clip lg:px-2"
     >
       <div className="min-w-0">
         <h1 id="hero-title" className="optical-hang text-hero tracking-display text-balance">
@@ -25,7 +26,10 @@ export function Hero({ sampleMode, connected = false }: { readonly sampleMode: b
           ))}
         </div>
       </div>
-      <PnrTerminal sampleMode={sampleMode} connected={connected} />
+      <div className="dial-host">
+        <HeroDial />
+        <PnrTerminal sampleMode={sampleMode} connected={connected} />
+      </div>
     </section>
   );
 }
