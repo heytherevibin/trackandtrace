@@ -115,6 +115,12 @@
   --color-accent-soft-ink: var(--accent-soft-ink);
   --color-accent-wash: var(--accent-wash);
   --color-accent-busy: var(--accent-busy);
+  --color-open-soft: var(--open-soft);
+  --color-open-soft-ink: var(--open-soft-ink);
+  --color-queued-soft: var(--queued-soft);
+  --color-queued-soft-ink: var(--queued-soft-ink);
+  --color-closed-soft: var(--closed-soft);
+  --color-closed-soft-ink: var(--closed-soft-ink);
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
   --color-mark: var(--mark);

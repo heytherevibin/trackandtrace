@@ -19,10 +19,17 @@ function block(selector: string): Record<string, string> {
 const light = block(':root,\n[data-theme="light"]');
 const dark = block('[data-theme="dark"]');
 
+// The three status roles are the one place in this world where a colour carries meaning rather
+// than chrome. They are named for the facts they report — a berth is open, a queue is forming,
+// booking is closed — and not for a severity ramp, because a ramp invites shading a queue by how
+// likely it looks to clear, which is a prediction this product does not make.
+const STATUS = ["open", "queued", "closed"] as const;
+
 const REQUIRED = [
   "surface-0", "surface-1", "surface-2", "surface-3",
   "ink-1", "ink-2", "ink-3", "ink-inverse", "ink-alert",
   "accent", "accent-text", "accent-strong", "accent-strong-hover", "accent-strong-active", "accent-ink", "accent-soft", "accent-soft-ink", "accent-wash", "accent-busy",
+  ...STATUS.flatMap((s) => [`${s}-soft`, `${s}-soft-ink`]),
   "line", "line-strong", "mark",
   "focus-ring", "backdrop", "skeleton-base", "skeleton-sheen", "selection-bg", "selection-fg", "scrollbar-thumb",
   "elevation-1", "elevation-2", "elevation-3",
@@ -67,6 +74,21 @@ describe("theme roles", () => {
     expect(contrast(t["accent"]!, t["surface-0"]!), "accent on surface-0").toBeGreaterThanOrEqual(3);
     expect(contrast(t["accent-soft-ink"]!, t["accent-soft"]!), "accent-soft-ink on accent-soft").toBeGreaterThanOrEqual(4.5);
     expect(contrast(t["focus-ring"]!, t["surface-0"]!), "focus ring on surface-0").toBeGreaterThanOrEqual(3);
+
+    // A status ink is drawn twice: inside its own chip, and as the bare waitlist figure on the page
+    // ground. So it owes AA against its own fill AND against every surface a plate can sit on —
+    // checking only the chip would pass an ink that the figure beside it renders illegibly.
+    for (const s of STATUS) {
+      const ink = t[`${s}-soft-ink`]!;
+      expect(contrast(ink, t[`${s}-soft`]!), `${s}-soft-ink on ${s}-soft`).toBeGreaterThanOrEqual(4.5);
+      for (const surface of ["surface-0", "surface-1", "surface-2", "surface-3"]) {
+        expect(contrast(ink, t[surface]!), `${s}-soft-ink on ${surface}`).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+    // And the three must be told apart by more than a name: a fill that matched another's would
+    // make the colour decorative.
+    const fills = STATUS.map((s) => t[`${s}-soft`]!);
+    expect(new Set(fills).size, "status fills are distinct").toBe(STATUS.length);
   });
 
   it("keeps brand-colors.ts in parity with the CSS", () => {

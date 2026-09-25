@@ -34,6 +34,19 @@
   --accent-wash: rgba(89, 128, 166, 0.08);
   --accent-busy: #94bce3;
 
+  /* Status. Steel is still the only accent; these three are the one place a colour reports a fact
+     rather than drawing chrome — a berth is open, a queue is forming, booking is closed. They are
+     named for those facts and NOT as a severity ramp, because a ramp invites shading a waitlist by
+     how likely it looks to clear, and this product does not predict. Each ink is drawn both inside
+     its own chip and as the bare waitlist figure on the page ground, so both pairings are held to
+     AA by the token contract. Colour is never the only signal: the chip still says what it is. */
+  --open-soft: #e2f1e6;
+  --open-soft-ink: #15603a;
+  --queued-soft: #fbeed7;
+  --queued-soft-ink: #6f4605;
+  --closed-soft: #fae8e6;
+  --closed-soft-ink: #92201c;
+
   /* Hairlines and registration marks */
   --line: rgba(29, 31, 32, 0.16);
   --line-strong: rgba(29, 31, 32, 0.45);
@@ -82,6 +95,15 @@
   --accent-soft-ink: #d6ebff;
   --accent-wash: rgba(89, 128, 166, 0.16);
   --accent-busy: #94bce3;
+
+  /* Status on the black ground: the fill is a low tint that reads off the page without a border,
+     the ink is the pale step. */
+  --open-soft: #11291d;
+  --open-soft-ink: #8fd6ab;
+  --queued-soft: #2b2213;
+  --queued-soft-ink: #e8c684;
+  --closed-soft: #2c1817;
+  --closed-soft-ink: #efa9a4;
 
   --line: rgba(237, 237, 237, 0.2);
   --line-strong: rgba(237, 237, 237, 0.45);
