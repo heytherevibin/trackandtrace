@@ -15,6 +15,8 @@ export interface CollisionOptions {
   readonly panels?: readonly string[];
   /** Subtrees drawn under text on purpose, which the checker ignores. */
   readonly skip?: readonly string[];
+  /** How far each sweep step moves, as a fraction of the window (default 0.45). */
+  readonly step?: number;
 }
 
 /** Every collision in the current window: text over text, a panel over text or a panel, sideways scroll. */
@@ -145,7 +147,7 @@ const SWEEP_STEP_CAP = 400;
 /** Scrolls from top to bottom in steps of 45% of the window; each finding once, with the scroll position it was seen at. */
 export async function collisionsTopToBottom(page: Page, options: CollisionOptions = {}): Promise<string[]> {
   const height = await page.evaluate(() => window.innerHeight);
-  const step = Math.max(1, Math.round(height * 0.45));
+  const step = Math.max(1, Math.round(height * (options.step ?? 0.45)));
   const found = new Map<string, number>();
   const measureMax = () => page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight);
   // max can grow as later sections (pinned scenes, content that settles in after a scroll) change scrollHeight,

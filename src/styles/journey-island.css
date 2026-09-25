@@ -42,3 +42,45 @@ html[data-journey="on"] .hero-dial.is-face .dial-seg { opacity: 0; }
   html[data-journey="on"] .dial-host.is-face > .dial-readout { display: block; }
 }
 html[data-journey="on"] .hero-dial .is-dashed { transform-box: view-box; transform-origin: 0 0; }
+
+/* ---- 02 · pinned: the section holds under the masthead while its three stops play in one dial. Only while it
+   fits (chapters.ts adds .is-pinned after measuring each stop open); otherwise it stays the plain section. */
+html[data-motion="on"][data-journey="on"] .chapters.is-pinned { position: relative; height: 330vh; padding-top: 0; padding-bottom: 0; }
+html[data-motion="on"][data-journey="on"] .is-pinned .chapters-pin {
+  position: sticky; z-index: 2; top: var(--header-height); height: calc(100svh - var(--header-height)); min-height: 560px;
+  display: grid; grid-template-columns: minmax(0, 27rem) minmax(0, 1fr); column-gap: clamp(24px, 4vw, 64px); align-items: center;
+}
+html[data-motion="on"][data-journey="on"] .is-pinned .chapters-instrument { display: flex; flex-direction: column; align-items: center; gap: 14px; min-width: 0; }
+html[data-motion="on"][data-journey="on"] .is-pinned .rail-marker { display: block; }
+html[data-motion="on"][data-journey="on"] .is-pinned .chapters-dial { width: min(100%, calc(100svh - var(--header-height) - 12.5rem), 560px); }
+html[data-motion="on"][data-journey="on"] .is-pinned .chapters-steps { display: flex; flex-direction: column; gap: 22px; margin-top: 20px; }
+html[data-motion="on"][data-journey="on"] .is-pinned .chapters-steps > li:not(.is-current) :is(h3, p) { color: var(--ink-3); }
+html[data-motion="on"][data-journey="on"] .is-pinned .chapters-steps > li.is-current h3 { color: var(--ink-1); }
+@media (max-width: 63.99rem) {
+  html[data-motion="on"][data-journey="on"] .chapters.is-pinned { height: 300vh; }
+  html[data-motion="on"][data-journey="on"] .is-pinned .chapters-pin { grid-template-columns: 1fr; grid-template-rows: auto auto; align-content: start; row-gap: 4px; padding-top: 12px; min-height: 0; }
+  html[data-motion="on"][data-journey="on"] .is-pinned .chapters-instrument { grid-row: 1; }
+  html[data-motion="on"][data-journey="on"] .is-pinned .chapters-dial { width: min(84%, 34vh, 360px, calc(100svh - var(--header-height) - 21rem)); }
+  html[data-motion="on"][data-journey="on"] .is-pinned .chapters-copy { grid-row: 2; }
+  html[data-motion="on"][data-journey="on"] .is-pinned .chapters-copy > :is(span, hr, .chapters-rail) { display: none; }
+  html[data-motion="on"][data-journey="on"] .is-pinned .chapters-copy h2 { font-size: var(--text-3xl); line-height: var(--text-3xl--line-height); }
+  html[data-motion="on"][data-journey="on"] .is-pinned .chapters-steps { gap: 8px; margin-top: 10px; }
+  html[data-motion="on"][data-journey="on"] .is-pinned .chapters-steps > li:not(.is-current) p { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  html[data-motion="on"][data-journey="on"] .is-pinned .chapter-card { display: none; }
+}
+/* Short windows: only the current stop's words. */
+@media (min-width: 64rem) and (max-height: 760px) {
+  html[data-motion="on"][data-journey="on"] .is-pinned .chapters-steps { gap: 12px; margin-top: 14px; }
+  html[data-motion="on"][data-journey="on"] .is-pinned .chapters-steps > li:not(.is-current) p { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  html[data-motion="on"][data-journey="on"] .is-pinned .chapters-dial { width: min(100%, calc(100svh - var(--header-height) - 11rem), 520px); }
+}
+/* A phone on its side: the dial beside the stops. */
+@media (max-height: 520px) and (orientation: landscape) {
+  html[data-motion="on"][data-journey="on"] .is-pinned .chapters-pin { grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto; align-content: center; padding-top: 0; column-gap: 24px; }
+  html[data-motion="on"][data-journey="on"] .is-pinned .chapters-copy { grid-row: 1; grid-column: 1; }
+  html[data-motion="on"][data-journey="on"] .is-pinned .chapters-instrument { grid-row: 1; grid-column: 2; }
+  html[data-motion="on"][data-journey="on"] .is-pinned .chapters-dial { width: min(38vw, calc(100svh - var(--header-height) - 28px)); }
+  html[data-motion="on"][data-journey="on"] .is-pinned .chapter-card { display: none; }
+}
+html[data-motion="on"][data-journey="on"] .is-pinned .chapters-dial .is-dashed,
+html[data-motion="on"][data-journey="on"] .is-pinned .dial-sweep { transform-box: view-box; transform-origin: 0 0; }

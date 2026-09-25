@@ -273,3 +273,15 @@ test.describe("the hero dial's chart readout", () => {
     expect(await collisionsInView(page, INSTRUMENTS)).toEqual([]);
   });
 });
+
+// 02's chapters play across a pinned window as the page scrolls; a dense, small-step sweep catches anything
+// the coarser top-to-bottom sweep's 45% stride could step over while a stop is playing.
+test.describe("02 pinned, a dense sweep", () => {
+  for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }] as const) {
+    test(`Motion on: nothing collides through the chapters at ${viewport.width}×${viewport.height}`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await gotoReady(page, "/");
+      expect(await collisionsTopToBottom(page, { ...INSTRUMENTS, panels: [...INSTRUMENTS.panels, ".chapter-card"], step: 0.15 })).toEqual([]);
+    });
+  }
+});

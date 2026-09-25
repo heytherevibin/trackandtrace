@@ -1,6 +1,7 @@
 import { MOTION_EVENT } from "@/components/motion/use-motion";
 import { startArrivals } from "./arrivals";
 import { startBoard } from "./board";
+import { startChapters } from "./chapters";
 import { startHero } from "./hero";
 import { introWanted, startIntro } from "./intro";
 import { LAYOUT_EVENT, REBUILD_EVENT } from "./journey-events";
@@ -25,13 +26,14 @@ export type Teardown = () => void;
 export type JourneyModule = (ctx: JourneyContext) => Teardown;
 
 /** In start order. Later tasks append their modules here. */
-export const MODULES: readonly JourneyModule[] = [startArrivals, startBoard, startStrip, startHero];
+export const MODULES: readonly JourneyModule[] = [startArrivals, startBoard, startStrip, startHero, startChapters];
 
 export function startJourney(): Teardown {
   const html = document.documentElement;
   let teardowns: Teardown[] = [];
   let resizeTimer = 0;
   let introPlayed = false;
+  let hashSettled = false;
 
   const stopAll = () => {
     for (const t of teardowns.reverse()) t();
@@ -52,7 +54,18 @@ export function startJourney(): Teardown {
       html.setAttribute("data-journey", "failed");
       throw error;
     }
-    requestAnimationFrame(() => window.dispatchEvent(new Event(LAYOUT_EVENT)));
+    requestAnimationFrame(() => {
+      // A piece the first build pins (02's chapters) can grow the page well past a still page's height; a
+      // reader who arrived with a URL fragment landed at the browser's pre-journey position, now short of the
+      // target. Corrected once, instantly, so no reader ever lands stranded above the section they followed a
+      // link to; never repeated on a later rebuild, which must not hijack a scroll the reader has since made.
+      if (!hashSettled) {
+        hashSettled = true;
+        const id = decodeURIComponent(location.hash.slice(1));
+        if (id) document.getElementById(id)?.scrollIntoView({ block: "start", behavior: "instant" });
+      }
+      window.dispatchEvent(new Event(LAYOUT_EVENT));
+    });
   };
   const rebuild = () => {
     if (html.getAttribute("data-journey") !== "on") return;
