@@ -32,7 +32,7 @@ function journey(train: TrainRow["train"]): string {
 export function TrainRowView({ row, last = false }: { readonly row: TrainRow; readonly last?: boolean }) {
   const runs = runsLine(row.train.runsOn);
   const asked = Object.entries(row.answers);
-  const lone = asked.length === 1;
+
   return (
     <div data-testid="train-row" className={cn("px-5 py-4", last ? "" : "border-b border-line")}>
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -45,8 +45,13 @@ export function TrainRowView({ row, last = false }: { readonly row: TrainRow; re
       {/* Asked and refused is not the same as never asked, and must not borrow its words. */}
       {row.failed ? <div className="mt-3 text-sm text-ink-1/70">{m.trainFailed}</div> : null}
 
+      {/* One grid, always, with the tracks KEPT rather than collapsed.
+          `auto-fit` would give a single block the whole row, so the collapsed state was held to a
+          fixed 480px — a number that matched no track at any width, and read wider than the
+          three-up it is meant to look like. `auto-fill` keeps the empty tracks, so one block is
+          exactly one column and stays that width as more arrive. */}
       {asked.length === 0 ? null : (
-        <div className={cn("mt-3", lone ? "max-w-[480px]" : "grid grid-cols-[repeat(auto-fit,minmax(min(100%,180px),1fr))] gap-3")}>
+        <div className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(min(100%,260px),1fr))] gap-3">
           {asked.map(([cls, answer]) => (
             <ClassBlock key={cls} cls={cls} day={answer.days[0] ?? null} fareTotal={answer.fare?.total ?? null} />
           ))}

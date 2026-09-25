@@ -21,14 +21,21 @@ import type { RouteOutcome, RouteTrain } from "@/services/route-source";
 
 const IP = "203.0.113.7";
 
-function train(trainNo: string): RouteTrain {
+/**
+ * A train on the pair, with its OWN boarding and alighting codes.
+ *
+ * These are usually not the pair the traveller typed. "Bengaluru to Delhi" is served from SBC and
+ * from YPR, and arrives at NDLS, NZM, DEE or TKD — production answers SBC → NDLS with eight trains
+ * of which seven call at none of those two stations.
+ */
+function train(trainNo: string, fromCode = "YPR", toCode = "NZM"): RouteTrain {
   return {
     trainNo,
     trainName: `TRAIN ${trainNo}`,
-    fromCode: "SBC",
-    fromName: "KSR Bengaluru",
-    toCode: "NDLS",
-    toName: "New Delhi",
+    fromCode,
+    fromName: fromCode,
+    toCode,
+    toName: toCode,
     originCode: "SBC",
     originName: "KSR Bengaluru",
     destinationCode: "NDLS",
@@ -43,7 +50,7 @@ function train(trainNo: string): RouteTrain {
   };
 }
 
-const EIGHT = ["12649", "12629", "22685", "12627", "22691", "12647", "12213", "00629"].map(train);
+const EIGHT = ["12649", "12629", "22685", "12627", "22691", "12647", "12213", "00629"].map((no) => train(no));
 
 function answer(request: AvailabilityRequest): AvailabilityAnswer {
   return {
@@ -101,6 +108,15 @@ describe("asking a whole route", () => {
     expect(outcome.ok).toBe(true);
     // Nine, not twenty-five: eight availability asks plus the route lookup above them.
     expect(calls).toHaveLength(8);
+  });
+
+  it("asks each train about the stations THAT train calls at", async () => {
+    const { calls, deps } = setup({ route: routeReturning([train("12649", "YPR", "NZM"), train("12627", "SBC", "NDLS")]).route });
+    await queryRouteAvailability(REQUEST, IP, deps);
+    // Not the pair the traveller typed. "Bengaluru to Delhi" is served from SBC and from YPR and
+    // arrives at NDLS, NZM, DEE or TKD; asking every train about SBC → NDLS refuses for all but the
+    // one that happens to run it. Production answered exactly that way: seven of eight failed.
+    expect(calls.map((c) => `${c.trainNo} ${c.from}→${c.to}`)).toEqual(["12649 YPR→NZM", "12627 SBC→NDLS"]);
   });
 
   it("leads with the first chosen class in the enum's order, not the first named", async () => {
