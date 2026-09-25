@@ -16,6 +16,8 @@ export const booking = {
   form: { title: "Availability request", sheet: "Form TL-02" },
   from: "From",
   to: "To",
+  /** The return journey is the same two stations the other way round, and nobody should retype it. */
+  swap: "Swap stations",
   stationPlaceholder: "CODE",
   route: {
     found: (count: number, from: string, to: string) => `${count === 1 ? "1 train runs" : `${count} trains run`} ${from} → ${to}.`,
@@ -63,6 +65,14 @@ export const booking = {
     closedNote: "Booking is closed for this date.",
     today: "Today",
     fare: (total: number) => `₹${total.toLocaleString("en-IN")}`,
+    /**
+     * The berth count an `AVAILABLE 0042` day carries. Forty-two free and one free are different
+     * worlds, and the card had room for the difference once the empty history line went.
+     *
+     * Allowed where the source's own PREDICTION is not: this is a number the railway published,
+     * not a guess about what will happen to it.
+     */
+    seatsFree: (seats: number) => `${seats.toLocaleString("en-IN")} free`,
   },
   /**
    * The route list. Two phrases carry weight and must never be swapped: a class NOT ASKED is a
@@ -77,7 +87,19 @@ export const booking = {
     more: "More classes and dates",
     /** Nothing left to ask: the other three dates arrived with the search and are being unhidden. */
     moreDates: "Three more dates",
+    /** The same control on the way back. It hides rows already in hand, so it costs nothing. */
+    fewerDates: "Hide dates",
     opening: "Asking…",
+    /**
+     * Which class the date table below belongs to.
+     *
+     * A row now carries every chosen class, so an uncaptioned table of dates is four possible
+     * answers and no way to tell which. The fares repeat down the column, which makes a WRONG
+     * reading look consistent rather than obviously wrong.
+     */
+    datesFor: (cls: string) => `Dates for ${cls}`,
+    /** Said on the class cards once a row is open, because clicking one is not otherwise evident. */
+    pickClassForDates: "Pick a class to see its dates",
     notAsked: (classes: string) => `${classes} not asked yet`,
     /** Asked and unanswered — a fact about the request, never confused with "Not carried". */
     classFailed: (classes: string) => `${classes} could not be answered`,

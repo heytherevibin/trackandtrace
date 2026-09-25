@@ -134,11 +134,26 @@ describe("the route's trains", () => {
     }
   });
 
-  it("draws the history line in the state it will really ship in", () => {
+  it("says booking is closed on the card, because WAITLIST alone reads as joinable", () => {
+    draw([row({ answers: { SL: answerFor([day({ status: "WL", wlBooking: 136, wlCurrent: 44, canBook: false })]) } })]);
+    // `canBook` outranks the status word — production answered canBook false for a date twenty-one
+    // days out. Neither the word nor its colour carries that, so the card has to.
+    expect(within(screen.getByTestId("class-block")).getByText("Booking closed")).toBeInTheDocument();
+  });
+
+  it("shows the berths a day actually has, where the source published a count", () => {
+    draw([row({ answers: { SL: answerFor([day({ status: "AVAILABLE", seats: 42 })]) } })]);
+    // Forty-two free and one free are different worlds. This is a number the railway published —
+    // unlike `prediction`, which is the source's own guess and is never shown.
+    expect(within(screen.getByTestId("class-block")).getByText("42 free")).toBeInTheDocument();
+  });
+
+  it("spends no line on a history it cannot show yet", () => {
     draw([row()]);
-    // `availability_observations.outcome` is written by nothing yet, so a number here would be
-    // invented. When the crawler has depth this becomes "Cleared 9 of the last 10 weeks".
-    expect(screen.getByText("Not enough history yet")).toBeInTheDocument();
+    // `availability_observations.outcome` is written by nothing yet. The card used to say so on
+    // every class of every train — sixteen times on a five-train list — which cost more room than
+    // the sentence was worth. It returns when there is a number to put there.
+    expect(screen.queryByText("Not enough history yet")).not.toBeInTheDocument();
   });
 
   it("renders a refusal and no list at all", () => {

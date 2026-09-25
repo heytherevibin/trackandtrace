@@ -184,6 +184,41 @@ describe("opening a row", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("hides the dates again on a second press, and asks for nothing either way", async () => {
+    const four = ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19"].map((date) => day({ date }));
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    draw([row("12627", { answers: { SL: answer(1000, four) }, pending: [], notCarried: [] })]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Three more dates" }));
+    await waitFor(() => expect(screen.getByRole("table", { name: /availability/i })).toBeVisible());
+    // The rows are in hand, so the press only showed them — and pressing again only hides them.
+    // The control greying out after one use read as broken, having cost nothing to use.
+    fireEvent.click(screen.getByRole("button", { name: "Hide dates" }));
+    await waitFor(() => expect(screen.queryByRole("table", { name: /availability/i })).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Three more dates" }));
+    await waitFor(() => expect(screen.getByRole("table", { name: /availability/i })).toBeVisible());
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("says which class the dates belong to, and follows the one the reader picks", async () => {
+    const dates = (from: number) => [16, 17, 18, 19].map((d) => day({ date: `2026-10-${d}`, wlCurrent: from + d }));
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    draw([row("12627", { answers: { SL: answer(1000, dates(0)), "3A": answer(2325, dates(100)) }, pending: [], notCarried: [] })]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Three more dates" }));
+    // A row carries every chosen class now, so an uncaptioned table is four possible answers and
+    // no way to tell which. It leads with the class the list is ranked by.
+    await waitFor(() => expect(screen.getByText("Dates for SL")).toBeVisible());
+
+    // And the reader is not stuck with it: the cards are the control.
+    fireEvent.click(screen.getByRole("button", { name: /3A/ }));
+    await waitFor(() => expect(screen.getByText("Dates for 3A")).toBeVisible());
+    expect(screen.queryByText("Dates for SL")).not.toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("offers nothing to open when a row has one date and nothing pending", () => {
     draw([row("12627", { answers: { SL: answer(1000) }, pending: [], notCarried: [] })]);
     expect(screen.queryByRole("button", { name: /dates/ })).not.toBeInTheDocument();
