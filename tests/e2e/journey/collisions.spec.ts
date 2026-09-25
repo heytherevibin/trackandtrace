@@ -213,7 +213,7 @@ test.describe("the collision checker", () => {
 // The landing's railway instruments, held as panels: the hero dial is drawn under the plate on purpose (v3's
 // gate skipped it as well), and its left side fades before the words. Every other instrument must never cover
 // text outside itself, nor another instrument.
-const INSTRUMENTS = { panels: [".board", ".berth-plan", ".station-clock", ".route-map"], skip: [".hero-dial"] } as const;
+const INSTRUMENTS = { panels: [".board", ".berth-plan", ".station-clock", ".route-map", ".chapter-card"], skip: [".hero-dial"] } as const;
 
 // Today's landing, before the journey adds anything: the baseline every journey PR must keep.
 const SIZES = [
@@ -231,6 +231,7 @@ for (const size of SIZES) {
       test(`Motion ${motion}: nothing collides, top to bottom`, async ({ page }) => {
         if (motion === "off") await page.addInitScript(() => window.localStorage.setItem("tt.motion", "off"));
         await gotoReady(page, "/");
+        await waitForJourney(page);
         expect(await collisionsTopToBottom(page, INSTRUMENTS)).toEqual([]);
       });
     }
@@ -281,7 +282,8 @@ test.describe("02 pinned, a dense sweep", () => {
     test(`Motion on: nothing collides through the chapters at ${viewport.width}×${viewport.height}`, async ({ page }) => {
       await page.setViewportSize(viewport);
       await gotoReady(page, "/");
-      expect(await collisionsTopToBottom(page, { ...INSTRUMENTS, panels: [...INSTRUMENTS.panels, ".chapter-card"], step: 0.15 })).toEqual([]);
+      await waitForJourney(page);
+      expect(await collisionsTopToBottom(page, { ...INSTRUMENTS, step: 0.15 })).toEqual([]);
     });
   }
 });
