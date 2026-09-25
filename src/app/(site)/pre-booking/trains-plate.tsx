@@ -56,8 +56,14 @@ export function TrainsPlate({
 
   function open(train: TrainRow["train"], pending: readonly string[]): void {
     const trainNo = train.trainNo;
-    // Each press costs provider requests, so a row already asking is not asked again.
-    if (!answer || opened[trainNo] || pending.length === 0) return;
+    // Each press costs provider requests, so a row already open is not asked again.
+    if (!answer || opened[trainNo]) return;
+    // Nothing pending means nothing to ask: the other dates are already in the payload, so opening
+    // the row is a toggle. Marked done without a request.
+    if (pending.length === 0) {
+      setOpened((was) => ({ ...was, [trainNo]: { phase: "done", answers: {}, failedClasses: [], message: "" } }));
+      return;
+    }
     setOpened((was) => ({ ...was, [trainNo]: { phase: "loading", answers: {}, failedClasses: [], message: "" } }));
     void (async () => {
       const failed = (message: string) => setOpened((was) => ({ ...was, [trainNo]: { phase: "error", answers: {}, failedClasses: [], message } }));

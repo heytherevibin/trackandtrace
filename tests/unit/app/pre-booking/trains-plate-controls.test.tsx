@@ -171,6 +171,24 @@ describe("opening a row", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("shows the other three dates without asking for anything, once every class is in hand", async () => {
+    const four = ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19"].map((date) => day({ date }));
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    draw([row("12627", { answers: { SL: answer(1000, four) }, pending: [], notCarried: [] })]);
+
+    // Nothing is pending, so there is nothing to ask: the four dates came back with the search and
+    // opening the row only stops hiding three of them.
+    fireEvent.click(screen.getByRole("button", { name: "Three more dates" }));
+    await waitFor(() => expect(screen.getByRole("table", { name: /availability/i })).toBeVisible());
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("offers nothing to open when a row has one date and nothing pending", () => {
+    draw([row("12627", { answers: { SL: answer(1000) }, pending: [], notCarried: [] })]);
+    expect(screen.queryByRole("button", { name: /dates/ })).not.toBeInTheDocument();
+  });
+
   it("never offers to open a row the cap stopped it asking", () => {
     draw([row("12627", { answers: {}, beyondCap: true, pending: ["SL", "3A", "2A"] })]);
     expect(screen.queryByRole("button", { name: "More classes and dates" })).not.toBeInTheDocument();

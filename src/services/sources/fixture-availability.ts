@@ -76,11 +76,13 @@ interface SampleJourney {
   /** The stations this train calls at. Asked about any other pair, it refuses — as the real one does. */
   readonly from: string;
   readonly to: string;
+  /** Classes this train does not carry. A Rajdhani has no sleeper, and the provider says so. */
+  readonly without?: readonly string[];
 }
 
 const ANSWERS: Readonly<Record<string, SampleJourney>> = {
   "12627": { build: karnataka, from: "SBC", to: "NDLS" },
-  "22691": { build: janShatabdi, from: "SBC", to: "NZM" },
+  "22691": { build: janShatabdi, from: "SBC", to: "NZM", without: ["SL", "2S"] },
 };
 
 export const fixtureAvailabilitySource: AvailabilitySource = {
@@ -98,6 +100,11 @@ export const fixtureAvailabilitySource: AvailabilitySource = {
     const from = request.from.trim().toUpperCase();
     const to = request.to.trim().toUpperCase();
     if (from !== journey.from || to !== journey.to) return unavailable(messages.source.availability.notOnRoute, "server");
+    // A class the train does not carry is an INVALID, not a failure — what the provider really
+    // answers, and what keeps a route search from resting the breaker on its own.
+    if (journey.without?.includes(request.travelClass.trim().toUpperCase())) {
+      return { ok: false, code: "INVALID", message: messages.source.availability.classNotCarried };
+    }
     return { ok: true, answer: journey.build(new Date()) };
   },
 };

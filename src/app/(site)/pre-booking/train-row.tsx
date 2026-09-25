@@ -66,8 +66,14 @@ export function TrainRowView({
   // A class that came back on the expand is no longer pending; one that failed there is named on
   // its own line rather than dropped back into "not asked", which would be a different claim.
   const pending = row.pending.filter((cls) => !(cls in answers) && !(opened?.failedClasses ?? []).includes(cls));
-  const lead = answers[leadClass];
-  const dates = opened?.phase === "done" && lead && lead.days.length > 1 ? lead : null;
+  const lead = answers[leadClass] ?? Object.values(answers)[0];
+  // Four dates came back with every ask, and the list shows one. Opening a row stops hiding the
+  // other three, and when every chosen class is already in hand that costs NOTHING — there is
+  // nothing left to request, so the button is a toggle and not a fetch.
+  const hasMoreDates = (lead?.days.length ?? 0) > 1;
+  const showDates = opened !== undefined && opened.phase !== "error" && hasMoreDates;
+  const dates = showDates ? lead : null;
+  const offer = pending.length > 0 ? m.more : hasMoreDates ? m.moreDates : null;
 
   return (
     <div data-testid="train-row" className={cn("px-5 py-4", last ? "" : "border-b border-line")}>
@@ -110,13 +116,13 @@ export function TrainRowView({
         </div>
       ) : null}
 
-      {pending.length > 0 || opened?.phase === "loading" ? (
+      {offer !== null || opened?.phase === "loading" ? (
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
           {/* A row the cap stopped it asking is not offered an expand: the button would spend the
               request the cap exists to withhold. */}
           {row.beyondCap ? null : (
             <button type="button" className={BTN} disabled={opened !== undefined} onClick={onOpen}>
-              {opened?.phase === "loading" ? m.opening : m.more}
+              {opened?.phase === "loading" ? m.opening : offer}
             </button>
           )}
           {pending.length > 0 ? <span className="text-label text-ink-1/70">{m.notAsked(pending.join(", "))}</span> : null}

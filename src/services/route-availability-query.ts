@@ -42,6 +42,16 @@ export const ROUTE_AVAILABILITY_RATE_LIMIT = { limit: 6, windowMs: 60_000 };
  */
 export const ROUTE_AVAILABILITY_MAX_TRAINS = 12;
 
+/**
+ * The ceiling on one search, counted in ASKS rather than trains.
+ *
+ * Every chosen class of every asked train is a request, so twenty trains and four classes would be
+ * eighty on one click. The cap drops whole TRAINS rather than classes: every row that was asked
+ * then carries the same columns, and a list whose rows answered different questions cannot be
+ * ranked against each other.
+ */
+export const ROUTE_AVAILABILITY_MAX_ASKS = 40;
+
 /** Enough to hide the latency of a dozen asks, few enough not to look like an attack. */
 const CONCURRENCY = 4;
 
@@ -117,12 +127,16 @@ export async function queryRouteAvailability(
   if (!found.ok) return { outcome: found, remaining: rate.remaining };
 
   const trains = found.answer.trains;
-  const asking = trains.slice(0, ROUTE_AVAILABILITY_MAX_TRAINS);
+  // Two ceilings, whichever bites first: a train count a reader will not scroll past, and a total
+  // ask count that a wide class selection would otherwise blow through.
+  const affordable = Math.max(1, Math.floor(ROUTE_AVAILABILITY_MAX_ASKS / chosen.length));
+  const limit = Math.min(ROUTE_AVAILABILITY_MAX_TRAINS, affordable);
+  const asking = trains.slice(0, limit);
 
   // Nothing is reserved and nothing is asked for a pair with no trains — and that is still an
   // answer, not a refusal.
   if (asking.length > 0) {
-    const allowance = await budget.takeMany(asking.length);
+    const allowance = await budget.takeMany(asking.length * chosen.length);
     if (!allowance.ok) {
       return {
         outcome: { ok: false, code: "SOURCE_UNAVAILABLE", message: messages.source.outcomes.dailyLimit, retryAfter: allowance.retryAfterSeconds },
@@ -131,48 +145,61 @@ export async function queryRouteAvailability(
     }
   }
 
-  const rest = chosen.filter((cls) => cls !== lead);
-
   const asked = await pooled(asking, CONCURRENCY, async (train): Promise<TrainRow> => {
-    // The stations THAT TRAIN calls at, not the pair the traveller typed.
-    //
-    // "Bengaluru to Delhi" is served from SBC and from YPR, and arrives at NDLS, NZM, DEE or TKD.
-    // Production answers SBC → NDLS with eight trains of which SEVEN call at neither of those two
-    // stations, and asking them about SBC → NDLS refuses for all seven. `RouteTrain.fromCode` and
-    // `toCode` are that train's own segment on this pair, which is exactly what must be asked.
-    const ask: AvailabilityRequest = {
-      trainNo: train.trainNo,
-      from: train.fromCode,
-      to: train.toCode,
-      journeyDate: request.journeyDate,
-      travelClass: lead,
-      quota: request.quota,
-    };
-    const outcome = await source.check(ask).catch((error: unknown) => {
-      log.warn("[route-availability] a train's ask threw", { kind: error instanceof Error ? error.name : typeof error });
-      // A throw is a failure, never a wrong question. It carries the taxonomy's own shape so the
-      // branch below reads one type rather than two.
-      return { ok: false, code: "SOURCE_UNAVAILABLE", message: messages.source.availability.couldNotAnswer, cause: "network" } satisfies SourceFailure;
-    });
-    if (!outcome.ok) {
-      // INVALID is a wrong question the provider answered, not a provider that could not answer —
-      // the breaker ignores it for the same reason. "Does not carry that class" is the one we can
-      // name, and it belongs to the train, so it is neither pending nor failed: asking again can
-      // only be refused the same way.
-      if (outcome.code === "INVALID" && outcome.message === messages.source.availability.classNotCarried) {
-        return { train, answers: {}, pending: rest, notCarried: [lead], beyondCap: false, failed: false };
+    const answers: Record<string, AvailabilityAnswer> = {};
+    const notCarried: BookingClass[] = [];
+    const pending: BookingClass[] = [];
+    let missed = false;
+
+    // Every chosen class, one after another for this train. Sequential within a train and parallel
+    // across trains: four trains at once is already the whole concurrency budget, and a burst of
+    // every class of every train would be the stampede the cap exists to prevent.
+    for (const travelClass of chosen) {
+      // The stations THAT TRAIN calls at, not the pair the traveller typed.
+      //
+      // "Bengaluru to Delhi" is served from SBC and from YPR, and arrives at NDLS, NZM, DEE or TKD.
+      // Production answers SBC → NDLS with eight trains of which SEVEN call at neither of those two
+      // stations. `RouteTrain.fromCode` and `toCode` are that train's own segment on this pair.
+      const ask: AvailabilityRequest = {
+        trainNo: train.trainNo,
+        from: train.fromCode,
+        to: train.toCode,
+        journeyDate: request.journeyDate,
+        travelClass,
+        quota: request.quota,
+      };
+      const outcome = await source.check(ask).catch((error: unknown) => {
+        log.warn("[route-availability] a train's ask threw", { kind: error instanceof Error ? error.name : typeof error });
+        // A throw is a failure, never a wrong question. It carries the taxonomy's own shape so the
+        // branch below reads one type rather than two.
+        return { ok: false, code: "SOURCE_UNAVAILABLE", message: messages.source.availability.couldNotAnswer, cause: "network" } satisfies SourceFailure;
+      });
+      if (!outcome.ok) {
+        // INVALID is a wrong question the provider answered, not a provider that could not answer —
+        // the breaker ignores it for the same reason. "Does not carry that class" belongs to the
+        // TRAIN, so it is neither pending nor failed: asking again can only be refused the same way.
+        if (outcome.code === "INVALID" && outcome.message === messages.source.availability.classNotCarried) {
+          notCarried.push(travelClass);
+          continue;
+        }
+        // Anything else stays askable, so opening the row can try it again.
+        pending.push(travelClass);
+        missed = true;
+        continue;
       }
-      // Anything else: the class goes back in the queue so opening the row can ask it again.
-      // Dropping it would lose the lead class with no way to retry.
-      return { train, answers: {}, pending: chosen, notCarried: [], beyondCap: false, failed: true };
+      answers[travelClass] = outcome.answer;
+      void Promise.resolve(record(ask, outcome.answer)).catch((error: unknown) => {
+        log.warn("[route-availability] an answer was served but not recorded", { kind: error instanceof Error ? error.name : typeof error });
+      });
     }
-    void Promise.resolve(record(ask, outcome.answer)).catch((error: unknown) => {
-      log.warn("[route-availability] an answer was served but not recorded", { kind: error instanceof Error ? error.name : typeof error });
-    });
-    return { train, answers: { [lead]: outcome.answer }, pending: rest, notCarried: [], beyondCap: false, failed: false };
+
+    // A row is "failed" only when it answered NOTHING. One class that could not be reached beside
+    // three that could is a gap in the row, not a train the source could not answer for, and
+    // saying otherwise would put a refusal above three real answers.
+    return { train, answers, pending, notCarried, beyondCap: false, failed: missed && Object.keys(answers).length === 0 };
   });
 
-  const beyond: TrainRow[] = trains.slice(ROUTE_AVAILABILITY_MAX_TRAINS).map((train: RouteTrain) => ({
+  const beyond: TrainRow[] = trains.slice(limit).map((train: RouteTrain) => ({
     train,
     answers: {},
     pending: chosen,
