@@ -50,6 +50,7 @@ const ROW = {
     },
   },
   pending: ["3A", "SL"],
+  notCarried: [],
   beyondCap: false,
   failed: false,
 };

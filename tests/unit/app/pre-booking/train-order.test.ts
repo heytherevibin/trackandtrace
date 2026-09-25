@@ -51,6 +51,7 @@ function row(trainNo: string, over: { departs?: string | null; travelTime?: stri
       },
     },
     pending: [],
+    notCarried: [],
     beyondCap: false,
     failed: false,
   };

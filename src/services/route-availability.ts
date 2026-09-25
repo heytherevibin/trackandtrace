@@ -45,6 +45,14 @@ export interface TrainRow {
   readonly train: RouteTrain;
   readonly answers: Readonly<Record<string, AvailabilityAnswer>>;
   readonly pending: readonly BookingClass[];
+  /**
+   * Classes this train does not carry — a fact about the TRAIN, and an answer.
+   *
+   * The provider names it distinctly ("Class does not exist in this train for this Train route",
+   * measured 2026-09-25), so it is neither pending nor failed: asking again can only be refused the
+   * same way, and calling it a failure would say "we could not ask", which is a different thing.
+   */
+  readonly notCarried: readonly BookingClass[];
   readonly beyondCap: boolean;
   readonly failed: boolean;
 }

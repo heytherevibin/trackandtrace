@@ -150,23 +150,33 @@ export async function queryRouteAvailability(
     };
     const outcome = await source.check(ask).catch((error: unknown) => {
       log.warn("[route-availability] a train's ask threw", { kind: error instanceof Error ? error.name : typeof error });
-      return { ok: false } as const;
+      // A throw is a failure, never a wrong question. It carries the taxonomy's own shape so the
+      // branch below reads one type rather than two.
+      return { ok: false, code: "SOURCE_UNAVAILABLE", message: messages.source.availability.couldNotAnswer, cause: "network" } satisfies SourceFailure;
     });
     if (!outcome.ok) {
-      // The class that failed goes back in the queue, so opening the row can ask it again.
+      // INVALID is a wrong question the provider answered, not a provider that could not answer —
+      // the breaker ignores it for the same reason. "Does not carry that class" is the one we can
+      // name, and it belongs to the train, so it is neither pending nor failed: asking again can
+      // only be refused the same way.
+      if (outcome.code === "INVALID" && outcome.message === messages.source.availability.classNotCarried) {
+        return { train, answers: {}, pending: rest, notCarried: [lead], beyondCap: false, failed: false };
+      }
+      // Anything else: the class goes back in the queue so opening the row can ask it again.
       // Dropping it would lose the lead class with no way to retry.
-      return { train, answers: {}, pending: chosen, beyondCap: false, failed: true };
+      return { train, answers: {}, pending: chosen, notCarried: [], beyondCap: false, failed: true };
     }
     void Promise.resolve(record(ask, outcome.answer)).catch((error: unknown) => {
       log.warn("[route-availability] an answer was served but not recorded", { kind: error instanceof Error ? error.name : typeof error });
     });
-    return { train, answers: { [lead]: outcome.answer }, pending: rest, beyondCap: false, failed: false };
+    return { train, answers: { [lead]: outcome.answer }, pending: rest, notCarried: [], beyondCap: false, failed: false };
   });
 
   const beyond: TrainRow[] = trains.slice(ROUTE_AVAILABILITY_MAX_TRAINS).map((train: RouteTrain) => ({
     train,
     answers: {},
     pending: chosen,
+    notCarried: [],
     beyondCap: true,
     failed: false,
   }));

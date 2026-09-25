@@ -61,7 +61,7 @@ function answer(total: number | null, days: readonly AvailabilityDayRecord[] = [
 }
 
 function row(trainNo: string, over: Partial<TrainRow> = {}, trainOver: Partial<RouteTrain> = {}): TrainRow {
-  return { train: train(trainNo, trainOver), answers: { SL: answer(1000) }, pending: ["3A", "2A"], beyondCap: false, failed: false, ...over };
+  return { train: train(trainNo, trainOver), answers: { SL: answer(1000) }, pending: ["3A", "2A"], notCarried: [], beyondCap: false, failed: false, ...over };
 }
 
 function plate(rows: readonly TrainRow[]): RouteAvailabilityAnswer {

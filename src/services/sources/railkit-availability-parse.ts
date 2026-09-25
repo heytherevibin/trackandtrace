@@ -86,13 +86,25 @@ export function seatsFromRawStatus(raw: string): number | null {
 }
 
 /** Which measured refusal this is. Kept separate from the outcome so the adapter can log our own bug loudly. */
-export type AvailabilityRefusal = "not-on-route" | "our-date-format" | "no-profile" | "upstream" | "unreadable";
+export type AvailabilityRefusal =
+  | "not-on-route"
+  | "our-date-format"
+  | "class-not-carried"
+  | "not-bookable-on-date"
+  | "our-class-code"
+  | "no-profile"
+  | "upstream"
+  | "unreadable";
 
-/** Every arm was measured on 2026-09-23; anything unmeasured falls through to "unreadable", which is the safe side. */
+/** Every arm was measured live (2026-09-23, extended 2026-09-25); anything unmeasured falls through to "unreadable", which is the safe side. */
 export function classifyAvailabilityRefusal(message: string): AvailabilityRefusal {
   const said = message.toLowerCase();
   if (said.includes("not an intermediate station")) return "not-on-route";
   if (said.includes("invalid date format") || said.includes("date still invalid")) return "our-date-format";
+  // Measured 2026-09-25, probing 12649 YPR → NZM across seven dates and six classes.
+  if (said.includes("class does not exist in this train")) return "class-not-carried";
+  if (said.includes("not available for booking for this date")) return "not-bookable-on-date";
+  if (said.includes("invalid coach type")) return "our-class-code";
   if (said.includes("no valid profile found")) return "no-profile";
   if (said.includes("unable to process your request")) return "upstream";
   // "Failed to fetch availability" is a past date — unreadable by design — and the text is too
@@ -107,6 +119,17 @@ export function refusalFailure(kind: AvailabilityRefusal): SourceFailure {
     case "our-date-format":
       // Our bug, never the traveller's: the adapter is the only place that writes this date.
       return { ok: false, code: "INVALID", message: AV.dateNotAccepted };
+    // Two facts about the railway. INVALID rather than SOURCE_UNAVAILABLE is load-bearing here:
+    // the breaker ignores INVALID by design — "a wrong question ... the breaker learns nothing
+    // from it" — and a route search asks one class of every train at once, so a handful of trains
+    // that do not carry the chosen class would otherwise rest the whole availability feature.
+    case "class-not-carried":
+      return { ok: false, code: "INVALID", message: AV.classNotCarried };
+    case "not-bookable-on-date":
+      return { ok: false, code: "INVALID", message: AV.notBookableOnDate };
+    case "our-class-code":
+      // Ours too: the provider did not recognise the code we sent, which no traveller types.
+      return { ok: false, code: "INVALID", message: AV.invalidRequest };
     case "no-profile":
     case "upstream":
       return unavailable(AV.couldNotAnswer, "server");

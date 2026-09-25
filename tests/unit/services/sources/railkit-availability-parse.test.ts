@@ -350,6 +350,32 @@ describe("the measured refusals", () => {
     expect(out.message).toBe(AV.couldNotAnswer);
   });
 
+  // Measured 2026-09-25, probing 12649 YPR → NZM. These three had been falling through to
+  // `unreadable`, which is a SOURCE_UNAVAILABLE and counts toward the breaker — five of them inside
+  // a minute rests the whole availability feature. They are wrong questions, not a sick provider,
+  // and two of them are facts a traveller wants.
+  it("maps a class the train does not carry to invalid input, not to a failure", () => {
+    const out = refusal("Class does not exist in this train for this Train route");
+    expect(out).toMatchObject({ ok: false, code: "INVALID", message: AV.classNotCarried });
+  });
+
+  it("maps a train that cannot be booked on that date to invalid input", () => {
+    const out = refusal("Sorry, this train is not available for booking for this date");
+    expect(out).toMatchObject({ ok: false, code: "INVALID", message: AV.notBookableOnDate });
+  });
+
+  it("maps a coach type the provider does not know to invalid input — our bug, never the traveller's", () => {
+    const out = refusal("Invalid coach type.");
+    expect(out).toMatchObject({ ok: false, code: "INVALID", message: AV.invalidRequest });
+  });
+
+  it("keeps a generic refusal counting against the breaker", () => {
+    // "Unable to process your request" says nothing. A provider that really starts refusing
+    // everything has to reach the failure counter, so the unmeasured arms must stay failures.
+    const out = refusal("Unable to process your request\n");
+    expect(out).toMatchObject({ ok: false, code: "SOURCE_UNAVAILABLE" });
+  });
+
   it("never turns a refusal into a not-found or into an answer with no days", () => {
     for (const error of ["not an intermediate station of train 12951", "Unable to process your request", "Failed to fetch availability"]) {
       const out = refusal(error);

@@ -16,7 +16,7 @@ export const booking = {
   form: { title: "Availability request", sheet: "Form TL-02" },
   from: "From",
   to: "To",
-  stationPlaceholder: "Code",
+  stationPlaceholder: "CODE",
   route: {
     found: (count: number, from: string, to: string) => `${count === 1 ? "1 train runs" : `${count} trains run`} ${from} → ${to}.`,
     none: (from: string, to: string) => `No trains run ${from} → ${to}. Check both codes — they are station codes, not names.`,
