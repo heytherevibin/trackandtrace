@@ -3,3 +3,11 @@
 
 /* ---- Entrances: a kicker's characters turn on their own axis, so each is its own box */
 html[data-journey="on"] [data-flap] :is(span) { display: inline-block; transform-origin: 50% 55%; backface-visibility: hidden; }
+
+/* ---- The intro's plotter: the masthead rule and the plates' outlines draw themselves once per visit */
+html[data-journey="on"] header.is-plotting { border-bottom-color: transparent; }
+html[data-journey="on"] .blueprint.is-plotting { border-color: transparent; }
+.intro-rule { position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; background: var(--line-strong); transform-origin: 0 50%; pointer-events: none; }
+.intro-outline { position: absolute; inset: -1px; width: calc(100% + 2px); height: calc(100% + 2px); pointer-events: none; overflow: visible; }
+.intro-outline rect { fill: none; stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
+html[data-journey="on"] #hero-title span span { display: inline-block; }

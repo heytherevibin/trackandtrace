@@ -1,5 +1,6 @@
 import { MOTION_EVENT } from "@/components/motion/use-motion";
 import { startArrivals } from "./arrivals";
+import { introWanted, startIntro } from "./intro";
 import { LAYOUT_EVENT, REBUILD_EVENT } from "./journey-events";
 import { JOURNEY_CHUNK_MARK } from "./journey-mark";
 import { refreshAll, untrackAll } from "./observers";
@@ -14,6 +15,8 @@ export { JOURNEY_CHUNK_MARK };
 export interface JourneyContext {
   /** Motion on: things may move. Off: only true readings update, drawn still. */
   readonly motion: boolean;
+  /** True only in the build that plays the once-per-visit intro. */
+  readonly intro: boolean;
 }
 export type Teardown = () => void;
 export type JourneyModule = (ctx: JourneyContext) => Teardown;
@@ -25,6 +28,7 @@ export function startJourney(): Teardown {
   const html = document.documentElement;
   let teardowns: Teardown[] = [];
   let resizeTimer = 0;
+  let introPlayed = false;
 
   const stopAll = () => {
     for (const t of teardowns.reverse()) t();
@@ -33,8 +37,12 @@ export function startJourney(): Teardown {
   };
   const build = () => {
     stopAll();
-    const ctx: JourneyContext = { motion: html.getAttribute("data-motion") !== "off" };
+    const motion = html.getAttribute("data-motion") !== "off";
+    const intro = !introPlayed && introWanted(motion);
+    introPlayed = true;
+    const ctx: JourneyContext = { motion, intro };
     try {
+      if (intro) teardowns.push(startIntro());
       for (const start of MODULES) teardowns.push(start(ctx));
     } catch (error) {
       stopAll();
