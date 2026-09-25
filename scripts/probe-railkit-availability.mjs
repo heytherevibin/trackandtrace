@@ -20,8 +20,31 @@
 // `src/services/sources/railkit-availability.ts`; re-run this before trusting them again, because
 // nothing here is pinned by a test against the live API.
 //
+// WHAT A SECOND RUN FOUND, 2026-09-25, probing 12627 SBC→NDLS. Four of the twenty-two answer:
+//
+//   /api/v1/seats/:no/:from/:to/:ddmmyyyy/:class/:quota  as above
+//   /api/v1/trains/:trainNo            {trainNo, trainName} and NOTHING else
+//   /api/v1/trains/search?name=        {query, count, trains:[{trainNo, trainName}]}
+//   /api/v1/trains/between/:from/:to   the rich one, below
+//
+// THERE IS NO TRAIN-TO-ROUTE LOOKUP. `/route/:no`, `/schedule/:no`, `/train-schedule/:no`,
+// `/station/:code` and both hyphenated trains-between spellings are 404, and the `train` block
+// inside a seats response only echoes the from/to that was ASKED for, with station names attached.
+// Neither `/trains/:no` nor `/trains/search` carries a route either, so a train number or name can
+// NEVER reach `/seats` on its own — the station pair has to come from the traveller or from
+// `/trains/between`, which is the only endpoint that knows where a train runs.
+//
+// `/trains/between/:from/:to` returns an array of:
+//   train_no, train_name,
+//   source_stn_code/name, dstn_stn_code/name   the TRAIN's own origin and destination
+//   from_stn_code/name, to_stn_code/name       the SEGMENT that was asked for
+//   from_time, to_time, travel_time, running_days, distance, halts
+// So one call gives a route's trains, the codes `/seats` needs, and the running days that explain
+// why four returned dates are not four consecutive ones. There is no station lookup at all: a
+// station code cannot be resolved to a name except through one of these responses.
+//
 // Budget: Enterprise is 600 requests per 10 minutes (railkit-source memory). This makes at most
-// ~20 and stops dead on 401/403/429, so it cannot eat a meaningful share of the month's 10k.
+// ~22 and stops dead on 401/403/429, so it cannot eat a meaningful share of the month's 10k.
 
 const args = new Map();
 for (let i = 2; i < process.argv.length; i += 2) args.set(process.argv[i].replace(/^--/, ""), process.argv[i + 1]);
@@ -33,6 +56,8 @@ const TO = args.get("to") ?? "BCT";
 const DATE = args.get("date") ?? new Date(Date.now() + 21 * 86_400_000).toISOString().slice(0, 10);
 const CLASS = args.get("class") ?? "3A";
 const QUOTA = args.get("quota") ?? "GN";
+// A partial train name, for the search endpoint the drawn train field would use.
+const NAME = args.get("name") ?? "karnat";
 // The seats endpoint wants DD-MM-YYYY; every guessed path below is asked in ISO, as it was on the
 // run that found this. Both forms are derived here once, from the same day.
 const DDMMYYYY = DATE.split("-").reverse().join("-");
@@ -88,6 +113,13 @@ const CANDIDATES = [
   ["live", `/api/v1/running-status/${TRAIN}`],
   ["trains-between", `/api/v1/trains-between/${FROM}/${TO}`],
   ["trains-between", `/api/v1/trains?from=${FROM}&to=${TO}&date=${DATE}`],
+  // The two the sheet's train field is drawn on. The `trains/...` prefix answers for a train number,
+  // so these spellings are the ones worth asking; the hyphenated and query forms above do not.
+  // A form that starts from a train name needs `search`; one that starts from a station pair needs
+  // `between` — and whether `between` carries running_days decides whether a missing day can be
+  // explained or has to be left as a hole. Neither is pinned by a test, so re-ask before trusting.
+  ["trains-search", `/api/v1/trains/search?name=${encodeURIComponent(NAME)}`],
+  ["trains-between", `/api/v1/trains/between/${FROM}/${TO}`],
   ["station", `/api/v1/station/${FROM}`],
 ];
 

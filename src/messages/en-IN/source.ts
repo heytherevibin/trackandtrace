@@ -24,4 +24,10 @@ export const source = {
     dateNotAccepted: "That journey date could not be read. Nothing was shown in its place.",
     invalidRequest: "That journey could not be checked. Check the train number, the stations and the date.",
   },
+  // Which trains run between two stations. "No trains run that pair" is an ANSWER and is written by
+  // the page, not here; every sentence in this block means the question could not be asked at all.
+  route: {
+    invalidRequest: "Those station codes could not be read. Check both codes and try again.",
+    couldNotAnswer: "The reservation service could not answer for those stations. Nothing was shown in its place.",
+  },
 } as const satisfies MessageTree;
