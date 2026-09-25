@@ -1,14 +1,21 @@
 import { expect, test } from "./fixtures";
 import { expectAxeClean, gotoReady } from "./helpers";
 
-test("pre-booking answers honestly and never lists an invented train", async ({ page }) => {
+test("pre-booking offers no train until a route answers, and labels a sample answer", async ({ page }) => {
+  // The honest stub this replaced could not list a train because nothing could find one. Now a
+  // route can, so the honesty moves: nothing is offered until a route has answered, what is offered
+  // comes from that answer, and sample data says it is sample data.
   await gotoReady(page, "/pre-booking");
-  await expect(page.getByText("Train search: not connected")).toBeVisible();
+  await expect(page.getByLabel("Train", { exact: true })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Check availability" })).toBeDisabled();
+
+  await page.getByLabel("From", { exact: true }).fill("SBC");
+  await page.getByLabel("To", { exact: true }).fill("NDLS");
+  await expect(page.getByLabel("Train", { exact: true })).toBeEnabled();
   await page.getByLabel("Journey date").fill("2027-01-15");
   await page.getByRole("button", { name: "Check availability" }).click();
-  await expect(page.getByRole("heading", { name: "No availability returned" })).toBeVisible();
-  await expect(page.getByText(/Requested: 3A · GN · 2027-01-15/)).toBeVisible();
+
+  await expect(page.getByText("Sample data").first()).toBeVisible();
   await expectAxeClean(page);
 });
 

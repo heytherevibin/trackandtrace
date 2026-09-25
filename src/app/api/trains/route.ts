@@ -3,6 +3,7 @@ import { z } from "zod";
 import { jsonError, jsonOk } from "@/services/api-response";
 import { clientIp } from "@/services/rate-limit";
 import { queryRoute } from "@/services/route-query";
+import { servingSampleData } from "@/services/sources";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +21,7 @@ export async function GET(req: NextRequest): Promise<Response> {
     const ip = clientIp(null, req.headers.get("x-forwarded-for"));
     const { outcome, remaining } = await queryRoute(parsed.data.from, parsed.data.to, ip);
     if (!outcome.ok) return jsonError(outcome);
-    return jsonOk({ ok: true, remaining, ...outcome.answer });
+    return jsonOk({ ok: true, remaining, sampleData: servingSampleData(), ...outcome.answer });
   } catch (err) {
     return jsonError(err);
   }

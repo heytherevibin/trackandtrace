@@ -121,6 +121,12 @@
     border-color: var(--accent);
     outline-offset: 0;
   }
+  /* A field the page has told the reader is wrong wears the alert hairline, so the message and the
+     field it is about are connected by something other than proximity. Focus still wins: while you
+     are fixing it, the field reads as the one you are in. */
+  &[aria-invalid="true"]:not(:focus-visible) {
+    border-color: var(--ink-alert);
+  }
 }
 
 /* Twin rails with sleepers: the route line drawn between stops */
