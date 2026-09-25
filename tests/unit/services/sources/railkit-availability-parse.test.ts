@@ -64,6 +64,13 @@ describe("splitRawStatus", () => {
     ["RLWL12/WL5", 12, 5],
     ["TQWL8/WL3", 8, 3],
     ["CKWL10/CKWL3", 10, 3],
+    // RAC pairs, measured live 2026-09-26 on 16159 MS → SRR. The provider labels them
+    // `status: WAITLIST` and pads the numbers. They carry exactly the movement a WL pair does —
+    // opened at 58, now at 51 — and the WL-only pattern threw all of it away, so the card showed a
+    // queue with no figure at all.
+    ["RAC  58/RAC  51", 58, 51],
+    ["RAC   3/RAC   3", 3, 3],
+    ["RAC28/RAC27", 28, 27],
   ])("reads %s as the booking-position waitlist and the current one", (raw, booking, current) => {
     expect(splitRawStatus(raw)).toEqual({ booking, current });
   });

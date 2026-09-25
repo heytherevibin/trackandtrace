@@ -39,8 +39,16 @@ const TRAIN_NO = /^\d{5}$/;
  * `GNWL65/WL26` → 65 and 26. The quota prefix varies (GNWL, PQWL, RLWL, TQWL,
  * CKWL …) so it is matched, never hard-coded, and the second prefix is optional
  * because both `…/WL26` and `…/CKWL3` occur.
+ *
+ * **RAC pairs count too.** `RAC  58/RAC  51`, measured live on 2026-09-26, is the
+ * same fact in the same shape — where the queue opened and where it is now — and
+ * the provider labels it `status: WAITLIST` like the rest. Matching only `…WL`
+ * threw the movement away and left the card drawing a queue with no figure.
+ *
+ * `RAC 12` alone still reads as nothing, and must: that is a position in the RAC
+ * queue, not a pair, and the `/` is what separates the two readings.
  */
-const WAITLIST_PAIR = /^[A-Z]{0,6}WL\s*(\d{1,5})\s*\/\s*(?:[A-Z]{0,6}WL)?\s*(\d{1,5})$/i;
+const WAITLIST_PAIR = /^(?:[A-Z]{0,6}WL|RAC)\s*(\d{1,5})\s*\/\s*(?:[A-Z]{0,6}WL|RAC)?\s*(\d{1,5})$/i;
 /**
  * `AVAILABLE 0042` → 42. Anchored at the start on purpose: `NOT AVAILABLE`
  * contains the word, and a count read out of it would be a berth count on a day
