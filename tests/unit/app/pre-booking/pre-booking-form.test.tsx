@@ -76,10 +76,20 @@ const settle = (ms = 350) =>
     await new Promise((resolve) => setTimeout(resolve, ms));
   });
 
+/**
+ * Types a pair and waits for the route to have ANSWERED, not for a fixed number of milliseconds.
+ *
+ * A sleep long enough on an idle machine is not long enough on a busy one, and the failure it
+ * produces looks like a broken lifecycle rather than a slow debounce. Both answers — trains, and no
+ * trains — name the pair, so waiting for that sentence waits for either.
+ */
 async function enterPair(from = "SBC", to = "NDLS"): Promise<void> {
   fireEvent.change(screen.getByLabelText(m.from), { target: { value: from } });
   fireEvent.change(screen.getByLabelText(m.to), { target: { value: to } });
   await settle();
+  // `getAllBy`, because the lifecycle names the pair too — and that is the point: once either
+  // sentence exists, the route has answered.
+  await waitFor(() => expect(screen.getAllByText(new RegExp(`${from.toUpperCase()} → ${to.toUpperCase()}`)).length).toBeGreaterThan(0));
 }
 
 beforeEach(() => {

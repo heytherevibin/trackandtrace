@@ -1,5 +1,7 @@
+import { AvailabilityPlate } from "./availability-plate";
 import { ClassBlock } from "./class-block";
 import { messages } from "@/messages";
+import type { AvailabilityAnswer } from "@/services/availability-source";
 import type { TrainRow } from "@/services/route-availability";
 import { cn } from "@/utils/cn";
 
@@ -7,9 +9,12 @@ import { cn } from "@/utils/cn";
 //
 // Collapsed, a row carries ONE class — the one request per train the list spends — and names the
 // rest without asking them. Opening it asks those and brings the other three dates, which arrived
-// with the first and cost nothing more.
+// with the first ask and cost nothing more.
 
 const m = messages.booking.list;
+
+const BTN =
+  "press relative inline-flex min-h-8 cursor-pointer select-none items-center justify-center gap-1.5 whitespace-nowrap border border-line bg-transparent px-2.5 py-1 font-display text-label font-semibold leading-none text-ink-1 hover:bg-ink-1/7 disabled:cursor-not-allowed disabled:opacity-45 max-sm:h-11";
 
 /**
  * How many days a week, never which ones.
@@ -24,14 +29,42 @@ function runsLine(runsOn: readonly boolean[] | null): string | null {
 }
 
 function journey(train: TrainRow["train"]): string {
-  const legs = [train.departs, train.arrives].filter(Boolean);
-  const times = legs.length === 2 ? `${train.fromCode} ${train.departs} → ${train.toCode} ${train.arrives}` : `${train.fromCode} → ${train.toCode}`;
+  const timed = train.departs !== null && train.arrives !== null;
+  const times = timed ? `${train.fromCode} ${train.departs} → ${train.toCode} ${train.arrives}` : `${train.fromCode} → ${train.toCode}`;
   return train.travelTime ? `${times} · ${train.travelTime}` : times;
 }
 
-export function TrainRowView({ row, last = false }: { readonly row: TrainRow; readonly last?: boolean }) {
+/** What opening the row has produced so far, if it has been opened. */
+export interface Opened {
+  readonly phase: "loading" | "done" | "error";
+  readonly answers: Readonly<Record<string, AvailabilityAnswer>>;
+  readonly failedClasses: readonly string[];
+  readonly message: string;
+}
+
+export function TrainRowView({
+  row,
+  leadClass,
+  todayIso,
+  opened,
+  onOpen,
+  last = false,
+}: {
+  readonly row: TrainRow;
+  readonly leadClass: string;
+  readonly todayIso: string;
+  readonly opened: Opened | undefined;
+  readonly onOpen: () => void;
+  readonly last?: boolean;
+}) {
   const runs = runsLine(row.train.runsOn);
-  const asked = Object.entries(row.answers);
+  const answers = { ...row.answers, ...(opened?.answers ?? {}) };
+  const asked = Object.entries(answers);
+  // A class that came back on the expand is no longer pending; one that failed there is named on
+  // its own line rather than dropped back into "not asked", which would be a different claim.
+  const pending = row.pending.filter((cls) => !(cls in answers) && !(opened?.failedClasses ?? []).includes(cls));
+  const lead = answers[leadClass];
+  const dates = opened?.phase === "done" && lead && lead.days.length > 1 ? lead : null;
 
   return (
     <div data-testid="train-row" className={cn("px-5 py-4", last ? "" : "border-b border-line")}>
@@ -58,14 +91,27 @@ export function TrainRowView({ row, last = false }: { readonly row: TrainRow; re
         </div>
       )}
 
-      {row.pending.length > 0 ? (
+      {(opened?.failedClasses ?? []).length > 0 ? (
+        <div className="mt-2 text-label text-ink-1/70">{m.classFailed((opened?.failedClasses ?? []).join(", "))}</div>
+      ) : null}
+      {opened?.phase === "error" ? <div className="mt-2 text-sm text-ink-1/78">{opened.message}</div> : null}
+
+      {dates ? (
+        <div className="-mx-5 mt-3">
+          <AvailabilityPlate answer={dates} todayIso={todayIso} retrievedAt="" sampleData={false} bare />
+        </div>
+      ) : null}
+
+      {pending.length > 0 || opened?.phase === "loading" ? (
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+          {/* A row the cap stopped it asking is not offered an expand: the button would spend the
+              request the cap exists to withhold. */}
           {row.beyondCap ? null : (
-            <button type="button" className="press relative inline-flex min-h-8 cursor-pointer select-none items-center justify-center gap-1.5 whitespace-nowrap border border-line bg-transparent px-2.5 py-1 font-display text-label font-semibold leading-none text-ink-1 hover:bg-ink-1/7">
-              {m.more}
+            <button type="button" className={BTN} disabled={opened !== undefined} onClick={onOpen}>
+              {opened?.phase === "loading" ? m.opening : m.more}
             </button>
           )}
-          <span className="text-label text-ink-1/70">{m.notAsked(row.pending.join(", "))}</span>
+          {pending.length > 0 ? <span className="text-label text-ink-1/70">{m.notAsked(pending.join(", "))}</span> : null}
         </div>
       ) : null}
     </div>

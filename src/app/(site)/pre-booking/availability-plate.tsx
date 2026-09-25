@@ -62,47 +62,63 @@ function Day({ day }: { readonly day: AvailabilityDay & { readonly wlBooking: nu
   );
 }
 
+/**
+ * `bare` drops the plate's own frame and heading.
+ *
+ * Inside a train row the frame would be a box around a box, and the heading would repeat a train
+ * the row already names two lines above. The table itself — the four dates and what each of them
+ * says — is the same either way, and is the only part a row needs.
+ */
 export function AvailabilityPlate({
   answer,
   todayIso,
   retrievedAt,
   sampleData,
+  bare = false,
 }: {
   readonly answer: AvailabilityAnswer;
   readonly todayIso: string;
   readonly retrievedAt: string;
   readonly sampleData: boolean;
+  readonly bare?: boolean;
 }) {
   const fare = answer.fare ? messages.booking.availability.fare(answer.fare.total) : "—";
+  const Frame = bare ? "div" : "section";
   return (
-    <section className="blueprint mt-[28px]" aria-labelledby="tl02-avail">
-      <Corners />
-      <div className="flex flex-wrap items-stretch border-b border-line">
-        <h2 id="tl02-avail" className={`font-display text-label font-semibold uppercase leading-6 tracking-caps text-pretty min-w-[14ch] flex-1 px-5 py-2.5 ${PLATE_TITLE_STACK}`}>
-          {m.title}
-        </h2>
-        <span className={cn("font-display text-label font-semibold uppercase leading-6 tracking-caps whitespace-nowrap border-l border-line px-5 py-2.5 text-ink-1/70", plateCellClass(0))}>
-          {m.retrieved(retrievedAt)}
-        </span>
-        {/* A sample answer always says so — the product's rule everywhere an answer is shown. */}
-        {sampleData ? (
-          <span
-            title={messages.common.sampleDataHint}
-            className={cn("font-display text-label font-semibold uppercase leading-6 tracking-caps whitespace-nowrap border-l border-line px-5 py-2.5 text-ink-1/70", plateCellClass(1))}
-          >
-            {messages.common.sampleData}
-          </span>
-        ) : null}
-      </div>
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-line px-5 py-3 text-sm">
-        <span className="font-data">{answer.train.no}</span>
-        <span className="text-ink-1">{answer.train.name}</span>
-        <span className="text-ink-1/70">
-          {answer.train.fromName} → {answer.train.toName}
-        </span>
-      </div>
+    <Frame className={bare ? "" : "blueprint mt-[28px]"}>
+      {/* Not hidden — absent. A hidden copy would still carry `tl02-avail`, and several open rows
+          would then share one id. */}
+      {bare ? null : (
+        <>
+          <Corners />
+          <div className="flex flex-wrap items-stretch border-b border-line">
+            <h2 id="tl02-avail" className={`font-display text-label font-semibold uppercase leading-6 tracking-caps text-pretty min-w-[14ch] flex-1 px-5 py-2.5 ${PLATE_TITLE_STACK}`}>
+              {m.title}
+            </h2>
+            <span className={cn("font-display text-label font-semibold uppercase leading-6 tracking-caps whitespace-nowrap border-l border-line px-5 py-2.5 text-ink-1/70", plateCellClass(0))}>
+              {m.retrieved(retrievedAt)}
+            </span>
+            {/* A sample answer always says so — the product's rule everywhere an answer is shown. */}
+            {sampleData ? (
+              <span
+                title={messages.common.sampleDataHint}
+                className={cn("font-display text-label font-semibold uppercase leading-6 tracking-caps whitespace-nowrap border-l border-line px-5 py-2.5 text-ink-1/70", plateCellClass(1))}
+              >
+                {messages.common.sampleData}
+              </span>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-line px-5 py-3 text-sm">
+            <span className="font-data">{answer.train.no}</span>
+            <span className="text-ink-1">{answer.train.name}</span>
+            <span className="text-ink-1/70">
+              {answer.train.fromName} → {answer.train.toName}
+            </span>
+          </div>
+        </>
+      )}
       <div className="overflow-x-auto">
-        <table role={R.table} aria-labelledby="tl02-avail" className={cn("tnum w-full border-collapse text-sm", S.table)}>
+        <table role={R.table} aria-label={m.title} className={cn("tnum w-full border-collapse text-sm", S.table)}>
           <thead role={R.rowgroup} className={S.head}>
             <tr role={R.row}>
               <th role={R.columnheader} scope="col" className={HEAD}>
@@ -134,6 +150,6 @@ export function AvailabilityPlate({
         </table>
       </div>
       <div className="border-t border-line px-5 py-3 text-label text-ink-1/70">{m.window}</div>
-    </section>
+    </Frame>
   );
 }
