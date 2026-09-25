@@ -1,5 +1,5 @@
 import { messages } from "@/messages";
-import type { AvailabilityOutcome, AvailabilityRequest, AvailabilitySource } from "./availability-source";
+import type { AvailabilityAnswer, AvailabilityOutcome, AvailabilityRequest, AvailabilitySource } from "./availability-source";
 import type { LiveBudget } from "./live-budget";
 import { log } from "./log";
 import { recordObservations } from "./observations";
@@ -23,6 +23,13 @@ import { getAvailabilitySource } from "./sources";
 // ---------------------------------------------------------------------------
 
 export const AVAILABILITY_RATE_LIMIT = { limit: 10, windowMs: 60_000 };
+
+/**
+ * Opening a row in the route list. Thirty a minute is eight rows of two classes each, opened back
+ * to back, with room to spare — a reader working down a list never waits, and a script still
+ * cannot turn one address into a crawler.
+ */
+export const CLASS_EXPAND_RATE_LIMIT = { limit: 30, windowMs: 60_000 };
 
 export interface AvailabilityQueryDeps {
   readonly limiter: RateLimiter;
@@ -72,4 +79,69 @@ export async function queryAvailability(request: AvailabilityRequest, ip: string
     });
   }
   return { outcome, remaining: rate.remaining };
+}
+
+/** One train, several classes: what a row being opened asks for. */
+export interface ClassExpandResult {
+  readonly outcome: { readonly ok: true } | Extract<AvailabilityOutcome, { ok: false }>;
+  readonly answers: Readonly<Record<string, AvailabilityAnswer>>;
+  /** Classes that were asked and could not be answered — named, never left as an absence. */
+  readonly failedClasses: readonly string[];
+  readonly remaining: number;
+}
+
+/**
+ * Opens a row: the classes the search named but did not ask.
+ *
+ * It pays the limit and the budget ONCE for the whole expand, then calls the source per class.
+ * Looping `queryAvailability` would take the per-ask limit and a budget unit each time — the same
+ * double-counting the route fan-out exists to remove.
+ *
+ * A class that fails does not cost the others their answer, and is NAMED in `failedClasses` rather
+ * than left out: an absent class on this surface reads as "not carried", which is a different fact
+ * about the train and not about the request.
+ */
+export async function queryAvailabilityClasses(
+  journey: Omit<AvailabilityRequest, "travelClass">,
+  classes: readonly string[],
+  ip: string,
+  overrides: Partial<AvailabilityQueryDeps> = {},
+): Promise<ClassExpandResult> {
+  const { limiter, budget, source, record } = { ...deps(), ...overrides };
+
+  const rate = await limiter.check(`availabilityClasses:${addressKey(ip)}`, CLASS_EXPAND_RATE_LIMIT.limit, CLASS_EXPAND_RATE_LIMIT.windowMs);
+  if (!rate.ok) {
+    return {
+      outcome: { ok: false, code: "RATE_LIMITED", message: messages.states.rateLimited.detail, retryAfter: rate.retryAfterSeconds },
+      answers: {},
+      failedClasses: [],
+      remaining: rate.remaining,
+    };
+  }
+
+  const allowance = await budget.takeMany(classes.length);
+  if (!allowance.ok) {
+    return {
+      outcome: { ok: false, code: "SOURCE_UNAVAILABLE", message: messages.source.outcomes.dailyLimit, retryAfter: allowance.retryAfterSeconds },
+      answers: {},
+      failedClasses: [],
+      remaining: rate.remaining,
+    };
+  }
+
+  const answers: Record<string, AvailabilityAnswer> = {};
+  const failedClasses: string[] = [];
+  for (const travelClass of classes) {
+    const request: AvailabilityRequest = { ...journey, travelClass };
+    const outcome = await source.check(request);
+    if (!outcome.ok) {
+      failedClasses.push(travelClass);
+      continue;
+    }
+    answers[travelClass] = outcome.answer;
+    void Promise.resolve(record(request, outcome.answer)).catch((error: unknown) => {
+      log.warn("[availability] an answer was served but not recorded", { kind: error instanceof Error ? error.name : typeof error });
+    });
+  }
+  return { outcome: { ok: true }, answers, failedClasses, remaining: rate.remaining };
 }
