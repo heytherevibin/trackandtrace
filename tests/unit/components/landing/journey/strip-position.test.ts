@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { leanStep, odometer, stationTops, stripFraction, stripPlace } from "@/components/landing/journey/strip-position";
+import { leanStep, odometer, stationTops, stripFraction, stripPlace, trainLeft } from "@/components/landing/journey/strip-position";
 
 describe("the strip's position", () => {
   it("starts at 0, sets each station a third of a window early, and always rises", () => {
@@ -26,5 +26,22 @@ describe("the strip's position", () => {
     expect(hard).toBeGreaterThanOrEqual(-10);
     const settled = Array.from({ length: 120 }).reduce<number>((lean) => leanStep(lean, 0), -9);
     expect(settled).toBe(0);
+  });
+
+  it("holds the train inside a 390px rail: a 22px glyph's left edge sits at 0% at fraction 0, its right edge at 100% at fraction 1", () => {
+    const [glyphWidth, trackWidth] = [22, 390];
+    const halfPercent = (glyphWidth / 2 / trackWidth) * 100;
+    expect(trainLeft(0, glyphWidth, trackWidth)).toBeCloseTo(halfPercent);
+    expect(trainLeft(0, glyphWidth, trackWidth) - halfPercent).toBeCloseTo(0);
+    expect(trainLeft(1, glyphWidth, trackWidth) + halfPercent).toBeCloseTo(100);
+  });
+
+  it("centres the train on an unclamped mid fraction", () => {
+    expect(trainLeft(0.5, 22, 390)).toBe(50);
+  });
+
+  it("skips the clamp when the track has not been measured yet (trackWidth <= 0)", () => {
+    expect(trainLeft(0.3, 22, 0)).toBe(30);
+    expect(trainLeft(0.3, 22, -5)).toBe(30);
   });
 });
