@@ -3,7 +3,7 @@ import { LazyMotion, domAnimation } from "motion/react";
 import type { ReactNode } from "react";
 import { hydrateRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { PlateMorph } from "@/components/pnr/plate-morph";
 
 // The plate's face rises 8px only when it changes after mount, and only with Motion on (ruling J3-13). The
@@ -32,12 +32,16 @@ describe("the plate morph's first face", () => {
     expect(html).not.toMatch(/translateY/);
   });
 
-  it.each(["on", "off"] as const)("does not rise at hydration with Motion %s", async (motion) => {
+  it.each(["on", "off"] as const)("does not rise at hydration with Motion %s, and hydrates cleanly", async (motion) => {
     const container = document.createElement("div");
     container.innerHTML = renderToString(<Tree face="entry" />);
     document.body.append(container);
     document.documentElement.setAttribute("data-motion", motion);
-    const root = await act(async () => hydrateRoot(container, <Tree face="entry" />));
+    const consoleError = vi.spyOn(console, "error");
+    const recoverable: unknown[] = [];
+    const root = await act(async () => hydrateRoot(container, <Tree face="entry" />, { onRecoverableError: (error) => recoverable.push(error) }));
+    expect(recoverable).toEqual([]);
+    expect(consoleError).not.toHaveBeenCalled();
     expect(faceOf(container).style.transform).not.toMatch(/translateY/);
     act(() => root.unmount());
     container.remove();
@@ -50,19 +54,25 @@ describe("the plate morph's first face", () => {
 });
 
 describe("a change of face", () => {
-  it("rises 8px with Motion on", () => {
+  it.each([
+    ["entry", "record"],
+    ["record", "entry"],
+  ] as const)("from %s to %s rises 8px with Motion on", (from, to) => {
     document.documentElement.setAttribute("data-motion", "on");
-    const { container, rerender } = render(<Tree face="entry" />);
-    rerender(<Tree face="record" />);
-    expect(faceOf(container).textContent).toBe("record");
+    const { container, rerender } = render(<Tree face={from} />);
+    rerender(<Tree face={to} />);
+    expect(faceOf(container).textContent).toBe(to);
     expect(faceOf(container).style.transform).toMatch(/translateY\(8px\)/);
   });
 
-  it("swaps at once with Motion off", () => {
+  it.each([
+    ["entry", "record"],
+    ["record", "entry"],
+  ] as const)("from %s to %s swaps at once with Motion off", (from, to) => {
     document.documentElement.setAttribute("data-motion", "off");
-    const { container, rerender } = render(<Tree face="entry" />);
-    rerender(<Tree face="record" />);
-    expect(faceOf(container).textContent).toBe("record");
+    const { container, rerender } = render(<Tree face={from} />);
+    rerender(<Tree face={to} />);
+    expect(faceOf(container).textContent).toBe(to);
     expect(faceOf(container).style.transform).not.toMatch(/translateY/);
   });
 });

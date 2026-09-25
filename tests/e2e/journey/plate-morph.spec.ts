@@ -149,6 +149,22 @@ test.describe("the plate morph", () => {
     await expect(page.getByTestId("terminal-result")).toHaveCount(0);
   });
 
+  test("under a slow CPU the plate still ends at its content's own height", async ({ page }) => {
+    test.setTimeout(90_000);
+    // The morph once left the plate at its tween's last pixel height when the tween's completion landed
+    // late (reproduced only with the CPU throttled). A few throttled runs, each read after the morph.
+    const cdp = await page.context().newCDPSession(page);
+    for (const rate of [4, 6, 8]) {
+      await cdp.send("Emulation.setCPUThrottlingRate", { rate });
+      await page.goto("/");
+      await run(page);
+      await page.waitForTimeout(2_500);
+      const wrapper = page.locator('[data-testid="hero-instrument"] .plate-morph');
+      expect(await wrapper.evaluate((el) => (el as HTMLElement).style.height), `at ${rate}x`).toMatch(/^(auto|)$/);
+    }
+    await cdp.send("Emulation.setCPUThrottlingRate", { rate: 1 });
+  });
+
   test("Motion off mid-morph ends at the new face's own height", async ({ page }) => {
     await page.goto("/");
     await run(page);

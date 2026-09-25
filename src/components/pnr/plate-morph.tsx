@@ -1,6 +1,6 @@
 "use client";
 
-import { animate, m, useMotionValue } from "motion/react";
+import { animate, m } from "motion/react";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { LAYOUT_EVENT } from "@/components/landing/journey/journey-events";
 import { useMotion } from "@/components/motion/use-motion";
@@ -14,22 +14,32 @@ import { useMotion } from "@/components/motion/use-motion";
 // (where Motion always reads as on), not on first paint, whatever the reader's Motion. The rise belongs to
 // a face that replaced another after mount, and only with Motion on.
 //
-// The height tween is driven imperatively (`animate` on a motion value), not the declarative `animate` prop:
-// under this app's strict `domAnimation` `LazyMotion`, a prop-driven keyframe update on an already-mounted
-// `m.div` does not interpolate `height` (it jumps straight to the target, verified against Motion 13's own
-// source — `render/dom/features-animation.mjs` — and empirically against the running app). The imperative
-// engine (`animate`, `useMotionValue`) is a separate, always-available part of the same package.
+// This component is the one writer of the block's inline height: it is tweened as a plain number by Motion's
+// imperative `animate`, written from its `onUpdate`, and cleared when it settles, so the server's markup (no
+// inline height) is the resting state. It is not a motion value bound through `style`: that gave Motion's
+// render a second say over the same property, and its render could skip the settle when the tween's
+// promise-driven completion landed after the frame that painted its last value. A stopped tween never
+// settles through its own `onComplete`: only the tween still current may.
 
 const EXPO = [0.16, 1, 0.3, 1] as const;
 const MORPH_S = 0.42;
+
+type Tween = ReturnType<typeof animate>;
+
+/** Stops the block's height tween, if one is running. The ref is cleared first, so its completion is a no-op
+ * (a stop can land the tween on its last frame); whoever stops it writes the height next. */
+function stopGrow(grow: { current: Tween | null }): void {
+  const running = grow.current;
+  grow.current = null;
+  running?.stop();
+}
 
 export function PlateMorph({ face, children }: { readonly face: string; readonly children: ReactNode }) {
   const on = useMotion().motion === "on";
   const outer = useRef<HTMLDivElement>(null);
   const inner = useRef<HTMLDivElement>(null);
   const seen = useRef<{ readonly face: string; readonly height: number } | null>(null);
-  const controls = useRef<ReturnType<typeof animate> | null>(null);
-  const height = useMotionValue<number | "auto">("auto");
+  const grow = useRef<Tween | null>(null);
 
   // Whether the face has ever changed since mount: the last face seen, updated during render (React's
   // pattern for information from previous renders), so the new face's first render already knows.
@@ -47,19 +57,13 @@ export function PlateMorph({ face, children }: { readonly face: string; readonly
     if (!before || before.face === face) return;
 
     // Every face change starts clean: a still-running tween from the last one would otherwise keep writing
-    // stale heights and fire a second, stale `tt:layout` from its own `onComplete`.
-    controls.current?.stop();
-    controls.current = null;
+    // stale heights and fire a second, stale `tt:layout`.
+    stopGrow(grow);
 
     const box = outer.current;
-    // The height is the content's again. Written to the node as well as the motion value: `animate`'s
-    // top-level `onComplete` runs from its `finished` promise, after the frame that rendered the tween's last
-    // height, and Motion can still read that frame's time then, so it treats the render as already done and
-    // never paints "auto" (the plate was left at its tween's last pixel height).
     const settle = () => {
-      height.set("auto");
       if (box) {
-        box.style.height = "auto";
+        box.style.height = "";
         box.style.overflow = "";
       }
       window.dispatchEvent(new Event(LAYOUT_EVENT));
@@ -69,26 +73,33 @@ export function PlateMorph({ face, children }: { readonly face: string; readonly
       return;
     }
 
-    height.set(before.height);
-    if (box) box.style.overflow = "clip";
-    controls.current = animate(height, measured, {
+    if (box) {
+      box.style.height = `${before.height}px`;
+      box.style.overflow = "clip";
+    }
+    const tween: Tween = animate(before.height, measured, {
       duration: MORPH_S,
       ease: EXPO,
+      onUpdate: (h) => {
+        if (box) box.style.height = `${h}px`;
+      },
       onComplete: () => {
-        controls.current = null;
+        if (grow.current !== tween) return;
+        grow.current = null;
         settle();
       },
     });
+    grow.current = tween;
   });
 
-  // True unmount only: an in-flight tween never touches a detached node.
-  useLayoutEffect(() => () => controls.current?.stop(), []);
+  // True unmount only: an in-flight tween is stopped, and its completion is already a no-op.
+  useLayoutEffect(() => () => stopGrow(grow), []);
 
   return (
-    <m.div ref={outer} className="plate-morph" style={{ height }}>
+    <div ref={outer} className="plate-morph">
       <m.div ref={inner} key={face} initial={rise ? { y: 8 } : false} animate={{ y: 0 }} transition={{ duration: rise ? MORPH_S : 0, ease: EXPO }}>
         {children}
       </m.div>
-    </m.div>
+    </div>
   );
 }
