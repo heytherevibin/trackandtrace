@@ -84,10 +84,12 @@ const ROWS = [
 const form = renderToStaticMarkup(createElement(PreBookingForm));
 
 const list = renderToStaticMarkup(
-  TrainsPlate({
+  createElement(TrainsPlate, {
     answer: { from: "SBC", to: "NDLS", journeyDate: "2026-10-16", leadClass: "SL", rows: ROWS, retrievedAt: "14:09" },
     refusal: null,
     sampleData: true,
+    quota: "GN",
+    todayIso: "2026-09-25",
   }),
 );
 
