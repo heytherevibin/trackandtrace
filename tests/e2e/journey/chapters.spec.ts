@@ -5,10 +5,9 @@ import { motionOff, scrollToId, waitForJourney } from "./journey-helpers";
 
 const PANELS = { panels: [".board", ".berth-plan", ".station-clock", ".route-map", ".chapter-card"], skip: [".hero-dial"] };
 
-/** Waits for window.scrollY to stop moving: the browser's own fragment scroll for a URL hash glides in on
- * this app's smooth in-page anchors (base.css), and can still be settling for several hundred ms after its
- * target first enters the viewport — a scroll made while it is still running would otherwise inherit a few
- * more of its frames as unrelated drift. */
+/** Waits for window.scrollY to stop moving: in-page anchors glide (base.css) once the journey has started
+ * (before that, journey.css lands them instantly), and a glide can still be settling for several hundred ms
+ * after its target first enters the viewport. */
 async function waitForScrollSettled(page: Page): Promise<void> {
   let last = -1;
   for (let i = 0; i < 20; i++) {
@@ -79,7 +78,7 @@ test.describe("02 · the chapters, pinned", () => {
     const headerBottom = await page.locator("header").evaluate((h) => Math.round(h.getBoundingClientRect().bottom));
     const target = headerBottom + 100;
     await scrollToId(page, "features", target);
-    // Lets chapters.ts's scroll-position tracker (guardPlace) catch up: it learns the reader's position off
+    // Lets chapters.ts's place guard (startPlaceGuard) catch up: it learns the reader's position off
     // the window's own "scroll" event, which this environment delivers as a throttled task rather than on
     // this frame, so the toggle below must wait for it to land before it can rely on that position.
     await page.waitForTimeout(200);
@@ -134,11 +133,65 @@ test.describe("02 · the chapters, pinned", () => {
     expect(Math.abs(top - target)).toBeLessThanOrEqual(4);
   });
 
+  test("on /#faq, 02 never pins under the reader, and #faq stays where the link landed it", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    // Records every moment #how carries .is-pinned, however briefly: a class added and removed within one task
+    // shows up in the removal's old value.
+    await page.addInitScript(() => {
+      const w = window as unknown as { __howPinned: boolean };
+      w.__howPinned = false;
+      new MutationObserver((records) => {
+        for (const r of records) {
+          if (!(r.target instanceof Element) || r.target.id !== "how") continue;
+          if (r.target.classList.contains("is-pinned") || /\bis-pinned\b/.test(r.oldValue ?? "")) w.__howPinned = true;
+        }
+      }).observe(document, { subtree: true, attributes: true, attributeFilter: ["class"], attributeOldValue: true });
+    });
+    await page.goto("/#faq");
+    const faq = page.locator("#faq");
+    const offLanding = () => faq.evaluate((el) => Math.abs(el.getBoundingClientRect().top - Number.parseFloat(getComputedStyle(el).scrollMarginTop)));
+    await expect.poll(offLanding).toBeLessThanOrEqual(4);
+    await waitForJourney(page);
+    await page.waitForTimeout(1000);
+    expect(await offLanding()).toBeLessThanOrEqual(4);
+    expect(await page.evaluate(() => (window as unknown as { __howPinned: boolean }).__howPinned)).toBe(false);
+  });
+
+  test("an anchor clicked on the board lands its section, and 02 stays pinned", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/");
+    await waitForJourney(page);
+    await expect(page.locator("#how")).toHaveClass(/is-pinned/);
+    await page.locator('.board a[href="#reliability"]').click();
+    await page.waitForTimeout(300);
+    await waitForScrollSettled(page);
+    // The landing as the app defines it: the section's scroll-margin (base.css: the masthead's height and 1rem).
+    const off = await page
+      .locator("#reliability")
+      .evaluate((el) => Math.abs(el.getBoundingClientRect().top - Number.parseFloat(getComputedStyle(el).scrollMarginTop)));
+    expect(off).toBeLessThanOrEqual(4);
+    await expect(page.locator("#how")).toHaveClass(/is-pinned/);
+  });
+
+  test("a window that grows tall enough never pins 02 while the reader is below it", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 360 });
+    await page.goto("/");
+    await waitForJourney(page);
+    await expect(page.locator("#how")).not.toHaveClass(/is-pinned/);
+    await scrollToId(page, "faq", 120);
+    await page.waitForTimeout(300);
+    const before = await page.locator("#faq").evaluate((el) => el.getBoundingClientRect().top);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.waitForTimeout(500);
+    expect(await page.locator("#how").getAttribute("class")).not.toMatch(/is-pinned/);
+    const after = await page.locator("#faq").evaluate((el) => el.getBoundingClientRect().top);
+    expect(Math.abs(after - before)).toBeLessThanOrEqual(4);
+  });
+
   test("02 pins once the reader scrolls back above it", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/#faq");
     await waitForJourney(page);
-    await expect(page.locator("#how")).not.toHaveClass(/is-pinned/);
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
     await expect(page.locator("#how")).toHaveClass(/is-pinned/);
   });

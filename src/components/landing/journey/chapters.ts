@@ -10,10 +10,12 @@ import { track } from "./observers";
 import type { JourneyContext, Teardown } from "./start-journey";
 
 // 02 pinned (spec §3.A): the section holds under the masthead while the scroll plays its three stops inside
-// one dial, and the trace card prints each. Pinned only while every stop fits the window (fitsPinned); a fit
-// that changes rebuilds the journey (tt:rebuild). Never pinned while the reader is below #how's own start —
-// pinning grows it, and growing it there would move everything after it away from them — so that is deferred
-// until they scroll back above it. Motion off: the plain section.
+// one dial, and the trace card prints each. Pinned only while every stop fits the window (fitsPinned), and only
+// while #how's top is at or below the window's top: pinning grows it by up to 330vh, and that growth must land
+// below the reader, never under them. A reader below it (a "/#faq" link, or a scroll past it) leaves 02 pending
+// until they come back above it; it then pins in place, starting only its own driver. Fragments land before the
+// journey decides (journey.css makes them instant until then), so the reader is never mid-glide when it does.
+// A pinned 02 that stops fitting rebuilds the journey (tt:rebuild). Motion off: the plain section.
 
 const m = messages.journey.chapters;
 
@@ -27,53 +29,26 @@ function span(el: Element | null): Span | null {
   return { top: r.top, bottom: r.bottom };
 }
 
-// Keeps the reader's eye in place across the one resize #how can still make while they are below it: a
-// Motion toggle collapses the pinned height by the CSS selector alone (it needs both html[data-motion="on"]
-// and .is-pinned), the instant <html data-motion> is rewritten — before this module's own teardown (which
-// runs later, off the same tt:motion event) ever gets a turn to measure a "before". #how can no longer grow
-// while the reader is below its own start at all (startChapters defers pinning until they scroll back above
-// it — spec §3.A), so this guard's only remaining job is the shrink. A ResizeObserver watches #how directly,
-// reacting to that collapse whatever exact moment it lands. Its own live window.scrollY can no longer be
-// trusted for "before" either, by the same problem one level up: the browser already adjusts the scroll
-// position itself (anchoring or the plain physical clamp to a now-shorter page) as part of the very reflow
-// the observer is reacting to, before its callback ever runs. So scrollY is kept one step behind instead, off
-// the window's own "scroll" event, which reliably fires before the observer's callback: the value it holds
-// when that event fires is still the reader's true, undisturbed position.
+// Keeps the reader's eye in place across the one resize #how makes while they are below it: Motion off
+// collapses the pinned height by the CSS selector alone (it needs html[data-motion="on"] as well as
+// .is-pinned), the instant <html data-motion> is rewritten, before any module's teardown gets a turn. The
+// collapse lands in two frames: the height at once, then the section's padding one frame later (Motion off's
+// 0.01ms transitions, motion.css), which only the border box shows. By then the browser has already moved
+// window.scrollY for the same reflow, so the reader's position is kept one step behind, off "scroll" events.
 let placeHeight = 0;
 let placeDocTop = 0;
 let lastScrollY = 0;
-let placeSettle = 0;
-/** Set for exactly the shrink that undoes a pin the glide-overshoot check below finds was premature: the
- * glide's own destination, fixed against the still-static page before that pin ever grew it, is already the
- * reader's true target — restoring the static layout is what makes scrollY land on it again by itself. The
- * usual "keep the reader where they were" compensation would instead hold them at the pin's own, wrong
- * interruption of it, so it is skipped this one time. */
-let skipNextSettle = false;
 
-/** Re-measures #how against the last known height and compensates for whatever changed. Called from the
- * observer, and once more shortly after: the static layout the CSS collapses to does not always finish
- * settling within the same pass the observer catches (a second, small reflow can follow, uncaught by the
- * observer itself), so one follow-up check catches that tail without polling forever. */
 function settlePlace(section: HTMLElement): void {
-  const now = section.getBoundingClientRect();
-  if (now.height === placeHeight) return;
-  const delta = now.height - placeHeight;
-  if (skipNextSettle) {
-    skipNextSettle = false;
-  } else if (lastScrollY > placeDocTop) {
-    lastScrollY += delta;
-    // Set synchronously, not left for the "scroll" listener below: that event is delivered late (a
-    // throttled task, not this frame), and #how can resize again within that window — a second correction
-    // must add to where this one already put the reader, not silently to the stale, pre-correction position.
-    window.scrollTo({ top: lastScrollY, behavior: "instant" });
-  }
-  placeHeight = now.height;
+  const height = section.getBoundingClientRect().height;
+  const delta = height - placeHeight;
+  placeHeight = height;
+  if (delta !== 0 && lastScrollY > placeDocTop) window.scrollTo({ top: lastScrollY + delta, behavior: "instant" });
   lastScrollY = window.scrollY;
 }
 
-/** Started once, for the journey's whole lifetime (start-journey.ts calls this, not this module: it must
- * survive every rebuild a visit's Motion toggles and refits cause, not just one build's worth of modules),
- * and stopped only when the journey itself is. */
+/** Started once, for the journey's whole lifetime (start-journey.ts calls this: it must already be watching
+ * when a Motion toggle collapses #how, and survive the rebuild that follows), and stopped only with it. */
 export function startPlaceGuard(): Teardown {
   const section = document.getElementById("how");
   if (!section) return () => {};
@@ -83,14 +58,9 @@ export function startPlaceGuard(): Teardown {
   lastScrollY = window.scrollY;
   const onScroll = () => (lastScrollY = window.scrollY);
   window.addEventListener("scroll", onScroll, { passive: true });
-  const observer = new ResizeObserver(() => {
-    settlePlace(section);
-    window.clearTimeout(placeSettle);
-    placeSettle = window.setTimeout(() => settlePlace(section), 150);
-  });
-  observer.observe(section);
+  const observer = new ResizeObserver(() => settlePlace(section));
+  observer.observe(section, { box: "border-box" });
   return () => {
-    window.clearTimeout(placeSettle);
     window.removeEventListener("scroll", onScroll);
     observer.disconnect();
   };
@@ -119,85 +89,58 @@ export function startChapters({ motion }: JourneyContext): Teardown {
   const section = document.getElementById("how");
   const dial = section?.querySelector<SVGSVGElement>(".chapters-dial svg");
   if (!section || !dial || !motion) return () => {};
+  let stopDriver: Teardown | null = null;
+  let refitTimer = 0;
 
-  // Pinning grows #how by up to 330vh (journey-island.css): fine while the reader is at or above its start,
-  // since the growth then lands entirely below their view and nothing they are looking at moves — but never
-  // while they are already below it (a reader on "/#faq", or one who has scrolled past #how for any other
-  // reason), which would otherwise shove everything after #how down and away from them the instant the
-  // journey starts or rebuilds. Held off until they scroll back above it (spec §3.A); checked again on every
-  // build, so a fit that changes while pending is still caught once pinning is finally allowed.
-  if (section.getBoundingClientRect().top < 0) {
-    const recheck = () => {
-      if (section.getBoundingClientRect().top < 0) return;
-      stopPending();
-      window.dispatchEvent(new Event(REBUILD_EVENT));
-    };
-    const stopPending = () => {
-      window.removeEventListener("scroll", recheck);
-      window.removeEventListener("resize", recheck);
-      window.removeEventListener(LAYOUT_EVENT, recheck);
-    };
+  // Unpinned: pending while the reader is below #how's top, otherwise pinned in place if every stop fits.
+  const decide = (announce: boolean) => {
+    if (section.getBoundingClientRect().top < 0) {
+      startPending();
+      return;
+    }
+    stopPending();
+    if (!fitsPinned(section)) return;
+    stopDriver = startDriver(section, dial);
+    // The growth lands below the reader: only the journey's observers need to measure it again.
+    if (announce) window.dispatchEvent(new Event(LAYOUT_EVENT));
+  };
+  const recheck = () => {
+    if (section.getBoundingClientRect().top >= 0) decide(true);
+  };
+  const startPending = () => {
     window.addEventListener("scroll", recheck, { passive: true });
     window.addEventListener("resize", recheck);
     window.addEventListener(LAYOUT_EVENT, recheck);
-    return stopPending;
-  }
-
-  // Captured before fitsPinned can grow the section: the reader's own document position, and #how's still-
-  // static bottom, exactly as the browser's glide (below) was computed against, before this pin ever moved it.
-  const atDecision = section.getBoundingClientRect();
-  const staticDocBottom = window.scrollY + atDecision.top + atDecision.height;
-
-  const pinned = fitsPinned(section);
-
-  // The reader can still be mid-glide toward somewhere below #how when this decision is made (the browser's
-  // own smooth in-page-anchor scroll for a URL fragment on the still-unpinned page, base.css) — #how's own
-  // top was at or below the window's top a moment ago, but the glide's destination, fixed before this pin,
-  // may not be. "scrollend" fires exactly once whenever the current scroll genuinely settles, whatever caused
-  // it and however long it takes — not a timer, so it never depends on load. Watched once, only for this
-  // build's own initial decision: if, by the time it fires, the reader's document position has passed where
-  // #how's own bottom sat before this pin ever grew it, the glide's fixed destination was never inside #how at
-  // all — pinning just happened to land in its way. Checked against that static bottom, not the pin's own,
-  // inflated one: the glide can settle inside the now-larger #how (short of its new, inflated bottom) while
-  // still having overshot the section as the glide itself understood it, and that is what stranded the reader
-  // undetected before. But a deliberate, one-shot jump — a reader's own click to a later anchor, or this app's
-  // own scrollTo calls — also ends in a "scrollend" past that same static bottom, and is not premature: it is
-  // the reader's own next move, after the pin already correctly landed. What tells the two apart is not where
-  // the settle ends up but how it got there: an "instant" jump reaches it in the one "scroll" event that IS
-  // the jump; the browser's own glide is an animation, delivering many. Counted, not timed, so it never depends
-  // on load either.
-  let ticks = 0;
-  const onTick = () => ticks++;
-  const onSettled = () => {
-    window.removeEventListener("scroll", onTick);
-    if (ticks > 1 && window.scrollY > staticDocBottom) {
-      skipNextSettle = true;
-      window.dispatchEvent(new Event(REBUILD_EVENT));
-    }
   };
-  if (pinned) {
-    window.addEventListener("scroll", onTick, { passive: true });
-    window.addEventListener("scrollend", onSettled, { once: true });
-  }
-
-  let refitTimer = 0;
+  const stopPending = () => {
+    window.removeEventListener("scroll", recheck);
+    window.removeEventListener("resize", recheck);
+    window.removeEventListener(LAYOUT_EVENT, recheck);
+  };
   const onLayout = () => {
     window.clearTimeout(refitTimer);
     refitTimer = window.setTimeout(() => {
-      if (fitsPinned(section) !== pinned) window.dispatchEvent(new Event(REBUILD_EVENT));
+      if (!stopDriver) decide(true);
+      else if (!fitsPinned(section)) window.dispatchEvent(new Event(REBUILD_EVENT));
     }, 200);
   };
+
+  decide(false);
   window.addEventListener("resize", onLayout);
   window.addEventListener(LAYOUT_EVENT, onLayout);
-  const stopListening = () => {
+  return () => {
     window.clearTimeout(refitTimer);
     window.removeEventListener("resize", onLayout);
     window.removeEventListener(LAYOUT_EVENT, onLayout);
-    window.removeEventListener("scroll", onTick);
-    window.removeEventListener("scrollend", onSettled);
+    stopPending();
+    stopDriver?.();
+    section.classList.remove("is-pinned");
   };
-  if (!pinned) return stopListening;
+}
 
+/** 02's own driver, on a section already pinned: the scroll observer that plays the three stops, and the
+ * render. Its teardown puts the server's markup back (the caller removes .is-pinned). */
+function startDriver(section: HTMLElement, dial: SVGSVGElement): Teardown {
   const q = <E extends Element>(sel: string) => [...section.querySelectorAll<E>(sel)];
   const items = q<HTMLElement>("li[data-chapter]");
   const arcs = q<SVGPathElement>(".chapter-arc");
@@ -262,7 +205,6 @@ export function startChapters({ motion }: JourneyContext): Teardown {
   render();
 
   return () => {
-    stopListening();
     drive.revert();
     observer.revert();
     ring?.revert();
@@ -285,6 +227,5 @@ export function startChapters({ motion }: JourneyContext): Teardown {
     marker?.style.removeProperty("left");
     if (count) count.textContent = m.step(1, 3);
     if (digits) digits.textContent = m.noDigits;
-    section.classList.remove("is-pinned");
   };
 }

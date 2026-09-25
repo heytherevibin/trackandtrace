@@ -43,6 +43,8 @@
 @media (max-width: 47.99rem) {
   .route-strip { display: none; }
 }
+/* 02's height is undecided until the journey starts: fragments land instantly until then. */
+html:has(#how):not([data-journey]) { scroll-behavior: auto; }
 
 /* ---- Departures · Platform 3 (under the hero) */
 .board-table { width: 100%; border-collapse: collapse; }
