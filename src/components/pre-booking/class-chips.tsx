@@ -16,8 +16,14 @@ const DRAWN: readonly FormClass[] = ["SL", "3A", "2A", "1A", "CC", "EC", "2S"];
 /** The order the lead is taken from; it mirrors `bookingClassSchema`, which the service reads. */
 const ORDER: readonly FormClass[] = ["1A", "2A", "3A", "SL", "CC", "EC", "2S"];
 
+// 44x44 on a phone, and the drawn 35x32 on a desk.
+//
+// The coarse-pointer overlay in motion.css cannot do this one. Seven chips sit eight pixels apart,
+// so each overlay reaches about four pixels before the next one answers instead: measured, they
+// came to 42x40. An overlay can only claim space no neighbour wants, and in a row of chips every
+// neighbour wants it. So on touch the chips are really that size rather than pretending to be.
 const CHIP =
-  "press relative inline-flex min-h-8 cursor-pointer select-none items-center justify-center gap-1.5 whitespace-nowrap border px-2.5 py-1 font-display text-label font-semibold leading-none";
+  "press relative inline-flex min-h-8 cursor-pointer select-none items-center justify-center gap-1.5 whitespace-nowrap border px-2.5 py-1 font-display text-label font-semibold leading-none max-sm:h-11 max-sm:min-w-11";
 const ON = "border-accent bg-accent-soft text-accent-soft-ink";
 const OFF = "border-line bg-transparent text-ink-1 hover:bg-ink-1/7";
 
