@@ -57,6 +57,38 @@ describe.each([
     await kv.incr("n", 10_000, true);
     await expect(kv.ttl("n")).resolves.toBe(10_000);
   });
+
+  it("adds many at once, setting the ttl only when the count starts", async () => {
+    const { kv, tick } = make();
+    await expect(kv.incrBy("n", 10_000, 9)).resolves.toBe(9);
+    tick(4_000);
+    await expect(kv.incrBy("n", 10_000, 3)).resolves.toBe(12);
+    await expect(kv.ttl("n")).resolves.toBe(6_000);
+  });
+
+  it("gives back exactly what a negative count takes", async () => {
+    const { kv } = make();
+    await kv.incrBy("n", 10_000, 9);
+    await expect(kv.incrBy("n", 10_000, -9)).resolves.toBe(0);
+  });
+
+  it("never lets a counter fall below zero", async () => {
+    // A budget reservation refunds itself when it is refused, and the key it refunds can expire in
+    // between. A negative counter would then UNDER-count the day — the one direction that spends
+    // someone else's plan rather than our own.
+    const { kv } = make();
+    await expect(kv.incrBy("gone", 10_000, -5)).resolves.toBe(0);
+    await kv.incrBy("n", 10_000, 2);
+    await expect(kv.incrBy("n", 10_000, -7)).resolves.toBe(0);
+    await expect(kv.incrBy("n", 10_000, 1)).resolves.toBe(1);
+  });
+
+  it("counts a single incr and a bulk one on the same key", async () => {
+    const { kv } = make();
+    await kv.incr("n", 10_000);
+    await expect(kv.incrBy("n", 10_000, 4)).resolves.toBe(5);
+    await expect(kv.incr("n", 10_000)).resolves.toBe(6);
+  });
 });
 
 describe("resilientKv", () => {
@@ -68,6 +100,7 @@ describe("resilientKv", () => {
     await kv.set("a", "1", 10_000);
     await expect(kv.get("a")).resolves.toBe("1");
     await expect(kv.incr("n", 10_000)).resolves.toBe(1);
+    await expect(kv.incrBy("n", 10_000, 4)).resolves.toBe(5);
     expect(onError).toHaveBeenCalled();
   });
 

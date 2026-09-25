@@ -30,6 +30,9 @@ describe("provider usage counters", () => {
       set: async () => undefined,
       del: async () => undefined,
       ttl: async () => 0,
+      incrBy: async () => {
+        throw new Error("store down");
+      },
       incr: async () => {
         throw new Error("store down");
       },

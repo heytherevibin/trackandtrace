@@ -41,7 +41,10 @@ function countedSource() {
 function switchableBudget() {
   const state = { spent: false };
   const take = vi.fn(async (): Promise<BudgetVerdict> => (state.spent ? { ok: false, retryAfterSeconds: 1800 } : { ok: true }));
-  return { state, take, budget: { take } };
+  // The PNR path spends one at a time; `takeMany` exists for the route fan-out and is never
+  // reached from here, so it mirrors `take` rather than pretending to a different answer.
+  const takeMany = vi.fn(async (): Promise<BudgetVerdict> => take());
+  return { state, take, budget: { take, takeMany } };
 }
 
 describe("queryPnr", () => {

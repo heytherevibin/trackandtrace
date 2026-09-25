@@ -6,6 +6,14 @@ import { BUDGET_TTL_MS, createLiveBudget, secondsToIstMidnight } from "@/service
 const LATE_EVENING_IST = Date.parse("2026-09-18T18:00:00.000Z");
 const MIDNIGHT_IST = Date.parse("2026-09-18T18:30:00.000Z");
 
+/** A store that answers nothing and throws on every count. */
+function brokenKv(): Kv {
+  const down = () => {
+    throw new Error("store down");
+  };
+  return { get: async () => null, set: async () => undefined, del: async () => undefined, incr: down, incrBy: down, ttl: async () => 0 };
+}
+
 function setup(limit: () => number, at = LATE_EVENING_IST) {
   const clock = { now: at };
   const kv = new MemoryKv(() => clock.now);
@@ -84,17 +92,74 @@ describe("the daily live-request budget", () => {
   });
 
   it("lets checks through when the store can't count, as the limiter does", async () => {
-    const broken: Kv = {
-      get: async () => null,
-      set: async () => undefined,
-      del: async () => undefined,
-      incr: async () => {
-        throw new Error("store down");
+    const budget = createLiveBudget({ kv: brokenKv(), prefix: "tt:test", limit: () => 1, now: () => LATE_EVENING_IST });
+    expect(await budget.take()).toEqual({ ok: true });
+    expect(await budget.take()).toEqual({ ok: true });
+  });
+});
+
+// A route search asks one train at a time but decides once: it must know before it spends anything
+// whether the whole fan-out fits in the day. Taking one unit per train would let a search begin,
+// cross the limit halfway and leave a half-drawn list — which reads like an answer and is not one.
+describe("reserving a whole search at once", () => {
+  it("takes n units in a single call", async () => {
+    const { kv, budget } = setup(() => 20);
+    expect(await budget.takeMany(9)).toEqual({ ok: true });
+    await expect(kv.get("tt:test:budget:live:2026-09-18")).resolves.toBe("9");
+  });
+
+  it("refuses the whole reservation rather than taking part of it", async () => {
+    const { kv, budget } = setup(() => 10);
+    await budget.takeMany(8);
+    expect(await budget.takeMany(4)).toEqual({ ok: false, retryAfterSeconds: 30 * 60 });
+    // All or nothing. A partial take would have stranded the two units that are genuinely
+    // left, so the next, smaller search must still succeed.
+    await expect(kv.get("tt:test:budget:live:2026-09-18")).resolves.toBe("8");
+    expect(await budget.takeMany(2)).toEqual({ ok: true });
+  });
+
+  it("shares one counter with the single takes", async () => {
+    const { budget } = setup(() => 5);
+    await budget.take();
+    await budget.takeMany(4);
+    expect((await budget.take()).ok).toBe(false);
+  });
+
+  it("reports the day reached, the same once a day as a single take", async () => {
+    const { budget, reached } = setup(() => 3);
+    await budget.takeMany(5);
+    await budget.takeMany(5);
+    expect(reached).toHaveBeenCalledTimes(1);
+    expect(reached).toHaveBeenCalledWith({ day: "2026-09-18", limit: 3 });
+  });
+
+  it("lets a search through when the store can't count", async () => {
+    const budget = createLiveBudget({ kv: brokenKv(), prefix: "tt:test", limit: () => 1, now: () => LATE_EVENING_IST });
+    expect(await budget.takeMany(50)).toEqual({ ok: true });
+  });
+
+  it("still refuses when the refund itself fails, and over-counts rather than under", async () => {
+    // A refund that cannot be written leaves the day counted high. That is the safe direction:
+    // over-counting costs a few of our own requests, under-counting spends the provider's plan.
+    const kv = new MemoryKv(() => LATE_EVENING_IST);
+    let refunds = 0;
+    const flaky: Kv = {
+      get: (key) => kv.get(key),
+      set: (key, value, ttlMs) => kv.set(key, value, ttlMs),
+      del: (key) => kv.del(key),
+      ttl: (key) => kv.ttl(key),
+      incr: (key, ttlMs, refresh) => kv.incr(key, ttlMs, refresh),
+      incrBy: async (key, ttlMs, by, refresh) => {
+        if (by < 0) {
+          refunds += 1;
+          throw new Error("store down");
+        }
+        return kv.incrBy(key, ttlMs, by, refresh);
       },
-      ttl: async () => 0,
     };
-    const budget = createLiveBudget({ kv: broken, prefix: "tt:test", limit: () => 1, now: () => LATE_EVENING_IST });
-    expect(await budget.take()).toEqual({ ok: true });
-    expect(await budget.take()).toEqual({ ok: true });
+    const budget = createLiveBudget({ kv: flaky, prefix: "tt:test", limit: () => 5, now: () => LATE_EVENING_IST });
+    expect((await budget.takeMany(9)).ok).toBe(false);
+    expect(refunds).toBe(1);
+    await expect(kv.get("tt:test:budget:live:2026-09-18")).resolves.toBe("9");
   });
 });

@@ -29,8 +29,8 @@ const JOURNEY: AvailabilityRequest = {
   quota: "GN",
 };
 
-const SPENT: LiveBudget = { take: async () => ({ ok: false, retryAfterSeconds: 3_600 }) };
-const OPEN: LiveBudget = { take: async () => ({ ok: true }) };
+const SPENT: LiveBudget = { take: async () => ({ ok: false, retryAfterSeconds: 3_600 }), takeMany: async () => ({ ok: false, retryAfterSeconds: 3_600 }) };
+const OPEN: LiveBudget = { take: async () => ({ ok: true }), takeMany: async () => ({ ok: true }) };
 const NOTHING = async () => 0;
 
 afterEach(() => resetLocalState());
