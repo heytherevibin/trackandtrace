@@ -1,4 +1,4 @@
-import { INCR_SCRIPT } from "@/services/kv";
+import { INCRBY_SCRIPT, INCR_SCRIPT } from "@/services/kv";
 import type { RedisLike, WindowLimiterFactory, WindowVerdict } from "@/services/upstash";
 
 // An in-memory stand-in for Upstash: shared by every "instance" a test builds,
@@ -47,15 +47,28 @@ export function createFakeUpstash(): FakeUpstash {
     },
     async eval(script, keys, args) {
       guard();
-      if (script !== INCR_SCRIPT) throw new Error("fake-upstash: unknown script");
       const [key] = keys;
-      const [ttlMs, refresh] = args;
       const entry = store.get(key);
       const live = entry && entry.exp > state.now ? entry : undefined;
-      const count = (live ? Number(live.value) : 0) + 1;
-      const exp = count === 1 || refresh === "1" ? state.now + Number(ttlMs) : (live?.exp ?? Infinity);
-      store.set(key, { value: String(count), exp });
-      return count;
+      const held = live ? Number(live.value) : 0;
+
+      if (script === INCR_SCRIPT) {
+        const [ttlMs, refresh] = args;
+        const count = held + 1;
+        const exp = count === 1 || refresh === "1" ? state.now + Number(ttlMs) : (live?.exp ?? Infinity);
+        store.set(key, { value: String(count), exp });
+        return count;
+      }
+      if (script === INCRBY_SCRIPT) {
+        // Mirrors the Lua: floor at zero, and set the expiry when the key has none rather than
+        // when the count reads 1 — a bulk add starts a counter at `by`, not at 1.
+        const [ttlMs, by, refresh] = args;
+        const count = Math.max(0, held + Number(by));
+        const exp = live && refresh !== "1" ? live.exp : state.now + Number(ttlMs);
+        store.set(key, { value: String(count), exp });
+        return count;
+      }
+      throw new Error("fake-upstash: unknown script");
     },
   };
 

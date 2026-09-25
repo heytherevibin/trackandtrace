@@ -9,6 +9,12 @@ export interface Kv {
   del(key: string): Promise<void>;
   /** Adds one and returns the count. A new count lives `ttlMs`; `refreshTtl` restarts that on every call. */
   incr(key: string, ttlMs: number, refreshTtl?: boolean): Promise<number>;
+  /**
+   * Adds `by` in one round trip. `by` may be negative, which is how a refused reservation gives
+   * itself back. The count never falls below zero: a refund whose key expired in the meantime would
+   * otherwise leave a negative that under-counts everything after it.
+   */
+  incrBy(key: string, ttlMs: number, by: number, refreshTtl?: boolean): Promise<number>;
   /** Milliseconds until the key expires, or 0 when it is absent. */
   ttl(key: string): Promise<number>;
 }
@@ -47,8 +53,12 @@ export class MemoryKv implements Kv {
   }
 
   async incr(key: string, ttlMs: number, refreshTtl = false): Promise<number> {
+    return this.incrBy(key, ttlMs, 1, refreshTtl);
+  }
+
+  async incrBy(key: string, ttlMs: number, by: number, refreshTtl = false): Promise<number> {
     const entry = this.live(key);
-    const count = (entry ? Number(entry.value) : 0) + 1;
+    const count = Math.max(0, (entry ? Number(entry.value) : 0) + by);
     this.store.set(key, { value: String(count), exp: entry && !refreshTtl ? entry.exp : this.now() + ttlMs });
     return count;
   }
@@ -68,6 +78,18 @@ export class MemoryKv implements Kv {
 export const INCR_SCRIPT =
   "local n = redis.call('INCR', KEYS[1]) if n == 1 or ARGV[2] == '1' then redis.call('PEXPIRE', KEYS[1], ARGV[1]) end return n";
 
+/**
+ * INCRBY, floored at zero, with its expiry — one atomic step for the same reason.
+ *
+ * The expiry is set when the key has none rather than when the count reads 1: a bulk add starts a
+ * counter at `by`, not at 1, and a refund must not restart a live window.
+ */
+export const INCRBY_SCRIPT =
+  "local n = redis.call('INCRBY', KEYS[1], ARGV[2]) " +
+  "if n < 0 then redis.call('SET', KEYS[1], '0') n = 0 end " +
+  "if redis.call('PTTL', KEYS[1]) < 0 or ARGV[3] == '1' then redis.call('PEXPIRE', KEYS[1], ARGV[1]) end " +
+  "return n";
+
 export function redisKv(redis: RedisLike): Kv {
   return {
     async get(key) {
@@ -82,6 +104,9 @@ export function redisKv(redis: RedisLike): Kv {
     },
     async incr(key, ttlMs, refreshTtl = false) {
       return Number(await redis.eval(INCR_SCRIPT, [key], [String(ttlMs), refreshTtl ? "1" : "0"]));
+    },
+    async incrBy(key, ttlMs, by, refreshTtl = false) {
+      return Number(await redis.eval(INCRBY_SCRIPT, [key], [String(ttlMs), String(by), refreshTtl ? "1" : "0"]));
     },
     async ttl(key) {
       const ms = await redis.pttl(key);
@@ -105,6 +130,7 @@ export function resilientKv(primary: Kv, fallback: Kv, onError: (error: unknown)
     set: (key, value, ttlMs) => guarded((kv) => kv.set(key, value, ttlMs)),
     del: (key) => guarded((kv) => kv.del(key)),
     incr: (key, ttlMs, refreshTtl) => guarded((kv) => kv.incr(key, ttlMs, refreshTtl)),
+    incrBy: (key, ttlMs, by, refreshTtl) => guarded((kv) => kv.incrBy(key, ttlMs, by, refreshTtl)),
     ttl: (key) => guarded((kv) => kv.ttl(key)),
   };
 }

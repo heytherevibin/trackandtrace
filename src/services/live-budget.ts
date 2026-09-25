@@ -13,6 +13,14 @@ const IST_OFFSET_MS = (5 * 60 + 30) * 60 * 1000;
 export type BudgetVerdict = { readonly ok: true } | { readonly ok: false; readonly retryAfterSeconds: number };
 
 export interface LiveBudget {
+  /**
+   * Reserve `n` units in one decision, all or nothing.
+   *
+   * A route search asks one train at a time but must decide once, before it spends anything,
+   * whether the whole fan-out fits in the day. Taking a unit per train would let a search begin,
+   * cross the limit halfway and leave a half-drawn list — which reads like an answer and is not one.
+   */
+  takeMany(n: number): Promise<BudgetVerdict>;
   /** Spends one live request, or says how long until the budget opens again. */
   take(): Promise<BudgetVerdict>;
 }
@@ -35,7 +43,7 @@ export function secondsToIstMidnight(nowMs: number): number {
 }
 
 /** For sources that spend no provider quota: the sample data and the unconnected live seam. */
-export const UNLIMITED_BUDGET: LiveBudget = { take: async () => ({ ok: true }) };
+export const UNLIMITED_BUDGET: LiveBudget = { take: async () => ({ ok: true }), takeMany: async () => ({ ok: true }) };
 
 export function createLiveBudget(options: LiveBudgetOptions): LiveBudget {
   const now = options.now ?? Date.now;
@@ -65,6 +73,30 @@ export function createLiveBudget(options: LiveBudgetOptions): LiveBudget {
         return { ok: true };
       }
       if (used <= limit) return { ok: true };
+      await report(day, limit);
+      return { ok: false, retryAfterSeconds: secondsToIstMidnight(at) };
+    },
+
+    async takeMany(n) {
+      const at = now();
+      const day = istDate(new Date(at));
+      const limit = options.limit();
+      const key = `${options.prefix}:budget:live:${day}`;
+      let used: number;
+      try {
+        used = await options.kv.incrBy(key, BUDGET_TTL_MS, n);
+      } catch {
+        return { ok: true };
+      }
+      if (used <= limit) return { ok: true };
+      // All or nothing: give back what this call added, so a refused search does not strand the
+      // units that are genuinely left and a smaller one can still spend them.
+      try {
+        await options.kv.incrBy(key, BUDGET_TTL_MS, -n);
+      } catch {
+        // A refund that cannot be written leaves the day counted high. That is the safe direction:
+        // over-counting costs a few of our own requests, under-counting spends the provider's plan.
+      }
       await report(day, limit);
       return { ok: false, retryAfterSeconds: secondsToIstMidnight(at) };
     },
