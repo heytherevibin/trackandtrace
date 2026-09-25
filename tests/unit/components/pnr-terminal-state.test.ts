@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { caretIndex, factsFor, fieldStatus, hintFor, lampFor, paxRows, statusBigFor, terminalResult } from "@/components/pnr/pnr-terminal-state";
+import { caretIndex, factsFor, fieldStatus, hintFor, lampFor, paxRows, statusBigFor, statusCode, terminalResult } from "@/components/pnr/pnr-terminal-state";
 import { buildFixtureResult } from "@/services/sources/fixture";
 import type { PnrOutcome, PnrResult } from "@/types/domain";
 
@@ -50,6 +50,13 @@ describe("lampFor and caretIndex", () => {
     expect(caretIndex("234567890", "partial")).toBe(9);
     expect(caretIndex("2345678901", "ready")).toBeNull();
     expect(caretIndex("2345678901", "running")).toBeNull();
+  });
+});
+
+describe("statusCode", () => {
+  it("writes a status as the passenger table does: CNF, RAC 4, WL 9", () => {
+    expect(statusCode("CNF")).toBe("CNF");
+    expect(statusCode("WL", 9)).toBe("WL 9");
   });
 });
 

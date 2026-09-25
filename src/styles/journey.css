@@ -118,3 +118,15 @@
 .dial-seg { fill: none; stroke: var(--line); stroke-width: 7; stroke-linecap: butt; }
 .dial-seg.is-on { stroke: var(--accent); }
 .dial-label { fill: var(--ink-3); font-family: var(--font-display); font-weight: 600; font-size: 13px; /* drawing units */ letter-spacing: var(--tracking-caps); text-transform: uppercase; }
+
+/* ---- 03 · the berth plan (sample data, beside the specimen record) */
+.berth-plan { margin: 28px 0 0; max-width: 34rem; }
+.berth-plan svg { display: block; width: 100%; height: auto; padding: 10px 12px 2px; box-sizing: border-box; }
+.plan-line { fill: none; stroke: var(--line-strong); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.plan-line.is-faint { stroke: var(--line); }
+.plan-berth.is-lit { fill: var(--accent-wash); stroke: var(--accent); stroke-width: 1.5; }
+.plan-num { fill: var(--ink-3); font-family: var(--font-display); font-weight: 600; font-size: 9px; /* drawing units */ letter-spacing: var(--tracking-wide); }
+.plan-tag { fill: var(--ink-3); font-family: var(--font-display); font-weight: 600; font-size: 11px; /* drawing units */ letter-spacing: var(--tracking-caps); }
+.plan-tag.is-lit { fill: var(--accent-text); }
+.berth-cap { margin: 0; padding: 8px 12px 10px; border-top: 1px solid var(--line); font-size: var(--text-label); line-height: 1.25rem; color: var(--ink-2); }
+.berth-cap b { font-weight: 600; color: var(--accent-text); }

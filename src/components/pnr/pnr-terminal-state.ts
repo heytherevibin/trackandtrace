@@ -83,7 +83,8 @@ export interface TerminalResult {
   readonly recent: RecentCheck;
 }
 
-function code(status: TicketStatus, position?: number | null): string {
+/** A status as the passenger table writes it: CNF, RAC 4, WL 9. */
+export function statusCode(status: TicketStatus, position?: number | null): string {
   const r = messages.check.result;
   const base = r.codes[status];
   return (status === "RAC" || status === "WL") && typeof position === "number" ? r.withPosition(base, position) : base;
@@ -94,8 +95,8 @@ export function paxRows(pax: readonly PassengerSeat[]): readonly PaxRow[] {
   return pax.map((p) => ({
     key: String(p.index),
     name: m.nth(p.index),
-    booked: code(p.bookingStatus),
-    current: code(p.currentStatus, p.position),
+    booked: statusCode(p.bookingStatus),
+    current: statusCode(p.currentStatus, p.position),
     alloc: p.coach && p.berth ? messages.check.result.values.pair(p.coach, p.berth) : m.notAllocated,
   }));
 }

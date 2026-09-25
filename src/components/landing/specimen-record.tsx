@@ -2,6 +2,7 @@ import { SampleTag, SheetTag } from "@/components/pnr/pnr-terminal-tags";
 import { Plate } from "@/components/ui/plate";
 import { STACKED_ROLES as R, stackedTable } from "@/components/ui/stacked-table";
 import { messages } from "@/messages";
+import { BerthPlan } from "./journey/berth-plan";
 import type { Specimen } from "./specimen-data";
 import { BODY, H2, SectionKicker, TABLE_HEAD } from "./sheet-type";
 
@@ -23,6 +24,7 @@ export function SpecimenRecord({ specimen }: { readonly specimen: Specimen | nul
           </h2>
           <p className={`mt-5 max-w-[48ch] ${BODY}`}>{m.bodyOne}</p>
           <p className={`mt-4 max-w-[48ch] ${BODY}`}>{m.bodyTwo}</p>
+          <BerthPlan seats={specimen?.seats ?? null} />
         </div>
         <Plate as="div" title={m.plateTitle} meta={[m.plateSheet]} cells="tight" padding="none" bodyClassName="flex flex-col gap-3 px-5 py-[18px]">
           {specimen ? (

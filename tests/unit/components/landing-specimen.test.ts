@@ -14,6 +14,12 @@ describe("buildSpecimen", () => {
         { key: "3", name: "Passenger 3", booked: "WL", current: "WL 9", alloc: "Not allocated" },
       ],
       provenance: "Retrieved 12:00 IST from the development fixture · every field as returned, none invented",
+      seats: { cls: "3A", coach: "B1", berth: "12 LB", status: "CNF", waiting: [{ index: 2, label: "RAC 4" }, { index: 3, label: "WL 9" }] },
     });
+  });
+
+  it("carries the lead passenger's seat for the berth plan, and who is still waiting", () => {
+    const specimen = buildSpecimen(new Date("2026-09-17T06:30:00.000Z"))!;
+    expect(specimen.seats).toEqual({ cls: "3A", coach: "B1", berth: "12 LB", status: "CNF", waiting: [{ index: 2, label: "RAC 4" }, { index: 3, label: "WL 9" }] });
   });
 });

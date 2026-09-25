@@ -52,3 +52,13 @@ test.describe("the departure board and the hero dial", () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
   });
 });
+
+test.describe("the berth plan", () => {
+  test("lights the specimen passenger's berth beside the record, and says so in words", async ({ page }) => {
+    await gotoReady(page, "/");
+    const plan = page.locator("#record figure.berth-plan");
+    await expect(plan).toBeVisible();
+    await expect(plan.locator(".plan-tag.is-lit")).toHaveText("12 LB");
+    await expect(plan).toContainText("berth B1 · 12 LB, lit.");
+  });
+});
