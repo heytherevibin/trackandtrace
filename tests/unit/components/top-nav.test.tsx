@@ -94,4 +94,15 @@ describe("TopNav", () => {
     expect(screen.queryByTestId("sign-in")).toBeNull();
     expect(within(screen.getByRole("link", { name: "Trakline" })).getByText("Trakline").parentElement).not.toHaveClass("hidden");
   });
+
+  it("carries the landing's route strip on the landing only", () => {
+    const strip = <nav aria-label="Route through this page" />;
+    nav.pathname = "/";
+    const { unmount } = render(<TopNav strip={strip} />);
+    expect(within(screen.getByRole("banner")).getByRole("navigation", { name: "Route through this page" })).toBeInTheDocument();
+    unmount();
+    nav.pathname = "/watchlist";
+    render(<TopNav strip={strip} />);
+    expect(screen.queryByRole("navigation", { name: "Route through this page" })).toBeNull();
+  });
 });

@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Wordmark } from "@/components/brand/wordmark";
@@ -21,9 +22,10 @@ const ITEM = cn(MASTHEAD_CONTROL, "press no-underline");
  * IN (or the account menu) on the right. Below lg: the hamburger on the left of the logo mark (the name
  * shows from lg), with the same theme button and sign in on the right; the hamburger opens the nav in a
  * sheet from the left. On the landing, Check a PNR jumps to the check plate. The landing's section anchors
- * live in the footer. /login shows the brand only.
+ * live in the footer. /login shows the brand only. On the landing a second row carries the route strip,
+ * server-rendered and passed in (`strip`).
  */
-export function TopNav() {
+export function TopNav({ strip }: { readonly strip?: ReactNode } = {}) {
   const pathname = usePathname();
   const minimal = MINIMAL_HEADER_ROUTES.includes(pathname);
 
@@ -56,6 +58,7 @@ export function TopNav() {
           </>
         )}
       </div>
+      {pathname === "/" && !minimal ? strip : null}
     </header>
   );
 }
