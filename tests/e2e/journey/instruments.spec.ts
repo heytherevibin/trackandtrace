@@ -47,8 +47,32 @@ test.describe("the departure board and the hero dial", () => {
   test("the dial stands behind the plate on a wide screen, hidden on a phone, and never scrolls the page", async ({ page, isMobile }) => {
     await gotoReady(page, "/");
     const dial = page.locator(".hero-dial");
-    if (isMobile) await expect(dial).toBeHidden();
-    else await expect(dial).toBeVisible();
+    if (isMobile) {
+      await expect(dial).toBeHidden();
+    } else {
+      await expect(dial).toBeVisible();
+      const measured = await page.evaluate(() => {
+        const hero = document.querySelector("section[aria-labelledby='hero-title']")!;
+        const dialEl = document.querySelector(".hero-dial")!;
+        const plate = document.querySelector(".dial-host > :not(.hero-dial)")!;
+        const departures = document.getElementById("departures")!;
+        const heroStyle = getComputedStyle(hero);
+        return {
+          dialRight: dialEl.getBoundingClientRect().right,
+          plateRight: plate.getBoundingClientRect().right,
+          heroOverflowX: heroStyle.overflowX,
+          heroOverflowY: heroStyle.overflowY,
+          heroBottom: hero.getBoundingClientRect().bottom,
+          departuresTop: departures.getBoundingClientRect().top,
+        };
+      });
+      // The painted dial reaches past the plate's right edge, and the hero no longer cuts it there.
+      expect(measured.dialRight).toBeGreaterThan(measured.plateRight);
+      expect(measured.heroOverflowX).toBe("visible");
+      // Nothing of the dial is painted over the board below.
+      expect(measured.heroOverflowY).toBe("clip");
+      expect(measured.heroBottom).toBeLessThanOrEqual(measured.departuresTop);
+    }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
   });
 });

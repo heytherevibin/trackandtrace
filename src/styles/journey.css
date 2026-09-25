@@ -92,6 +92,7 @@
 
 /* ---- The hero dial: behind the check plate, only where the plate stands beside the words (two columns). Its
    left side fades out before the words, and the hero clips its width (hero.tsx), so it never scrolls the page. */
+main:has(.hero-dial) { overflow-x: clip; } /* the landing clips the dial at the page's edge, as v3 does */
 .dial-host { position: relative; min-width: 0; }
 .dial-host > :not(.hero-dial) { position: relative; z-index: 1; }
 .hero-dial { display: none; }
