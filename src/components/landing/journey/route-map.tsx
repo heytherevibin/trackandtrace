@@ -1,4 +1,5 @@
 import { routePath, routeSleepers, routeStops } from "./geometry/route";
+import { TrainGlyph } from "./train-glyph";
 
 /**
  * 05 · the roadmap's track, drawn still as v3 draws it with Motion off: the full line, every sleeper laid, each
@@ -28,14 +29,7 @@ export function RouteMap({ count }: { readonly count: number }) {
           </g>
         ))}
         <g transform={`translate(${last.x + 50} ${last.y})`} className="route-train">
-          <g transform="translate(-34 -13)">
-            <path d="M0 7h27v12H0z" fill="currentColor" opacity=".55" />
-            <path d="M30 5h27l7 5.5V19H30z" fill="currentColor" />
-            <circle cx="5" cy="21.5" r="2.2" fill="currentColor" />
-            <circle cx="22" cy="21.5" r="2.2" fill="currentColor" />
-            <circle cx="35" cy="21.5" r="2.4" fill="currentColor" />
-            <circle cx="59" cy="21.5" r="2.4" fill="currentColor" />
-          </g>
+          <TrainGlyph width={68} height={26} x={-34} y={-13} />
         </g>
       </svg>
     </div>

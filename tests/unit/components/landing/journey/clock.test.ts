@@ -21,4 +21,13 @@ describe("the station clock's geometry", () => {
     expect(Math.hypot(ticks[1]!.x1, ticks[1]!.y1)).toBeCloseTo(82);
     expect(Math.hypot(ticks[1]!.x2, ticks[1]!.y2)).toBeCloseTo(88);
   });
+
+  it("rounds every tick coordinate to two decimals, so the SSR-ed markup never mismatches on hydration", () => {
+    for (const tick of clockTicks()) {
+      for (const v of [tick.x1, tick.y1, tick.x2, tick.y2]) {
+        expect(Number.isInteger(Math.round(v * 100))).toBe(true);
+        expect(v).toBe(Math.round(v * 100) / 100);
+      }
+    }
+  });
 });

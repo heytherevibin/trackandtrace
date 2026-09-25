@@ -3,6 +3,12 @@
 
 export type Point = readonly [number, number];
 
+/** Rounded to 2dp: Math.cos/sin can differ in their last bit between the server's V8 and the browser's, and an
+ * unrounded coordinate would carry that bit into the SSR-ed attribute, mismatching on hydration. */
+export function round2(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
 /** The digit groups of a PNR as a ticket prints it: 3-3-4. */
 export const DIGIT_GROUPS = [3, 3, 4] as const;
 
@@ -53,7 +59,7 @@ export function bezelTicks(): readonly Tick[] {
     const major = i % 10 === 0;
     const [x1, y1] = polar(major ? 392 : 400, i * 3);
     const [x2, y2] = polar(412, i * 3);
-    return { x1, y1, x2, y2, major };
+    return { x1: round2(x1), y1: round2(y1), x2: round2(x2), y2: round2(y2), major };
   });
 }
 

@@ -28,4 +28,13 @@ describe("the route map's geometry", () => {
     expect(mids[0]).toEqual({ x: 20, y: 46 });
     expect(Math.abs(sleepers[0]!.x2 - sleepers[0]!.x1)).toBeCloseTo(0);
   });
+
+  it("rounds every sleeper coordinate to two decimals, so the SSR-ed markup never mismatches on hydration", () => {
+    for (const sleeper of routeSleepers(stops)) {
+      for (const v of [sleeper.x1, sleeper.y1, sleeper.x2, sleeper.y2]) {
+        expect(Number.isInteger(Math.round(v * 100))).toBe(true);
+        expect(v).toBe(Math.round(v * 100) / 100);
+      }
+    }
+  });
 });

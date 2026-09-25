@@ -38,6 +38,15 @@ describe("the dial's geometry", () => {
     expect(Math.hypot(ticks[1]!.x2, ticks[1]!.y2)).toBeCloseTo(412);
   });
 
+  it("rounds every bezel tick coordinate to two decimals, so the SSR-ed markup never mismatches on hydration", () => {
+    for (const tick of bezelTicks()) {
+      for (const v of [tick.x1, tick.y1, tick.x2, tick.y2]) {
+        expect(Number.isInteger(Math.round(v * 100))).toBe(true);
+        expect(v).toBe(Math.round(v * 100) / 100);
+      }
+    }
+  });
+
   it("puts each group's label at the middle of its own arcs", () => {
     const arcs = digitArcs({ start: -60, sweep: 300 });
     const points = groupLabelPoints(arcs, 326);

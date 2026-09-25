@@ -1,7 +1,16 @@
-/** The journey's train, as a glyph: a coach and a locomotive in side elevation. Decoration only. */
-export function TrainGlyph() {
+interface TrainGlyphProps {
+  readonly x?: number;
+  readonly y?: number;
+  readonly width?: number;
+  readonly height?: number;
+}
+
+/** The journey's train, as a glyph: a coach and a locomotive in side elevation. Decoration only. Nests inside
+ * another `<svg>` (the route map's marker) when `x`/`y`/`width`/`height` are given; its own drawing stays at
+ * `viewBox="0 0 68 26"` either way. */
+export function TrainGlyph({ x, y, width, height }: TrainGlyphProps = {}) {
   return (
-    <svg viewBox="0 0 68 26" aria-hidden="true" focusable="false">
+    <svg viewBox="0 0 68 26" x={x} y={y} width={width} height={height} aria-hidden="true" focusable="false">
       <g fill="currentColor">
         <path d="M0 7h27v12H0z" opacity=".55" />
         <path d="M30 5h27l7 5.5V19H30z" />

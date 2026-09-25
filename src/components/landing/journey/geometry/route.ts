@@ -2,6 +2,8 @@
 // drawing, joined by S-curves, with a short lead-in and lead-out. Sleepers are laid by sampling the path, since a
 // Server Component has no getPointAtLength.
 
+import { round2 } from "./dial";
+
 export interface RoutePoint {
   readonly x: number;
   readonly y: number;
@@ -68,6 +70,6 @@ export function routeSleepers(stops: readonly RoutePoint[], spacing = 14, half =
     const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
     const nx = -(b.y - a.y) / len;
     const ny = (b.x - a.x) / len;
-    return { x1: x - nx * half, y1: y - ny * half, x2: x + nx * half, y2: y + ny * half };
+    return { x1: round2(x - nx * half), y1: round2(y - ny * half), x2: round2(x + nx * half), y2: round2(y + ny * half) };
   });
 }
