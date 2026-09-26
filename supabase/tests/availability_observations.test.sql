@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(68);
+select plan(73);
 
 -- ---------------------------------------------------------------------------
 -- The observation store: facts about berths, never about people.
@@ -331,6 +331,65 @@ select is(
   (select outcome from public.availability_observations where train_no = '12623'),
   null,
   'an observation of a future journey has no outcome yet'
+);
+
+-- ---------------------------------------------------------------------------
+-- The same rule, applied to rows that were written before the trigger existed.
+--
+-- This is not hypothetical. The trigger migration was merged and the hosted
+-- store went on collecting without it for days, because a migration reaches a
+-- database only when it is pushed and an app deploy does not push one. Twenty
+-- `days_out = 0` rows accumulated unlabelled. The trigger fires on write, so
+-- nothing it does later reaches a row already sitting there.
+--
+-- **One rule, one place.** The trigger and the backfill ask the same question —
+-- is this the row observed on its journey date, and is it still unlabelled —
+-- and the store's own migration warns where that ends: "a value two callers
+-- compute is a value that will disagree". So the rule is a function, the
+-- trigger calls it for one row, the backfill calls it for all of them, and
+-- there is nothing to keep in step.
+--
+-- The rows below are inserted with the trigger DISABLED, which is the only way
+-- to reproduce the state the hosted store was actually in. A test that inserted
+-- them normally would find them already labelled and assert nothing.
+-- ---------------------------------------------------------------------------
+
+select has_function(
+  'public',
+  'availability_observation_label',
+  'the label rule is callable on its own, not only from inside the trigger'
+);
+
+alter table public.availability_observations disable trigger availability_observations_set_outcome;
+insert into public.availability_observations
+  (observed_at, train_no, from_code, to_code, travel_class, quota, journey_date, status, can_book, raw_status)
+values
+  ('2026-10-02T06:00:00Z', '12624', 'MAS', 'NDLS', 'SL', 'GN', '2026-10-02', 'WAITLIST', true, 'GNWL9/WL4'),
+  ('2026-10-02T06:00:00Z', '12625', 'MAS', 'NDLS', 'SL', 'GN', '2026-11-30', 'WAITLIST', true, 'GNWL9/WL4');
+alter table public.availability_observations enable trigger availability_observations_set_outcome;
+
+select is(
+  (select outcome from public.availability_observations where train_no = '12624'),
+  null,
+  'a row written while the trigger was absent carries no label, which is the state to repair'
+);
+
+select is(
+  public.availability_observation_label(),
+  1,
+  'the backfill labels exactly the unlabelled days_out = 0 rows, and says how many it found'
+);
+
+select is(
+  (select outcome from public.availability_observations where train_no = '12624'),
+  'WAITLIST',
+  'the backfilled label is the status that row was observed with, not a recomputed one'
+);
+
+select is(
+  (select outcome from public.availability_observations where train_no = '12625'),
+  null,
+  'the backfill leaves a future journey alone: it has not happened, so it has no outcome'
 );
 
 select * from finish();
