@@ -91,6 +91,19 @@ export const booking = {
     moreDates: "Three more dates",
     /** The same control on the way back. It hides rows already in hand, so it costs nothing. */
     fewerDates: "Hide dates",
+    /**
+     * Four more days, and the only control on this surface that SPENDS something on a press.
+     *
+     * One ask buys exactly four consecutive days — measured 2026-09-26, and `?days=` and `?limit=`
+     * are both ignored — so a week needs a second ask. It is therefore never made for a list: a
+     * search of twelve trains would double the most expensive thing this product does. It is made
+     * for the one class of the one train a reader asked about, when they ask.
+     */
+    nextDates: "Next available dates",
+    nextDatesLoading: "Asking…",
+    /** Said when the press has already been made, so nobody presses it twice expecting more. */
+    nextDatesDone: (days: number) => `${days} days shown`,
+    nextDatesFailed: "Those dates could not be read.",
     opening: "Asking…",
     /**
      * Which class the date table below belongs to.
