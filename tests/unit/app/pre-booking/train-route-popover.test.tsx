@@ -147,6 +147,19 @@ describe("a train's run", () => {
     expect(screen.getByText("MYS")).toBeInTheDocument();
   });
 
+  it("takes the distance from the run, not from the search, and shows none until it has one", async () => {
+    // The trains-on-a-pair endpoint sends a wrong distance for some trains: 12639 MAS → SBC is
+    // answered as 57 km there and 362 at its own last stop. 57 km in six hours is not a number
+    // anyone would print twice, so the run's own arithmetic wins — and before the run arrives no
+    // figure is shown at all rather than a figure that cannot be stood behind.
+    stubFetch([stop("SBC", "KSR Bengaluru"), { ...stop("NDLS", "New Delhi", null), distanceKm: 2444 }]);
+    render(<TrainRoutePopover train={train({ distanceKm: 57 })} />);
+    openIt();
+    expect(screen.queryByText(/km/)).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(/2,444 km/)).toBeInTheDocument());
+    expect(screen.queryByText(/57 km/)).not.toBeInTheDocument();
+  });
+
   it("marks only the stops between boarding and alighting as the traveller's own", async () => {
     stubFetch();
     render(<TrainRoutePopover train={train()} />);

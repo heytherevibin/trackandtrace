@@ -137,7 +137,20 @@ export function TrainRoutePopover({ train, className }: { readonly train: TrainR
   const last = points.map((p) => p.mine).lastIndexOf(true);
   const joins = first > 0;
   const continues = last >= 0 && last < points.length - 1;
-  const facts = [train.halts === null ? null : m.halts(train.halts), train.distanceKm === null ? null : m.distance(train.distanceKm)].filter(
+  /**
+   * How far, taken from the RUN and not from the search.
+   *
+   * The trains-on-a-pair endpoint sends a distance that is wrong for some trains. Measured
+   * 2026-09-26 on 12639 BRINDAVAN SF EXP, MAS → SBC: `between` answers **57**, while the train's
+   * own route answers **362** at its last stop — and 57 km in six hours and twenty minutes is not a
+   * number anyone would print twice. Four of thirty-one trains on that pair carry the same nonsense.
+   *
+   * So the cumulative distance at the last stop is used, which is the provider's own arithmetic and
+   * agrees with the times. Before the run arrives there is no honest figure, and none is shown:
+   * this product does not fill a gap with a number it cannot stand behind.
+   */
+  const runKm = run && run.length > 0 ? (run[run.length - 1]?.distanceKm ?? null) : null;
+  const facts = [train.halts === null ? null : m.halts(train.halts), runKm === null ? null : m.distance(runKm)].filter(
     (fact): fact is string => fact !== null,
   );
 
@@ -192,7 +205,11 @@ export function TrainRoutePopover({ train, className }: { readonly train: TrainR
                   </span>
                   <span className={cn("flex min-w-0 flex-1 items-baseline gap-2 pb-2.5", point.mine ? "text-ink-1" : "text-ink-1/60")}>
                     <span className="font-data text-xs">{point.code}</span>
-                    {point.name && point.name.toUpperCase() !== point.code.toUpperCase() ? <span className="truncate text-label">{point.name}</span> : null}
+                    {/* Set in caps like the codes beside them and every other label on the sheet.
+                        `uppercase` is CSS, so a screen reader still says "Mgr Chennai Ctr". */}
+                    {point.name && point.name.toUpperCase() !== point.code.toUpperCase() ? (
+                      <span className="truncate text-label uppercase tracking-caps">{point.name}</span>
+                    ) : null}
                     {/* The time a traveller reads is the one they act on: departure where there is
                         one, arrival at the terminus where there is not. */}
                     {point.departure ?? point.arrival ? (
