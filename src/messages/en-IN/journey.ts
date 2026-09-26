@@ -7,6 +7,7 @@ const NUMBER_WORDS = ["no", "one", "two", "three", "four", "five", "six"] as con
 export const journey = {
   stations: {
     top: "Platform 3 · Departures",
+    anatomy: "The train, drawn",
     principles: "Operating principles",
     how: "How it works",
     record: "The record you get",

@@ -7,7 +7,7 @@ describe("RouteStrip", () => {
     render(<RouteStrip />);
     const strip = screen.getByRole("navigation", { name: "Route through this page" });
     const links = within(strip).getAllByRole("link");
-    expect(links.map((l) => l.textContent)).toEqual(["DEP", "01", "02", "03", "04", "05", "06", "07", "08", "END"]);
+    expect(links.map((l) => l.textContent)).toEqual(["DEP", "GA", "01", "02", "03", "04", "05", "06", "07", "08", "END"]);
     expect(within(strip).getByRole("link", { name: "03 · The record you get" })).toHaveAttribute("href", "#record");
     expect(within(strip).getByRole("link", { name: "DEP · Platform 3 · Departures" })).toHaveAttribute("href", "#top");
   });

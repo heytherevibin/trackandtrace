@@ -19,7 +19,7 @@ describe("the departure board's statuses", () => {
 
     station(3);
     expect(cells.map((c) => c.querySelector(".flap-char"))).toEqual(cells.map(() => null));
-    expect(cells.map((c) => c.textContent)).toEqual(["Departed", "Departed", "At platform", "Next", "", "", "", "", ""]);
+    expect(cells.map((c) => c.textContent)).toEqual(["Departed", "Departed", "At platform", "Next", "", "", "", "", "", ""]);
 
     station(4);
     expect(cells[3]!.querySelector(".flap-char")).not.toBeNull();
