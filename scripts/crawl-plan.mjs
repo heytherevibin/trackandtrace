@@ -100,7 +100,7 @@ export { QUOTAS_OPENING_NEAR_DEPARTURE, comboKey, loadRouteFile, parseRouteFile,
 export const CALLS_PER_ASK_MAX = 2;
 /**
  * Asks per combo per run: the rolling window, and the ask pinned at today that supplies the
- * `days_out = 0` outcome row. See `planAsks`. On run 0 of a sweep they are the same date and only
+ * `days_out = 1` outcome row. See `planAsks`. On run 0 of a sweep they are the same date and only
  * one is made, so this is a worst case and not an average — and a combo whose quota only opens near
  * departure makes the pinned ask alone, every run (`QUOTAS_OPENING_NEAR_DEPARTURE`).
  */
@@ -249,9 +249,9 @@ export const RUNS_WITHOUT_ROWS_BEFORE_NOTICE = 7;
  * `rolling` is the window this combo's cursor points at — the sweep, unchanged.
  *
  * `pinned` is a second ask at TODAY, every combo, every run. It exists because of one piece of
- * arithmetic: `days_out = 0` — the row the migration calls **the outcome**, the label a model trains
- * against — requires the ask date to equal today, and `nextAsk` returns today only when a sweep
- * wraps. That is run 0 of a sweep: one journey date in `cycleRuns`, on a phase that locks on the
+ * arithmetic: `days_out = 1` — the row the migration calls **the outcome**, the label a model trains
+ * against — is inside the four-date window an ask at today returns, and nowhere else. `nextAsk`
+ * reaches that band only when a sweep wraps. That is run 0 of a sweep: one journey date in `cycleRuns`, on a phase that locks on the
  * first run and never drifts, so the same residue class is starved for ever. Measured over 200 runs
  * at `H=60, W=4`: **133 of 140** steady-state journey dates never got an outcome row, and a past
  * date answers 400, so none of them can be refilled. The pinned ask covers `days_out` 0..3, so every
@@ -279,16 +279,25 @@ export const RUNS_WITHOUT_ROWS_BEFORE_NOTICE = 7;
  * knowledge; what keeps a Tatkal combo off the stale list needs neither and lives in `runCrawl`.
  *
  * **The one thing this rests on, and it is now measured: a train that has already departed still
- * answers for today.** The label exists only if today is inside the pinned answer, so a morning
- * departure crawled in the evening was the open risk — the provider returns "the next days the
- * train runs, at or after the date asked for", and a *past* date is a hard 400, so dropping an
- * already-departed day would have been plausible. If it did, that combo would never get an outcome
- * row and nothing on this branch would notice: the ask succeeds, four rows land, and `shortWindows`
- * is computed for rolling asks only. Measured on a real run on 2026-09-23 at **22:00 IST**: 12051
- * DR–MAO departs about **05:25**, seventeen hours earlier, and still returned a `days_out = 0` row
- * (`WAITLIST can_book=false`). All six combos got one, at departure times spanning 05:25 to 22:00.
- * One day across six trains is what stands behind it; `crawl-plan.test.ts` models that provider —
- * a train that does not run every day, answering from today whenever today is a running day.
+ * answers for today.** The ask is made at today, so if a departed train refused it, the whole
+ * four-date window would be lost — including tomorrow, which is the row that carries the label. The
+ * provider returns "the next days the train runs, at or after the date asked for", and a *past* date
+ * is a hard 400, so dropping an already-departed day would have been plausible. If it did, that
+ * combo would never get an outcome row and nothing on this branch would notice: the ask succeeds,
+ * four rows land, and `shortWindows` is computed for rolling asks only. Measured on a real run on
+ * 2026-09-23 at **22:00 IST**: 12051 DR–MAO departs about **05:25**, seventeen hours earlier, and
+ * still answered, from today (`WAITLIST can_book=false` on the day itself). All six combos did, at
+ * departure times spanning 05:25 to 22:00. One day across six trains is what stands behind it;
+ * `crawl-plan.test.ts` models that provider — a train that does not run every day, answering from
+ * today whenever today is a running day.
+ *
+ * That day-itself row is **no longer the label**, and the twenty of them collected before anyone
+ * read one are why: ten said `TRAIN DEPARTED`, seven `NOT AVAILABLE`, and three carried a figure.
+ * The crawl runs at 05:30 IST, so it asks about today after half these trains have left and the
+ * counter has shut on most of the rest — and `status` is `WAITLIST` for all three of those forms, so
+ * every label came out the same word whatever had happened. One day out, 20 of 27 readings were
+ * still bookable and six carried the resolution itself, `CHARTING DONE` among them. The pinned ask
+ * did not change; `20260927080000` moved the label onto the row one day before the journey.
  *
  * @param {{ routes: readonly Route[], cursors: Cursors, today: string, horizonDays: number, windowDays: number }} at
  * @returns {PlannedAsk[]}

@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(73);
+select plan(74);
 
 -- ---------------------------------------------------------------------------
 -- The observation store: facts about berths, never about people.
@@ -274,8 +274,28 @@ select lives_ok(
 );
 
 -- ---------------------------------------------------------------------------
--- `outcome`: the label a model trains against, written on the row that IS the
--- outcome and never overwritten afterwards.
+-- `outcome`: the label a model trains against — the reading taken ONE DAY
+-- before the journey, never overwritten afterwards.
+--
+-- **Why one day out and not the journey date itself.** The journey-date reading
+-- was the first rule and it was measured wrong. Of the first twenty collected:
+-- ten read `TRAIN DEPARTED`, seven `NOT AVAILABLE`, and only three carried a
+-- waitlist figure at all — the crawl runs at 05:30 IST, so by the time it asks
+-- about today, half these trains have left and booking has shut on most of the
+-- rest. `status` is `WAITLIST` for `NOT AVAILABLE` and `TRAIN DEPARTED` alike,
+-- so every one of those twenty labels came out `WAITLIST` whatever had actually
+-- happened. A constant is not a label; a model trained on it learns to say
+-- `WAITLIST`.
+--
+-- One day out, the same store shows 20 of 27 readings still bookable, and six
+-- of them carrying the resolution: `AVAILABLE`, `CURR_AVBL` (berths released)
+-- and `CHARTING DONE` — the chart being prepared, which IS the moment a
+-- waitlist resolves. That is the last reading this crawler can take while the
+-- question is still answerable.
+--
+-- Nothing needed to change in the crawler to get it. The pinned ask is made at
+-- today and one seats ask returns a four-date window, so it already writes
+-- `days_out` 0..3 every run. Only which of those rows carries the label changed.
 --
 -- The trap is the upsert above. It is keyed per observation DAY and resolves a
 -- conflict with `do update`, so a second read of the same day rewrites the row.
@@ -286,26 +306,39 @@ select lives_ok(
 -- The dates below are written out rather than computed from `current_date`,
 -- because `days_out` is `journey_date - observed_on` and `observed_on` is the
 -- IST date of `observed_at`. A row with today's journey date and a fixed
--- `observed_at` is not a days_out = 0 row at all — it was minus six when this
+-- `observed_at` is not a days_out = 1 row at all — it was minus six when this
 -- was first written, and the trigger correctly did nothing.
 -- ---------------------------------------------------------------------------
 
 insert into public.availability_observations
   (observed_at, train_no, from_code, to_code, travel_class, quota, journey_date, status, can_book, raw_status)
 values
-  ('2026-10-02T06:00:00Z', '12622', 'MAS', 'NDLS', 'SL', 'GN', '2026-10-02', 'WAITLIST', true, 'GNWL9/WL4');
+  ('2026-10-02T06:00:00Z', '12622', 'MAS', 'NDLS', 'SL', 'GN', '2026-10-03', 'WAITLIST', true, 'GNWL9/WL4');
 
 select is(
   (select outcome from public.availability_observations where train_no = '12622'),
   'WAITLIST',
-  'an observation made ON its journey date carries its own status as the outcome'
+  'an observation made one day before the journey carries its own status as the outcome'
+);
+
+-- The reading that used to be the label, and must not be one now: taken ON the
+-- journey date, when the counter is shut and the train may already have gone.
+insert into public.availability_observations
+  (observed_at, train_no, from_code, to_code, travel_class, quota, journey_date, status, can_book, raw_status)
+values
+  ('2026-10-02T06:00:00Z', '12626', 'MAS', 'NDLS', 'SL', 'GN', '2026-10-02', 'WAITLIST', false, 'TRAIN DEPARTED');
+
+select is(
+  (select outcome from public.availability_observations where train_no = '12626'),
+  null,
+  'a reading taken on the journey date is not an outcome: booking has shut and the train may have gone'
 );
 
 -- The same day, read again: the berths move, the label does not.
 insert into public.availability_observations
   (observed_at, train_no, from_code, to_code, travel_class, quota, journey_date, status, can_book, raw_status)
 values
-  ('2026-10-02T09:00:00Z', '12622', 'MAS', 'NDLS', 'SL', 'GN', '2026-10-02', 'AVAILABLE', true, 'AVAILABLE-0004')
+  ('2026-10-02T09:00:00Z', '12622', 'MAS', 'NDLS', 'SL', 'GN', '2026-10-03', 'AVAILABLE', true, 'AVAILABLE-0004')
 on conflict (train_no, travel_class, quota, from_code, to_code, journey_date, observed_on)
   do update set status = excluded.status, raw_status = excluded.raw_status, observed_at = excluded.observed_at;
 
@@ -364,7 +397,7 @@ alter table public.availability_observations disable trigger availability_observ
 insert into public.availability_observations
   (observed_at, train_no, from_code, to_code, travel_class, quota, journey_date, status, can_book, raw_status)
 values
-  ('2026-10-02T06:00:00Z', '12624', 'MAS', 'NDLS', 'SL', 'GN', '2026-10-02', 'WAITLIST', true, 'GNWL9/WL4'),
+  ('2026-10-02T06:00:00Z', '12624', 'MAS', 'NDLS', 'SL', 'GN', '2026-10-03', 'WAITLIST', true, 'GNWL9/WL4'),
   ('2026-10-02T06:00:00Z', '12625', 'MAS', 'NDLS', 'SL', 'GN', '2026-11-30', 'WAITLIST', true, 'GNWL9/WL4');
 alter table public.availability_observations enable trigger availability_observations_set_outcome;
 
