@@ -69,6 +69,11 @@ jobs:
           VERCEL_ENV: production
           RAILKIT_API_KEY: ${{ secrets.RAILKIT_API_KEY }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          # The schema pairs the URL with the publishable key and refuses one without the other,
+          # which is how the first run failed — before spending anything, the guard working. The
+          # crawler writes with the SECRET key and never reads with this one; it is here to satisfy
+          # the pair, not because this job uses it.
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           # The env schema reads this pair or `UPSTASH_REDIS_REST_*`. These names, because they are
           # what Vercel's integration injects — so the same credential is called the same thing in
@@ -76,6 +81,10 @@ jobs:
           KV_REST_API_URL: ${{ secrets.KV_REST_API_URL }}
           KV_REST_API_TOKEN: ${{ secrets.KV_REST_API_TOKEN }}
           DATA_KEY: ${{ secrets.DATA_KEY }}
+          # Must be set as a repository variable, and must match production's. Unset it defaults to
+          # 300 — and the crawler reserves 300 for live PNR checks, so its ceiling would come out at
+          # zero and every scheduled run would refuse, quietly, forever. A crawler that never
+          # crawls looks exactly like a crawler with nothing to do.
           LIVE_REQUESTS_PER_DAY: ${{ vars.LIVE_REQUESTS_PER_DAY }}
         run: node scripts/crawl-availability.mjs ${{ inputs.only && format('--only {0}', inputs.only) || '' }}
 

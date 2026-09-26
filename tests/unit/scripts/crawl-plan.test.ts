@@ -264,18 +264,28 @@ describe("crawlCeiling", () => {
     expect(ABSOLUTE_MAX_CALLS_PER_RUN).toBe(DEFAULT_DAILY_ALLOWANCE);
   });
 
-  it("does not let a stray zero in --daily raise the ceiling: the flag describes the plan, it does not decide it", () => {
-    const typo = crawlCeiling({ dailyAllowance: 3330, liveReserve: 300 });
-    const meant = crawlCeiling({ dailyAllowance: 333, liveReserve: 300 });
+  // The scenarios below are written from DEFAULT_DAILY_ALLOWANCE rather than from a literal.
+  //
+  // They used to say 333 and 3330, which described the plan at the time. When the plan was upgraded
+  // ten-fold these three tests failed — not because the rule had broken, but because a stray zero
+  // on the OLD number is a legitimate value on the new one. A test that has to be rewritten every
+  // time the plan changes is testing the plan, and the rule is what it is for.
+  const STRAY_ZERO = DEFAULT_DAILY_ALLOWANCE * 10;
+  const RESERVE = 300;
+  const HEADROOM = DEFAULT_DAILY_ALLOWANCE - RESERVE;
 
-    // Before: headroom 3330 - 300 = 3030, capped at 500, and the run could spend 500 calls.
+  it("does not let a stray zero in --daily raise the ceiling: the flag describes the plan, it does not decide it", () => {
+    const typo = crawlCeiling({ dailyAllowance: STRAY_ZERO, liveReserve: RESERVE });
+    const meant = crawlCeiling({ dailyAllowance: DEFAULT_DAILY_ALLOWANCE, liveReserve: RESERVE });
+
+    // Before the clamp, the typo's headroom would have freed the run up to the absolute cap.
     expect(typo.ceiling).toBe(meant.ceiling);
-    expect(typo.ceiling).toBe(33);
+    expect(typo.ceiling).toBe(HEADROOM);
   });
 
   it("says out loud that it ignored the flag, rather than clamping in silence", () => {
-    expect(crawlCeiling({ dailyAllowance: 3330, liveReserve: 300 }).reason).toMatch(/--daily 3330 ignored/);
-    expect(crawlCeiling({ dailyAllowance: 333, liveReserve: 300 }).reason).not.toMatch(/ignored/);
+    expect(crawlCeiling({ dailyAllowance: STRAY_ZERO, liveReserve: RESERVE }).reason).toMatch(new RegExp(`--daily ${STRAY_ZERO} ignored`));
+    expect(crawlCeiling({ dailyAllowance: DEFAULT_DAILY_ALLOWANCE, liveReserve: RESERVE }).reason).not.toMatch(/ignored/);
   });
 
   it("still lets --daily state a SMALLER plan, which is the honest direction for it to move", () => {
@@ -283,7 +293,16 @@ describe("crawlCeiling", () => {
   });
 
   it("leaves --reserve as the deliberate way to widen the gate, up to a day of the plan", () => {
-    expect(crawlCeiling({ dailyAllowance: 333, liveReserve: 0 }).ceiling).toBe(DEFAULT_DAILY_ALLOWANCE);
+    expect(crawlCeiling({ dailyAllowance: DEFAULT_DAILY_ALLOWANCE, liveReserve: 0 }).ceiling).toBe(DEFAULT_DAILY_ALLOWANCE);
+  });
+
+  it("refuses everything when the reserve is the whole plan, and says which number did it", () => {
+    // What the first scheduled run met: the plan constant still described 10,000 a month while
+    // LIVE_REQUESTS_PER_DAY had already been set against 100,000. The gate reported itself
+    // correctly all the way down — it was the number that had drifted.
+    const starved = crawlCeiling({ dailyAllowance: DEFAULT_DAILY_ALLOWANCE, liveReserve: DEFAULT_DAILY_ALLOWANCE });
+    expect(starved.ceiling).toBe(0);
+    expect(starved.reason).toMatch(/the whole plan \(\d+ a day\) is reserved/);
   });
 });
 

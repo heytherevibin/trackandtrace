@@ -118,8 +118,18 @@ export const ASKS_PER_COMBO_MAX = 2;
  * decision — it states how many live PNR checks are being left unprotected.
  *
  * If the plan itself is ever upgraded, this constant is what changes. A plan is source, not a flag.
+ *
+ * **It was upgraded, and this is that change.** 333 was 10,000 a month over thirty days. The plan
+ * is 100,000 a month, so it is 3,333 — and `LIVE_REQUESTS_PER_DAY` was already set to 3,200 against
+ * the NEW plan while this still described the old one. The first scheduled run is what surfaced it:
+ * `333 - 3200` clamps to zero, so the crawler refused to spend anything and said so plainly —
+ * "the whole plan (333 a day) is reserved for live PNR checks". A gate that had drifted ten-fold
+ * from the thing it gates, reporting itself correctly all the way down.
+ *
+ * At 3,333 less the 3,200 reserve the crawler has 133 calls a day, and one full run of the eight
+ * combos costs 28 at worst.
  */
-export const DEFAULT_DAILY_ALLOWANCE = 333;
+export const DEFAULT_DAILY_ALLOWANCE = 3333;
 /**
  * Nothing a flag can say makes one run worth more than this. The last line of the gate.
  *
