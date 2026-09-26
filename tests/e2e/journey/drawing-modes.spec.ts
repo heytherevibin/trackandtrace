@@ -1,6 +1,7 @@
 import { expect, test } from "../fixtures";
+import { JOURNEY_CHUNK_MARK } from "@/components/landing/journey/journey-mark";
 import { STILL_MANIFEST } from "@/components/landing/journey/still-manifest";
-import { blockJourneyChunk, motionOff, waitForJourney } from "./journey-helpers";
+import { blockJourneyChunk, motionOff, stubSaveData, waitForJourney } from "./journey-helpers";
 
 const drawn = (page: import("@playwright/test").Page) => page.locator("#anatomy .anatomy-still:not(.is-noscript) use[href]");
 
@@ -15,13 +16,7 @@ test.describe("every drawing mode draws the train (spec §4)", () => {
   });
 
   test("Data Saver: still from the first paint", async ({ page }) => {
-    await page.addInitScript(() => {
-      try {
-        Object.defineProperty(Navigator.prototype, "connection", { configurable: true, get: () => ({ saveData: true, effectiveType: "4g" }) });
-      } catch {
-        Object.defineProperty(window.navigator, "connection", { configurable: true, get: () => ({ saveData: true, effectiveType: "4g" }) });
-      }
-    });
+    await stubSaveData(page);
     await page.goto("/");
     await expect(page.locator("html")).toHaveAttribute("data-saver", "on");
     await expect(page.locator("html")).toHaveAttribute("data-drawing", "still");
@@ -48,7 +43,7 @@ test.describe("every drawing mode draws the train (spec §4)", () => {
     await page.route("**/_next/static/**/*.js", async (route) => {
       const response = await route.fetch();
       const body = await response.text();
-      if (body.includes("tt-journey-chunk")) {
+      if (body.includes(JOURNEY_CHUNK_MARK)) {
         await held;
         return route.fulfill({ response, body });
       }
@@ -63,11 +58,11 @@ test.describe("every drawing mode draws the train (spec §4)", () => {
     await expect.poll(() => fetched.length).toBeGreaterThan(0);
   });
 
-  test("a page without JavaScript draws the train from its noscript copy", async ({ browser, isMobile }) => {
+  test("a page without JavaScript draws the train from its noscript copy, the wide shape only (§3.H's budget)", async ({ browser }) => {
     const context = await browser.newContext({ javaScriptEnabled: false });
     const page = await context.newPage();
     await page.goto("/");
-    const shape = isMobile ? STILL_MANIFEST.shapes.anatomyTall : STILL_MANIFEST.shapes.anatomyWide;
+    const shape = STILL_MANIFEST.shapes.anatomyWide;
     await expect(page.locator(`#anatomy .is-noscript use[href="${shape.href}#shell"]`)).toBeAttached();
     await expect(page.locator("#anatomy .anatomy-still:not(.is-noscript)")).toBeHidden();
     await context.close();

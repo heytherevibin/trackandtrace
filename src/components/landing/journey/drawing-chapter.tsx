@@ -2,7 +2,7 @@ import { Corners } from "@/components/ui/corners";
 import { messages } from "@/messages";
 import { BODY, H2, SectionKicker } from "../sheet-type";
 import { StillDrawing } from "./still-drawing";
-import { StillSvg } from "./still-svg";
+import { StillNoscript } from "./still-svg";
 import { partSide } from "./train-parts";
 
 const num = (i: number) => String(i + 1).padStart(2, "0");
@@ -27,12 +27,7 @@ export function DrawingChapter() {
           <p className={`mt-3.5 ${BODY}`}>{m.lead}</p>
         </div>
         <StillDrawing kind="anatomy" className="anatomy-still" />
-        <noscript>
-          <div className="still-drawing anatomy-still is-noscript" aria-hidden="true">
-            <StillSvg kind="anatomy" wide drawn />
-            <StillSvg kind="anatomy" wide={false} drawn />
-          </div>
-        </noscript>
+        <StillNoscript kind="anatomy" className="anatomy-still" />
         <svg className="callout-lines" aria-hidden="true" focusable="false" />
         <ol className="callouts" aria-label={m.listLabel}>
           {m.parts.map((part, i) => (

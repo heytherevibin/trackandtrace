@@ -33,12 +33,12 @@ describe("the drawing chapter (GA)", () => {
     }
   });
 
-  it("sends a page with JavaScript no still file, and a page without it the drawing", () => {
+  it("sends a page with JavaScript no still file, and a page without it only the wide drawing (§3.H's budget)", () => {
     const html = renderToString(<DrawingChapter />);
     const [page, noscript = ""] = html.split("<noscript>");
     expect(page).not.toContain("/journey/");
     expect(noscript).toContain(`${STILL_MANIFEST.shapes.anatomyWide.href}#shell`);
-    expect(noscript).toContain(`${STILL_MANIFEST.shapes.anatomyTall.href}#shell`);
+    expect(html).not.toContain(STILL_MANIFEST.shapes.anatomyTall.href);
   });
 });
 
@@ -49,9 +49,11 @@ describe("the terminus stage", () => {
     expect(container).toHaveTextContent("Terminus · the check starts here");
   });
 
-  it("sends the terminus drawing only to a page without JavaScript", () => {
-    const [page, noscript = ""] = renderToString(<TerminusStage />).split("<noscript>");
+  it("sends the terminus drawing only to a page without JavaScript, wide only (§3.H's budget)", () => {
+    const html = renderToString(<TerminusStage />);
+    const [page, noscript = ""] = html.split("<noscript>");
     expect(page).not.toContain("/journey/");
     expect(noscript).toContain(STILL_MANIFEST.shapes.terminusWide.href);
+    expect(html).not.toContain(STILL_MANIFEST.shapes.terminusTall.href);
   });
 });
