@@ -1,8 +1,12 @@
+import type { DrawingMode, DrawingReason } from "./drawing-mode";
+
 // The landing journey's window events (spec 2026-09-24 §3.B). Names and details only, so the plates, the loader
 // and the journey chunk share them without importing each other.
 
 /** Something moved the page's layout (a morph, fonts, a resize): scroll-driven pieces re-measure. */
 export const LAYOUT_EVENT = "tt:layout";
+/** The drawing switched live ⇄ still, or its reasons changed. */
+export const DRAWING_EVENT = "tt:drawing";
 /** The strip reached another station. */
 export const STATION_EVENT = "tt:station";
 /** A piece's fit changed (chapters pinned ⇄ static): the whole journey rebuilds around it. */
@@ -31,6 +35,10 @@ export interface ResultDetail {
   readonly hero: boolean;
   readonly kind: string;
   readonly chartAt: string | null;
+}
+export interface DrawingDetail {
+  readonly mode: DrawingMode;
+  readonly reasons: readonly DrawingReason[];
 }
 
 export function emit<T>(name: string, detail?: T): void {

@@ -5,6 +5,7 @@ import { startBoard } from "./board";
 import { startChapters, startPlaceGuard } from "./chapters";
 import { startClock } from "./clock";
 import { startCursor } from "./cursor";
+import { startDrawing } from "./drawing";
 import { startHero } from "./hero";
 import { introWanted, startIntro } from "./intro";
 import { LAYOUT_EVENT, REBUILD_EVENT, type ResultDetail } from "./journey-events";
@@ -49,7 +50,7 @@ export type Teardown = () => void;
 export type JourneyModule = (ctx: JourneyContext) => Teardown;
 
 /** In start order. Later tasks append their modules here. */
-export const MODULES: readonly JourneyModule[] = [startArrivals, startBoard, startStrip, startHero, startChapters, startBerths, startClock, startRoute, startCursor, startSound];
+export const MODULES: readonly JourneyModule[] = [startArrivals, startBoard, startStrip, startHero, startChapters, startBerths, startClock, startRoute, startCursor, startSound, startDrawing];
 
 export function startJourney(): Teardown {
   const html = document.documentElement;
