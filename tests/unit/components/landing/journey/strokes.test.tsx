@@ -1,7 +1,7 @@
 import { render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { startBerths } from "@/components/landing/journey/berths";
-import { drawStrokes } from "@/components/landing/journey/drawing";
+import { drawStrokes } from "@/components/landing/journey/strokes";
 import { HeroDial } from "@/components/landing/journey/hero-dial";
 import { startHero } from "@/components/landing/journey/hero";
 import { RESULT_EVENT, type ResultDetail } from "@/components/landing/journey/journey-events";

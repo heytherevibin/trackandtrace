@@ -1,6 +1,6 @@
 import { animate, svg, utils, type AnimationParams, type JSAnimation } from "animejs";
 
-// Drawn strokes, for every module that draws one (the hero dial's rings and arc, the berth plan).
+// Drawn strokes (strokes.ts), for every module that draws one (the hero dial's rings and arc, the berth plan).
 //
 // A draw is never reverted: svg.createDrawable's proxy captures whatever "draw" value is current on the element
 // as its animation's own "original" (drawable.js), and createDrawable itself writes "0 0" the first time it

@@ -2,7 +2,7 @@ import { animate, createAnimatable, stagger, utils, type JSAnimation } from "ani
 import { messages } from "@/messages";
 import { formatTime } from "@/utils/datetime";
 import { chartFace } from "./chart-countdown";
-import { drawStrokes } from "./drawing";
+import { drawStrokes } from "./strokes";
 import { ease } from "./ease";
 import { PLATE_EVENT, RESULT_EVENT, RUN_EVENT, type PlateDetail, type ResultDetail, type RunDetail } from "./journey-events";
 import { STAGGER, T } from "./motion-tokens";
