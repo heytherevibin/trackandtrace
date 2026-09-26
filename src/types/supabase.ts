@@ -128,6 +128,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      availability_observation_label: {
+        Args: { p_id?: string }
+        Returns: number
+      }
       console_audit: {
         Args: {
           p_category?: string
