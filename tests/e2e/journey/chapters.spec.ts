@@ -213,6 +213,20 @@ test.describe("02 · the chapters, pinned", () => {
     expect(await page.evaluate(() => (window as unknown as { __howPinned: boolean }).__howPinned)).toBe(false);
   });
 
+  test("on /#record, the reader stays there: #anatomy settling into columns just above #how must never read as #how's own resize", async ({ page }) => {
+    // #record sits immediately after #how, so landing here puts #how's own bottom edge only a sliver above
+    // the window's top — the exact boundary the place guard's "was the reader inside #how" branch can
+    // misjudge if it ever reacts to a delivery that was never #how's own resize (the bug this guards against).
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/#record");
+    const record = page.locator("#record");
+    const offLanding = () => record.evaluate((el) => Math.abs(el.getBoundingClientRect().top - Number.parseFloat(getComputedStyle(el).scrollMarginTop)));
+    await expect.poll(offLanding).toBeLessThanOrEqual(4);
+    await waitForJourney(page);
+    await page.waitForTimeout(1000);
+    expect(await offLanding()).toBeLessThanOrEqual(4);
+  });
+
   test("an anchor clicked on the board lands its section, and 02 stays pinned", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/");
