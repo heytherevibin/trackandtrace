@@ -4,18 +4,21 @@ import { activePnrSource, env, fallbackPnrSource, fixtureAllowed, isThirdPartySo
 import type { AvailabilitySource } from "@/services/availability-source";
 import type { PnrDataSource } from "@/services/pnr-source";
 import type { RouteSource } from "@/services/route-source";
+import type { StationSource } from "@/services/station-source";
 import type { TrainRouteSource } from "@/services/train-route-source";
 import { providerGuard } from "@/services/shared-store";
 import { createFallbackSource } from "./fallback";
 import { fixtureSource } from "./fixture";
 import { fixtureAvailabilitySource } from "./fixture-availability";
 import { fixtureRouteSource } from "./fixture-route";
+import { fixtureStationSource } from "./fixture-stations";
 import { fixtureTrainRouteSource } from "./fixture-train-route";
 import { createGuardedSource } from "./guarded";
 import { createLiveSource } from "./live";
 import { createRailkitSource } from "./railkit";
 import { createRailKitAvailabilitySource } from "./railkit-availability";
 import { createRailKitRouteSource } from "./railkit-route";
+import { createRailKitStationSource } from "./railkit-stations";
 import { createRailKitTrainRouteSource } from "./railkit-train-route";
 
 // Provider registry. The fixture is served only when explicitly requested and
@@ -49,6 +52,22 @@ const refusedRouteSource: RouteSource = {
 const refusedTrainRouteSource: TrainRouteSource = {
   async check() {
     return { ok: false, code: "SOURCE_UNAVAILABLE", message: messages.source.route.couldNotAnswer };
+  },
+};
+
+/**
+ * No provider key, or sample data refused: the picker offers nothing.
+ *
+ * An EMPTY LIST and not a refusal, unlike every seam above it. Those answer a question the
+ * traveller asked; this one is an assistance while they type, and a field that interrupts someone
+ * mid-word has made typing worse than the plain code box it replaced.
+ */
+const emptyStationSource: StationSource = {
+  async search() {
+    return { ok: true, stations: [] };
+  },
+  async byCode() {
+    return { ok: true, stations: [] };
   },
 };
 
@@ -156,6 +175,29 @@ export function resolveTrainRouteSource(current: Env = env()): TrainRouteSource 
   if (!isThirdPartySource(active) || !current.RAILKIT_API_KEY) return refusedTrainRouteSource;
   const adapter = createRailKitTrainRouteSource({ key: current.RAILKIT_API_KEY, baseUrl: current.RAILKIT_BASE_URL, timeoutMs: current.RAILKIT_TIMEOUT_MS });
   return createGuardedSource(adapter, providerGuard(active, "route", current));
+}
+
+/**
+ * The station directory, by the same rules again.
+ *
+ * A deployment with no key answers an EMPTY list rather than a refusal: the picker is an
+ * assistance, and a field that interrupts someone mid-word has made typing worse. They can still
+ * type the code, which is what they did before this existed.
+ */
+export function resolveStationSource(current: Env = env()): StationSource {
+  if (current.PNR_SOURCE === "fixture") return fixtureAllowed(current) ? fixtureStationSource : emptyStationSource;
+  const active = activePnrSource(current);
+  if (!isThirdPartySource(active) || !current.RAILKIT_API_KEY) return emptyStationSource;
+  // Not behind `createGuardedSource`: that wraps a one-method `check` seam, and this one has two.
+  // The exposure it would guard against is bounded elsewhere — a station list is held for a WEEK,
+  // every failure answers an empty list rather than retrying, and the per-address limiter caps what
+  // one typist can spend. If that stops being true, this needs its own breaker before it needs
+  // anything else.
+  return createRailKitStationSource({ key: current.RAILKIT_API_KEY, baseUrl: current.RAILKIT_BASE_URL, timeoutMs: current.RAILKIT_TIMEOUT_MS });
+}
+
+export function getStationSource(): StationSource {
+  return resolveStationSource(env());
 }
 
 export function getTrainRouteSource(): TrainRouteSource {
