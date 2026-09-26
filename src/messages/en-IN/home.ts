@@ -14,6 +14,34 @@ export const home = {
       failsClosed: "Fails closed",
     },
   },
+  // The drawn train's chapter (GA) and the terminus, approved with prototype v3 (spec 2026-09-24 §2).
+  drawing: {
+    kicker: "General arrangement · Drawing TL-07",
+    title: "Every part answers to the source",
+    lead: "Take a check apart and each piece does one job: ask the source once, show exactly what came back, and say when. Nothing in it guesses.",
+    listLabel: "What each part does",
+    parts: [
+      { id: "pantoFront", title: "Leading pantograph", promise: "One live request", detail: "asked the moment you press Run" },
+      { id: "shell", title: "Body shell", promise: "The record", detail: "only the fields the source returned" },
+      { id: "cabFront", title: "Headlight", promise: "Provenance", detail: "every field says where it came from" },
+      { id: "bogieFront", title: "Leading bogie", promise: "Time-stamped", detail: "retrieval time beside the status, in IST" },
+      { id: "wheelsFront", title: "Leading wheelsets", promise: "Fails closed", detail: "no source, no claim" },
+      { id: "pantoRear", title: "Trailing pantograph", promise: "No odds", detail: "confirmation chances are never shown" },
+      { id: "roof", title: "Roof equipment", promise: "Nothing filled in", detail: "a missing field reads “Not returned”" },
+      { id: "cabRear", title: "Rear cab", promise: "PNR entry", detail: "ten digits, punched 3–3–4" },
+      { id: "bogieRear", title: "Trailing bogie", promise: "Never logged", detail: "PNRs and names stay out of logs" },
+      { id: "wheelsRear", title: "Trailing wheelsets", promise: "No account", detail: "a check needs only the PNR" },
+    ],
+    titleBlock: {
+      drawing: "DRG TL-07",
+      drawingName: "General arrangement",
+      sheet: "Sheet 1 of 1",
+      subject: "WAP-7-style electric locomotive · LHB rake",
+      scale: "Not to scale",
+      gauge: "Broad gauge 1 676 · dimensions approx.",
+      maker: "Trakline",
+    },
+  },
   principles: {
     title: "Trakline — operating principles",
     code: "TT-100",
@@ -117,5 +145,8 @@ export const home = {
     title: "Got a ticket? Run a check",
     meta: "No sign-up",
     lead: "Only what the railway returned — nothing filled in, nothing predicted.",
+  },
+  terminus: {
+    caption: "Terminus · the check starts here",
   },
 } as const satisfies MessageTree;
