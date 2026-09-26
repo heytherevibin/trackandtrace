@@ -3407,3 +3407,19 @@ git commit -m "docs(journey): the drawn train in DESIGN.md and the spec, with ev
 - **The bake.** `BAKE_SOURCES` gains every scene file J5 adds that the still depends on. Re-bake when they change.
 - **The live layout.** `html[data-drawing="live"]` has no layout of its own in J4. J5 pins `#anatomy` and draws into the holder `still.ts` places, and `keepsPlace` starts to matter.
 - **The strip's hand-off pulse** lands with J5's departure (J3-8, J4-5).
+- **`rig.loco`/`rig.length` and `pickables()` were dropped**, and J5's scan (v3 `scan.js:52`) needs `rig.loco`.
+- **`drawingModule` needs a place for a synchronous starting probe** (`webgl`), so a page without WebGL never downloads three.js, and for the 20 s `load` timeout.
+- **`page.ts` depends on `scene.background` being null** for hidden-line removal: null it during the passes, or throw, before any background is set in `buildWorld`.
+- **`sourceHash` should also hash the three version and `scripts/bake-train-stills.mjs`.**
+- **The bake-source minors queued for J5's re-bake:**
+  - the header comments below the imports in `rig-parts.ts` and `rig.ts`;
+  - the `rig.ts` Partial cast (check that all 11 parts are there);
+  - the `rig.ts` relative import (esbuild resolves `@/`);
+  - `drawHierarchy`'s error wording and its order of checks;
+  - `MaterialMap` written twice;
+  - the lint warning `_step` at `rig.ts:302`;
+  - `shapeSvg` not validating its keys;
+  - the `f1` name, which now rounds to 0.5 px;
+  - `setClearColor(0x000000, 0)`;
+  - `lines.test` casts.
+- **The loader's rejection reason is not logged.** Log it once J5 has a real loader.
