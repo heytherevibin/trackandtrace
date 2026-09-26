@@ -1,6 +1,6 @@
 import { test } from "../fixtures";
 import { expectAxeClean } from "../helpers";
-import { motionOff, scrollToId, waitForJourney } from "./journey-helpers";
+import { motionOff, scrollToId, stubSaveData, waitForJourney } from "./journey-helpers";
 
 const POSITIONS: readonly (readonly [name: string, id: string | null, fraction?: number])[] = [
   ["top", null],
@@ -10,17 +10,6 @@ const POSITIONS: readonly (readonly [name: string, id: string | null, fraction?:
   ["drawing", "anatomy"],
   ["terminus", "terminus"],
 ];
-
-/** Data Saver, stubbed the way drawing-modes.spec.ts does: on the prototype where this Chromium allows it, else the instance. */
-async function stubSaveData(page: import("@playwright/test").Page): Promise<void> {
-  await page.addInitScript(() => {
-    try {
-      Object.defineProperty(Navigator.prototype, "connection", { configurable: true, get: () => ({ saveData: true, effectiveType: "4g" }) });
-    } catch {
-      Object.defineProperty(window.navigator, "connection", { configurable: true, get: () => ({ saveData: true, effectiveType: "4g" }) });
-    }
-  });
-}
 
 test.describe("axe, while the journey runs", () => {
   for (const [name, id, fraction] of POSITIONS) {
@@ -58,6 +47,15 @@ test.describe("axe, while the journey runs", () => {
     await page.goto("/");
     await waitForJourney(page);
     await scrollToId(page, "anatomy", 40);
+    await page.waitForTimeout(1_200);
+    await expectAxeClean(page);
+  });
+
+  test("clean at Night, at the terminus", async ({ page }) => {
+    await page.addInitScript(() => window.localStorage.setItem("tt.theme", "dark"));
+    await page.goto("/");
+    await waitForJourney(page);
+    await scrollToId(page, "terminus", 40);
     await page.waitForTimeout(1_200);
     await expectAxeClean(page);
   });

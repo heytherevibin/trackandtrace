@@ -9,7 +9,7 @@ export type StillShapeName = "anatomyWide" | "anatomyTall" | "terminusWide" | "t
 export interface StillShape {
   readonly href: string;
   readonly viewBox: readonly [number, number, number, number];
-  /** The file's groups, one per part: the ten labelled ones, "coach" and "world". */
+  /** The groups this shape's file holds, one per part visible in it (labelled parts, tanks, coach, world). */
   readonly parts: readonly string[];
   /** Where each labelled part's leader ends, in the shape's viewBox units (the anatomy shapes only). */
   readonly anchors: Readonly<Partial<Record<PartId, readonly [number, number]>>>;
