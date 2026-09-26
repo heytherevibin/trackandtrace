@@ -97,3 +97,12 @@ describe("headers by host", () => {
     expect(headers.get("strict-transport-security")).toBe("max-age=63072000; includeSubDomains; preload");
   });
 });
+
+describe("the baked still drawings' cache", () => {
+  it("keeps a content-named drawing for a year, and nothing else", async () => {
+    const drawing = await unstable_getResponseFromNextConfig({ url: "https://trakline.in/journey/anatomy-wide.0123456789.svg", nextConfig });
+    expect(drawing.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
+    const home = await unstable_getResponseFromNextConfig({ url: "https://trakline.in/", nextConfig });
+    expect(home.headers.get("cache-control")).not.toBe("public, max-age=31536000, immutable");
+  });
+});

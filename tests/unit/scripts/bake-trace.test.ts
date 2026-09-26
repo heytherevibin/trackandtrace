@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chainPath, cropBox, idColour, idReader, pathsByPart, walkRuns, type IdAt, type Run } from "../../../scripts/bake/trace";
+import { chainPath, cropBox, f1, idColour, idReader, pathsByPart, walkRuns, type IdAt, type Run } from "../../../scripts/bake/trace";
 
 /** A synthetic ID image: `paint(x, y)` says which edge id (0 = none) each pixel holds. */
 function image(W: number, H: number, paint: (x: number, y: number) => number): IdAt {
@@ -73,7 +73,12 @@ describe("cropping and writing paths", () => {
   it("chains stretches that meet end to start into one polyline", () => {
     expect(chainPath([[0, 0, 10, 0], [10, 0, 10, 5]])).toBe("M0 0l10 0l0 5");
     expect(chainPath([[0, 0, 3, -2]])).toBe("M0 0l3-2");
-    expect(chainPath([[0.04, 0, 1.26, 0], [9, 9, 9, 10]])).toBe("M0 0l1.3 0M9 9l0 1");
+    expect(chainPath([[0.04, 0, 1.26, 0], [9, 9, 9, 10]])).toBe("M0 0l1.5 0M9 9l0 1");
+  });
+
+  it("rounds to the nearest half pixel, which the eye cannot tell from a tenth at a hairline (§3.H budget)", () => {
+    expect([f1(1.24), f1(1.26), f1(-0.3), f1(7.75)]).toEqual([1, 1.5, -0.5, 8]);
+    expect(chainPath([[0.2, 0.3, 2.3, 4.8]])).toBe("M0 0.5l2.5 4.5");
   });
 
   it("groups each part's stretches inside the crop, crop-relative", () => {

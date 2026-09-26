@@ -72,6 +72,8 @@ const nextConfig: NextConfig = {
     // Constants, as the proxy's matcher: the console host in production, and admin.localhost everywhere else.
     const consoleHost = { type: "host" as const, value: "(?:admin\\.trakline\\.in|admin\\.localhost)" };
     return [
+      // The baked still drawings (spec §3.D): content-named, so they never change under their name.
+      { source: "/journey/:path*", headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }] },
       {
         source: "/:path*",
         headers: [

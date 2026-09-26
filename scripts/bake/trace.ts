@@ -103,8 +103,8 @@ export function cropBox(runs: readonly Run[], isTrain: (i: number) => boolean, m
   return { l: Math.max(0, l - mx), t: Math.max(0, t - my), r: Math.min(W, r + mx), b: Math.min(H, b + my) };
 }
 
-/** Round to one decimal place. */
-export const f1 = (v: number): number => Math.round(v * 10) / 10;
+/** Round to the nearest half pixel: finer than a hairline can show, and it keeps a page's stills within budget (§3.H). */
+export const f1 = (v: number): number => Math.round(v * 2) / 2;
 
 /** Chains stretches that meet end to start into one polyline (v3's greedy `byStart`/`used` chain). */
 export function chainPath(list: readonly Quad[]): string {
