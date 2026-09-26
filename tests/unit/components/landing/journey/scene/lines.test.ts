@@ -1,6 +1,6 @@
 import { BoxGeometry, BufferAttribute, BufferGeometry, Color, Group, LineSegments, Mesh, MeshBasicMaterial } from "three";
 import { describe, expect, it } from "vitest";
-import { baseOf, cloneShared, createStyle, drawn, edgesOf, mergeAll, type Palette } from "@/components/landing/journey/scene/lines";
+import { baseOf, cloneShared, createStyle, drawHierarchy, drawn, edgesOf, mergeAll, type Palette } from "@/components/landing/journey/scene/lines";
 
 const INK = new Color(0, 0, 0);
 const PALETTE: Palette = { ground: INK, ink: INK, steel: INK, steelText: INK };
@@ -49,5 +49,37 @@ describe("the drawing's lines", () => {
     group.add(m);
     const out = Array.from(mergeAll(group).attributes.position.array, (v) => v + 0); // -0 reads as 0
     expect(out).toEqual([0, 0, 0, 0, 1, 0, -1, 0, 0]);
+  });
+
+  it("replaces each mesh under a group with its drawing, keeping position, rotation and scale", () => {
+    const style = createStyle(PALETTE);
+    const root = new Group();
+    const child = new Mesh(new BoxGeometry(1, 1, 1), new MeshBasicMaterial());
+    child.position.set(1, 2, 3);
+    child.rotation.set(0, Math.PI / 4, 0);
+    child.scale.set(2, 2, 2);
+    const wantQuaternion = child.quaternion.clone();
+    root.add(child);
+
+    drawHierarchy(root, style);
+
+    expect(root.children).toHaveLength(1);
+    const [drawing] = root.children;
+    expect(drawing).toBeInstanceOf(Group);
+    expect(drawing.position.toArray()).toEqual([1, 2, 3]);
+    expect(drawing.scale.toArray()).toEqual([2, 2, 2]);
+    expect(drawing.quaternion.equals(wantQuaternion)).toBe(true);
+    const [fill, edges] = (drawing as Group).children;
+    expect(fill).toBeInstanceOf(Mesh);
+    expect(edges).toBeInstanceOf(LineSegments);
+  });
+
+  it("refuses to draw a mesh that has no parent, rather than silently dropping it", () => {
+    const style = createStyle(PALETTE);
+    const detached = new Mesh(new BoxGeometry(1, 1, 1), new MeshBasicMaterial());
+    const root = new Group();
+    root.add(detached);
+    root.remove(detached); // now parentless, as a bug in a builder might leave one
+    expect(() => drawHierarchy(detached, style)).toThrow(/no parent/);
   });
 });

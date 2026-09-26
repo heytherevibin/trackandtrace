@@ -128,7 +128,7 @@ export function drawHierarchy<T extends Object3D>(root: T, style: LineStyle, opt
     d.quaternion.copy(m.quaternion);
     d.scale.copy(m.scale);
     const parent = m.parent;
-    if (!parent) continue;
+    if (!parent) throw new Error("drawHierarchy: a mesh has no parent to receive its drawing — the rig built a detached mesh");
     parent.add(d);
     parent.remove(m);
   }
