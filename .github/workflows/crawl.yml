@@ -1,0 +1,90 @@
+# The availability crawler, once a day.
+#
+# **Why a schedule at all, and why this is overdue.** The observation store has existed since
+# PRs #38/#39 and has never been filled, because nothing ran the crawler. Its own plan says why that
+# matters: the pinned ask is what writes the `days_out = 0` row, the row the migration calls **the
+# outcome** and the label a model trains against — and "a skipped day costs one outcome row per
+# combo, permanently". A past journey date answers 400, so no run tomorrow can recover what today
+# did not ask. Every unscheduled day was destroyed, not deferred.
+#
+# **Why GitHub Actions and not a Vercel cron.** The crawler is a CLI with flags, a preflight, a day
+# gate and a cursor file; a serverless route would be a second implementation of all of it under a
+# function timeout, for a job with no web caller and no user waiting. Here it has its own secrets,
+# its own concurrency group, and as long as it needs.
+name: Crawl availability
+
+on:
+  schedule:
+    # 00:00 UTC is 05:30 IST: after the railway's nightly window — measured 2026-09-26, it refuses
+    # flakily between 23:45 and 00:15 IST — and early enough that most of today's trains have not
+    # departed, which is what the `days_out = 0` row is a reading of.
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+    inputs:
+      only:
+        description: "Crawl at most this many combos (leave blank for all)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+# One run at a time, and a scheduled run is never cancelled for a manual one: a half-finished crawl
+# has spent provider quota and saved no cursor.
+concurrency:
+  group: crawl-availability
+  cancel-in-progress: false
+
+jobs:
+  crawl:
+    # Never from a fork, which would be someone else's pull request spending this plan's quota.
+    if: github.repository == 'heytherevibin/trackandtrace'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+
+      # No cursor cache. The cursor lives in the SHARED STORE — the same Upstash the day gate and
+      # the breaker use, under `tt:production:crawl:cursor` — so it survives a fresh checkout, an
+      # evicted cache and this runner entirely. That is what makes the sixty-day sweep actually
+      # advance here rather than re-asking the same four days near today, forever.
+
+      # The script reads `process.env` directly and validates it with the app's own schema, so a
+      # missing secret fails here with the field named rather than halfway through a crawl.
+      - name: Crawl
+        env:
+          PNR_SOURCE: railkit
+          PNR_FALLBACK: none
+          # **Not cosmetic.** Every shared key is prefixed `tt:${VERCEL_ENV ?? NODE_ENV}`, so
+          # without this the crawler would run under `tt:development` — its own daily budget, its
+          # own breaker, its own counters, none of them the ones production is using. Two callers
+          # spending one 600-per-10-minutes plan with neither able to see the other, which is the
+          # exact failure sharing DATA_KEY exists to prevent. It IS production traffic, against the
+          # production plan, and it has to be counted there.
+          VERCEL_ENV: production
+          RAILKIT_API_KEY: ${{ secrets.RAILKIT_API_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          # The env schema reads this pair or `UPSTASH_REDIS_REST_*`. These names, because they are
+          # what Vercel's integration injects — so the same credential is called the same thing in
+          # both systems, and nobody has to remember which name is the real one.
+          KV_REST_API_URL: ${{ secrets.KV_REST_API_URL }}
+          KV_REST_API_TOKEN: ${{ secrets.KV_REST_API_TOKEN }}
+          DATA_KEY: ${{ secrets.DATA_KEY }}
+          LIVE_REQUESTS_PER_DAY: ${{ vars.LIVE_REQUESTS_PER_DAY }}
+        run: node scripts/crawl-availability.mjs ${{ inputs.only && format('--only {0}', inputs.only) || '' }}
+
+      # Printed after the crawl and never allowed to fail it: the rows are written and the cursor is
+      # saved by then, so a store that cannot be read back is a reporting problem and not a lost run.
+      - name: Coverage
+        if: always()
+        continue-on-error: true
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: npm run source:report

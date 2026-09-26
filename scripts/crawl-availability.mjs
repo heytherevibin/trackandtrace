@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 // Fills the availability observation store: one ask per (train, class, quota, from, to) per stride,
-// one row per day the provider answered for. A human runs this and reads what it says — it is
-// deliberately NOT scheduled, which is a later decision, after a few supervised runs show what it
-// actually costs. **The thing that made scheduling unsafe is gone** (a per-run ceiling with no
-// per-day one); deciding to schedule is still a separate decision, and nothing here makes it.
+// one row per day the provider answered for. A human can still run it and read what it says, and
+// **it is now also scheduled** — daily at 05:30 IST by `.github/workflows/crawl.yml`, decided
+// 2026-09-26 on the grounds the header below already gave: the pinned ask is the only source of the
+// `days_out = 0` outcome row, and a day nobody ran it is a row that can never be recovered, because
+// a past journey date answers 400. The per-day ceiling that made scheduling safe is gate C below.
 //
 //   node --env-file=.env.local scripts/crawl-availability.mjs
 //   (or: npm run source:crawl)
@@ -26,14 +27,17 @@
 // combos the pinned ask IS the sampler; see `QUOTAS_OPENING_NEAR_DEPARTURE` in `crawl-routes.mjs`,
 // which says which entries were measured and which inferred.
 //
-// **Where the rolling window got to lives in `scripts/crawl-cursor.json`**, written after every run
-// and read before the next; the pinned ask does not touch it. It is gitignored: it is this
-// machine's record of what it has asked, not source.
+// **Where the rolling window got to lives in the SHARED STORE**, under `…:crawl:cursor`, written
+// after every run and read before the next; the pinned ask does not touch it. It was a file until
+// 2026-09-26, and a file is still used when no shared store is configured or `--cursor` names one —
+// which is what a local run against a scratch path wants. A scheduled runner checks out fresh every
+// time, so a file-only cursor is always absent there: the same four days near today, every run,
+// with the sixty-day horizon never swept.
 //
-// Losing that file is not a disaster — every combo restarts its sweep at today — but it is a lost
+// Losing it is not a disaster — every combo restarts its sweep at today — but it is a lost
 // sweep: the band the cursor was pointing at gets re-read while another band waits a full cycle
 // longer. **The run cannot tell you it happened, and this header used to claim otherwise.** A lost
-// file and a first run are the same input, an empty map, so a missing entry takes `reset: "none"`;
+// cursor and a first run are the same input, an empty map, so a missing entry takes `reset: "none"`;
 // nothing lands in `restarted` and the run is whole. Only a cursor in the PAST (`behind`) names the
 // band it gave up and makes the run un-whole, because only then is there a band to name — and only
 // then does the crawler know it had one. Which is why `--start` no longer overwrites the entries it
@@ -86,7 +90,7 @@
 // The env file is passed in by the operator exactly as this script's siblings take it, and no key is
 // ever read from anywhere else or printed anywhere. Nothing here knows anything about a person.
 
-import { readFileSync, writeFileSync } from "node:fs";
+
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { registerAppImports } from "./crawl-imports.mjs";
 import {
@@ -102,6 +106,7 @@ import {
   preflight,
   rollingAskIsPointless,
 } from "./crawl-plan.mjs";
+import { createCursorStore } from "./crawl-cursor-store.mjs";
 import { runCrawl } from "./crawl-run.mjs";
 import { STORE_TIMEOUT_MS, createCountingFetch, createDayGate, mayRun } from "./crawl-spend.mjs";
 import { dayBudgetLines, exitCodeFor, summarise } from "./crawl-report.mjs";
@@ -209,16 +214,6 @@ async function printStoreCoverage({ db, table, today, listed }) {
   }
 }
 
-/** Absent is the normal first run: every combo starts at today. Unreadable is not, and is refused. */
-function readCursorFile(path) {
-  try {
-    return readFileSync(path, "utf8");
-  } catch (error) {
-    if (error.code === "ENOENT") return null;
-    throw error;
-  }
-}
-
 async function main() {
   const found = flags(process.argv.slice(2));
   const srcRoot = new URL("../src/", HERE);
@@ -258,12 +253,28 @@ async function main() {
   const today = istToday();
   if (horizonDays < 1 || windowDays < 2) fail("--horizon must be at least 1 and --window at least 2");
 
+  // The cursor goes to the SHARED STORE when there is one, and to a file when there is not.
+  //
+  // A file was enough while this only ran from a working copy. A scheduled runner checks out fresh
+  // every time, so a file-only cursor is always absent there: every run re-asks the same four days
+  // near today and the sixty-day horizon is never swept. `--cursor` still forces the file, which is
+  // what a one-off local run against a scratch path wants.
+  //
+  // `publicStore` answers with an IN-MEMORY store when none is configured, under a prefix that
+  // looks exactly like the real one — so a cursor written there is lost when the process exits
+  // while the banner reports a key as though it were durable. `sharedStoreConfig` is what actually
+  // says whether there is a store, and the file is the honest answer when there is not.
+  const { publicStore } = await import(new URL("services/shared-store.ts", srcRoot).href);
+  const { sharedStoreConfig } = await import(new URL("services/env.ts", srcRoot).href);
   const cursorPath = found.get("cursor") ?? fileURLToPath(new URL("crawl-cursor.json", HERE));
-  const readCursors = parseCursors(readCursorFile(cursorPath));
+  const durable = !found.get("cursor") && sharedStoreConfig(environment) !== null;
+  const shared = durable ? publicStore(environment) : null;
+  const cursorStore = createCursorStore({ kv: shared?.kv ?? null, prefix: shared?.prefix ?? "", path: cursorPath });
+  const readCursors = parseCursors(await cursorStore.read());
   if (!readCursors.ok) {
     fail(
-      `the cursor file is unusable, so nothing was asked:\n  ${readCursors.issues.join("\n  ")}\n` +
-        `It says where each combo's rolling window got to. Fix ${cursorPath}, or delete it to restart every sweep at today.`,
+      `the stored cursor is unusable, so nothing was asked:\n  ${readCursors.issues.join("\n  ")}\n` +
+        `It says where each combo's rolling window got to. Fix ${cursorStore.where}, or clear it to restart every sweep at today.`,
     );
   }
   // --start is the one-off escape hatch: ignore every cursor and ask this exact date. The cursors
@@ -341,7 +352,7 @@ async function main() {
     console.log(`pinned only    ${pinnedOnly.length} combo${pinnedOnly.length === 1 ? "" : "s"} make the pinned ask and no rolling one: ${quotas} open${quotas.includes(",") ? "" : "s"} too close to departure for a rolling ask to answer`);
     for (const route of pinnedOnly) console.log(`               ${comboKey(route)}`);
   }
-  console.log(`cursor         ${cursorPath}${Object.keys(readCursors.cursors).length === 0 ? " (none yet: every combo starts at today)" : ""}${startAt === undefined ? "" : ` (overridden for this run: ${startAt})`}`);
+  console.log(`cursor         ${cursorStore.where}${Object.keys(readCursors.cursors).length === 0 ? " (none yet: every combo starts at today)" : ""}${startAt === undefined ? "" : ` (overridden for this run: ${startAt})`}`);
   console.log(
     `worst case     ${worstCase} calls (${worstCase / CALLS_PER_ASK_MAX} asks × ${CALLS_PER_ASK_MAX} for the guard's one retry: ${routes.length - pinnedOnly.length} combo${routes.length - pinnedOnly.length === 1 ? "" : "s"} × ${ASKS_PER_COMBO_MAX} asks${pinnedOnly.length === 0 ? "" : `, ${pinnedOnly.length} × 1`})`,
   );
@@ -405,9 +416,9 @@ async function main() {
   // Written before anything else, and even when the run was not whole: the asks were spent either
   // way, and a cursor that forgets them makes the next run re-ask a band it has already covered.
   try {
-    writeFileSync(cursorPath, `${JSON.stringify(summary.cursors, null, 2)}\n`);
+    await cursorStore.write(summary.cursors);
   } catch (error) {
-    console.error(`[crawl] the run finished but its cursor could not be saved to ${cursorPath}: ${error.message}`);
+    console.error(`[crawl] the run finished but its cursor could not be saved to ${cursorStore.where}: ${error.message}`);
     console.error("[crawl] the next run will restart every sweep at today unless this is fixed.");
   }
 
