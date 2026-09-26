@@ -6,7 +6,7 @@ import { orderRows, type SortKey } from "./train-order";
 import { Corners } from "@/components/ui/corners";
 import { PLATE_TITLE_STACK, plateCellClass } from "@/components/ui/plate";
 import { messages } from "@/messages";
-import type { AvailabilityAnswer } from "@/services/availability-source";
+import type { AvailabilityAnswer, AvailabilityDayRecord } from "@/services/availability-source";
 import type { RouteAvailabilityAnswer, TrainRow } from "@/services/route-availability";
 import type { SourceFailure } from "@/services/sources/outcome";
 import { cn } from "@/utils/cn";
@@ -106,6 +106,48 @@ export function TrainsPlate({
     })();
   }
 
+  /**
+   * Days 5–8 for ONE class of ONE train, and only when a reader presses for them.
+   *
+   * One ask buys exactly four consecutive days — measured 2026-09-26, and the provider ignores
+   * `?days=` and `?limit=`. So a week costs a second ask, and it is never made for a list: twelve
+   * trains would double the most expensive thing this product does. It is made here, for the class
+   * whose dates are on screen, when someone asks to see further.
+   */
+  function moreDates(train: TrainRow["train"], cls: string, lastDate: string): void {
+    const trainNo = train.trainNo;
+    const already = opened[trainNo];
+    if (!answer || !already || already.loadingDatesFor || already.extraDays?.[cls]) return;
+    const next = new Date(`${lastDate}T00:00:00Z`);
+    if (Number.isNaN(next.getTime())) return;
+    // The day AFTER the last one shown, so the two windows meet without a gap or an overlap.
+    next.setUTCDate(next.getUTCDate() + 1);
+    const from = next.toISOString().slice(0, 10);
+
+    setOpened((was) => ({ ...was, [trainNo]: { ...already, loadingDatesFor: cls, datesFailedFor: null } }));
+    void (async () => {
+      const failed = () => setOpened((was) => ({ ...was, [trainNo]: { ...(was[trainNo] ?? already), loadingDatesFor: null, datesFailedFor: cls } }));
+      try {
+        const res = await fetch("/api/availability", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ trainNo, from: train.fromCode, to: train.toCode, journeyDate: from, quota, travelClass: cls }),
+        });
+        const body = (await res.json()) as { ok?: boolean; days?: readonly AvailabilityDayRecord[] };
+        if (!res.ok || body.ok !== true || !Array.isArray(body.days) || body.days.length === 0) {
+          failed();
+          return;
+        }
+        setOpened((was) => {
+          const current = was[trainNo] ?? already;
+          return { ...was, [trainNo]: { ...current, loadingDatesFor: null, datesFailedFor: null, extraDays: { ...current.extraDays, [cls]: body.days ?? [] } } };
+        });
+      } catch {
+        failed();
+      }
+    })();
+  }
+
   const rows = answer && !refusal ? orderRows(answer.rows, answer.leadClass, sort, onlyBookable) : [];
 
   return (
@@ -163,6 +205,7 @@ export function TrainsPlate({
               leadClass={answer.leadClass}
               todayIso={todayIso}
               opened={opened[row.train.trainNo]}
+              onMoreDates={(cls, lastDate) => moreDates(row.train, cls, lastDate)}
               onOpen={() => open(row.train, row.pending)}
               last={i === rows.length - 1}
             />

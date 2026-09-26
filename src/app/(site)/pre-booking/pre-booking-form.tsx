@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Corners } from "@/components/ui/corners";
 import { DateField } from "@/components/ui/date-field";
 import { NativeSelect } from "@/components/ui/native-select";
+import { StationField } from "@/components/ui/station-field";
 import { PLATE_TITLE_STACK, plateCellClass } from "@/components/ui/plate";
 import { Timeline } from "@/components/ui/timeline";
 import { messages } from "@/messages";
@@ -177,19 +178,7 @@ export function PreBookingForm() {
           {/* From, swap, To as ONE cell of the outer grid: the pair belongs together, and the arrow
               has to sit between them at every width rather than wrapping off on its own. */}
           <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2 sm:col-span-2">
-            <div className={FIELD}>
-              <label htmlFor={`${ids}-from`} className={FIELD_LABEL}>
-                {m.from}
-              </label>
-              <input
-                id={`${ids}-from`}
-                className="well h-10 w-full px-2.5 uppercase"
-                autoCapitalize="characters"
-                placeholder={m.stationPlaceholder}
-                value={from}
-                onChange={(event) => setFrom(event.target.value.toUpperCase())}
-              />
-            </div>
+            <StationField id={`${ids}-from`} label={m.from} labelClassName={FIELD_LABEL} value={from} onChange={setFrom} />
             {/* The return journey is these two the other way round. Typing them again is the kind of
                 work a form should do for the reader. */}
             <button
@@ -206,21 +195,15 @@ export function PreBookingForm() {
                 <path d="M2 5.5h10M9.5 3l2.5 2.5L9.5 8M14 10.5H4M6.5 8L4 10.5 6.5 13" strokeLinecap="square" />
               </svg>
             </button>
-            <div className={FIELD}>
-              <label htmlFor={`${ids}-to`} className={FIELD_LABEL}>
-                {m.to}
-              </label>
-              <input
-                id={`${ids}-to`}
-                className="well h-10 w-full px-2.5 uppercase"
-                autoCapitalize="characters"
-                placeholder={m.stationPlaceholder}
-                aria-invalid={route === "none" || undefined}
-                aria-describedby={route === "none" ? `${ids}-route` : undefined}
-                value={to}
-                onChange={(event) => setTo(event.target.value.toUpperCase())}
-              />
-            </div>
+            <StationField
+              id={`${ids}-to`}
+              label={m.to}
+              labelClassName={FIELD_LABEL}
+              value={to}
+              onChange={setTo}
+              invalid={route === "none"}
+              describedBy={route === "none" ? `${ids}-route` : undefined}
+            />
           </div>
           {/* Our calendar, not Chrome's. The input inside is still `type="date"`, so typing, `min`
               and validation are untouched — only the popup changed. */}

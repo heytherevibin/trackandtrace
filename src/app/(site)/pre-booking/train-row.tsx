@@ -3,7 +3,7 @@ import { AvailabilityPlate } from "./availability-plate";
 import { ClassBlock } from "./class-block";
 import { TrainRoutePopover } from "./train-route-strip";
 import { messages } from "@/messages";
-import type { AvailabilityAnswer } from "@/services/availability-source";
+import type { AvailabilityAnswer, AvailabilityDayRecord } from "@/services/availability-source";
 import type { TrainRow } from "@/services/route-availability";
 import { cn } from "@/utils/cn";
 
@@ -51,6 +51,17 @@ export interface Opened {
    * already in hand. A control that greys out after one press, having cost nothing, reads as broken.
    */
   readonly shown: boolean;
+  /**
+   * Days 5–8 for a class, fetched only when a reader presses for them.
+   *
+   * Keyed by class because they are bought one class at a time: one ask buys four days for ONE
+   * class of ONE train, so asking for every chosen class would be three requests for a press that
+   * looks like one.
+   */
+  readonly extraDays?: Readonly<Record<string, readonly AvailabilityDayRecord[]>>;
+  /** Which class is being fetched right now, so only that button says it is working. */
+  readonly loadingDatesFor?: string | null;
+  readonly datesFailedFor?: string | null;
 }
 
 export function TrainRowView({
@@ -59,6 +70,7 @@ export function TrainRowView({
   todayIso,
   opened,
   onOpen,
+  onMoreDates,
   last = false,
 }: {
   readonly row: TrainRow;
@@ -66,6 +78,8 @@ export function TrainRowView({
   readonly todayIso: string;
   readonly opened: Opened | undefined;
   readonly onOpen: () => void;
+  /** Buy the four days after `lastDate` for one class. The only press on this row that costs a request. */
+  readonly onMoreDates: (cls: string, lastDate: string) => void;
   readonly last?: boolean;
 }) {
   const runs = runsLine(row.train.runsOn);
@@ -81,7 +95,11 @@ export function TrainRowView({
   // the lead is only the default, and a row where every class answered has four equal candidates.
   const [picked, setPicked] = useState<string | null>(null);
   const pickable = picked !== null && picked in answers ? picked : leadClass in answers ? leadClass : (Object.keys(answers)[0] ?? null);
-  const lead = pickable === null ? undefined : answers[pickable];
+  const found = pickable === null ? undefined : answers[pickable];
+  // The four days the search bought, plus any later window a reader has since asked for. Appended
+  // rather than replacing: the first four are already on screen and must not move under them.
+  const extra = (pickable === null ? undefined : opened?.extraDays?.[pickable]) ?? [];
+  const lead = found && extra.length > 0 ? { ...found, days: [...found.days, ...extra] } : found;
   // Four dates came back with every ask, and the list shows one. Opening a row stops hiding the
   // other three, and when every chosen class is already in hand that costs NOTHING — there is
   // nothing left to request, so the button is a toggle and not a fetch.
@@ -150,6 +168,23 @@ export function TrainRowView({
           </div>
           <div className="-mx-5 mt-2">
             <AvailabilityPlate answer={dates} todayIso={todayIso} retrievedAt="" sampleData={false} bare />
+          </div>
+          {/* The one control here that spends a request. Offered only once per class, because a
+              second press would buy days nine to twelve and nobody asked for a fortnight. */}
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
+            {extra.length > 0 ? (
+              <span className="text-label text-ink-1/70">{m.nextDatesDone(dates.days.length)}</span>
+            ) : (
+              <button
+                type="button"
+                className={BTN}
+                disabled={opened?.loadingDatesFor === pickable}
+                onClick={() => onMoreDates(pickable, dates.days[dates.days.length - 1]?.date ?? "")}
+              >
+                {opened?.loadingDatesFor === pickable ? m.nextDatesLoading : m.nextDates}
+              </button>
+            )}
+            {opened?.datesFailedFor === pickable ? <span className="text-label text-ink-1/70">{m.nextDatesFailed}</span> : null}
           </div>
         </div>
       ) : null}

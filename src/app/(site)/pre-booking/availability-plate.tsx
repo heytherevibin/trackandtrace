@@ -57,7 +57,9 @@ function Day({ day }: { readonly day: AvailabilityDay & { readonly wlBooking: nu
         ) : null}
         {day.canBook ? null : <span className={cn(TAG, "bg-surface-1 text-ink-2")}>{m.closed}</span>}
       </div>
-      {day.canBook ? null : <div className="mt-1 text-ink-1/70">{m.closedNote}</div>}
+      {/* The sentence that used to sit here said what the chip beside the status already says, and
+          cost the row a second line to say it — one row in four standing twice as tall as its
+          neighbours. The chip is the claim; a paragraph repeating it is not more true. */}
     </>
   );
 }
@@ -135,7 +137,9 @@ export function AvailabilityPlate({
           <tbody role={R.rowgroup} className={S.body}>
             {answer.days.map((day) => (
               <tr key={day.date} role={R.row} className={cn(S.row, "max-sm:grid-cols-3")}>
-                <td role={R.cell} className={cn(CELL, S.wide, "whitespace-nowrap max-sm:font-semibold")}>
+                {/* Set in caps like every other label on the sheet. `uppercase` is CSS, so the
+                    date a screen reader announces is still "Wed, 30 Sep 2026". */}
+                <td role={R.cell} className={cn(CELL, S.wide, "font-data whitespace-nowrap uppercase tracking-caps max-sm:font-semibold")}>
                   {readDate(day.date, todayIso)}
                 </td>
                 <td role={R.cell} data-label={m.columns.availability} className={cn(CELL, S.wide)}>

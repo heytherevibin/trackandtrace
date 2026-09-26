@@ -55,14 +55,16 @@ export const booking = {
     /** The queue's two ends: where it started when booking opened, and where it is now. */
     waitlistOf: (opened: number) => `of ${opened} when booking opened`,
     nobodyCleared: "nobody has cleared yet",
-    closed: "Booking closed",
     /**
-     * Says only what the source said: `canBook` is false. It used to say "The chart is prepared.
-     * This is how it finished." — which production disproved on 2026-09-25, answering canBook false
-     * for a date twenty-one days out, where no chart exists yet. The reason is not measured, so no
-     * reason is given.
+     * Says only what the source said: `canBook` is false. No reason is given, because none is
+     * measured — a longer form once read "The chart is prepared. This is how it finished.", which
+     * production disproved on 2026-09-25 by answering canBook false for a date twenty-one days out,
+     * where no chart exists yet.
+     *
+     * It is the whole claim. A sentence under the row repeating it cost every closed row a second
+     * line and added nothing, so there is no longer one.
      */
-    closedNote: "Booking is closed for this date.",
+    closed: "Booking closed",
     today: "Today",
     fare: (total: number) => `₹${total.toLocaleString("en-IN")}`,
     /**
@@ -89,6 +91,19 @@ export const booking = {
     moreDates: "Three more dates",
     /** The same control on the way back. It hides rows already in hand, so it costs nothing. */
     fewerDates: "Hide dates",
+    /**
+     * Four more days, and the only control on this surface that SPENDS something on a press.
+     *
+     * One ask buys exactly four consecutive days — measured 2026-09-26, and `?days=` and `?limit=`
+     * are both ignored — so a week needs a second ask. It is therefore never made for a list: a
+     * search of twelve trains would double the most expensive thing this product does. It is made
+     * for the one class of the one train a reader asked about, when they ask.
+     */
+    nextDates: "Next available dates",
+    nextDatesLoading: "Asking…",
+    /** Said when the press has already been made, so nobody presses it twice expecting more. */
+    nextDatesDone: (days: number) => `${days} days shown`,
+    nextDatesFailed: "Those dates could not be read.",
     opening: "Asking…",
     /**
      * Which class the date table below belongs to.
