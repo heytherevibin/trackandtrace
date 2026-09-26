@@ -3,7 +3,7 @@
 // one row per day the provider answered for. A human can still run it and read what it says, and
 // **it is now also scheduled** — daily at 05:30 IST by `.github/workflows/crawl.yml`, decided
 // 2026-09-26 on the grounds the header below already gave: the pinned ask is the only source of the
-// `days_out = 0` outcome row, and a day nobody ran it is a row that can never be recovered, because
+// `days_out = 1` outcome row, and a day nobody ran it is a row that can never be recovered, because
 // a past journey date answers 400. The per-day ceiling that made scheduling safe is gate C below.
 //
 //   node --env-file=.env.local scripts/crawl-availability.mjs
@@ -17,7 +17,7 @@
 //
 //   * the ROLLING window — each combo's cursor rolls forward a stride a day and wraps at the
 //     horizon, which is what gives a journey date several looks at decreasing distances;
-//   * an ask PINNED at today, which is the only thing that supplies the `days_out = 0` row the
+//   * an ask PINNED at today, which is the only thing that supplies the `days_out = 1` row the
 //     migration calls the outcome — the label a model trains against. The rolling window reaches it
 //     for one journey date in twenty; see `planAsks` in `crawl-plan.mjs` for the arithmetic.
 //
@@ -299,7 +299,7 @@ async function main() {
     requested: found.has("max-calls") ? whole(found, "max-calls", 0) : undefined,
   });
   // Two asks a combo — the rolling window, and the ask pinned at today that supplies the
-  // days_out = 0 outcome row — except for a combo whose quota only opens near departure, which
+  // days_out = 1 outcome row — except for a combo whose quota only opens near departure, which
   // makes the pinned ask alone. Gate A itself is unchanged; what matters is that the arithmetic
   // handed to it tells the truth about what THIS list will spend, which is why it is given the
   // routes and not merely their number.
@@ -346,7 +346,7 @@ async function main() {
 
   console.log(`routes         ${routes.length} combo${routes.length === 1 ? "" : "s"}${limit < parsed.routes.length ? ` (of ${parsed.routes.length}, limited by --only)` : ""}`);
   console.log(`window         rolling ${windowDays} days a run over a ${horizonDays}-day horizon — a sweep takes ${cycleRuns(horizonDays, windowDays)} runs`);
-  console.log(`pinned         one more ask each at ${today}, which is what supplies the days_out = 0 outcome row (skipped where a sweep wraps onto today)`);
+  console.log(`pinned         one more ask each at ${today}, which is what supplies the days_out = 1 outcome row (skipped where a sweep wraps onto today)`);
   if (pinnedOnly.length > 0) {
     const quotas = [...new Set(pinnedOnly.map((route) => route.quota))].join(", ");
     console.log(`pinned only    ${pinnedOnly.length} combo${pinnedOnly.length === 1 ? "" : "s"} make the pinned ask and no rolling one: ${quotas} open${quotas.includes(",") ? "" : "s"} too close to departure for a rolling ask to answer`);

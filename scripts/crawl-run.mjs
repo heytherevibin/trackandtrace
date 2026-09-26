@@ -193,7 +193,7 @@ export async function runCrawl({ routes, cursors, today, horizonDays, windowDays
 
   // Everything a stop leaves unasked, recorded where the stop happens because the breaking step is
   // itself forfeited only when the gate closed BEFORE its ask. The pinned ones are what matter: a
-  // pinned ask is the only ask that reaches `days_out = 0`, so one never made is a label that does
+  // pinned ask is the only ask that reaches `days_out = 1`, so one never made is a label that does
   // not exist and that no later run can create. Stopping is still right; it was never free.
   const forfeitFrom = (index) => {
     summary.forfeited = plan.slice(index).map((one) => ({ combo: one.combo, kind: one.kind, date: one.date }));

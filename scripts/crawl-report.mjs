@@ -24,7 +24,7 @@
 //     routes.json". It has its own section, it names the held cursor, and it makes the run
 //     un-whole — but it is emphatically NOT a refusal, and the prose has to say so or an operator
 //     will go looking for a bad route that does not exist.
-//   * **A failed pinned ask.** The pinned ask at today is what supplies the `days_out = 0` outcome
+//   * **A failed pinned ask.** The pinned ask at today is what supplies the `days_out = 1` outcome
 //     row, and it can legitimately refuse — the train may simply not run today. So it is reported
 //     apart from the rolling asks, is not counted towards a combo's consecutive-refusal total, and
 //     does NOT make the run un-whole. Counting it would name a Tuesday-only train a bad list entry
@@ -113,7 +113,7 @@ export function summarise(summary) {
     lines.push("", `STOPPED: ${summary.stopped}`);
     // What stopping cost, said out loud. Stopping is the right call — the fuse is 30 s at minimum
     // and every remaining ask would rest too — but "it costs nothing" was never true. A pinned ask
-    // is the only ask that reaches `days_out = 0`, so one the run never made is a label that does
+    // is the only ask that reaches `days_out = 1`, so one the run never made is a label that does
     // not exist and that no later run can create: the rolling window reaches 0 for one journey date
     // in twenty.
     // Keyed on the DATE, not on `kind`. On the run a sweep wraps, `planAsks` emits one step instead
@@ -123,7 +123,7 @@ export function summarise(summary) {
     const lostOutcomes = summary.forfeited.filter((one) => one.date === summary.today);
     if (lostOutcomes.length > 0) {
       lines.push(
-        `  ${lostOutcomes.length} combo${s(lostOutcomes.length)} past the stop were never asked for today's outcome row, and THAT is gone for good — a days_out = 0 row is the label, and only the pinned ask reaches it:`,
+        `  ${lostOutcomes.length} combo${s(lostOutcomes.length)} past the stop were never asked for today's outcome row, and THAT is gone for good — a days_out = 1 row is the label, and only the pinned ask reaches it:`,
       );
       for (const one of lostOutcomes) lines.push(`    ${one.combo}  ${one.date}`);
     }
@@ -196,7 +196,7 @@ export function summarise(summary) {
   if (summary.pinnedFailures.length > 0) {
     lines.push(
       "",
-      `${summary.pinnedFailures.length} pinned ask${s(summary.pinnedFailures.length)} at ${summary.today} did not answer, so ${summary.pinnedFailures.length === 1 ? "that journey date has" : "those journey dates have"} no days_out = 0 outcome row. Usually this means the train does not run today, which is normal — it is NOT counted against the combo's consecutive refusals and does not make the run un-whole. A combo that appears here every day is worth a look:`,
+      `${summary.pinnedFailures.length} pinned ask${s(summary.pinnedFailures.length)} at ${summary.today} did not answer, so ${summary.pinnedFailures.length === 1 ? "that journey date has" : "those journey dates have"} no days_out = 1 outcome row. Usually this means the train does not run today, which is normal — it is NOT counted against the combo's consecutive refusals and does not make the run un-whole. A combo that appears here every day is worth a look:`,
     );
     for (const failure of summary.pinnedFailures) lines.push(`  ${failure.combo}  ${failure.date}  ${failure.why}`);
   }

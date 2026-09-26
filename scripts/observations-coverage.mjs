@@ -18,7 +18,7 @@
 //
 // What the sampler actually promises per run is one thing, and it is the thing measured here:
 // **every combo is ASKED, every run.** (Since `5d0e949` it is asked twice — the rolling-window ask,
-// plus one pinned at today that supplies the `days_out = 0` outcome row; the two collapse into one
+// plus one pinned at today that supplies the `days_out = 1` outcome row; the two collapse into one
 // on the run a sweep wraps. The count below is of combo-DAYS, not of asks, so one or two makes no
 // difference to it.) So:
 //

@@ -43,10 +43,13 @@
 // WHAT IT DOES NOT GUARANTEE — and the one that cost a correction
 // ---------------------------------------------------------------------------
 // This header used to claim those four observations land "at roughly 45, 30, 15 and 0 days out".
-// **The `0` was false**, and it was the only one that mattered: the migration defines the row whose
-// `days_out` is 0 as THE OUTCOME, the label a model trains against.
+// **The `0` was false**, and it was the only one that mattered: the migrations define one row per
+// journey as THE OUTCOME, the label a model trains against, and it sits in that band. It was the
+// `days_out = 0` row until `20260927080000` moved it to `days_out = 1` — on the journey date the
+// counter is shut and the train may already have gone, which is a reading of nothing.
 //
-// `days_out = 0` needs the ask date to equal today, and `nextAsk` returns today only on the `beyond`
+// Either way the rolling window cannot reach it: it needs the ask date at or within a day of today,
+// and `nextAsk` returns today only on the `beyond`
 // wrap — run 0 of a sweep, one journey date in `cycleRuns`. Inside a sweep, run `j` asks
 // `sweepStart + W·j` while today is `sweepStart + j`, so the window lands at
 // `days_out ∈ {3j, 3j+1, 3j+2, 3j+3}` and the closest observation of any other date is
