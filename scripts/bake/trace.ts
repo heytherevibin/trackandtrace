@@ -140,19 +140,47 @@ export function chainPath(list: readonly Quad[]): string {
 }
 
 /**
- * Groups each run's stretch by `${part}|${cls}`, keeping it when either end is inside `box`, translating to
- * box-relative coordinates, and chains each group's stretches into one path.
+ * Segment (x0,y0)-(x1,y1) cut to `box` (Liang-Barsky), or null if it never crosses it. The line side's rails,
+ * sleepers and wire (line-world.ts) run from -420 m to 520 m: a stretch that only dips into the crop at one end
+ * must stop dead at the box's edge, never carry its far end's true (and often huge) coordinate into the path —
+ * the crop only clips what is painted (the still's `<svg>` clips overflow in CSS), never what `getBBox()` reads.
+ */
+function clipToBox(x0: number, y0: number, x1: number, y1: number, box: Box): Quad | null {
+  let t0 = 0;
+  let t1 = 1;
+  const dx = x1 - x0;
+  const dy = y1 - y0;
+  const clip = (p: number, q: number): boolean => {
+    if (p === 0) return q >= 0;
+    const r = q / p;
+    if (p < 0) {
+      if (r > t1) return false;
+      if (r > t0) t0 = r;
+    } else {
+      if (r < t0) return false;
+      if (r < t1) t1 = r;
+    }
+    return true;
+  };
+  if (!clip(-dx, x0 - box.l) || !clip(dx, box.r - x0) || !clip(-dy, y0 - box.t) || !clip(dy, box.b - y0)) return null;
+  if (t0 >= t1) return null;
+  return [x0 + t0 * dx, y0 + t0 * dy, x0 + t1 * dx, y0 + t1 * dy];
+}
+
+/**
+ * Groups each run's stretch by `${part}|${cls}`, keeping it when any of it crosses `box`, cutting it to the
+ * box's edge, translated to box-relative coordinates, and chains each group's stretches into one path.
  */
 export function pathsByPart(runs: readonly Run[], meta: readonly EdgeMeta[], box: Box): Record<string, string> {
-  const inBox = (x: number, y: number) => x >= box.l && x <= box.r && y >= box.t && y <= box.b;
   const groups = new Map<string, Quad[]>();
   for (const run of runs) {
     const [x0, y0, x1, y1] = run.xy;
-    if (!inBox(x0, y0) && !inBox(x1, y1)) continue;
+    const cut = clipToBox(x0, y0, x1, y1, box);
+    if (!cut) continue;
     const { part, cls } = meta[run.i];
     const key = `${part}|${cls}`;
     if (!groups.has(key)) groups.set(key, []);
-    groups.get(key)!.push([x0 - box.l, y0 - box.t, x1 - box.l, y1 - box.t]);
+    groups.get(key)!.push([cut[0] - box.l, cut[1] - box.t, cut[2] - box.l, cut[3] - box.t]);
   }
   const out: Record<string, string> = {};
   for (const [key, list] of groups) out[key] = chainPath(list);

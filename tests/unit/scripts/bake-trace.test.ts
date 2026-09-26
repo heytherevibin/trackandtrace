@@ -85,4 +85,16 @@ describe("cropping and writing paths", () => {
     const box = { l: 90, t: 30, r: 210, b: 270 };
     expect(pathsByPart(runs, meta, box)).toEqual({ "shell|line": "M10 20l100 0", "roof|faint": "M60 120l0 100" });
   });
+
+  // world's rails, sleepers and overhead wire run from -420 m to 520 m (line-world.ts): a stretch that dips into
+  // the crop at one end can run far past it at the other. The crop clips the render (CSS overflow on the still's
+  // <svg>), but getBBox() reads path data, not paint — so an uncropped coordinate silently reopens the very
+  // hairline-vs-label collision the crop exists to prevent (drawing-checks.ts, spec §5). Every written stretch
+  // must stay inside the box, never just have an end inside it.
+  it("clips a stretch that only dips into the crop to the box's edge, never past it", () => {
+    const box = { l: 90, t: 30, r: 210, b: 270 };
+    const dips: Run[] = [{ i: 0, xy: [100, 150, 1000, 150] }]; // one end inside, running far right, level with the crop
+    const dipsMeta = [{ part: "world", cls: "line" }] as const;
+    expect(pathsByPart(dips, dipsMeta, box)).toEqual({ "world|line": "M10 120l110 0" }); // stops dead at r=210 (box-relative 120)
+  });
 });

@@ -2,10 +2,10 @@
 import type { StillManifest } from "./still-shapes";
 
 export const STILL_MANIFEST = {
-  "sourceHash": "50485a7ab8175cc9",
+  "sourceHash": "2243477d612dd911",
   "shapes": {
     "anatomyWide": {
-      "href": "/journey/anatomy-wide.87c869df50.svg",
+      "href": "/journey/anatomy-wide.f3d026ef40.svg",
       "viewBox": [
         0,
         0,
@@ -70,7 +70,7 @@ export const STILL_MANIFEST = {
       }
     },
     "anatomyTall": {
-      "href": "/journey/anatomy-tall.154122b940.svg",
+      "href": "/journey/anatomy-tall.5b4bce8627.svg",
       "viewBox": [
         0,
         0,
@@ -135,7 +135,7 @@ export const STILL_MANIFEST = {
       }
     },
     "terminusWide": {
-      "href": "/journey/terminus-wide.b3a6ff0af5.svg",
+      "href": "/journey/terminus-wide.fd3dd93480.svg",
       "viewBox": [
         0,
         0,
@@ -160,7 +160,7 @@ export const STILL_MANIFEST = {
       "anchors": {}
     },
     "terminusTall": {
-      "href": "/journey/terminus-tall.07875bbc24.svg",
+      "href": "/journey/terminus-tall.513e76bca8.svg",
       "viewBox": [
         0,
         0,
