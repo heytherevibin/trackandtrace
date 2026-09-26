@@ -109,6 +109,34 @@ export const booking = {
     notCarried: "Not carried",
     /** Which class every row carries. Said aloud because a column nobody chose reads as arbitrary. */
     leadsWith: (cls: string) => `${cls} first`,
+    /**
+     * The train's whole run, against the part of it you are on.
+     *
+     * Worth the room because the list otherwise hides the reason two trains on the same pair take
+     * nine hours and thirteen: 12685 makes 9 halts over 583 km, 16159 makes 24 over 677.
+     */
+    route: {
+      label: "This train's run",
+      /** Said only when the train started before your station — otherwise you board where it begins. */
+      boardsLater: "You join it here",
+      /** Said only when it carries on past yours. */
+      carriesOn: "Carries on to",
+      halts: (halts: number) => (halts === 1 ? "1 halt" : `${halts} halts`),
+      distance: (km: number) => `${km.toLocaleString("en-IN")} km`,
+      loading: "Reading the timetable…",
+      /** The run could not be fetched. Never drawn as a train with no stops. */
+      failed: "Trakline could not read this train's run.",
+      /**
+       * The middle of a long run, folded away.
+       *
+       * The ends are what a traveller checks — where they get on and off, and whether the train
+       * starts or continues elsewhere. Thirty-one rows in a hover is a scroll nobody asked for, so
+       * the middle collapses and says how much it is holding.
+       */
+      hiddenStops: (count: number) => `${count} more stops`,
+      /** A timetable, not a live reading: it is the scheduled run and says so. */
+      scheduled: "Scheduled stops",
+    },
     trainFailed: "Trakline could not answer for this train. Nothing is shown in its place.",
     /**
      * An ANSWER, and it must not borrow the words above. "Could not answer" says we failed to ask;

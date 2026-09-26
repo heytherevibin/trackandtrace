@@ -31,17 +31,39 @@ interface SampleTrain {
   readonly runningDays: string;
   readonly halts: number;
   readonly distanceKm: number;
+  /** The train's own ends, where they differ from the segment on this pair. */
+  readonly originCode?: string;
+  readonly originName?: string;
+  readonly destinationCode?: string;
+  readonly destinationName?: string;
 }
 
 const SBC_NDLS: readonly SampleTrain[] = [
-  { trainNo: "12627", trainName: "KARNATAKA EXP", fromCode: "SBC", toCode: "NDLS", departs: "20:00", arrives: "06:10", travelTime: "34:10 hrs", runningDays: "1111111", halts: 31, distanceKm: 2444 },
+  // Begins before SBC, so the traveller joins it mid-route — the commonest shape on a real pair.
+  { trainNo: "12627", trainName: "KARNATAKA EXP", fromCode: "SBC", toCode: "NDLS", departs: "20:00", arrives: "06:10", travelTime: "34:10 hrs", runningDays: "1111111", halts: 31, distanceKm: 2444, originCode: "MYS", originName: "Mysuru Jn" },
   // Boards at SBC and arrives at NZM, as the real 22691 does: the sample pair is not its pair.
-  { trainNo: "22691", trainName: "RAJDHANI EXP", fromCode: "SBC", toCode: "NZM", departs: "20:20", arrives: "05:30", travelTime: "33:10 hrs", runningDays: "1011010", halts: 9, distanceKm: 2365 },
+  // Starts where the traveller boards, and carries on past where they get off.
+  { trainNo: "22691", trainName: "RAJDHANI EXP", fromCode: "SBC", toCode: "NZM", departs: "20:20", arrives: "05:30", travelTime: "33:10 hrs", runningDays: "1011010", halts: 9, distanceKm: 2365, destinationCode: "JAT", destinationName: "Jammu Tawi" },
   // A special, listed on the pair and closed for booking — the third answer a row can carry, beside
   // a berth count and a class the train does not run. Production answers exactly this for 00629
   // YPR → TKD, measured 2026-09-26, and without a sample that does it no test could see the row.
   { trainNo: "00629", trainName: "YPR TKD SPECIAL", fromCode: "SBC", toCode: "TKD", departs: "23:45", arrives: "08:15", travelTime: "32:30 hrs", runningDays: "0000100", halts: 12, distanceKm: 2401 },
 ];
+
+/**
+ * Real names for the sample codes.
+ *
+ * The fixture used to answer `fromName: fromCode`, so every surface that draws a station name got
+ * "SBC SBC" and nothing could show a name being wrong, missing, or the same as its code.
+ */
+const NAMES: Readonly<Record<string, string>> = {
+  SBC: "KSR Bengaluru",
+  NDLS: "New Delhi",
+  NZM: "Hazrat Nizamuddin",
+  TKD: "Tughlakabad",
+  MYS: "Mysuru Jn",
+  JAT: "Jammu Tawi",
+};
 
 const ROUTES: Readonly<Record<string, readonly SampleTrain[]>> = { "SBC-NDLS": SBC_NDLS };
 
@@ -60,13 +82,17 @@ export const fixtureRouteSource: RouteSource = {
           trainNo: train.trainNo,
           trainName: train.trainName,
           fromCode: train.fromCode,
-          fromName: train.fromCode,
+          fromName: NAMES[train.fromCode] ?? train.fromCode,
           toCode: train.toCode,
-          toName: train.toCode,
-          originCode: train.fromCode,
-          originName: train.fromCode,
-          destinationCode: train.toCode,
-          destinationName: train.toCode,
+          toName: NAMES[train.toCode] ?? train.toCode,
+          // A train's OWN ends, which are usually not the pair asked about: production answers
+          // SBC → NDLS with eight trains of which seven begin or end somewhere else. Deriving these
+          // from `fromCode`/`toCode`, as this fixture did until 2026-09-26, made every sample train
+          // start exactly where the traveller boards — so nothing could render the commonest case.
+          originCode: train.originCode ?? train.fromCode,
+          originName: train.originName ?? train.fromCode,
+          destinationCode: train.destinationCode ?? train.toCode,
+          destinationName: train.destinationName ?? train.toCode,
           departs: train.departs,
           arrives: train.arrives,
           travelTime: train.travelTime,

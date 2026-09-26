@@ -90,6 +90,17 @@ export function resetLocalState(): void {
   localKv.clear();
 }
 
+/**
+ * The plain shared store, for values that are facts about the railway rather than about a person.
+ *
+ * Deliberately NOT `createPnrCache`: that one is encrypted and keyed for reservation records, and
+ * a timetable is neither personal nor secret. Sharing it would encrypt a public timetable and, far
+ * worse, put railway data under the key reserved for passenger data.
+ */
+export function publicStore(current: Env = env()): { readonly kv: Kv; readonly prefix: string } {
+  return stateStore(current);
+}
+
 /** Today's live-request budget, shared by every instance. Sources that spend no provider quota have none. */
 export function liveBudget(current: Env = env()): LiveBudget {
   if (!isThirdPartySource(activePnrSource(current))) return UNLIMITED_BUDGET;

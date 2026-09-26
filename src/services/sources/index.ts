@@ -4,16 +4,19 @@ import { activePnrSource, env, fallbackPnrSource, fixtureAllowed, isThirdPartySo
 import type { AvailabilitySource } from "@/services/availability-source";
 import type { PnrDataSource } from "@/services/pnr-source";
 import type { RouteSource } from "@/services/route-source";
+import type { TrainRouteSource } from "@/services/train-route-source";
 import { providerGuard } from "@/services/shared-store";
 import { createFallbackSource } from "./fallback";
 import { fixtureSource } from "./fixture";
 import { fixtureAvailabilitySource } from "./fixture-availability";
 import { fixtureRouteSource } from "./fixture-route";
+import { fixtureTrainRouteSource } from "./fixture-train-route";
 import { createGuardedSource } from "./guarded";
 import { createLiveSource } from "./live";
 import { createRailkitSource } from "./railkit";
 import { createRailKitAvailabilitySource } from "./railkit-availability";
 import { createRailKitRouteSource } from "./railkit-route";
+import { createRailKitTrainRouteSource } from "./railkit-train-route";
 
 // Provider registry. The fixture is served only when explicitly requested and
 // never in production; the env schema refuses that combination at boot and this
@@ -37,6 +40,13 @@ const refusedSource: PnrDataSource = {
 
 /** No provider key, or sample data refused: the route is unavailable, never an empty list of trains. */
 const refusedRouteSource: RouteSource = {
+  async check() {
+    return { ok: false, code: "SOURCE_UNAVAILABLE", message: messages.source.route.couldNotAnswer };
+  },
+};
+
+/** And for one train's run, where an empty list would read as a train that calls nowhere. */
+const refusedTrainRouteSource: TrainRouteSource = {
   async check() {
     return { ok: false, code: "SOURCE_UNAVAILABLE", message: messages.source.route.couldNotAnswer };
   },
@@ -132,6 +142,24 @@ export function resolveRouteSource(current: Env = env()): RouteSource {
 
 export function getRouteSource(): RouteSource {
   return resolveRouteSource(env());
+}
+
+/**
+ * One train's whole run, by the same rules as the route seam above.
+ *
+ * It shares the **"route"** guard key with the trains-on-a-pair lookup, because both are timetable
+ * questions and a timetable outage is one outage. Neither may rest live PNR checks.
+ */
+export function resolveTrainRouteSource(current: Env = env()): TrainRouteSource {
+  if (current.PNR_SOURCE === "fixture") return fixtureAllowed(current) ? fixtureTrainRouteSource : refusedTrainRouteSource;
+  const active = activePnrSource(current);
+  if (!isThirdPartySource(active) || !current.RAILKIT_API_KEY) return refusedTrainRouteSource;
+  const adapter = createRailKitTrainRouteSource({ key: current.RAILKIT_API_KEY, baseUrl: current.RAILKIT_BASE_URL, timeoutMs: current.RAILKIT_TIMEOUT_MS });
+  return createGuardedSource(adapter, providerGuard(active, "route", current));
+}
+
+export function getTrainRouteSource(): TrainRouteSource {
+  return resolveTrainRouteSource(env());
 }
 
 /**
