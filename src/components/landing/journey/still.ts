@@ -1,6 +1,6 @@
 import { DRAWING_EVENT, LAYOUT_EVENT, emit } from "./journey-events";
-import { columnsFit, columnsZone, distribute, leaderFrom, letterbox, type Box } from "./labels-layout";
-import type { JourneyContext, Teardown } from "./start-journey";
+import { columnsFit, columnsZone, distribute, leaderFrom, letterbox } from "./labels-layout";
+import type { Teardown } from "./start-journey";
 import { STILL_MANIFEST } from "./still-manifest";
 import { isPartId, partSide } from "./train-parts";
 
@@ -18,8 +18,25 @@ interface Leader {
   readonly line: SVGLineElement;
   readonly dot: SVGCircleElement;
 }
+interface RoundedBox {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
 
-export function startStill(_ctx: JourneyContext): Teardown {
+// The pin's own height (and whether it settled into columns) the reader last actually saw, kept across every
+// rebuild for the journey's whole page load (module-level, exactly like chapters.ts's own placeBox): a
+// teardown's clear() drops .is-columns synchronously, before the reader has seen anything change, and the
+// very next frame's fresh startStill() instance settles again — comparing that fresh instance's first pass
+// against what clear() just (invisibly) left behind would read the rebuild itself as a change the reader
+// lived through, and move them for a jump they never saw. Comparing against what was last actually settled,
+// instead, only reacts to changes the reader really saw. null: nothing has settled yet this page load, so
+// the very first settle (whatever height it lands on) is never treated as a change from anything.
+let lastColumns = false;
+let lastHeight: number | null = null;
+
+export function startStill(): Teardown {
   const pin = document.querySelector<HTMLElement>("#anatomy .anatomy-pin");
   const copy = pin?.querySelector<HTMLElement>(".anatomy-copy");
   const holder = pin?.querySelector<HTMLElement>(".anatomy-still:not(.is-noscript)");
@@ -39,6 +56,7 @@ export function startStill(_ctx: JourneyContext): Teardown {
     pin.classList.remove("is-columns", "is-compact");
     for (const label of labels) label.style.top = "";
     for (const key of HOLDER) holder.style[key] = "";
+    lines.removeAttribute("viewBox");
     for (const { line, dot } of leaders) {
       line.remove();
       dot.remove();
@@ -46,10 +64,12 @@ export function startStill(_ctx: JourneyContext): Teardown {
     leaders = [];
   };
 
-  const drawLeaders = (zone: Box, pinBox: DOMRect) => {
-    const fit = letterbox(WIDE.viewBox, { x: zone.l, y: zone.t, width: zone.r - zone.l, height: zone.b - zone.t });
-    // every label's box read before any leader is written, so no write forces a layout
-    const boxes = labels.map((el) => ({ left: el.offsetLeft, top: el.offsetTop, width: el.offsetWidth }));
+  const drawLeaders = (box: RoundedBox, pinBox: DOMRect, tops: ReadonlyMap<HTMLElement, number>) => {
+    const fit = letterbox(WIDE.viewBox, box);
+    // left and width still come from the DOM (CSS decides them, never written here); top is what settle()
+    // just decided for each label, never read back off the DOM — offsetTop can still answer the write from
+    // a call before this one, its own layout a frame behind the style it was just given.
+    const boxes = labels.map((el) => ({ left: el.offsetLeft, top: tops.get(el) ?? el.offsetTop, width: el.offsetWidth }));
     lines.setAttribute("viewBox", `0 0 ${pinBox.width} ${pinBox.height}`);
     if (leaders.length === 0) {
       leaders = labels.map(() => {
@@ -85,15 +105,18 @@ export function startStill(_ctx: JourneyContext): Teardown {
       return { top: r.top - pinBox.top, bottom: r.bottom - pinBox.top, left: r.left - pinBox.left, right: r.right - pinBox.left };
     };
     let fits = false;
+    const tops = new Map<HTMLElement, number>();
     for (const compact of [false, true]) {
       pin.classList.toggle("is-compact", compact);
       const l = distribute(left.map((el) => el.offsetHeight), rel(copy).bottom + 22, pinBox.height - 44);
       const r = distribute(right.map((el) => el.offsetHeight), Math.max(20, pinBox.height * 0.05), rel(titleBlock).top - 14);
       left.forEach((el, i) => {
         el.style.top = `${l.tops[i]}px`;
+        tops.set(el, l.tops[i]);
       });
       right.forEach((el, i) => {
         el.style.top = `${r.tops[i]}px`;
+        tops.set(el, r.tops[i]);
       });
       if (l.fits && r.fits) {
         fits = true;
@@ -102,67 +125,49 @@ export function startStill(_ctx: JourneyContext): Teardown {
     }
     const zone = columnsZone({ leftEdges: left.map((el) => rel(el).right), rightEdges: right.map((el) => rel(el).left), top: rel(copy).bottom + 16, floor: rel(titleBlock).top - 16 });
     if (!columnsFit({ fits, zone, pinWidth: pinBox.width, titleWidth: titleBlock.offsetWidth })) return false;
-    holder.style.left = `${Math.round(zone.l)}px`;
-    holder.style.top = `${Math.round(zone.t)}px`;
-    holder.style.width = `${Math.round(zone.r - zone.l)}px`;
-    holder.style.height = `${Math.round(zone.b - zone.t)}px`;
-    drawLeaders(zone, pinBox);
+    // Rounded once, so the leaders' letterbox lands in the exact box the holder is placed at — never a
+    // fractional pixel apart from it.
+    const box: RoundedBox = { x: Math.round(zone.l), y: Math.round(zone.t), width: Math.round(zone.r - zone.l), height: Math.round(zone.b - zone.t) };
+    holder.style.left = `${box.x}px`;
+    holder.style.top = `${box.y}px`;
+    holder.style.width = `${box.width}px`;
+    holder.style.height = `${box.height}px`;
+    drawLeaders(box, pinBox, tops);
     return true;
   };
 
   // A reader already below the chapter never asked to move: the pin taking its columns for the first time,
-  // or giving them up, must shift such a reader by exactly the height that gained or lost, never snap them
-  // to its start. Scoped to that one transition only (never a plain resize that leaves is-columns as it
-  // was, columns or not): #how keeps its own reader in place independently (chapters.ts), and the two must
-  // never both react to the same resize — each computing its own correction from its own idea of "before"
-  // can overwrite the other's. A flip is measured fresh, before and after, within this one call.
-  const keepBelow = (change: () => void): boolean => {
-    const wasColumns = pin.classList.contains("is-columns");
-    const beforeRect = pin.getBoundingClientRect();
-    const beforeScrollY = window.scrollY;
-    const beforeDocBottom = beforeRect.top + beforeScrollY + beforeRect.height;
-    change();
-    const isColumns = pin.classList.contains("is-columns");
-    if (wasColumns === isColumns) return isColumns;
-    const afterHeight = pin.getBoundingClientRect().height;
-    if (beforeScrollY >= beforeDocBottom && afterHeight !== beforeRect.height) {
-      window.scrollTo({ top: beforeScrollY + (afterHeight - beforeRect.height), behavior: "instant" });
-    }
-    return isColumns;
-  };
-
-  // While the pin stays in columns across two calls (never a flip: that is keepBelow's job above), only its
-  // own height formula answering a plain window resize can still move a reader below it — #how never enters
-  // into that, since nothing here ever changes its own size, so there is no other guard to conflict with.
-  // Held across calls, like chapters.ts's own placeBox: a plain resize is never caught mid-change by any
-  // callback, only after, so there is no "before" left to measure at that moment except what was on record.
-  let colBottom: number | null = null;
-  let colScrollY = 0;
-  const onScroll = () => {
-    colScrollY = window.scrollY;
-  };
-  window.addEventListener("scroll", onScroll, { passive: true });
-
+  // giving them up, or its own height formula answering a plain resize while staying in columns, must shift
+  // such a reader by exactly the height that gained or lost, never snap them to its start. Never reacts while
+  // list on both sides of the change, though (never a plain resize to the ordinary, content-driven list
+  // height, which nothing here writes or is answerable for): #how keeps its own reader in place
+  // independently in that case, via chapters.ts, and the two must never both react to the same resize.
+  // Compared against what the reader last actually settled on (lastColumns/lastHeight above) when there is
+  // one, never a value measured fresh in this same call: a rebuild's teardown already having run, or the
+  // columns formula answering a resize, is never caught mid-change by any callback, only after, so there is
+  // no "before" left to measure at that moment except what was already on record (prototype v3's placeBox
+  // pattern, chapters.ts's own settlePlace) — comparing a fresh instance's first pass against a live read
+  // instead would misread the rebuild itself (list, briefly, while nothing is watching, then columns again)
+  // as a flip the reader lived through. Only the very first settle this page load, with nothing on record
+  // yet, measures fresh: at that moment the pin still carries its untouched server-rendered height, which a
+  // live read is the right (and only) way to learn.
   const layout = () => {
     frame = 0;
-    const wasColumns = pin.classList.contains("is-columns");
-    const before = colBottom;
-    const beforeY = colScrollY;
-    const isColumns = keepBelow(() => {
-      if (!settle()) clear();
-    });
-    if (wasColumns && isColumns && before !== null) {
-      const rect = pin.getBoundingClientRect();
-      const now = rect.top + window.scrollY + rect.height;
-      if (beforeY >= before && now !== before) window.scrollTo({ top: beforeY + (now - before), behavior: "instant" });
+    const wasColumns = lastColumns;
+    const beforeRect = pin.getBoundingClientRect();
+    const beforeHeight = lastHeight ?? beforeRect.height;
+    const beforeScrollY = window.scrollY;
+
+    const isColumns = settle();
+    if (!isColumns) clear();
+    const afterHeight = pin.getBoundingClientRect().height;
+
+    if (wasColumns || isColumns) {
+      const beforeDocBottom = beforeRect.top + beforeScrollY + beforeHeight;
+      if (beforeScrollY >= beforeDocBottom && afterHeight !== beforeHeight) window.scrollTo({ top: beforeScrollY + (afterHeight - beforeHeight), behavior: "instant" });
     }
-    if (isColumns) {
-      const rect = pin.getBoundingClientRect();
-      colBottom = rect.top + window.scrollY + rect.height;
-      colScrollY = window.scrollY;
-    } else {
-      colBottom = null;
-    }
+    lastColumns = isColumns;
+    lastHeight = afterHeight;
     // the chapter changed height: every module that measures sections hears it (only on a change, or it would loop)
     if (wasColumns !== isColumns) emit(LAYOUT_EVENT);
   };
@@ -191,8 +196,16 @@ export function startStill(_ctx: JourneyContext): Teardown {
   window.addEventListener(DRAWING_EVENT, schedule);
   window.addEventListener(LAYOUT_EVENT, schedule);
   columns.addEventListener("change", schedule);
+  // The pin's own box (fixed by CSS in columns mode) never answers a label, the title block or the copy
+  // changing size — a font swapping in after the first pass, say — so each is watched too. layout() only
+  // ever writes labels' own `top` and the holder's geometry, never anything these boxes are measured from
+  // (a label's height, the title block's or the copy's box), so observing them can never loop back into
+  // triggering itself.
   const observer = new ResizeObserver(schedule);
   observer.observe(pin);
+  observer.observe(copy);
+  observer.observe(titleBlock);
+  for (const label of labels) observer.observe(label);
   void document.fonts.ready.then(schedule);
   schedule();
 
@@ -203,7 +216,6 @@ export function startStill(_ctx: JourneyContext): Teardown {
     window.removeEventListener(DRAWING_EVENT, schedule);
     window.removeEventListener(LAYOUT_EVENT, schedule);
     columns.removeEventListener("change", schedule);
-    window.removeEventListener("scroll", onScroll);
     observer.disconnect();
     for (const stop of pointing) stop();
     light(null);
