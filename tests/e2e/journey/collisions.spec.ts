@@ -2,6 +2,7 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "../fixtures";
 import { PNR, gotoReady } from "../helpers";
 import { collisionsInView, collisionsTopToBottom } from "./collisions";
+import { drawingCollisions } from "./drawing-checks";
 import { waitForJourney } from "./journey-helpers";
 
 /** Draws two probe lines, the second `gap` px below the first, fixed where the window shows them. */
@@ -213,7 +214,7 @@ test.describe("the collision checker", () => {
 // The landing's railway instruments, held as panels: the hero dial is drawn under the plate on purpose (v3's
 // gate skipped it as well), and its left side fades before the words. Every other instrument must never cover
 // text outside itself, nor another instrument.
-const INSTRUMENTS = { panels: [".board", ".berth-plan", ".station-clock", ".route-map", ".chapter-card"], skip: [".hero-dial"] } as const;
+const INSTRUMENTS = { panels: [".board", ".berth-plan", ".station-clock", ".route-map", ".chapter-card", ".title-block"], skip: [".hero-dial"] } as const;
 
 // Today's landing, before the journey adds anything: the baseline every journey PR must keep.
 const SIZES = [
@@ -284,6 +285,33 @@ test.describe("02 pinned, a dense sweep", () => {
       await gotoReady(page, "/");
       await waitForJourney(page);
       expect(await collisionsTopToBottom(page, { ...INSTRUMENTS, step: 0.15 })).toEqual([]);
+    });
+  }
+});
+
+// The drawn train's labels stand in columns only from 64rem up: every width that reaches columns must clear
+// both the shared checker (the title block, now a panel above) and the drawing's own checks (labels over the
+// drawn box, crossing leaders).
+test.describe("the drawn train at #anatomy: nothing collides in columns", () => {
+  test.skip(({ isMobile }) => isMobile, "columns only ever stand at desktop widths; one project is enough");
+
+  for (const viewport of [{ width: 1440, height: 900 }, { width: 1280, height: 800 }, { width: 1366, height: 768 }] as const) {
+    test(`nothing collides at ${viewport.width}×${viewport.height}`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await gotoReady(page, "/");
+      await waitForJourney(page);
+      await page.locator("#anatomy").scrollIntoViewIfNeeded();
+      // The still files have loaded once the shown <svg>'s content has a real box.
+      await expect
+        .poll(() =>
+          page.evaluate(() => {
+            const svg = [...document.querySelectorAll<SVGSVGElement>("#anatomy .anatomy-still:not(.is-noscript) svg")].find((s) => s.checkVisibility());
+            return svg ? svg.getBBox().width : 0;
+          }),
+        )
+        .toBeGreaterThan(0);
+      expect(await drawingCollisions(page)).toEqual([]);
+      expect(await collisionsInView(page, INSTRUMENTS)).toEqual([]);
     });
   }
 });

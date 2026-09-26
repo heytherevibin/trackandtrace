@@ -76,6 +76,14 @@ except the station clock, which is one named image of the time ("Station clock: 
 decorative ones say is also said in text. Their styles live in `src/styles/journey.css`. SVG labels there are
 sized in the drawing's own units, so they scale with it; HTML text anywhere still takes the type roles.
 
+**The drawn train.** The landing's drawing chapter (GA) and terminus draw a WAP-7-style locomotive and LHB rake as
+a hairline technical drawing: edges only, hidden lines removed, ink on the sheet in Day and Night, and the lit part
+in steel. The still drawing is baked from the same three.js rig the live drawing (J5) uses
+(`npm run bake:stills`, after any change to the scene); it is one SVG file per shape in `public/journey/`, coloured
+by `currentColor`, fetched only when the page draws still. The drawing is decoration (`aria-hidden`); its ten
+labels are a real list, beside the drawing with leaders on wide screens while the journey runs, and a parts list
+under it everywhere else.
+
 ## Shell
 
 - **Masthead** (`TopNav`), the same on every page: sticky, `surface-0`, hairline bottom. Wordmark (mark + "TRAKLINE" 18px `tracking-brand`); the nav CHECK A PNR · WATCHLIST · PRE-BOOKING · ACCURACY, each its own hairline box with a Fluent **Filled** icon at 20px beside its 13px capital label (Watchlist = eye), the current page tinted steel (on `/`, Check a PNR is current and jumps to `#terminal`); then, on the right, the theme icon button (one square 36px box showing the active mode's Filled icon; a click cycles System → Day → Night; the mode lives in its accessible name and tooltip) beside SIGN IN (capitals, person icon), or the account menu. Every masthead control shares one 36px box (13px capitals, 20px icons). From `lg` it is one row. Below `lg` it is still one row: a square hamburger box on the left of the logo mark (the name shows from `lg`), with the theme button and SIGN IN on the right; the hamburger opens the nav in a sheet that slides in from the left edge and swipes back to it, holding the same four boxes at 48px. Below `xs` (360px) SIGN IN keeps its icon and moves its label to assistive tech. `/login` is not sticky and shows the brand only. On `/` a second row, the route strip, links the page's sections as stations on a rail (from 48rem); while the journey runs, a train runs along it with the odometer and the current station, and phones get a hairline rail in the masthead's foot.
@@ -118,7 +126,9 @@ what the device's reduced-motion setting means, on every traveller page. `motion
 reduced-motion rules under `html[data-motion="off"]` as well as under the media query, and Motion's own
 animations run reduced (`SiteMotion`, `MotionConfig reducedMotion="always"`). The head script in the site
 layout (`src/components/motion/motion-boot.ts`) writes `data-motion` before first paint, from the stored
-choice (`tt.motion`, only ever `off`) and the device. `SiteMotion` re-applies it when either changes;
+choice (`tt.motion`, only ever `off`) and the device, and with it `data-saver` (Save-Data, a 2G or 3G
+connection, or reduced data) and `data-drawing` (`still` when Motion is off, on Data Saver, or once this
+session's drawing fell to its floor; else `live`). `SiteMotion` re-applies it when either changes;
 React never writes it on mount. When the device asks for reduced motion, the switch reads off, is disabled,
 and says why. Under both, a held button stays still. That rule is `!important` because the press selector
 outranks it (guarded by `tests/e2e/motion-switch.spec.ts`).

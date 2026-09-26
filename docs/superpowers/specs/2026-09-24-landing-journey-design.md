@@ -178,11 +178,13 @@ over 40 ms at the lowest step asks for the still drawing. The step is kept in se
 page would, renders the fills depth-only with the live polygon offset, renders every edge in its own ID colour
 depth-tested against them, and walks each edge across the image keeping only the stretches whose colour
 survived. The result is SVG paths per part (anchors for the ten labels included) for four shapes: drawing
-wide and tall, terminus wide and tall (17–34 KB compressed each). The script writes one sprite,
-`public/journey/stills.<hash>.svg` (symbols per part, strokes `currentColor`), and `still-manifest.ts` (the
-hashed path, viewBoxes, anchors, and a hash of the scene sources it was baked from). `next.config.ts` serves
+wide and tall, terminus wide and tall (17–34 KB compressed each). The script writes one file per shape,
+`public/journey/<shape>.<hash>.svg` (a group per part, strokes `currentColor`, each ink weight an inherited CSS
+variable), so a page fetches at most two, and `still-manifest.ts` (J4-2, J4-3) (the hashed path, viewBoxes,
+anchors, and a hash of the scene sources it was baked from). `next.config.ts` serves
 `/journey/*` as `public, max-age=31536000, immutable`. The page shows a still by setting `<use href>` per
-part only when still, so a live page never fetches it; a `<noscript>` copy covers pages without JavaScript.
+part, for the shape its width shows, only when it draws still or its journey failed (J4-4); a `<noscript>`
+copy covers pages without JavaScript.
 A unit test fails when the scene sources change without a re-bake.
 
 ### E. Scene colours and tokens
@@ -292,6 +294,12 @@ Decided while planning J3 (2026-09-25):
 - the phone strip is its own aria-hidden rail (J3-7);
 - the strip's hand-off pulse and the departure horn land with their callers in J4/J5 (J3-8);
 - the plate morph tweens height on `domAnimation` (J3-13).
+
+Decided while planning J4 (2026-09-26):
+- one still file per shape, not one sprite, to keep a page within its still budget (J4-2);
+- the camera fit, the governor, the palette, the glow and the strip's hand-off pulse wait for the live drawing in
+  J5, their only caller (J4-5; J3-8's pulse moves to J5);
+- the parts list is the page's own layout; the journey stands the labels beside the drawing when they fit (J4-7).
 
 Each PR brings the dependency, copy, tokens and DESIGN.md rules its own code first uses, so nothing lands
 unused, and nothing a traveller can see is inert (a Sound switch with no sound). Each runs `npm run check`
