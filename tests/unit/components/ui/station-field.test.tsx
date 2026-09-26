@@ -121,6 +121,17 @@ describe("the station field", () => {
     await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(1));
   });
 
+  it("shows a long station name whole, never clipped", async () => {
+    // MAS is "Puratchi Thalaivar Dr. M.G.R. Chennai Central". Cut to "PURATCHI THALAIVAR DR. M…"
+    // it is the one thing in the row a reader cannot recognise their station from.
+    const long = { code: "MAS", name: "PURATCHI THALAIVAR DR. M.G.R. CHENNAI CENTRAL" };
+    stubFetch([long]);
+    render(<Harness />);
+    fireEvent.change(field(), { target: { value: "chennai" } });
+    await waitFor(() => expect(screen.getByText(long.name)).toBeInTheDocument());
+    expect(screen.getByText(long.name)).not.toHaveClass("truncate");
+  });
+
   it("offers nothing and says nothing when the lookup fails", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("offline"); }));
     render(<Harness />);
