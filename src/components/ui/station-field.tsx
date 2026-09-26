@@ -163,8 +163,15 @@ export function StationField({
           onKeyDown={onKeyDown}
           onBlur={onBlur}
         />
+        {/* The list is wider than the field where there is room, because a station's NAME is the
+            whole point of it and Indian station names are long — "Puratchi Thalaivar Dr. M.G.R.
+            Chennai Central" is MAS. Capped against the viewport so it cannot run off a phone. */}
         {showing ? (
-          <ul id={listId} role="listbox" className="popup-motion absolute inset-x-0 top-full z-popover mt-1 border border-line bg-surface-2 py-1 shadow-2">
+          <ul
+            id={listId}
+            role="listbox"
+            className="popup-motion absolute left-0 top-full z-popover mt-1 w-max min-w-full max-w-[min(28rem,calc(100vw-2rem))] border border-line bg-surface-2 py-1 shadow-2"
+          >
             {options.map((station, i) => (
               <li key={station.code} id={`${listId}-${i}`} role="option" aria-selected={i === active}>
                 {/* `onMouseDown` and not `onClick`: a click blurs the field first, and a blur that
@@ -179,8 +186,10 @@ export function StationField({
                   onMouseEnter={() => setActive(i)}
                   className={cn("flex w-full cursor-pointer items-baseline gap-2.5 px-2.5 py-1.5 text-left max-sm:min-h-11", i === active && "bg-ink-1/7")}
                 >
-                  <span className="font-data text-xs text-ink-1">{station.code}</span>
-                  <span className="truncate text-label text-ink-1/70">{station.name}</span>
+                  <span className="shrink-0 font-data text-xs text-ink-1">{station.code}</span>
+                  {/* Wrapped, never clipped. A name cut to "PURATCHI THALAIVAR DR. M…" is the one
+                      thing in the row a reader cannot recognise their station from. */}
+                  <span className="min-w-0 break-words text-label text-ink-1/70">{station.name}</span>
                 </button>
               </li>
             ))}
