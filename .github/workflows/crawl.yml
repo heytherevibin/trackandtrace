@@ -49,25 +49,10 @@ jobs:
           cache: npm
       - run: npm ci
 
-      # **The cursor, and the one thing this schedule does not yet solve.**
-      #
-      # `scripts/crawl-cursor.json` says how far each combo's rolling window has walked into the
-      # sixty-day horizon. A fresh checkout has none, so without this every run would re-ask the same
-      # four days near today and the horizon would never be swept.
-      #
-      # A cache is best-effort by design: it can be evicted, and then the sweep restarts at today.
-      # That is survivable because it is exactly the behaviour without it, and because the row this
-      # whole schedule exists for — the `days_out = 0` outcome row — comes from the PINNED ask,
-      # which reads no cursor at all. So an evicted cache costs history at distance, never a label.
-      #
-      # The durable fix is to keep the cursor in the shared store beside the day gate, which is a
-      # change to the crawler rather than to this file.
-      - name: Restore the rolling cursor
-        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
-        with:
-          path: scripts/crawl-cursor.json
-          key: crawl-cursor-${{ github.run_id }}
-          restore-keys: crawl-cursor-
+      # No cursor cache. The cursor lives in the SHARED STORE — the same Upstash the day gate and
+      # the breaker use, under `tt:production:crawl:cursor` — so it survives a fresh checkout, an
+      # evicted cache and this runner entirely. That is what makes the sixty-day sweep actually
+      # advance here rather than re-asking the same four days near today, forever.
 
       # The script reads `process.env` directly and validates it with the app's own schema, so a
       # missing secret fails here with the field named rather than halfway through a crawl.
@@ -75,6 +60,13 @@ jobs:
         env:
           PNR_SOURCE: railkit
           PNR_FALLBACK: none
+          # **Not cosmetic.** Every shared key is prefixed `tt:${VERCEL_ENV ?? NODE_ENV}`, so
+          # without this the crawler would run under `tt:development` — its own daily budget, its
+          # own breaker, its own counters, none of them the ones production is using. Two callers
+          # spending one 600-per-10-minutes plan with neither able to see the other, which is the
+          # exact failure sharing DATA_KEY exists to prevent. It IS production traffic, against the
+          # production plan, and it has to be counted there.
+          VERCEL_ENV: production
           RAILKIT_API_KEY: ${{ secrets.RAILKIT_API_KEY }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
@@ -86,15 +78,6 @@ jobs:
           DATA_KEY: ${{ secrets.DATA_KEY }}
           LIVE_REQUESTS_PER_DAY: ${{ vars.LIVE_REQUESTS_PER_DAY }}
         run: node scripts/crawl-availability.mjs ${{ inputs.only && format('--only {0}', inputs.only) || '' }}
-
-      # Saved even when the crawl failed: it writes the cursor for every combo it did reach, and
-      # throwing that away would re-ask those days tomorrow at full price.
-      - name: Save the rolling cursor
-        if: always()
-        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
-        with:
-          path: scripts/crawl-cursor.json
-          key: crawl-cursor-${{ github.run_id }}
 
       # Printed after the crawl and never allowed to fail it: the rows are written and the cursor is
       # saved by then, so a store that cannot be read back is a reporting problem and not a lost run.
