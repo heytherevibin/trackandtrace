@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(64);
+select plan(68);
 
 -- ---------------------------------------------------------------------------
 -- The observation store: facts about berths, never about people.
@@ -271,6 +271,66 @@ select lives_ok(
   $$insert into public.availability_observations (observed_at, train_no, from_code, to_code, travel_class, quota, journey_date, status, can_book, raw_status)
     values ('2026-09-23T18:30:00Z', '12621', 'MAS', 'NDLS', 'SL', 'GN', '2026-10-02', 'WAITLIST', true, 'GNWL65/WL26')$$,
   'a different journey date is a different observation'
+);
+
+-- ---------------------------------------------------------------------------
+-- `outcome`: the label a model trains against, written on the row that IS the
+-- outcome and never overwritten afterwards.
+--
+-- The trap is the upsert above. It is keyed per observation DAY and resolves a
+-- conflict with `do update`, so a second read of the same day rewrites the row.
+-- The berths SHOULD change — the later read is the more current fact — and the
+-- label must not. A dataset whose labels move under a retry is worse than one
+-- with none, because nothing says it happened.
+--
+-- The dates below are written out rather than computed from `current_date`,
+-- because `days_out` is `journey_date - observed_on` and `observed_on` is the
+-- IST date of `observed_at`. A row with today's journey date and a fixed
+-- `observed_at` is not a days_out = 0 row at all — it was minus six when this
+-- was first written, and the trigger correctly did nothing.
+-- ---------------------------------------------------------------------------
+
+insert into public.availability_observations
+  (observed_at, train_no, from_code, to_code, travel_class, quota, journey_date, status, can_book, raw_status)
+values
+  ('2026-10-02T06:00:00Z', '12622', 'MAS', 'NDLS', 'SL', 'GN', '2026-10-02', 'WAITLIST', true, 'GNWL9/WL4');
+
+select is(
+  (select outcome from public.availability_observations where train_no = '12622'),
+  'WAITLIST',
+  'an observation made ON its journey date carries its own status as the outcome'
+);
+
+-- The same day, read again: the berths move, the label does not.
+insert into public.availability_observations
+  (observed_at, train_no, from_code, to_code, travel_class, quota, journey_date, status, can_book, raw_status)
+values
+  ('2026-10-02T09:00:00Z', '12622', 'MAS', 'NDLS', 'SL', 'GN', '2026-10-02', 'AVAILABLE', true, 'AVAILABLE-0004')
+on conflict (train_no, travel_class, quota, from_code, to_code, journey_date, observed_on)
+  do update set status = excluded.status, raw_status = excluded.raw_status, observed_at = excluded.observed_at;
+
+select is(
+  (select outcome from public.availability_observations where train_no = '12622'),
+  'WAITLIST',
+  'a same-day re-observation updates the berths and leaves a resolved outcome alone'
+);
+
+select is(
+  (select status from public.availability_observations where train_no = '12622'),
+  'AVAILABLE',
+  'the berths themselves are still the later, more current reading'
+);
+
+-- A journey still in the future has no outcome, because it has not happened.
+insert into public.availability_observations
+  (observed_at, train_no, from_code, to_code, travel_class, quota, journey_date, status, can_book, raw_status)
+values
+  ('2026-10-02T06:00:00Z', '12623', 'MAS', 'NDLS', 'SL', 'GN', '2026-11-30', 'WAITLIST', true, 'GNWL9/WL4');
+
+select is(
+  (select outcome from public.availability_observations where train_no = '12623'),
+  null,
+  'an observation of a future journey has no outcome yet'
 );
 
 select * from finish();
