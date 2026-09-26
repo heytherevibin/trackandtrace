@@ -4,7 +4,7 @@ import { DRAWING_EVENT, type DrawingDetail, type ResultDetail } from "@/componen
 import { keep, type JourneyContext } from "@/components/landing/journey/start-journey";
 
 const html = document.documentElement;
-const ctx = (motion: boolean): JourneyContext => ({ motion, intro: false, result: keep<ResultDetail | null>(null) });
+const ctx = (motion: boolean): JourneyContext => ({ motion, intro: false, result: keep<ResultDetail | null>(null), still: keep({ columns: false, height: null }) });
 const heard: DrawingDetail[] = [];
 const hear = (e: Event) => heard.push((e as CustomEvent<DrawingDetail>).detail);
 

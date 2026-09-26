@@ -66,7 +66,7 @@ describe("the hero dial's strokes", () => {
 
   it("are the server's again after the intro's rings are torn down", () => {
     const { container } = mount();
-    const stop = startHero({ motion: true, intro: true, result: keep<ResultDetail | null>(null) });
+    const stop = startHero({ motion: true, intro: true, result: keep<ResultDetail | null>(null), still: keep({ columns: false, height: null }) });
     const rings = [...container.querySelectorAll(".hero-dial svg > .dial-ring")];
     expect(rings).toHaveLength(3);
     stop();
@@ -75,7 +75,7 @@ describe("the hero dial's strokes", () => {
 
   it("are the server's again after the chart face's arc is torn down", () => {
     const { container } = mount();
-    const stop = startHero({ motion: true, intro: false, result: keep<ResultDetail | null>(null) });
+    const stop = startHero({ motion: true, intro: false, result: keep<ResultDetail | null>(null), still: keep({ columns: false, height: null }) });
     window.dispatchEvent(new CustomEvent<ResultDetail>(RESULT_EVENT, { detail: { hero: true, kind: "ok", chartAt: new Date(Date.now() + 3 * 3_600_000).toISOString() } }));
     const arc = container.querySelector(".dial-arc")!;
     expect(arc.getAttribute("d")).toMatch(/^M/);
@@ -88,7 +88,7 @@ describe("the berth plan's strokes", () => {
   it("carry no drawn state once torn down", () => {
     document.body.innerHTML = `<figure class="berth-plan"><svg><rect class="plan-line"/><line class="plan-line is-faint"/><rect class="plan-line plan-berth is-lit"/></svg></figure>`;
     // Off screen in jsdom (an empty box), so the entrance arms: every stroke is held hidden, at "0 0".
-    const stop = startBerths({ motion: true, intro: false, result: keep<ResultDetail | null>(null) });
+    const stop = startBerths({ motion: true, intro: false, result: keep<ResultDetail | null>(null), still: keep({ columns: false, height: null }) });
     const strokes = [...document.querySelectorAll(".plan-line")];
     expect(strokes.every((s) => s.getAttribute("draw") === "0 0")).toBe(true);
     stop();

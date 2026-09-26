@@ -1,6 +1,6 @@
 import { DRAWING_EVENT, LAYOUT_EVENT, emit } from "./journey-events";
 import { columnsFit, columnsZone, distribute, leaderFrom, letterbox } from "./labels-layout";
-import type { Teardown } from "./start-journey";
+import type { JourneyContext, Teardown } from "./start-journey";
 import { STILL_MANIFEST } from "./still-manifest";
 import { isPartId, partSide } from "./train-parts";
 
@@ -25,18 +25,19 @@ interface RoundedBox {
   readonly height: number;
 }
 
-// The pin's own height (and whether it settled into columns) the reader last actually saw, kept across every
-// rebuild for the journey's whole page load (module-level, exactly like chapters.ts's own placeBox): a
+// The pin's own height (and whether it settled into columns) the reader last actually saw, kept on
+// JourneyContext's `still` (start-journey.ts) for this startJourney's whole lifetime, across every rebuild: a
 // teardown's clear() drops .is-columns synchronously, before the reader has seen anything change, and the
 // very next frame's fresh startStill() instance settles again — comparing that fresh instance's first pass
 // against what clear() just (invisibly) left behind would read the rebuild itself as a change the reader
 // lived through, and move them for a jump they never saw. Comparing against what was last actually settled,
-// instead, only reacts to changes the reader really saw. null: nothing has settled yet this page load, so
-// the very first settle (whatever height it lands on) is never treated as a change from anything.
-let lastColumns = false;
-let lastHeight: number | null = null;
+// instead, only reacts to changes the reader really saw. A value kept on the context, rather than at module
+// scope, also means a fresh client navigation back to the page (a new startJourney) starts with nothing on
+// record: the module chunk itself stays loaded across that navigation, but its own last-seen place must not.
+// null height: nothing has settled yet this lifetime, so the very first settle (whatever height it lands on)
+// is never treated as a change from anything.
 
-export function startStill(): Teardown {
+export function startStill({ still }: JourneyContext): Teardown {
   const pin = document.querySelector<HTMLElement>("#anatomy .anatomy-pin");
   const copy = pin?.querySelector<HTMLElement>(".anatomy-copy");
   const holder = pin?.querySelector<HTMLElement>(".anatomy-still:not(.is-noscript)");
@@ -67,8 +68,8 @@ export function startStill(): Teardown {
   const drawLeaders = (box: RoundedBox, pinBox: DOMRect, tops: ReadonlyMap<HTMLElement, number>) => {
     const fit = letterbox(WIDE.viewBox, box);
     // left and width still come from the DOM (CSS decides them, never written here); top is what settle()
-    // just decided for each label, never read back off the DOM — offsetTop can still answer the write from
-    // a call before this one, its own layout a frame behind the style it was just given.
+    // just decided for each label (the tops map), so drawing the leaders never needs to read that write back
+    // off the DOM.
     const boxes = labels.map((el) => ({ left: el.offsetLeft, top: tops.get(el) ?? el.offsetTop, width: el.offsetWidth }));
     lines.setAttribute("viewBox", `0 0 ${pinBox.width} ${pinBox.height}`);
     if (leaders.length === 0) {
@@ -142,20 +143,21 @@ export function startStill(): Teardown {
   // list on both sides of the change, though (never a plain resize to the ordinary, content-driven list
   // height, which nothing here writes or is answerable for): #how keeps its own reader in place
   // independently in that case, via chapters.ts, and the two must never both react to the same resize.
-  // Compared against what the reader last actually settled on (lastColumns/lastHeight above) when there is
-  // one, never a value measured fresh in this same call: a rebuild's teardown already having run, or the
-  // columns formula answering a resize, is never caught mid-change by any callback, only after, so there is
-  // no "before" left to measure at that moment except what was already on record (prototype v3's placeBox
-  // pattern, chapters.ts's own settlePlace) — comparing a fresh instance's first pass against a live read
-  // instead would misread the rebuild itself (list, briefly, while nothing is watching, then columns again)
-  // as a flip the reader lived through. Only the very first settle this page load, with nothing on record
-  // yet, measures fresh: at that moment the pin still carries its untouched server-rendered height, which a
-  // live read is the right (and only) way to learn.
+  // Compared against what the reader last actually settled on (ctx.still, above) when there is one, never a
+  // value measured fresh in this same call: a rebuild's teardown already having run, or the columns formula
+  // answering a resize, is never caught mid-change by any callback, only after, so there is no "before" left
+  // to measure at that moment except what was already on record (prototype v3's placeBox pattern, chapters.ts's
+  // own settlePlace) — comparing a fresh instance's first pass against a live read instead would misread the
+  // rebuild itself (list, briefly, while nothing is watching, then columns again) as a flip the reader lived
+  // through. Only the very first settle this lifetime, with nothing on record yet, measures fresh: at that
+  // moment the pin still carries its untouched server-rendered height, which a live read is the right (and
+  // only) way to learn.
   const layout = () => {
     frame = 0;
-    const wasColumns = lastColumns;
+    const place = still.get();
+    const wasColumns = place.columns;
     const beforeRect = pin.getBoundingClientRect();
-    const beforeHeight = lastHeight ?? beforeRect.height;
+    const beforeHeight = place.height ?? beforeRect.height;
     const beforeScrollY = window.scrollY;
 
     const isColumns = settle();
@@ -166,8 +168,7 @@ export function startStill(): Teardown {
       const beforeDocBottom = beforeRect.top + beforeScrollY + beforeHeight;
       if (beforeScrollY >= beforeDocBottom && afterHeight !== beforeHeight) window.scrollTo({ top: beforeScrollY + (afterHeight - beforeHeight), behavior: "instant" });
     }
-    lastColumns = isColumns;
-    lastHeight = afterHeight;
+    still.set({ columns: isColumns, height: afterHeight });
     // the chapter changed height: every module that measures sections hears it (only on a change, or it would loop)
     if (wasColumns !== isColumns) emit(LAYOUT_EVENT);
   };
@@ -197,10 +198,10 @@ export function startStill(): Teardown {
   window.addEventListener(LAYOUT_EVENT, schedule);
   columns.addEventListener("change", schedule);
   // The pin's own box (fixed by CSS in columns mode) never answers a label, the title block or the copy
-  // changing size — a font swapping in after the first pass, say — so each is watched too. layout() only
-  // ever writes labels' own `top` and the holder's geometry, never anything these boxes are measured from
-  // (a label's height, the title block's or the copy's box), so observing them can never loop back into
-  // triggering itself.
+  // changing size — a font swapping in after the first pass, say — so each is watched too. layout() itself
+  // toggles .is-compact, which changes a label's own height (its detail line disappears, journey-island.css),
+  // so this observer does fire again from layout()'s own write; that second pass settles on the same
+  // compact-or-not choice, so layout() converges on it rather than looping.
   const observer = new ResizeObserver(schedule);
   observer.observe(pin);
   observer.observe(copy);

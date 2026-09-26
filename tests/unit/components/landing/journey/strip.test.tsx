@@ -32,7 +32,7 @@ afterEach(() => {
 describe("the strip's train", () => {
   it("is placed on scroll from widths measured on layout, never read in the scroll frame", async () => {
     const reads = mount();
-    const stop = startStrip({ motion: false, intro: false, result: keep<ResultDetail | null>(null) });
+    const stop = startStrip({ motion: false, intro: false, result: keep<ResultDetail | null>(null), still: keep({ columns: false, height: null }) });
     expect(reads).toHaveBeenCalled();
     const trains = [...document.querySelectorAll<HTMLElement>(".strip-train")];
     // Clamped at DEP by half the measured glyph: 20 / 1000.
@@ -67,7 +67,7 @@ describe("the strip's train", () => {
     } as unknown as typeof ResizeObserver;
     const width = { value: 1000 };
     mount(width);
-    const stop = startStrip({ motion: false, intro: false, result: keep<ResultDetail | null>(null) });
+    const stop = startStrip({ motion: false, intro: false, result: keep<ResultDetail | null>(null), still: keep({ columns: false, height: null }) });
     const train = document.querySelector<HTMLElement>(".strip-train")!;
     expect(observed.has(train.parentElement!)).toBe(true);
     expect(train.style.left).toBe("2%");

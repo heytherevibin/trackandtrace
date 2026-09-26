@@ -15,7 +15,7 @@ describe("the departure board's statuses", () => {
   it("are set without a flip for a build's first station, and flip for the next", () => {
     const { container } = render(<DepartureBoard />);
     const cells = [...container.querySelectorAll<HTMLElement>("td.board-status")];
-    const stop = startBoard({ motion: true, intro: false, result: keep<ResultDetail | null>(null) });
+    const stop = startBoard({ motion: true, intro: false, result: keep<ResultDetail | null>(null), still: keep({ columns: false, height: null }) });
 
     station(3);
     expect(cells.map((c) => c.querySelector(".flap-char"))).toEqual(cells.map(() => null));

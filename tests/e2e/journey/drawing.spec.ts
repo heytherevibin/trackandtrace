@@ -1,7 +1,7 @@
 import { expect, test } from "../fixtures";
 import { STILL_MANIFEST } from "@/components/landing/journey/still-manifest";
 import { CALLOUT_PARTS } from "@/components/landing/journey/train-parts";
-import { waitForJourney } from "./journey-helpers";
+import { scrollToId, waitForJourney } from "./journey-helpers";
 
 const WIDE = STILL_MANIFEST.shapes.anatomyWide;
 
@@ -74,6 +74,28 @@ test.describe("the drawn train, still (spec §3.C–D)", () => {
     await waitForJourney(page);
     await expect(page.locator("#anatomy .anatomy-pin")).toHaveClass(/is-columns/);
     const after = await page.locator("#record").evaluate((el) => el.getBoundingClientRect().top);
+    expect(Math.abs(after - before)).toBeLessThanOrEqual(4);
+  });
+
+  test("a reader who left below the drawing and came back with Back keeps their place once the new journey settles", async ({ page, isMobile }) => {
+    test.skip(isMobile, "wide screens");
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/");
+    await waitForJourney(page);
+    await expect(page.locator("#anatomy .anatomy-pin")).toHaveClass(/is-columns/);
+    // #principles, just below the drawing: below #anatomy (spec's own landmark for this scenario), and short
+    // of #how, whose own pinned-height mechanism (chapters.ts) is a separate module with its own concerns.
+    await scrollToId(page, "principles");
+    const before = await page.locator("#principles").evaluate((el) => el.getBoundingClientRect().top);
+
+    // A real Next <Link> in the masthead, so the browser records genuine history/scroll state for "/".
+    await page.getByLabel("Primary").getByRole("link", { name: "Watchlist" }).click();
+    await expect(page).toHaveURL(/\/watchlist/);
+    await page.goBack();
+    await waitForJourney(page);
+    await expect(page.locator("#anatomy .anatomy-pin")).toHaveClass(/is-columns/);
+
+    const after = await page.locator("#principles").evaluate((el) => el.getBoundingClientRect().top);
     expect(Math.abs(after - before)).toBeLessThanOrEqual(4);
   });
 });

@@ -39,6 +39,12 @@ export function keep<T>(initial: T): Kept<T> {
   };
 }
 
+/** The pin's columns state and the height the reader last actually saw it settle on (still.ts). */
+export interface StillPlace {
+  readonly columns: boolean;
+  readonly height: number | null;
+}
+
 export interface JourneyContext {
   /** Motion on: things may move. Off: only true readings update, drawn still. */
   readonly motion: boolean;
@@ -46,6 +52,9 @@ export interface JourneyContext {
   readonly intro: boolean;
   /** The hero plate's last result while it still shows it: its chart face is a true reading, so each build redraws it. */
   readonly result: Kept<ResultDetail | null>;
+  /** still.ts's own place, kept for this startJourney's whole lifetime, across every rebuild — never reset by a
+   * teardown within that lifetime. A new startJourney (a fresh client navigation back to the page) starts fresh. */
+  readonly still: Kept<StillPlace>;
 }
 export type Teardown = () => void;
 export type JourneyModule = (ctx: JourneyContext) => Teardown;
@@ -59,6 +68,7 @@ export function startJourney(): Teardown {
   let resizeTimer = 0;
   let introPlayed = false;
   const result = keep<ResultDetail | null>(null);
+  const still = keep<StillPlace>({ columns: false, height: null });
 
   const stopAll = () => {
     for (const t of teardowns.reverse()) t();
@@ -70,7 +80,7 @@ export function startJourney(): Teardown {
     const motion = html.getAttribute("data-motion") !== "off";
     const intro = !introPlayed && introWanted(motion);
     introPlayed = true;
-    const ctx: JourneyContext = { motion, intro, result };
+    const ctx: JourneyContext = { motion, intro, result, still };
     try {
       if (intro) teardowns.push(startIntro());
       for (const start of MODULES) teardowns.push(start(ctx));
