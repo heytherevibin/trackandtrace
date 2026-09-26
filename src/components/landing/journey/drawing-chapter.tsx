@@ -19,13 +19,13 @@ export function DrawingChapter() {
   return (
     <section id="anatomy" aria-labelledby="anatomy-title" className="anatomy section-pad">
       <div className="anatomy-pin">
-        <header className="anatomy-copy">
+        <div className="anatomy-copy">
           <SectionKicker rule="mb-3">{m.kicker}</SectionKicker>
           <h2 id="anatomy-title" className={H2}>
             {m.title}
           </h2>
           <p className={`mt-3.5 ${BODY}`}>{m.lead}</p>
-        </header>
+        </div>
         <StillDrawing kind="anatomy" className="anatomy-still" />
         <noscript>
           <div className="still-drawing anatomy-still is-noscript" aria-hidden="true">
