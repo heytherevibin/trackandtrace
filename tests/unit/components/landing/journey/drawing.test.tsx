@@ -43,13 +43,15 @@ describe("the drawing's mode on the page", () => {
   it("never asks for the live drawing on Data Saver, or once the session fell to the floor", () => {
     const load = vi.fn<LoadLive>(() => Promise.reject(new Error("no")));
     html.dataset.saver = "on";
-    drawingModule(load)(ctx(true))();
+    let stop = drawingModule(load)(ctx(true));
     expect(html.dataset.drawingWhy).toBe("saver");
+    stop();
     html.dataset.saver = "off";
     window.sessionStorage.setItem("tt.q", "still");
-    drawingModule(load)(ctx(true))();
+    stop = drawingModule(load)(ctx(true));
     expect(html.dataset.drawingWhy).toBe("quality");
     expect(load).not.toHaveBeenCalled();
+    stop();
   });
 
   it("draws live when the live drawing loads, stops it on teardown, and follows its reasons", async () => {
@@ -78,6 +80,27 @@ describe("the drawing's mode on the page", () => {
     stop();
     arrive(liveStop);
     await vi.waitFor(() => expect(liveStop).toHaveBeenCalledTimes(1));
+  });
+
+  it("writes back the drawing the boot script's own rule would choose on teardown, dropping data-drawing-why", async () => {
+    // Motion on, no saver, no stored quality floor: the boot script's own rule (resolveDrawing) says "live".
+    // The module still settles "still" at runtime, for its own reason ("load", since J4 has no live drawing) —
+    // teardown must write back what a fresh mount's boot script would choose, not leave that runtime reason
+    // stuck in the markup for the next mount to find (spec, J4-4 minor #4).
+    const stop = startDrawing(ctx(true));
+    await vi.waitFor(() => expect(html.dataset.drawingWhy).toBe("load"));
+    expect(html.dataset.drawing).toBe("still");
+    stop();
+    expect(html.dataset.drawing).toBe("live");
+    expect(html.dataset.drawingWhy).toBeUndefined();
+  });
+
+  it("writes back still on teardown when Motion is off, matching the boot script", () => {
+    const stop = startDrawing(ctx(false));
+    expect(html.dataset.drawing).toBe("still");
+    stop();
+    expect(html.dataset.drawing).toBe("still");
+    expect(html.dataset.drawingWhy).toBeUndefined();
   });
 
   it("keeps a reader inside the chapter at its start when the switch changes its height", () => {

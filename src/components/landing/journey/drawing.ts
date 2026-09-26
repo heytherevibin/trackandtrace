@@ -1,4 +1,4 @@
-import { QUALITY_STORAGE_KEY } from "@/components/motion/motion-boot";
+import { QUALITY_STORAGE_KEY, resolveDrawing, type MotionState, type SaverState } from "@/components/motion/motion-boot";
 import { keepsPlace, modeOf, startingReasons, whyOf, withReason, type DrawingMode, type DrawingReason, type Reasons } from "./drawing-mode";
 import { DRAWING_EVENT, LAYOUT_EVENT, emit, type DrawingDetail } from "./journey-events";
 import type { JourneyContext, JourneyModule, Teardown } from "./start-journey";
@@ -101,6 +101,14 @@ export function drawingModule(loadLive: LoadLive): JourneyModule {
       token = null;
       live?.();
       live = null;
+      // A client navigation away leaves this markup for the next mount to find — StillDrawing reads
+      // data-drawing on its own next render — so it must read exactly what a fresh boot script would choose
+      // for the motion this module was built with, never this runtime's own reason ("load", say): that reason
+      // belongs to this lifetime only, and J4-4 (still) is harmless to leave stale, but J5's live drawing is not.
+      const motionState: MotionState = motion ? "on" : "off";
+      const saverState: SaverState = html.dataset.saver === "on" ? "on" : "off";
+      html.dataset.drawing = resolveDrawing(motionState, saverState, storedQuality());
+      delete html.dataset.drawingWhy;
     };
   };
 }
