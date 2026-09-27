@@ -90,13 +90,21 @@ function mastheadFoot(): number {
   return document.querySelector("header")?.getBoundingClientRect().bottom ?? 0;
 }
 
+/** A section's top in the window, where the reader reads it: while it rides the window-seat run, where run.ts says it
+ * stands (data-run-at, the page y it would have were it not riding, as station-progress.ts reads it; J6-9), not the
+ * pinned box it shares with the other; otherwise its own box. */
+function topOf(el: HTMLElement): number {
+  const riding = Number(el.dataset.runAt);
+  return el.dataset.runAt !== undefined && Number.isFinite(riding) ? riding - window.scrollY : el.getBoundingClientRect().top;
+}
+
 /** Where the reader stands now, on this page's own sections; null once they have left the document. */
 function placeNow(): Place | null {
   const entry = entryKey();
   if (!entry) return null;
   const tops = IDS.flatMap((id) => {
     const el = document.getElementById(id);
-    return el?.isConnected ? [{ id, top: el.getBoundingClientRect().top }] : [];
+    return el?.isConnected ? [{ id, top: topOf(el) }] : [];
   });
   const on = pickPlace(tops, mastheadFoot());
   return on ? { entry, ...on } : null;
@@ -188,7 +196,7 @@ export function startPlaceMemory(): PlaceMemory {
       pending = null;
       const el = place ? document.getElementById(place.id) : null;
       if (!place || !el) return;
-      const by = el.getBoundingClientRect().top - mastheadFoot() - place.offset;
+      const by = topOf(el) - mastheadFoot() - place.offset;
       window.scrollTo({ top: window.scrollY + by, behavior: "instant" });
       sample();
     },

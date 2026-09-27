@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { LAYOUT_EVENT, STATION_EVENT, type StationDetail } from "@/components/landing/journey/journey-events";
 import { startStationProgress, stationPlace, stationTops } from "@/components/landing/journey/station-progress";
 import { STATIONS } from "@/components/landing/journey/stations";
@@ -101,5 +101,36 @@ describe("startStationProgress", () => {
     expect(heard).toEqual([]);
 
     window.removeEventListener(STATION_EVENT, onStation);
+  });
+});
+
+describe("a section riding the window-seat run (J6-8)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    document.body.replaceChildren();
+  });
+
+  it("is reached where run.ts says its first station stands at the window, not at its pinned box", () => {
+    vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
+    document.body.innerHTML = STATIONS.map((s) => `<section id="${s.id}"></section>`).join("");
+    const tops: Record<string, number> = Object.fromEntries(STATIONS.map((s, i) => [s.id, i * 1000]));
+    tops.use = 15_000; // pinned in the run: its box is the pin's, far from where its words come to the window
+    tops.faq = 20_000;
+    tops.terminus = 21_000;
+    for (const s of STATIONS) document.getElementById(s.id)!.getBoundingClientRect = () => ({ top: tops[s.id] ?? 0 }) as DOMRect;
+    document.getElementById("use")!.dataset.runAt = "12345";
+    let y = 0;
+    vi.spyOn(window, "scrollY", "get").mockImplementation(() => y);
+    const heard: number[] = [];
+    const hear = (e: Event) => heard.push((e as CustomEvent<StationDetail>).detail.index);
+    window.addEventListener(STATION_EVENT, hear);
+    const stop = startStationProgress();
+    y = 12_200; // past use's run anchor, less the third-of-a-window bias; short of its pinned box
+    window.dispatchEvent(new Event("scroll"));
+    vi.advanceTimersToNextFrame();
+    expect(heard.at(-1)).toBe(STATIONS.findIndex((s) => s.id === "use"));
+    stop();
+    window.removeEventListener(STATION_EVENT, hear);
   });
 });

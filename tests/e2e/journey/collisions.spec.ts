@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "../fixtures";
 import { PNR, gotoReady } from "../helpers";
-import { collisionsInView, collisionsTopToBottom } from "./collisions";
+import { LANDING_INSTRUMENTS, collisionsInView, collisionsTopToBottom } from "./collisions";
 import { drawingCollisions } from "./drawing-checks";
 import { drawStill, waitForJourney } from "./journey-helpers";
 
@@ -232,11 +232,6 @@ test.describe("the collision checker", () => {
   });
 });
 
-// The landing's railway instruments, held as panels: the hero dial is drawn under the plate on purpose (v3's
-// gate skipped it as well), and its left side fades before the words. Every other instrument must never cover
-// text outside itself, nor another instrument.
-const INSTRUMENTS = { panels: [".board", ".berth-plan", ".station-clock", ".route-map", ".chapter-card", ".title-block"], skip: [".hero-dial"] } as const;
-
 // Today's landing, before the journey adds anything: the baseline every journey PR must keep.
 const SIZES = [
   { name: "1440×900", viewport: { width: 1440, height: 900 }, phone: false },
@@ -254,7 +249,7 @@ for (const size of SIZES) {
         if (motion === "off") await page.addInitScript(() => window.localStorage.setItem("tt.motion", "off"));
         await gotoReady(page, "/");
         await waitForJourney(page);
-        expect(await collisionsTopToBottom(page, INSTRUMENTS)).toEqual([]);
+        expect(await collisionsTopToBottom(page, LANDING_INSTRUMENTS)).toEqual([]);
       });
     }
   });
@@ -278,7 +273,7 @@ test.describe("the landing at 390×844 under the device's reduced motion", () =>
     // Proves the sweep actually covers the note: without this, the sweep would still pass green if the note
     // never rendered at all.
     await expect(page.getByText("Your device asks for reduced motion")).toBeVisible();
-    expect(await collisionsTopToBottom(page, INSTRUMENTS)).toEqual([]);
+    expect(await collisionsTopToBottom(page, LANDING_INSTRUMENTS)).toEqual([]);
   });
 });
 
@@ -293,7 +288,7 @@ test.describe("the hero dial's chart readout", () => {
     await plate.getByRole("button", { name: /run/i }).click();
     await expect(page.locator(".dial-readout")).toBeVisible();
     await page.locator(".dial-readout").scrollIntoViewIfNeeded();
-    expect(await collisionsInView(page, INSTRUMENTS)).toEqual([]);
+    expect(await collisionsInView(page, LANDING_INSTRUMENTS)).toEqual([]);
   });
 });
 
@@ -305,7 +300,7 @@ test.describe("02 pinned, a dense sweep", () => {
       await page.setViewportSize(viewport);
       await gotoReady(page, "/");
       await waitForJourney(page);
-      expect(await collisionsTopToBottom(page, { ...INSTRUMENTS, step: 0.15 })).toEqual([]);
+      expect(await collisionsTopToBottom(page, { ...LANDING_INSTRUMENTS, step: 0.15 })).toEqual([]);
     });
   }
 });
@@ -333,7 +328,7 @@ test.describe("the drawn train at #anatomy: nothing collides in columns", () => 
         )
         .toBeGreaterThan(0);
       expect(await drawingCollisions(page)).toEqual([]);
-      expect(await collisionsInView(page, INSTRUMENTS)).toEqual([]);
+      expect(await collisionsInView(page, LANDING_INSTRUMENTS)).toEqual([]);
     });
   }
 });

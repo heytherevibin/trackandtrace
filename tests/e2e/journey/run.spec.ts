@@ -1,0 +1,230 @@
+import type { Page } from "@playwright/test";
+import { expect, test } from "../fixtures";
+import { LANDING_INSTRUMENTS, collisionsInView } from "./collisions";
+import { drawStill, frames, motionOff, noAnchoring, scrollIntoRun, scrollToId, waitForJourney } from "./journey-helpers";
+
+// 06–07, the window-seat run (spec §3.A, §3.G; J6-7, J6-8). The drawing above is held to the still (drawStill): these
+// specs are about the run, and the live drawing would only make the software GPU slower.
+
+/** How far station i's centre stands from the train's: 0 when it is at the window. */
+function offTrain(page: Page, i: number): Promise<number> {
+  return page.evaluate((k) => {
+    const station = document.querySelectorAll("#run [data-station]")[k];
+    const train = document.querySelector("#run .run-train");
+    if (!station || !train) throw new Error("no such station, or no train");
+    const s = station.getBoundingClientRect();
+    const t = train.getBoundingClientRect();
+    return Math.abs(Math.round(s.left + s.width / 2 - (t.left + t.width / 2)));
+  }, i);
+}
+const here = (page: Page) => page.locator("#run [data-station]").evaluateAll((els) => els.findIndex((el) => el.classList.contains("is-here")));
+const stationOf = (page: Page, selector: string) => page.locator("#run [data-station]").evaluateAll((els, sel) => els.findIndex((el) => el.matches(sel) || el.querySelector(sel) !== null || el.closest(sel) !== null), selector);
+const running = (page: Page) => expect(page.locator("#run")).toHaveClass(/is-running/);
+/** How far 07's top stands from the masthead's foot, read as place-memory reads it (J6-9): where run.ts says it stands
+ * while the run is pinned (data-run-at), its own box otherwise. 0 when the reader is at 07. */
+const from07 = (page: Page) =>
+  page.evaluate(() => {
+    const use = document.getElementById("use");
+    if (!use) throw new Error("#use is missing");
+    const foot = document.querySelector("header")?.getBoundingClientRect().bottom ?? 0;
+    const top = use.dataset.runAt === undefined ? use.getBoundingClientRect().top : Number(use.dataset.runAt) - window.scrollY;
+    return Math.abs(Math.round(top - foot));
+  });
+
+test.describe("the window-seat run (spec §3.A)", () => {
+  test.beforeEach(async ({ page }) => {
+    await drawStill(page);
+  });
+
+  test("pins 06–07 and carries each station to the window in turn, lit, its words never fading", async ({ page }) => {
+    await page.goto("/");
+    await waitForJourney(page);
+    await running(page);
+    const count = await page.locator("#run [data-station]").count();
+    expect(count).toBe(6);
+    await scrollIntoRun(page, 0);
+    await expect.poll(() => here(page)).toBe(0);
+    await expect.poll(() => offTrain(page, 0)).toBeLessThanOrEqual(3);
+    await scrollIntoRun(page, 1);
+    await expect.poll(() => here(page)).toBe(count - 1);
+    await expect.poll(() => offTrain(page, count - 1)).toBeLessThanOrEqual(3);
+    await expect(page.locator("#run [data-station].is-passed")).toHaveCount(count - 1);
+    await expect(page.locator("#run .run-stop.is-lit")).toHaveCount(count);
+    expect(await page.locator("#run [data-station]").evaluateAll((els) => els.every((el) => getComputedStyle(el).opacity === "1"))).toBe(true);
+  });
+
+  test("the line counts kilometre posts on, and the train holds its place at the window", async ({ page }) => {
+    await page.goto("/");
+    await waitForJourney(page);
+    await running(page);
+    const posts = await page.locator("#run .run-km").allTextContents();
+    expect(posts.length).toBeGreaterThan(2);
+    expect(posts.every((p) => /^KM \d{3}$/.test(p))).toBe(true);
+    const km = posts.map((p) => Number(p.slice(3)));
+    expect(km.every((k, i) => i === 0 || k > km[i - 1]!)).toBe(true);
+    const trainLeft = () => page.locator("#run .run-train").evaluate((el) => el.getBoundingClientRect().left);
+    await scrollIntoRun(page, 0);
+    const at = await trainLeft();
+    await scrollIntoRun(page, 0.5);
+    expect(await trainLeft()).toBe(at);
+  });
+
+  test("a link to 07 on the departure board brings its words to the window, and the address and the board say so", async ({ page }) => {
+    await page.goto("/");
+    await waitForJourney(page);
+    await running(page);
+    await page.locator(".board").getByRole("link", { name: "Where it gets used" }).click();
+    await expect(page).toHaveURL(/#use$/);
+    const first07 = await stationOf(page, "#use *");
+    await expect.poll(() => offTrain(page, first07)).toBeLessThanOrEqual(3);
+    expect(await page.evaluate(() => document.activeElement?.id)).toBe("use");
+    // 07's row: the board's rows follow the stations after DEP, one each (departure-board.tsx)
+    await expect(page.locator('.board tr[data-stop="8"] td.board-status')).toHaveText(/At\s*platform/i);
+  });
+
+  test("Back from 07, inside the run, returns the reader to 07, not 06 (J6-9)", async ({ page, isMobile }) => {
+    test.skip(isMobile, "one project is enough");
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/");
+    await waitForJourney(page);
+    await running(page);
+    // 07's first station to the window, at the place run.ts gives it (data-run-at, less the masthead)
+    await page.evaluate(() => {
+      const use = document.getElementById("use");
+      const head = document.querySelector("header")?.getBoundingClientRect().bottom ?? 0;
+      window.scrollTo({ top: Number(use?.dataset.runAt) - head, behavior: "instant" });
+    });
+    const first07 = await stationOf(page, "#use *");
+    await expect.poll(() => offTrain(page, first07)).toBeLessThanOrEqual(3);
+    await frames(page); // the scroll has been sampled
+    await page.getByLabel("Primary").getByRole("link", { name: "Watchlist" }).click();
+    await expect(page).toHaveURL(/\/watchlist/);
+    await page.goBack();
+    await waitForJourney(page);
+    await expect.poll(() => from07(page)).toBeLessThanOrEqual(4); // the restore has landed, on 07
+  });
+
+  test("Tab brings each card to the window, never under the masthead (spec §3.G; WCAG 2.4.11)", async ({ page, isMobile }) => {
+    test.skip(isMobile, "the keyboard: one project is enough");
+    await page.goto("/");
+    await waitForJourney(page);
+    await running(page);
+    await page.getByRole("link", { name: "Open Watchlist →" }).focus();
+    for (const [n, name] of ["Open Watchlist →", "Open Pre-booking →", "Open Accuracy →"].entries()) {
+      if (n > 0) await page.keyboard.press("Tab");
+      const link = page.getByRole("link", { name });
+      await expect(link).toBeFocused();
+      const i = await link.evaluate((a) => [...document.querySelectorAll("#run [data-station]")].findIndex((s) => s.contains(a)));
+      await expect.poll(() => offTrain(page, i)).toBeLessThanOrEqual(3);
+      const seen = await link.evaluate((a) => {
+        const r = a.getBoundingClientRect();
+        const foot = document.querySelector("header")?.getBoundingClientRect().bottom ?? 0;
+        return r.top >= foot && r.bottom <= window.innerHeight && r.left >= 0 && r.right <= window.innerWidth;
+      });
+      expect(seen, `${name} is wholly in view, below the masthead`).toBe(true);
+    }
+  });
+
+  test("on a touch screen each station is a resting point", async ({ page, isMobile }) => {
+    test.skip(!isMobile, "touch screens");
+    await page.goto("/");
+    await waitForJourney(page);
+    await running(page);
+    await expect(page.locator("#run .run-snap")).toHaveCount(6);
+    // proximity is scroll-snap-type's default strictness, which the computed value leaves out ("y")
+    expect(await page.evaluate(() => getComputedStyle(document.documentElement).scrollSnapType)).toMatch(/^y( proximity)?$/);
+  });
+
+  test("Motion off: 06 and 07 read as they always did", async ({ page }) => {
+    await motionOff(page);
+    await page.goto("/");
+    await waitForJourney(page);
+    await expect(page.locator("#run")).not.toHaveClass(/is-running/);
+    await expect(page.locator("#run .run-window")).toBeHidden();
+    await expect(page.locator("#run .run-train")).toBeHidden();
+    const [features, use] = await page.evaluate(() => ["features", "use"].map((id) => document.getElementById(id)?.getBoundingClientRect().toJSON() as DOMRect));
+    expect(use!.top).toBeGreaterThanOrEqual(features!.bottom - 1);
+  });
+
+  test("a window too short for its stations: the sections as ever", async ({ page, isMobile }) => {
+    await page.setViewportSize(isMobile ? { width: 844, height: 390 } : { width: 1440, height: 360 });
+    await page.goto("/");
+    await waitForJourney(page);
+    await expect(page.locator("#run")).not.toHaveClass(/is-running/);
+    await expect(page.locator("#run .run-window")).toBeHidden();
+  });
+
+  test("a reader below the run leaves it unpinned until they come back above it (J3's rule)", async ({ page, isMobile }) => {
+    test.skip(isMobile, "one project is enough");
+    await page.goto("/#faq");
+    await waitForJourney(page);
+    await expect(page.locator("#run")).not.toHaveClass(/is-running/);
+    await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+    await running(page);
+  });
+
+  for (const anchoring of ["on", "off"] as const) {
+    test(`a reader below the pinned run stays put when Motion goes off (scroll anchoring ${anchoring})`, async ({ page, isMobile }) => {
+      test.skip(isMobile, "one project is enough");
+      await page.setViewportSize({ width: 1440, height: 900 });
+      if (anchoring === "off") await noAnchoring(page);
+      await page.goto("/");
+      await waitForJourney(page);
+      await running(page);
+      await scrollToId(page, "faq", 120);
+      await frames(page, 3); // the scroll has been heard
+      const faqTop = () => page.locator("#faq").evaluate((el) => el.getBoundingClientRect().top);
+      const before = await faqTop();
+      // through the DOM: Playwright's click would scroll the footer's switch into view first
+      await page.getByRole("contentinfo").getByRole("switch", { name: "Motion" }).evaluate((el) => (el as HTMLElement).click());
+      await expect(page.locator("#run")).not.toHaveClass(/is-running/);
+      await frames(page, 6); // the unpin, 02's collapse and the still's settle
+      expect(Math.abs((await faqTop()) - before)).toBeLessThanOrEqual(4);
+    });
+  }
+
+  // Inside the pinned run as Motion goes off: J5-3 sends the reader to its start, 06's top under the masthead. The
+  // rebuild tears the run down before the still and the drawing (it is started last), so the start is measured on the
+  // page the reader sees, not one those teardowns have changed for a moment; and the unpin clamps the scroll at the
+  // page's foot, which keepPlace reads through.
+  for (const anchoring of ["on", "off"] as const) {
+    test(`a reader inside the pinned run lands on its start when Motion goes off (scroll anchoring ${anchoring})`, async ({ page, isMobile }) => {
+      test.skip(isMobile, "one project is enough");
+      await page.setViewportSize({ width: 1440, height: 900 });
+      if (anchoring === "off") await noAnchoring(page);
+      await page.goto("/");
+      await waitForJourney(page);
+      await running(page);
+      await scrollIntoRun(page, 0.8);
+      await frames(page, 3); // the scroll has been heard
+      await page.getByRole("contentinfo").getByRole("switch", { name: "Motion" }).evaluate((el) => (el as HTMLElement).click());
+      await expect(page.locator("#run")).not.toHaveClass(/is-running/);
+      await frames(page, 6); // the unpin, 02's collapse and the still's settle
+      const [top, foot] = await page.evaluate(() => [document.getElementById("features")?.getBoundingClientRect().top ?? 0, document.querySelector("header")?.getBoundingClientRect().bottom ?? 0]);
+      expect(Math.abs(top! - foot!)).toBeLessThanOrEqual(4);
+    });
+  }
+});
+
+test.describe("nothing collides while the run carries 06–07 past the window (spec §5)", () => {
+  for (const size of [
+    { name: "1440×900", viewport: { width: 1440, height: 900 }, phone: false },
+    { name: "390×844", viewport: { width: 390, height: 844 }, phone: true },
+  ] as const) {
+    test(`at ${size.name}, a tenth of the run at a time`, async ({ page, isMobile }) => {
+      test.skip(isMobile !== size.phone, "each size runs once, in the project that emulates its device");
+      await drawStill(page);
+      await page.setViewportSize(size.viewport);
+      await page.goto("/");
+      await waitForJourney(page);
+      await running(page);
+      const found: string[] = [];
+      for (let k = 0; k <= 10; k += 1) {
+        await scrollIntoRun(page, k / 10);
+        await frames(page, 2);
+        found.push(...(await collisionsInView(page, LANDING_INSTRUMENTS)));
+      }
+      expect(found).toEqual([]);
+    });
+  }
+});

@@ -14,6 +14,7 @@ import { refreshAll, untrackAll } from "./observers";
 import { pause } from "./pause";
 import { startPlaceMemory } from "./place-memory";
 import { startRoute } from "./route";
+import { startRun } from "./run";
 import type { Engine } from "./scene/engine";
 import { startSound } from "./sound";
 import { startStationProgress } from "./station-progress";
@@ -105,8 +106,10 @@ export interface JourneyOptions {
   readonly hud?: boolean;
 }
 
-/** In start order. Later tasks append their modules here. */
-export const MODULES: readonly JourneyModule[] = [startArrivals, startBoard, startStationProgress, startHero, startChapters, startBerths, startClock, startRoute, startCursor, startSound, startDrawing, startStill];
+/** In start order; a rebuild tears them down in reverse. The run (06–07) is last, so it is torn down first: its unpin
+ * is measured on the page the reader sees, before the still's and the drawing's teardowns change the layout above it
+ * for a moment (J6-7). Later tasks append their modules before it. */
+export const MODULES: readonly JourneyModule[] = [startArrivals, startBoard, startStationProgress, startHero, startChapters, startBerths, startClock, startRoute, startCursor, startSound, startDrawing, startStill, startRun];
 
 export function startJourney(options: JourneyOptions = {}): Teardown {
   const html = document.documentElement;

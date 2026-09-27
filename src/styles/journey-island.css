@@ -167,6 +167,58 @@ html[data-journey="on"] #anatomy.is-live [data-live="list"] .anatomy-legend { po
   html[data-journey="on"] #anatomy.is-live [data-live="list"] .anatomy-legend { top: calc(var(--anatomy-copy-h, 0px) + 10px); bottom: 10px; left: auto; width: 36%; grid-template-columns: 1fr; align-content: center; border-top: 0; border-left: 1px solid var(--line); padding: 0 0 0 12px; }
 }
 
+/* ---- 06–07 · the window-seat run (spec §3.A; J6). run.ts pins it (#run.is-running) only while Motion is on, the reader
+   is not below it and every station fits the window, and writes --run-h (the pin plus the travel) and --run-band (the
+   line diagram's height). Only run.ts writes .is-running, always inside keepPlace (J5-3, J6-7), so these rules are not
+   gated on data-motion: Motion off unpins it there, with the reader kept. Otherwise both sections keep their layout. */
+html[data-journey="on"] #run.is-running { height: var(--run-h); }
+/* The pin and the unpin land whole in the task that makes them, so keepPlace (J5-3) measures all of the change, as
+   #anatomy's do: under Motion off's 0.01ms transitions (motion.css) the run's height and its pieces' widths, paddings
+   and type (the kicker's too) would land a frame later, under a reader nobody moves. A lit plate's own transition,
+   below, outranks this; it moves no box. */
+html[data-journey="on"] :is(#run, #run *) { transition-property: none; }
+/* clip, not hidden: a clipped box is not a scroll container, so focusing a card cannot scroll it sideways */
+html[data-journey="on"] #run.is-running .run-pin { position: sticky; top: var(--header-height); z-index: 2; height: calc(100svh - var(--header-height)); overflow: clip; }
+html[data-journey="on"] #run.is-running :is(.run-window, .run-train) { display: block; }
+html[data-journey="on"] #run.is-running .run-window { position: absolute; inset: 0; pointer-events: none; }
+html[data-journey="on"] #run.is-running .run-window svg { position: absolute; left: 0; top: 0; height: 100%; overflow: visible; will-change: transform; }
+html[data-journey="on"] #run.is-running .run-far { z-index: 0; }
+html[data-journey="on"] #run.is-running .run-line { z-index: 1; }
+html[data-journey="on"] #run.is-running .run-near { z-index: 4; }
+html[data-journey="on"] #run.is-running .run-train { position: absolute; bottom: 44px; z-index: 3; width: 74px; height: 28px; transform: translateX(-50%); color: var(--accent); pointer-events: none; }
+html[data-journey="on"] #run.is-running .run-train > span { display: block; width: 100%; height: 100%; transform-origin: 50% 100%; }
+html[data-journey="on"] #run.is-running .run-train svg { display: block; width: 100%; height: 100%; }
+html[data-journey="on"] #run.is-running .run-track { position: relative; z-index: 2; display: flex; align-items: flex-end; gap: clamp(56px, 9vw, 150px); width: max-content; height: calc(100% - var(--run-band, 124px)); padding: 0; will-change: transform; }
+html[data-journey="on"] #run.is-running .run-track > section { display: flex; align-items: flex-end; gap: clamp(48px, 7vw, 120px); padding: 0; margin: 0; }
+html[data-journey="on"] #run.is-running .run-cards { display: contents; }
+html[data-journey="on"] #run.is-running [data-station] { flex: none; background: var(--surface-0); }
+html[data-journey="on"] #run.is-running .run-intro { width: min(19rem, 80vw); padding-bottom: 8px; }
+html[data-journey="on"] #run.is-running .run-intro > span { font-size: clamp(1.625rem, 2.6vw, 2.25rem); line-height: 1.12; letter-spacing: 0.04em; }
+html[data-journey="on"] #run.is-running .run-intro > hr { margin: 14px 0 0; }
+html[data-journey="on"] #run.is-running .run-cards > [data-station] { width: min(22rem, 80vw); }
+html[data-journey="on"] #run.is-running #use > div[data-station] { width: min(34rem, 84vw); }
+html[data-journey="on"] #run.is-running #use > figure[data-station] { width: min(38rem, 84vw); }
+html[data-journey="on"] #run.is-running .blueprint[data-station] { transition: box-shadow 240ms var(--ease-out), border-color 240ms var(--ease-out); }
+html[data-journey="on"] #run.is-running .blueprint[data-station].is-here { border-color: var(--line-strong); box-shadow: inset 0 2px 0 var(--accent); }
+/* a link to 06 or 07 focuses the section itself, in place, so the next Tab starts inside it; no ring on a section */
+html[data-journey="on"] #run.is-running :is(#features, #use):focus { outline: none; }
+html[data-journey="on"] .run-stroke { fill: none; stroke: var(--line-strong); stroke-width: 1; vector-effect: non-scaling-stroke; }
+html[data-journey="on"] .run-stroke:is(.is-faint, .is-far) { stroke: var(--line); }
+html[data-journey="on"] .run-stroke.is-mast { opacity: 0.6; }
+html[data-journey="on"] .run-stroke.is-near { stroke: var(--ink-3); opacity: 0.5; }
+html[data-journey="on"] .run-stop.is-lit :is(.is-tick, .is-platform) { stroke: var(--accent); }
+html[data-journey="on"] .run-km { fill: var(--ink-3); font-family: var(--font-display); font-weight: 600; font-size: 0.625rem; /* drawing units, as v3's posts: no token matches */ letter-spacing: 0.08em; }
+/* short windows: 07's words run wider (and so shorter) to stand in the window */
+@media (max-height: 760px) and (min-width: 48rem) {
+  html[data-journey="on"] #run.is-running #use > div[data-station] { width: min(46rem, 60vw); }
+  html[data-journey="on"] #run.is-running #use > div[data-station] p { max-width: 64ch; }
+  html[data-journey="on"] #run.is-running #use > div[data-station] h2 { font-size: 2.5rem; line-height: 2.75rem; }
+  html[data-journey="on"] #run.is-running #use > figure[data-station] { width: min(38rem, 52vw, calc((100svh - var(--header-height) - var(--run-band, 124px) - 28px) * 1.45)); }
+}
+/* touch screens: each station is a resting point (run.ts places these marks) */
+html[data-journey="on"] .run-snap { position: absolute; left: 0; width: 1px; height: 1px; pointer-events: none; scroll-snap-align: start; }
+html[data-journey="on"]:has(#run.is-running .run-snap) { scroll-snap-type: y proximity; }
+
 /* ---- The frame meter: previews and development only, with ?journey-hud (J5-10) */
 html[data-journey="on"] .journey-hud { position: fixed; right: 12px; bottom: 12px; z-index: var(--z-toast); min-width: 17rem; padding: 6px 10px 8px; background: var(--surface-1); border: 1px solid var(--line-strong); color: var(--ink-1); font-size: var(--text-xs); }
 html[data-journey="on"] .journey-hud > div { display: flex; gap: 8px; align-items: center; }

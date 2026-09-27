@@ -194,3 +194,8 @@ export async function collisionsTopToBottom(page: Page, options: CollisionOption
   }
   return [...found].map(([finding, y]) => `@${y}: ${finding}`);
 }
+
+/** The landing's railway instruments, held as panels: the hero dial is drawn under the plate on purpose (v3's gate
+ * skipped it as well), and its left side fades before the words. Every other instrument must never cover text
+ * outside itself, nor another instrument. Shared by the PR's specs and the nightly's. */
+export const LANDING_INSTRUMENTS = { panels: [".board", ".berth-plan", ".station-clock", ".route-map", ".chapter-card", ".title-block"], skip: [".hero-dial"] } as const;

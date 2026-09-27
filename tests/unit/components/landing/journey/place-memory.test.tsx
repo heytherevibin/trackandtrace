@@ -289,4 +289,30 @@ describe("startPlaceMemory", () => {
     memory.restore();
     expect(() => memory.stop()).not.toThrow();
   });
+
+  // The window-seat run (J6-9): #features and #use ride it inside one pin, so their boxes stand together, far from
+  // where their words come to the window. run.ts writes where each would stand (data-run-at), as station-progress reads.
+  const ride = () => {
+    document.body.insertAdjacentHTML("beforeend", `<section id="features" data-run-at="3600"></section><section id="use" data-run-at="4600"></section>`);
+    for (const id of ["features", "use"]) document.getElementById(id)!.getBoundingClientRect = () => ({ top: 3600 - scrollY }) as DOMRect;
+  };
+
+  it("reads a section riding the run where run.ts says it stands, not at the pinned box it shares", () => {
+    ride();
+    const memory = startPlaceMemory();
+    scrollY = 4600 - 40; // 07's top 40px down the window, 24px above the masthead's foot
+    window.dispatchEvent(new Event("scroll"));
+    vi.advanceTimersToNextFrame();
+    memory.stop();
+    expect(parsePlace(window.sessionStorage.getItem(PLACE_KEY))).toEqual({ entry: "k1", id: "use", offset: -24 });
+  });
+
+  it("restores a place in the run where run.ts says it stands", () => {
+    ride();
+    store({ entry: "k1", id: "use", offset: -24 });
+    const memory = startPlaceMemory();
+    memory.restore();
+    expect(scrolls).toEqual([4600 - 64 + 24]);
+    memory.stop();
+  });
 });

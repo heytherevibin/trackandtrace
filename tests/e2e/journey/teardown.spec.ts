@@ -10,7 +10,7 @@ import { frames, motionOff, waitForJourney } from "./journey-helpers";
 // (a drawn stroke's dash, a revert's stale transform, a class) shows up as a difference.
 
 /** Inline style properties the journey's modules write; every other inline style is React's or the browser's. */
-const STYLE = ["transform", "opacity", "left", "top", "height", "stroke-width", "stroke-dasharray", "stroke-dashoffset", "stroke-linecap", "clip-path"] as const;
+const STYLE = ["transform", "opacity", "left", "top", "height", "width", "--run-h", "--run-band", "stroke-width", "stroke-dasharray", "stroke-dashoffset", "stroke-linecap", "clip-path"] as const;
 
 interface Live {
   readonly selector: string;

@@ -119,24 +119,26 @@ test.describe("02 · the chapters, pinned", () => {
     await page.waitForTimeout(300);
     const headerBottom = await page.locator("header").evaluate((h) => Math.round(h.getBoundingClientRect().bottom));
     const target = headerBottom + 100;
-    await scrollToId(page, "features", target);
+    // The reader reads 03, a section below 02 with a box of its own: 06's box rides the pinned window-seat run, where its
+    // top is not where the reader reads it (run.spec holds the run's own Motion switch).
+    await scrollToId(page, "record", target);
     // No wait for the scroll's own "scroll" event: the place guard reads the reader's place as Motion changes,
     // whether or not a frame has delivered that event yet (the next test holds it to exactly that).
     await clickMotionSwitch(page);
     await expect(page.locator("#how")).not.toHaveClass(/is-pinned/);
     // The collapse lands over two frames (the height, then the padding); a few more let any late move show.
     await frames(page, 6);
-    let top = await page.locator("#features").evaluate((el) => el.getBoundingClientRect().top);
+    let top = await page.locator("#record").evaluate((el) => el.getBoundingClientRect().top);
     expect(Math.abs(top - target)).toBeLessThanOrEqual(4);
 
     await clickMotionSwitch(page);
     await expect(page.locator("html")).toHaveAttribute("data-motion", "on");
     await frames(page, 6);
     // Motion re-enabling does not, by itself, re-pin #how here: the reader is still below its start (at
-    // #features), and pinning is deferred until they scroll back above it (spec §3.A) — the point of that
+    // #record), and pinning is deferred until they scroll back above it (spec §3.A) — the point of that
     // deferral is exactly that this toggle must not grow #how under them, so nothing moves either way.
     await expect(page.locator("#how")).not.toHaveClass(/is-pinned/);
-    top = await page.locator("#features").evaluate((el) => el.getBoundingClientRect().top);
+    top = await page.locator("#record").evaluate((el) => el.getBoundingClientRect().top);
     expect(Math.abs(top - target)).toBeLessThanOrEqual(4);
   });
 
@@ -156,7 +158,7 @@ test.describe("02 · the chapters, pinned", () => {
     const toggle = await motionSwitch(page);
     await page.evaluate(
       ([by, sw]) => {
-        const el = document.getElementById("features")!;
+        const el = document.getElementById("record")!;
         window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - by, behavior: "instant" });
         (sw as HTMLElement).click();
       },
@@ -166,7 +168,7 @@ test.describe("02 · the chapters, pinned", () => {
     await expect(page.locator("#how")).not.toHaveClass(/is-pinned/);
     // The collapse lands over two frames (the height, then the padding); a few more let any late move show.
     await frames(page, 6);
-    const top = await page.locator("#features").evaluate((el) => el.getBoundingClientRect().top);
+    const top = await page.locator("#record").evaluate((el) => el.getBoundingClientRect().top);
     expect(Math.abs(top - target)).toBeLessThanOrEqual(4);
   });
 

@@ -5,7 +5,7 @@ import { SCENE_CHUNK_MARK } from "@/components/landing/journey/scene/scene-mark"
 /** The journey marks <html data-journey="on"> as it takes the page over, then starts its modules a turn at a time;
  * outside production it says when the last has started and the page has settled (window.__ttJourneyStarted), and
  * specs act only after that. A production build has no such probe (it is compiled out): there, drawing.ts's own
- * decision (data-drawing-why, written by the eleventh of twelve modules) and two frames stand in for it. */
+ * decision (data-drawing-why, written by the eleventh of thirteen modules) and two frames stand in for it. */
 export async function waitForJourney(page: Page): Promise<void> {
   await expect(page.locator("html")).toHaveAttribute("data-journey", "on", { timeout: 15_000 });
   if (await page.evaluate(() => "__ttJourneyStarted" in window)) {
@@ -55,6 +55,20 @@ export async function scrollIntoChapter(page: Page, p: number): Promise<void> {
     window.scrollTo({ top: start + run * at, behavior: "instant" });
   }, p);
   await expect.poll(() => page.evaluate(() => window.__ttJourney?.anatomy() ?? -1), { timeout: 20_000 }).toBeCloseTo(p, 1);
+}
+
+/** Scrolls the pinned run to progress p (0 as the pin takes hold, 1 at its end), then lets the page draw. Its place is
+ * measured, never assumed: everything above it (the live drawing's 520vh pin, 02's 330vh) moves it. */
+export async function scrollIntoRun(page: Page, p: number): Promise<void> {
+  await page.evaluate((at) => {
+    const run = document.getElementById("run");
+    const pin = run?.querySelector<HTMLElement>(".run-pin");
+    if (!run || !pin) throw new Error("#run is missing");
+    const head = document.querySelector("header")?.getBoundingClientRect().bottom ?? 0;
+    const start = run.getBoundingClientRect().top + window.scrollY - head;
+    window.scrollTo({ top: start + (run.offsetHeight - pin.offsetHeight) * at, behavior: "instant" });
+  }, p);
+  await frames(page, 2);
 }
 
 /** Aborts the scene chunk (three.js and the live drawing). */
