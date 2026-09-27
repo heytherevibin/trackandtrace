@@ -8,6 +8,7 @@
 - **CI first.** The Playwright run is split into four parallel shards. The database tests and the console suite get their own job. One job still named `e2e` waits for all of them, so main's required check keeps its name. The journey's chunk budgets gate every PR in `verify`.
 - **A production build that cannot reach anything live.** `LOCAL_FIXTURE=1` is the one way `env.ts` lets a production build serve the fixture. `env.ts` refuses it on Vercel and beside any live credential. `scripts/serve-local-production.mjs` serves `.next` that way:
   - every credential is blanked;
+  - a working tree holding any `.env*` file but `.env.example` is refused, since Next bakes `NEXT_PUBLIC_*` into the build;
   - `scripts/offline-guard.mjs` is preloaded into the server, so any connection off this machine is refused and written down.
 
   The nightly, the production smoke and `journey-perf.mjs` all use it.
@@ -84,10 +85,11 @@ Each ruling has an id (J6-n) and says what it costs if wrong. Task 10 writes the
 2. **A production build serves the fixture only on this machine** (Task 2).
    - `LOCAL_FIXTURE=1` joins `env.ts`. With it, `PNR_SOURCE=fixture` is allowed when `NODE_ENV=production`.
    - It is refused where Vercel runs (`VERCEL`, `VERCEL_ENV` or `VERCEL_URL` set) and beside any live credential. A deployment that carried it therefore fails at boot (`env()` throws in production) rather than serving sample data.
-   - `scripts/serve-local-production.mjs` is the only thing that sets it. It blanks every live variable, not merely unsets it, and preloads `scripts/offline-guard.mjs`.
+   - `scripts/serve-local-production.mjs` is the only thing that sets it. It blanks every live variable, not merely unsets it, and preloads `scripts/offline-guard.mjs`. A unit test holds its blanked list to `env.ts`'s own `LIVE_CREDENTIALS` (exported), so the two lists cannot drift.
+   - The serve script refuses to serve from a working tree that holds any `.env*` file but `.env.example`. Next inlines `NEXT_PUBLIC_*` values into the build at `npm run build`, which the serve script does not control, so a build made beside a `.env.local` would ship the live Supabase URL and the Sentry DSN to the page (the pre-flight's finding 6).
    - The guard refuses every non-loopback TCP connection before DNS and logs it. The serve script confirms the guard loaded in the server; the production smoke and `journey-perf.mjs` fail on any refusal.
 
-   *Cost if wrong: a new flag at a security boundary. The two refusals and the guard make it three locks, not one.*
+   *Cost if wrong: a new flag at a security boundary. The two refusals in `env.ts`, the serve script's `.env` refusal and the guard make it four locks, not one. The `.env` refusal means the nightly and every perf run happen in a working tree with no `.env.local` (CI's, and the j-worktrees, have none).*
 3. **What the nightly measures, and what it cannot** (Tasks 8, 9). GitHub's runners have no GPU, so Chromium draws WebGL through SwiftShader on the CPU. arm64 macOS runners have no GPU acceleration either.
 
    The nightly measures:
@@ -126,9 +128,9 @@ Each ruling has an id (J6-n) and says what it costs if wrong. Task 10 writes the
    *Cost if wrong: a trial judged before a web font swaps in could misjudge by a few pixels. A false "no" holds the still until the next rebuild; a false "yes" is caught by the scene's check, as today.*
 6. **The run's frame is server markup; its lines are drawn by `run.ts`** (Task 5).
    - `window-run.tsx` renders the pin, the three empty layer `<svg>`s and the train glyph around 06 and 07, all hidden without the journey (`journey.css`).
-   - The layers' paths depend on measured card widths, so `run.ts` draws them from `geometry/run.ts`'s pure builders. §3.B lists "the run's window layers" under server markup: this departs from it for the paths only, and Task 10 records it.
+   - The layers' paths depend on measured card widths, so `run.ts` draws them from `geometry/run.ts`'s pure builders. §3.B lists "the run's window layers" under server markup: this departs from it for the paths only. The departure was accepted at pre-flight (2026-09-28): it is internal architecture with no visible difference, and the lines need measured card widths. Task 10 records it in the spec.
 
-   *Cost if wrong: none visible.*
+   *Cost if wrong: none visible. The spec's module map changes.*
 7. **The run pins by `#run.is-running`, J5-3's pattern** (Task 6).
    - Only `run.ts` writes the class, always inside `keepPlace`, and the CSS does not gate it on `data-motion`. Motion off therefore unpins it inside `keepPlace`, with the reader kept.
    - Its height is `--run-h` in px (the pin plus the travel), so only `run.ts` ever changes it.
@@ -140,26 +142,33 @@ Each ruling has an id (J6-n) and says what it costs if wrong. Task 10 writes the
    - `run.ts` writes `data-run-at` on `#features` and `#use`. That is the page y each would have were it not riding the run, and `station-progress.ts` reads it, so the board's status follows the run.
 
    *Cost if wrong: Next's router reacting to the push, which run.spec's link test would show.*
-9. **Back into the run lands at 06** (no task). `place-memory.ts` is unchanged. A reader who left from inside the pinned run returns to its start in the static layout, because the run then waits below them.
+9. **Back returns the reader where they left, the run included** (Tasks 3 and 6). `place-memory.ts` changes twice:
+   - **Only the reader's own scroll cancels a pending restore** (Task 3; the owner, 2026-09-28, amending J5-17's "any key"). That is:
+     - a mostly vertical wheel that is not a pinch-zoom (`ctrlKey`);
+     - `touchmove`, a finger dragging, never `touchstart`, a tap;
+     - a keydown of ArrowUp, ArrowDown, PageUp, PageDown, Home, End or Space, with focus outside a text field and no Alt, Ctrl or Meta (Shift+Space scrolls up, so Shift is allowed).
 
-   *Cost if wrong: a return to 07 lands at 06.*
+     A trackpad's swipe back (a sideways wheel), Back and Forward's own keys (Alt+←, Cmd+[), a tap and every other key leave the restore pending.
+   - **Its place is read where the reader reads it inside the pinned run** (Task 6). A section riding the run is read at `data-run-at`, as `station-progress.ts` reads it, not at the pinned box it shares with the other. Both the sampling and the restore do so. A reader who left at 07 returns to 07: to its first station at the window when the run has pinned, or to `#use`'s own top while the run waits below them. `run.spec.ts` proves Back to 07.
+
+   *Cost if wrong: none for the first (the owner's call). The second is a small addition to Task 6; without it, a return to 07 lands at 06.*
 10. **Night falls on every traveller page with Motion on** (Task 7). The sweep runs only under `html[data-motion="on"]`. Only the site's head script writes that, and it already answers reduced motion, so the console, which has none, always switches at once. Three details:
     - the masthead rides in the page's own capture: its `view-transition-name` is set to none during the sweep;
     - `tt:theme` is sent once the theme is applied, inside the view-transition callback;
-    - the module is `src/components/theme/night-falls.ts`, not the spec's `theme-sweep.ts` in the journey folder, because it is the theme button's, not the journey's. Task 10 records the rename.
+    - the module is `src/components/theme/night-falls.ts`, not the spec's `theme-sweep.ts` in the journey folder, because it is the theme button's, shared by every traveller page, not only the journey. The departure was accepted at pre-flight (2026-09-28): internal architecture, with no visible difference. Task 10 records the rename in the spec.
 
-    *Cost if wrong: none.*
+    *Cost if wrong: none. The spec's module map changes.*
 11. **The nightly runs on a schedule, and on the PR that changes it** (Task 9).
     - The schedule is 03:00 IST (`30 21 * * *` UTC). A public repository's Actions minutes are free.
     - It also runs on `pull_request` only when `.github/workflows/journey-nightly.yml` itself changes, so the J6 PR proves the nightly before it merges.
-    - Spec §7 leaves the schedule to the owner, so it is asked below.
+    - Spec §7 leaves the schedule to the owner, who kept it (2026-09-28).
 
     *Cost if wrong: the owner deletes two lines.*
 12. **WebKit** (Task 9).
     - The nightly runs `place`, `run`, `night-falls`, `drawing-modes` and `live-drawing` in WebKit, on a desktop and a phone project.
-    - `live-drawing.spec.ts` skips itself, saying why, where WebKit reports no WebGL 2. Linux WebKit on a GPU-less runner may not have it.
+    - Where WebKit reports no WebGL 2 (Linux WebKit on a GPU-less runner may not have it), a test that needs the live drawing skips, saying why. The check lives in one place, `waitForLive` itself (`skipWithoutWebgl2`), so `place`, `drawing-modes` and `night-falls` skip cleanly too. `live-drawing.spec.ts`'s own skip reuses it.
 
-    *Cost if wrong: the live drawing on Safari is proven only on the owner's phone.*
+    *Cost if wrong: the live drawing on Safari is proven only on the owner's phone, and the tests that need it (in `place`, `drawing-modes` and `night-falls`) only on Chromium.*
 13. **200% text at the three PR sizes** (Task 9). Spec §5's "at 15 sizes … and at 200% text" is read as the text setting, checked where every PR checks the landing: 1440×900, 390×844 and 844×390.
 
     *Cost if wrong: twelve size and text pairs go unchecked.*
@@ -180,16 +189,16 @@ Each ruling has an id (J6-n) and says what it costs if wrong. Task 10 writes the
     | Final review, minor 5 | No forced-colours e2e | Task 4. |
     | Final review, minor 6 | `waitForJourney` needs a dev-only flag | Task 2: it falls back to `data-drawing-why` and two frames when the probe is absent (a production build). |
     | Final review, minor 7 | Chunk budgets could gate every PR | Task 1. |
-    | Final review, minor 8 | After `place` clears, the still vanishes until `scrollend` | **Ruled out,** asked of the owner below. It is a UX call for the owner's device check, not a correctness fault. |
+    | Final review, minor 8 | After `place` clears, the still vanishes until `scrollend` | **Ruled out:** the owner keeps J5's behaviour until the pin (2026-09-28). It was a UX call, not a correctness fault. |
     | Task 1 / M8 | `rig.test.ts:101` unused `_` | Task 4. `rig.test.ts` is a test, not a bake source. |
     | Task 2 | Governor p90 re-sorts ≤ 40 items | **Ruled out:** negligible. |
     | Task 3 | `departure.ts` `fonts.load().then(draw)` not cancelled | **Ruled out:** it redraws an unused 2D canvas. `departure.ts` is not a bake source, but the change buys nothing. |
     | Task 4 | M1 watchContext seam test; M7 palette and glow test gaps | **Ruled out.** GPU loss is driven end to end by `drawing-modes.spec.ts`'s "the GPU drops the context". The palette and glow have unit tests; the gaps are branch-level. |
     | Task 4 | M2 `warm()` comment | Closed by the final review. |
     | Task 4 | M3 fractional `qualityAt`, M4 `inked` width, M6 `setClearAlpha` | **Ruled out:** unreachable, dev probe only, and cosmetic. |
-    | Task 5 | Restore test asserts once; only wheel cancels in tests | **Ruled out:** test quality. `wheel`, `touchstart` and `keydown` share one listener list (`HAND` in `place-memory.ts`). |
+    | Task 5 | Restore test asserts once; only wheel cancels in tests | Task 3 (J6-9): a unit test for every input that cancels the restore, and for every one that must not. |
     | Task 5 | Cancel listeners with nothing to restore; #how measured twice; `leaving` can stick | **Ruled out:** negligible or unreachable. |
-    | Task 5 | Any key and a trackpad swipe cancel the restore | **Ruled out:** pending the owner's device check. |
+    | Task 5 | Any key and a trackpad swipe cancel the restore | Task 3 (J6-9; the owner, 2026-09-28): only the reader's own scroll cancels it. |
     | Task 6 | `below()` vs `placeAfter` boundary | Task 3 (J6-4). |
     | Task 6 | The WebGL probe on every rebuild; a synchronously throwing loader; the listener-order test | **Ruled out:** one throwaway context; unreachable with `sceneLoader`; test quality. |
     | Task 6 | `still.test` timers and fonts not reset on failure | Task 3. |
@@ -203,6 +212,22 @@ Each ruling has an id (J6-n) and says what it costs if wrong. Task 10 writes the
     | Parked | "Inside 02" judged by the window's top edge alone | Task 3 (J6-4). |
     | Final review, recommendations | A WebKit project; an `overflow-anchor: none` variant | Task 9; the variant already exists (`noAnchoring`), and Task 3 widens it. |
     | Final review, recommendations | Move `storedQuality` out of `drawing.ts` | **Ruled out:** it only shapes the chunk split, which the budgets count correctly. |
+
+### Pre-flight amendments (the controller's rulings, 2026-09-28)
+
+The pre-flight scan checked this plan against itself, the spec, the owner's decisions and the branch. Its twelve rulings are written into the tasks above and below:
+1. The Back restore is cancelled only by the reader's own scroll (wheel, touch-drag, scroll keys): Task 3, J6-9, J6-15, Task 10's §6.
+2. Night falls' unit test is `night-falls.test.tsx`, so it runs under jsdom: Task 7.
+3. Task 4's new unit tests live in `drawing-fit.test.tsx`, keeping `drawing.test.tsx` under 500 lines: Task 4.
+4. The "no WebGL 2 in WebKit" skip lives in `waitForLive` itself, reused by `live-drawing.spec.ts`: Task 9, J6-12.
+5. Back into the run returns to 07: place-memory reads `data-run-at`, with a run.spec Back test: Task 6, J6-9.
+6. The serve script refuses a working tree with any `.env*` but `.env.example`, and its blanked list is tested against `LIVE_CREDENTIALS`: Task 2, J6-2, the Global Constraints.
+7. The `e2e` gate runs `if: ${{ !cancelled() }}`, so a superseded run does not report: Task 1.
+8. The nightly's step-order contract reads from `jobs:` on, so it proves the build step, not the header comment: Task 9.
+9. The nightly's size sweep steps 0.15 of a window, as dense as the PR's: Task 9.
+10. `hud.ts` writes `HUD_CHUNK_MARK` onto its own root element, so the bundler keeps it in the meter's chunk: Task 8.
+11. The one-writer list names `liveFits`'s trial writes: the Global Constraints.
+12. Both §3.B departures (the run's lines drawn by `run.ts`, J6-6; `night-falls.ts`, J6-10) are accepted, and Task 10 records them.
 
 ## Global Constraints
 
@@ -230,6 +255,7 @@ Each ruling has an id (J6-n) and says what it costs if wrong. Task 10 writes the
 - **Every reason not to draw live settles on the still,** with `data-drawing="still"` and its reason in `data-drawing-why`.
 - **One writer per attribute.** J5's list stands, with these additions:
   - `drawing.ts` still owns `#anatomy.is-live`. That includes `liveFits`'s trial, which is undone in the same task (J6-5).
+  - `liveFits`'s trial also drives `live-labels.ts`'s own writes, through `createLiveLabels(section)`, `layout()` and `clear()`: the pin's `data-live` and `data-compact`, `--anatomy-copy-h`, its `.live-lines` layer, and the reset of the labels' `transform` and `clip-path`. These are the trial's, inside its own task, and undone before it returns.
   - `keepPlace` (in `keep-place.ts`) is how `drawing.ts` and `run.ts` change their pieces' heights; it writes only `scrollY`.
   - `run.ts` owns everything the run writes:
     - `#run.is-running` and `#run`'s `--run-h` and `--run-band`;
@@ -251,7 +277,7 @@ Each ruling has an id (J6-n) and says what it costs if wrong. Task 10 writes the
   - E2E waits on state (`frames(page, n)`, `expect.poll`, an attribute), never a fixed time, except a window that is itself the assertion ("nothing downloads"), which says so in a comment.
   - Run Playwright only in this worktree, on port 4210 (check `lsof -nP -iTCP:4210 -sTCP:LISTEN` first). Use fixture mode, or the local production server of Task 2.
   - Never send a sample PNR to a live site. Never touch port 3100 or the primary checkout.
-- **Production-build runs** go only through `scripts/serve-local-production.mjs`. `LOCAL_FIXTURE` is set nowhere else: in no `.env*` file, no workflow `env:`, and no Vercel environment.
+- **Production-build runs** go only through `scripts/serve-local-production.mjs`. `LOCAL_FIXTURE` is set nowhere else: in no `.env*` file, no workflow `env:`, and no Vercel environment. The script refuses a working tree that holds any `.env*` file but `.env.example`, because Next inlines `NEXT_PUBLIC_*` into the build: build and serve for measurement only where there is none (this worktree, CI).
 - **Workflows.** Every action is pinned to a full commit SHA with its version in a comment. `permissions: contents: read`. No `secrets.` in `ci.yml` or `journey-nightly.yml`. Node 24. `tests/unit/ci-workflows.contract.test.ts` holds all of it.
 - **The bake.** No task in J6 edits a file in `BAKE_SOURCES` (`scripts/bake/emit.mjs`). If one must, re-bake on this Mac (`npm run bake:stills`) and commit its outputs in the same commit; the `sourceHash` test enforces it.
 - **The gate.** Run `npm run check` (the whole gate) before every commit. Each task runs its own focused e2e; Task 10 runs the full `npx playwright test`.
@@ -262,18 +288,19 @@ Each ruling has an id (J6-n) and says what it costs if wrong. Task 10 writes the
 | File | Responsibility | Task |
 |---|---|---|
 | `.github/workflows/ci.yml`, `playwright.config.ts`, `tests/unit/ci-workflows.contract.test.ts`, `.gitignore` | four Playwright shards with blob reports, the `console` job, the `e2e` gate, budgets in `verify` | 1 |
-| `src/services/env.ts`, `tests/unit/services/env.test.ts` | `LOCAL_FIXTURE`, refused on Vercel and beside a live credential | 2 |
-| `scripts/offline-guard-rules.mjs`, `scripts/offline-guard.mjs`, `scripts/serve-local-production.mjs`, `package.json` (`serve:local`) | the offline guard; the local production server | 2 |
+| `src/services/env.ts`, `tests/unit/services/env.test.ts` | `LOCAL_FIXTURE`, refused on Vercel and beside a live credential; `LIVE_CREDENTIALS` exported | 2 |
+| `scripts/offline-guard-rules.mjs`, `scripts/offline-guard.mjs`, `scripts/serve-local-production.mjs`, `package.json` (`serve:local`) | the offline guard; the local production server, which refuses a working tree with a `.env` file | 2 |
 | `playwright.config.ts` (`testIgnore`), `playwright.production.config.ts`, `tests/e2e/production/landing.spec.ts`, `tests/e2e/journey/journey-helpers.ts` | the production-build smoke; `waitForJourney` without the dev probe | 2 |
 | `src/components/landing/journey/drawing-mode.ts` (`readerPlace`, `pastShift`), `keep-place.ts` (new), `drawing.ts`, `chapters.ts`, `still.ts` | one rule for the reader's place; `keepPlace` shared | 3 |
 | `tests/e2e/journey/place.spec.ts`, `journey-helpers.ts` (`noAnchoring`), `DESIGN.md` | the reader-position proofs; the rule in writing | 3 |
-| `src/components/landing/journey/drawing.ts` (`liveFits`, the abort), `tests/e2e/journey/{drawing-modes,live-drawing}.spec.ts`, the spec's §3.C and §3.H | fit before the import; a late scene builds nothing; the modes' still; forced colours | 4 |
+| `src/components/landing/journey/place-memory.ts`, `tests/unit/components/landing/journey/place-memory.test.tsx` | only the reader's own scroll cancels the Back restore (J6-9) | 3 |
+| `src/components/landing/journey/drawing.ts` (`liveFits`, the abort), `tests/unit/components/landing/journey/drawing-fit.test.tsx` (new), `tests/e2e/journey/{drawing-modes,live-drawing}.spec.ts`, the spec's §3.C and §3.H | fit before the import; a late scene builds nothing; the modes' still; forced colours | 4 |
 | `src/components/landing/journey/geometry/run.ts`, `window-run.tsx` (new), `src/components/landing/{features,photo-split}.tsx`, `src/app/(site)/page.tsx`, `src/messages/en-IN/journey.ts`, `src/styles/journey.css` | the run's frame and geometry | 5 |
-| `src/components/landing/journey/run.ts` (new), `station-progress.ts`, `start-journey.ts`, `src/styles/journey-island.css`, `DESIGN.md` | the run, moving | 6 |
+| `src/components/landing/journey/run.ts` (new), `station-progress.ts`, `place-memory.ts` (`data-run-at`), `start-journey.ts`, `src/styles/journey-island.css`, `DESIGN.md` | the run, moving; Back into it (J6-9) | 6 |
 | `tests/e2e/journey/run.spec.ts` (new), `collisions.ts` (`LANDING_INSTRUMENTS`), `collisions.spec.ts`, `teardown.spec.ts`, `journey-axe.spec.ts` | the run's proofs; axe at run, Night run and phone run | 6 |
 | `src/components/theme/night-falls.ts` (new), `theme-toggle.tsx`, `src/styles/motion.css`, `tests/e2e/journey/night-falls.spec.ts`, `DESIGN.md` | Night falls | 7 |
-| `scripts/journey-budgets.mjs`, `src/components/landing/journey/hud-mark.ts` (new), `hud.ts`, `scripts/journey-perf.mjs` | the budgets hardened; the perf script serving itself, and `--software` | 8 |
-| `.github/workflows/journey-nightly.yml` (new), `playwright.nightly.config.ts` (new), `tests/e2e/nightly/{sizes,screens}.spec.ts` (new), `live-drawing.spec.ts` (WebKit skip), the spec's §5, §7, §8 and §9 | the nightly | 9 |
+| `scripts/journey-budgets.mjs`, `src/components/landing/journey/hud-mark.ts` (new), `hud.ts` (the mark on its root), `scripts/journey-perf.mjs` | the budgets hardened; the perf script serving itself, and `--software` | 8 |
+| `.github/workflows/journey-nightly.yml` (new), `playwright.nightly.config.ts` (new), `tests/e2e/nightly/{sizes,screens}.spec.ts` (new), `journey-helpers.ts` (`waitForLive`'s WebKit skip), `live-drawing.spec.ts`, the spec's §5, §7, §8 and §9 | the nightly | 9 |
 | the spec's §2, §3.B and §6 | the J6 rulings, the row marked done; the whole suite | 10 |
 
 ---
@@ -315,7 +342,8 @@ In `tests/unit/ci-workflows.contract.test.ts`, add inside `describe("ci.yml", �
     expect(ci).toMatch(/^ {2}console:$/m);
     const gate = ci.slice(ci.search(/^ {2}e2e:$/m));
     expect(gate).toContain("needs: [e2e-shard, console]");
-    expect(gate).toContain("if: always()");
+    // a failed or timed-out shard still reaches the gate; a run superseded by a newer push does not report
+    expect(gate).toContain("if: ${{ !cancelled() }}");
     expect(gate).toContain("npx playwright merge-reports --reporter html ./all-blob-reports");
   });
 
@@ -488,8 +516,10 @@ jobs:
 
   e2e:
     # The check main requires, under its old name: every shard and the console suite passed. When a shard failed, the
-    # shards' blob reports are merged into one HTML report and kept.
-    if: always()
+    # shards' blob reports are merged into one HTML report and kept. Not cancelled(), rather than always(): a failed or
+    # timed-out shard still reaches the gate and fails it, while a run superseded by a newer push (cancel-in-progress)
+    # starts nothing and reports nothing.
+    if: ${{ !cancelled() }}
     needs: [e2e-shard, console]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -574,7 +604,7 @@ The proof on the runners comes with the PR's first CI run (the Finish): each sha
 
 `env.ts` refuses `PNR_SOURCE=fixture` in production, so `next start` for measurement could not serve sample data. J5's perf run served "live" with an empty environment instead, and relied on nothing being set. This task makes the production fixture path explicit and locked three ways (J6-2):
 - `LOCAL_FIXTURE=1`, which `env.ts` refuses on Vercel and beside any live credential;
-- a serve script that blanks every live variable;
+- a serve script that blanks every live variable, and refuses a working tree with any `.env*` file but `.env.example` (Next inlines `NEXT_PUBLIC_*` into the build, where blanking cannot reach);
 - an offline guard in the server that refuses any connection off this machine.
 
 The production smoke proves "/" contacts nothing live under it.
@@ -590,11 +620,13 @@ The production smoke proves "/" contacts nothing live under it.
 - Consumes: `parseEnv`, `fixtureAllowed` and `activePnrSource` (`src/services/env.ts`).
 - Produces:
   - `Env.LOCAL_FIXTURE: boolean`;
+  - `LIVE_CREDENTIALS`, now exported from `src/services/env.ts`;
   - `scripts/offline-guard-rules.mjs`: `isLoopback(host: unknown): boolean` and `targetOf(args: readonly unknown[]): { host: string | undefined, port: unknown }`;
   - `scripts/serve-local-production.mjs`:
     - `GUARD_LOG: string` (`<root>/.offline-guard.log`);
     - `LIVE_VARIABLES: string[]`;
     - `localProductionEnv(base: Record<string, string | undefined>, port: number): Record<string, string>`;
+    - `strayEnvFiles(names: readonly string[]): string[]`;
     - `refusals(): string[]`;
     - `startLocalProduction({ port }?: { port?: number }): Promise<{ url: string, stop(): Promise<void> }>`, used by Task 8;
   - `npm run serve:local -- --port 4210`;
@@ -663,8 +695,9 @@ Expected: FAIL.
 
 Above `const envSchema = z`, add:
 ```ts
-/** Every variable that reaches a live service or a live account. A production build serving sample data carries none. */
-const LIVE_CREDENTIALS = [
+/** Every variable that reaches a live service or a live account. A production build serving sample data carries none.
+ * Exported so the local production server's test holds its blanked list to this one (J6-2). */
+export const LIVE_CREDENTIALS = [
   "RAILKIT_API_KEY",
   "UPSTASH_REDIS_REST_URL",
   "UPSTASH_REDIS_REST_TOKEN",
@@ -796,8 +829,8 @@ Create `tests/unit/scripts/serve-local-production.test.ts`:
 
 ```ts
 import { describe, expect, it } from "vitest";
-import { activePnrSource, fixtureAllowed, parseEnv } from "@/services/env";
-import { GUARD_LOG, LIVE_VARIABLES, localProductionEnv } from "../../../scripts/serve-local-production.mjs";
+import { LIVE_CREDENTIALS, activePnrSource, fixtureAllowed, parseEnv } from "@/services/env";
+import { GUARD_LOG, LIVE_VARIABLES, localProductionEnv, strayEnvFiles } from "../../../scripts/serve-local-production.mjs";
 
 // The local production server's environment (J6-2): sample data, every live variable blanked, the guard preloaded.
 
@@ -817,6 +850,10 @@ describe("the local production server's environment", () => {
     expect(env.PATH).toBe("/usr/bin");
   });
 
+  it("blanks every credential env.ts refuses LOCAL_FIXTURE beside, so the two lists cannot drift apart", () => {
+    expect(LIVE_VARIABLES).toEqual(expect.arrayContaining([...LIVE_CREDENTIALS]));
+  });
+
   it("serves the fixture from a production build, which env.ts accepts only this way", () => {
     const parsed = parseEnv(localProductionEnv(stray, 4210));
     if (!parsed.ok) throw new Error(parsed.issues.join("; "));
@@ -830,6 +867,17 @@ describe("the local production server's environment", () => {
     expect(env.OFFLINE_GUARD_LOG).toBe(GUARD_LOG);
     expect(env.PORT).toBe("4210");
     expect(env.NEXT_TELEMETRY_DISABLED).toBe("1");
+  });
+});
+
+describe("the working tree it serves from (J6-2)", () => {
+  it("refuses one that holds any .env file but the example: Next inlines NEXT_PUBLIC_* into the build, where blanking cannot reach", () => {
+    expect(strayEnvFiles([".env.example", ".env.local", "package.json", ".next", ".env"])).toEqual([".env", ".env.local"]);
+    expect(strayEnvFiles([".env.production.local", ".env.development"])).toEqual([".env.development", ".env.production.local"]);
+  });
+
+  it("serves from one with none: the example is documentation, and nothing else is an env file", () => {
+    expect(strayEnvFiles([".env.example", "package.json", "src", ".gitignore", "vercel.json"])).toEqual([]);
   });
 });
 ```
@@ -928,9 +976,12 @@ Create `scripts/serve-local-production.mjs`:
 // - every live variable blanked, not merely unset: Next never overrides a variable that is set, so a stray .env.local
 //   cannot fill one in (an empty value counts as unset in env.ts);
 // - scripts/offline-guard.mjs preloaded into the server: any connection off this machine is refused before it is made,
-//   and written to .offline-guard.log, which the production smoke and journey-perf.mjs read afterwards.
+//   and written to .offline-guard.log, which the production smoke and journey-perf.mjs read afterwards;
+// - a working tree that holds any .env file but .env.example refused outright: Next inlines NEXT_PUBLIC_* values into
+//   the build at `npm run build`, where blanking at serve time cannot reach, so a build made beside a .env.local would
+//   ship live addresses (Supabase, Sentry) to the page. Build and serve only where there is none (this worktree, CI).
 import { spawn } from "node:child_process";
-import { existsSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -981,6 +1032,16 @@ export function localProductionEnv(base, port) {
   };
 }
 
+/**
+ * The .env files in a working tree that Next would read into a build, baking their NEXT_PUBLIC_* values into the page:
+ * every `.env*` but `.env.example`. Pure, so a unit test reads it.
+ * @param {readonly string[]} names the working tree's root entries
+ * @returns {string[]}
+ */
+export function strayEnvFiles(names) {
+  return names.filter((name) => name.startsWith(".env") && name !== ".env.example").sort();
+}
+
 /** Every connection the guard refused since the server started, one line each. */
 export function refusals() {
   return existsSync(GUARD_LOG) ? readFileSync(GUARD_LOG, "utf8").split("\n").filter((line) => line !== "" && !line.startsWith("#")) : [];
@@ -990,11 +1051,14 @@ export function refusals() {
 const answers = (url) => fetch(url).then((r) => r.ok, () => false);
 
 /**
- * Starts `next start` on the build in .next and resolves once it answers, with the guard proven loaded.
+ * Starts `next start` on the build in .next and resolves once it answers, with the guard proven loaded. Refuses a
+ * working tree with a .env file (strayEnvFiles), a missing build, and a port another server already answers.
  * @param {{ port?: number }} [options]
  * @returns {Promise<{ url: string, stop: () => Promise<void> }>}
  */
 export async function startLocalProduction({ port = 4210 } = {}) {
+  const stray = strayEnvFiles(readdirSync(ROOT));
+  if (stray.length) throw new Error(`refused: ${stray.join(", ")} in this working tree. Next inlines its NEXT_PUBLIC_* values into the build, so the page could reach a live service: build and serve from a working tree with no .env file (J6-2)`);
   if (!existsSync(join(ROOT, ".next/BUILD_ID"))) throw new Error("no production build here: run `npm run build` first");
   const url = `http://localhost:${port}/`;
   if (await answers(url)) throw new Error(`${url} already answers: another server holds port ${port} (lsof -nP -iTCP:${port} -sTCP:LISTEN)`);
@@ -1173,10 +1237,11 @@ test("a production build has no frame meter and no dev probes", async ({ page })
 
 ```bash
 lsof -nP -iTCP:4210 -sTCP:LISTEN
+ls -a | grep '^\.env'
 npm run build
 npx playwright test -c playwright.production.config.ts
 ```
-Expected: FAIL. `waitForJourney` times out on `__ttJourneyStarted`, which a production build never defines.
+Expected: `ls` lists only `.env.example` (the serve script refuses any other `.env*` file). Then FAIL: `waitForJourney` times out on `__ttJourneyStarted`, which a production build never defines.
 
 - [ ] **Step 12: `waitForJourney` without the dev probe**
 
@@ -1230,21 +1295,25 @@ The last two cause J5's two parked moves:
 
 This task lifts J5-3's judgement into `readerPlace` and uses it in all three (J6-4). It also moves `keepPlace` into its own module, so the run (Task 6) changes its height through it, as the drawing does.
 
+It also owns the reader's place on Back (J6-9; the owner, 2026-09-28). A pending restore is cancelled only by the reader's own scroll: a mostly vertical wheel that is not a pinch-zoom, a finger dragging, or a scroll key outside a text field without Alt, Ctrl or Meta. A trackpad's swipe back, Back and Forward's own keys, a tap and every other key leave it pending.
+
 **Files:**
 - Modify: `src/components/landing/journey/drawing-mode.ts` (`readerPlace`, `pastShift`; `placeAfter` uses them)
 - Create: `src/components/landing/journey/keep-place.ts` (`keepPlace` and `mastheadBottom`, moved from `drawing.ts`)
 - Modify: `src/components/landing/journey/drawing.ts`, `chapters.ts`, `still.ts`
+- Modify: `src/components/landing/journey/place-memory.ts` (`ownScroll`: only the reader's own scroll cancels the restore)
 - Modify: `tests/e2e/journey/journey-helpers.ts` (`noAnchoring`, moved from `place.spec.ts`), `tests/e2e/journey/place.spec.ts`
 - Modify: `DESIGN.md`
-- Test: `tests/unit/components/landing/journey/{drawing-mode,place-guard,still}.test.ts(x)`
+- Test: `tests/unit/components/landing/journey/{drawing-mode,place-guard,still,place-memory}.test.ts(x)`
 
 **Interfaces:**
-- Consumes: `placeAfter`'s J5-3 contract (unchanged).
+- Consumes: `placeAfter`'s J5-3 contract (unchanged), and `startPlaceMemory()` (J5-17; its API unchanged).
 - Produces:
   - `readerPlace(box: { top: number; bottom: number }, viewport: number): "above" | "inside" | "past"`;
   - `pastShift(before: { top: number; bottom: number }, change: number, viewport: number): number`;
   - `keepPlace(section: HTMLElement | null, change: () => void): void` and `mastheadBottom(): number`, exported from `keep-place.ts` (Task 6 uses both);
-  - `noAnchoring(page)`, exported from `journey-helpers.ts` (Task 6 uses it).
+  - `noAnchoring(page)`, exported from `journey-helpers.ts` (Task 6 uses it);
+  - in `place-memory.ts`, the private `ownScroll(event)`, which says whether a `wheel`, `touchmove` or `keydown` is the reader's own scroll. Task 6 adds its `topOf` beside it.
 
 - [ ] **Step 1: Write the failing unit tests**
 
@@ -1317,13 +1386,91 @@ afterEach(() => {
 ```
 Then delete the now-redundant `vi.useRealTimers();` line at the end of the third test.
 
+In `tests/unit/components/landing/journey/place-memory.test.tsx`, add inside `describe("startPlaceMemory", …)`, after the test "restores nothing once the reader has scrolled by their own hand" (which keeps its vertical wheel):
+
+```ts
+  // Only the reader's own scroll cancels the restore (J6-9; the owner, 2026-09-28, amending J5-17's "any key"): a
+  // mostly vertical wheel that is not a pinch-zoom, a finger dragging, and a scroll key outside a text field with no
+  // Alt, Ctrl or Meta. A swipe back, Back and Forward's own keys, a tap and every other key leave it pending.
+  type Act = [name: string, act: () => void];
+  const wheel =
+    (init: WheelEventInit) =>
+    (): void => {
+      window.dispatchEvent(new WheelEvent("wheel", init));
+    };
+  const key =
+    (k: string, init: KeyboardEventInit = {}) =>
+    (): void => {
+      document.body.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, ...init }));
+    };
+  const inField =
+    (tag: "input" | "textarea" | "div", k: string) =>
+    (): void => {
+      const field = document.createElement(tag);
+      if (tag === "div") field.setAttribute("contenteditable", "");
+      document.body.append(field);
+      field.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true }));
+    };
+  const cancels: Act[] = [
+    ["a mostly vertical wheel", wheel({ deltaX: 12, deltaY: 40 })],
+    ["a finger dragging (touchmove)", () => window.dispatchEvent(new Event("touchmove"))],
+    ["ArrowUp", key("ArrowUp")],
+    ["ArrowDown", key("ArrowDown")],
+    ["PageUp", key("PageUp")],
+    ["PageDown", key("PageDown")],
+    ["Home", key("Home")],
+    ["End", key("End")],
+    ["Space", key(" ")],
+    ["Shift+Space", key(" ", { shiftKey: true })],
+  ];
+  const keeps: Act[] = [
+    ["a trackpad's swipe back (a sideways wheel)", wheel({ deltaX: -60 })],
+    ["a wheel as much sideways as down", wheel({ deltaX: 30, deltaY: 30 })],
+    ["a pinch-zoom (ctrl+wheel)", wheel({ deltaY: 40, ctrlKey: true })],
+    ["a tap (touchstart alone)", () => window.dispatchEvent(new Event("touchstart"))],
+    ["the a key", key("a")],
+    ["Tab", key("Tab")],
+    ["Shift", key("Shift")],
+    ["Escape", key("Escape")],
+    ["ArrowLeft", key("ArrowLeft")],
+    ["ArrowRight", key("ArrowRight")],
+    ["Alt+ArrowLeft (Back)", key("ArrowLeft", { altKey: true })],
+    ["Meta+[ (Back)", key("[", { metaKey: true })],
+    ["Alt+ArrowDown", key("ArrowDown", { altKey: true })],
+    ["Ctrl+End", key("End", { ctrlKey: true })],
+    ["Meta+ArrowUp", key("ArrowUp", { metaKey: true })],
+    ["ArrowDown in a text input", inField("input", "ArrowDown")],
+    ["Space in a textarea", inField("textarea", " ")],
+    ["End in an editable region", inField("div", "End")],
+  ];
+
+  it.each(cancels)("restores nothing once the reader scrolls by their own hand: %s", (_, act) => {
+    store({ entry: "k1", id: "record", offset: 136 });
+    const memory = startPlaceMemory();
+    act();
+    memory.restore();
+    expect(scrolls).toEqual([]);
+    memory.stop();
+  });
+
+  it.each(keeps)("still restores after what is not the reader's own scroll: %s", (_, act) => {
+    store({ entry: "k1", id: "record", offset: 136 });
+    const memory = startPlaceMemory();
+    act();
+    memory.restore();
+    expect(scrolls).toEqual([3000 - 64 - 136]);
+    memory.stop();
+  });
+```
+
 - [ ] **Step 2: Run them to verify they fail**
 
-Run: `npx vitest run tests/unit/components/landing/journey/drawing-mode.test.ts tests/unit/components/landing/journey/place-guard.test.tsx tests/unit/components/landing/journey/still.test.tsx`
+Run: `npx vitest run tests/unit/components/landing/journey/drawing-mode.test.ts tests/unit/components/landing/journey/place-guard.test.tsx tests/unit/components/landing/journey/still.test.tsx tests/unit/components/landing/journey/place-memory.test.tsx`
 Expected: FAIL.
 - `readerPlace is not a function` and `pastShift is not a function`.
 - The guard test fails with `expected "spy" to be called with arguments: [ { top: 3480, … } ]`: the old rule sends that reader to `1000 - 80`.
 - The still tests pass.
+- In place-memory, every "still restores" case fails with `expected [] to deeply equal [ 2800 ]` (today any wheel, any key and a tap cancel), and the touchmove case fails with `expected [ 2800 ] to deeply equal []` (nothing listens for it). The other "restores nothing" cases pass.
 
 - [ ] **Step 3: `readerPlace` and `pastShift`**
 
@@ -1450,12 +1597,62 @@ with:
 ```
 Update the long comment above `layout` accordingly: replace its first sentence ("A reader already below the chapter never asked to move: …") so it reads "A reader past the chapter (readerPlace's past: its foot within the window's top half) never asked to move: …".
 
-- [ ] **Step 6: Run the unit tests to verify they pass**
+- [ ] **Step 6: Only the reader's own scroll cancels the Back restore**
+
+In `src/components/landing/journey/place-memory.ts`, replace:
+```ts
+/** The reader's own hand: any of these before the restore means they have moved on, and nothing is restored under them. */
+const HAND = ["wheel", "touchstart", "keydown"] as const;
+```
+with:
+```ts
+/** The events that can carry the reader's own scroll; ownScroll says which of them do. */
+const HAND = ["wheel", "touchmove", "keydown"] as const;
+/** The keys that scroll the page: the arrows up and down, Page Up and Page Down, Home, End and Space (Shift+Space up). */
+const SCROLL_KEYS: ReadonlySet<string> = new Set(["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "]);
+/** Where a key types or picks rather than scrolls. */
+const TEXT_FIELD = "input, textarea, select, [contenteditable]:not([contenteditable='false'])";
+
+/**
+ * The reader's own scroll (J5-17, amended by the owner on 2026-09-28; J6-9): before the restore, it means they have
+ * moved on, and nothing is restored under them. Only a scroll counts:
+ * - a wheel that is mostly vertical and not a pinch-zoom (ctrl+wheel). A sideways wheel is a trackpad's swipe back, or
+ *   its momentum as the page returns;
+ * - a finger dragging (touchmove). A tap (touchstart alone) is not a scroll;
+ * - a scroll key, with focus outside a text field and no Alt, Ctrl or Meta: Alt+← and Cmd+[ are Back and Forward.
+ * A swipe back, a tap and every other key leave the restore pending.
+ */
+function ownScroll(event: Event): boolean {
+  if (event.type === "touchmove") return true;
+  if (event instanceof WheelEvent) return !event.ctrlKey && Math.abs(event.deltaY) > Math.abs(event.deltaX);
+  if (!(event instanceof KeyboardEvent) || !SCROLL_KEYS.has(event.key)) return false;
+  if (event.altKey || event.ctrlKey || event.metaKey) return false;
+  return !(event.target instanceof Element && event.target.closest(TEXT_FIELD));
+}
+```
+In `startPlaceMemory`, replace:
+```ts
+  const onHand = () => {
+    pending = null;
+    stopHand();
+  };
+```
+with:
+```ts
+  const onHand = (event: Event) => {
+    if (!ownScroll(event)) return;
+    pending = null;
+    stopHand();
+  };
+```
+The listeners stay capture and passive, and `stopHand` still removes all three.
+
+- [ ] **Step 7: Run the unit tests to verify they pass**
 
 Run: `npx vitest run tests/unit/components/landing/journey`
 Expected: PASS, every existing test included. `drawing.test.tsx`'s J5 cases use tops of 200 and large negatives, both on the same side of −8.
 
-- [ ] **Step 7: Write the failing e2e proofs**
+- [ ] **Step 8: Write the failing e2e proofs**
 
 In `tests/e2e/journey/journey-helpers.ts`, add (moved from `place.spec.ts`, which then imports it):
 ```ts
@@ -1543,7 +1740,7 @@ In `tests/e2e/journey/place.spec.ts`:
   }
 ```
 
-- [ ] **Step 8: Run the e2e proofs**
+- [ ] **Step 9: Run the e2e proofs**
 
 ```bash
 lsof -nP -iTCP:4210 -sTCP:LISTEN
@@ -1555,7 +1752,7 @@ Expected: PASS.
 
 Confirm both by stashing Steps 3–5 (`git stash push src/components/landing/journey`), running `place.spec.ts`, and restoring (`git stash pop`). If `chapters.spec.ts` has a case that put a reader at 02's foot and expected 02's start, it asserted the old rule: change its expectation to "stays on #record", and say so in the commit body.
 
-- [ ] **Step 9: Write the rule into DESIGN.md**
+- [ ] **Step 10: Write the rule into DESIGN.md**
 
 In `DESIGN.md`'s Motion section, in the landing journey's bullet list, after the "**Scroll-driven pieces follow the scroll both ways:**" bullet, add:
 ```markdown
@@ -1565,12 +1762,12 @@ In `DESIGN.md`'s Motion section, in the landing journey's bullet list, after the
   half, they move by exactly the change, so what follows it stays where they were reading.
 ```
 
-- [ ] **Step 10: The gate, then commit**
+- [ ] **Step 11: The gate, then commit**
 
 ```bash
 npm run check
-git add src/components/landing/journey/drawing-mode.ts src/components/landing/journey/keep-place.ts src/components/landing/journey/drawing.ts src/components/landing/journey/chapters.ts src/components/landing/journey/still.ts tests/unit/components/landing/journey/drawing-mode.test.ts tests/unit/components/landing/journey/place-guard.test.tsx tests/unit/components/landing/journey/still.test.tsx tests/e2e/journey/journey-helpers.ts tests/e2e/journey/place.spec.ts DESIGN.md
-git commit -m "fix(journey): judge the reader by one rule everywhere, so neither 02's last lines nor #principles move them"
+git add src/components/landing/journey/drawing-mode.ts src/components/landing/journey/keep-place.ts src/components/landing/journey/drawing.ts src/components/landing/journey/chapters.ts src/components/landing/journey/still.ts src/components/landing/journey/place-memory.ts tests/unit/components/landing/journey/drawing-mode.test.ts tests/unit/components/landing/journey/place-guard.test.tsx tests/unit/components/landing/journey/still.test.tsx tests/unit/components/landing/journey/place-memory.test.tsx tests/e2e/journey/journey-helpers.ts tests/e2e/journey/place.spec.ts DESIGN.md
+git commit -m "fix(journey): judge the reader by one rule everywhere, so neither 02's last lines nor #principles move them" -m "Back's restore is cancelled only by the reader's own scroll: a vertical wheel, a finger dragging, a scroll key (J6-9)."
 ```
 
 ---
@@ -1592,7 +1789,7 @@ The rest are J5's deferred minors:
 - Modify: `tests/e2e/journey/drawing-modes.spec.ts`, `tests/e2e/journey/live-drawing.spec.ts`
 - Modify: `tests/unit/components/landing/journey/journey-loader.test.tsx`, `tests/unit/components/landing/journey/scene/rig.test.ts`
 - Modify: `docs/superpowers/specs/2026-09-24-landing-journey-design.md` (§3.C, §3.H)
-- Test: `tests/unit/components/landing/journey/drawing.test.tsx`
+- Create: `tests/unit/components/landing/journey/drawing-fit.test.tsx` (`drawing.test.tsx` is at 463 of its 500 lines, and stays unchanged)
 
 **Interfaces:**
 - Consumes: `createLiveLabels(section)` and its `layout()` and `clear()` (`live-labels.ts`, J5).
@@ -1603,13 +1800,36 @@ The rest are J5's deferred minors:
 
 - [ ] **Step 1: Write the failing unit tests**
 
-In `tests/unit/components/landing/journey/drawing.test.tsx`, add `liveFits` to the import from `@/components/landing/journey/drawing`, and add at the end of the file:
+`drawing.test.tsx` already has 463 lines, and these would take it past the 500-line limit that `tokens.contract.test.ts` enforces. So they go in a file of their own. Create `tests/unit/components/landing/journey/drawing-fit.test.tsx`:
 
-```ts
+```tsx
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { LOAD_LIMIT_MS, drawingModule, liveFits, sceneLoader, type Begin, type LoadLive } from "@/components/landing/journey/drawing";
+import { testContext } from "./journey-context";
+
+// drawing.ts's J6 additions, apart from drawing.test.tsx (at its line limit): fit judged before the scene is fetched
+// (J6-5), and a scene that arrives too late (J5 final review, minor 2).
+
+const html = document.documentElement;
+
+beforeEach(() => {
+  html.dataset.drawing = "live";
+  html.dataset.saver = "off";
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+  delete html.dataset.drawing;
+  delete html.dataset.drawingWhy;
+  delete html.dataset.saver;
+  window.sessionStorage.clear();
+  document.body.innerHTML = "";
+});
+
 describe("fit, judged before the scene is fetched (J6-5)", () => {
   const markup = `<header></header><section id="anatomy"><div class="anatomy-pin"><div class="anatomy-copy"></div><ol class="callouts"><li class="callout" data-side="left"></li></ol><p class="anatomy-caption"></p><div class="title-block"></div><ol class="anatomy-legend"></ol></div></section>`;
-
-  afterEach(() => vi.unstubAllGlobals());
 
   it("lays the pinned chapter out for an instant, and puts it all back in the same task", () => {
     // live-labels.ts asks whether the window is narrow; jsdom has no matchMedia
@@ -1649,8 +1869,6 @@ describe("fit, judged before the scene is fetched (J6-5)", () => {
 });
 
 describe("a scene that arrives too late builds nothing (J5 final review, minor 2)", () => {
-  afterEach(() => vi.useRealTimers());
-
   it("prepares nothing from a chunk that arrives after the 20 s limit", async () => {
     vi.useFakeTimers();
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
@@ -1696,7 +1914,7 @@ In `tests/unit/components/landing/journey/journey-loader.test.tsx`, add after th
 
 - [ ] **Step 2: Run them to verify they fail**
 
-Run: `npx vitest run tests/unit/components/landing/journey/drawing.test.tsx tests/unit/components/landing/journey/journey-loader.test.tsx`
+Run: `npx vitest run tests/unit/components/landing/journey/drawing-fit.test.tsx tests/unit/components/landing/journey/journey-loader.test.tsx`
 Expected: FAIL.
 - `liveFits is not a function`, then the two "builds nothing" tests with `expected "spy" to not be called at all, but actually been called 1 times`.
 - The loader test passes at once: it pins behaviour J5 left untested, which is its point.
@@ -1872,7 +2090,7 @@ In `docs/superpowers/specs/2026-09-24-landing-journey-design.md`:
 
 ```bash
 npm run check
-git add src/components/landing/journey/drawing.ts tests/unit/components/landing/journey/drawing.test.tsx tests/unit/components/landing/journey/journey-loader.test.tsx tests/unit/components/landing/journey/scene/rig.test.ts tests/e2e/journey/drawing-modes.spec.ts tests/e2e/journey/live-drawing.spec.ts docs/superpowers/specs/2026-09-24-landing-journey-design.md
+git add src/components/landing/journey/drawing.ts tests/unit/components/landing/journey/drawing-fit.test.tsx tests/unit/components/landing/journey/journey-loader.test.tsx tests/unit/components/landing/journey/scene/rig.test.ts tests/e2e/journey/drawing-modes.spec.ts tests/e2e/journey/live-drawing.spec.ts docs/superpowers/specs/2026-09-24-landing-journey-design.md
 git commit -m "fix(journey): judge fit before the scene is fetched, and let a scene that arrives too late build nothing"
 ```
 
@@ -2379,21 +2597,23 @@ git commit -m "feat(journey): the window-seat run's frame around 06 and 07, and 
 - answers Tab and the board's links;
 - on touch screens, gives each station a resting point.
 
+Back into the run returns the reader where they left (J6-9): `place-memory.ts` reads a section riding the pinned run at its `data-run-at`, as `station-progress.ts` does, both as it samples and as it restores.
+
 **Files:**
 - Create: `src/components/landing/journey/run.ts`
-- Modify: `src/components/landing/journey/station-progress.ts` (`data-run-at`), `start-journey.ts` (`MODULES`), `src/styles/journey-island.css`, `DESIGN.md`
+- Modify: `src/components/landing/journey/station-progress.ts` (`data-run-at`), `place-memory.ts` (`topOf`: `data-run-at`), `start-journey.ts` (`MODULES`), `src/styles/journey-island.css`, `DESIGN.md`
 - Modify: `tests/e2e/journey/journey-helpers.ts` (`scrollIntoRun`), `collisions.ts` (`LANDING_INSTRUMENTS`), `collisions.spec.ts`, `teardown.spec.ts`, `journey-axe.spec.ts`
 - Create: `tests/e2e/journey/run.spec.ts`
-- Test: `tests/unit/components/landing/journey/run.test.tsx`, `station-progress.test.tsx`
+- Test: `tests/unit/components/landing/journey/run.test.tsx`, `station-progress.test.tsx`, `place-memory.test.tsx`
 
 **Interfaces:**
 - Consumes:
   - Task 5's `geometry/run.ts` (every export) and markup;
-  - Task 3's `readerPlace`, `keepPlace` and `mastheadBottom`;
+  - Task 3's `readerPlace`, `keepPlace` and `mastheadBottom`, and its `place-memory.ts` (`ownScroll` beside the `topOf` added here);
   - `track` (`observers.ts`), `SMOOTH` (`motion-tokens.ts`), `STATIONS` and `kmFigure`, `messages.journey.run.km`.
 - Produces:
   - `startRun(ctx: JourneyContext): Teardown` (a `JourneyModule`);
-  - `#features[data-run-at]` and `#use[data-run-at]`, each the page y that section's top would have were it not riding the run (the scroll at which its first station stands at the window, plus the masthead);
+  - `#features[data-run-at]` and `#use[data-run-at]`, each the page y that section's top would have were it not riding the run (the scroll at which its first station stands at the window, plus the masthead). `station-progress.ts` and `place-memory.ts` read it;
   - `scrollIntoRun(page, p)` and `LANDING_INSTRUMENTS` for e2e (Task 9 uses both).
 
 - [ ] **Step 1: Write the failing unit tests**
@@ -2548,12 +2768,43 @@ describe("a section riding the window-seat run (J6-8)", () => {
 });
 ```
 
+In `tests/unit/components/landing/journey/place-memory.test.tsx`, add at the end of `describe("startPlaceMemory", …)`:
+
+```ts
+  // The window-seat run (J6-9): #features and #use ride it inside one pin, so their boxes stand together, far from
+  // where their words come to the window. run.ts writes where each would stand (data-run-at), as station-progress reads.
+  const ride = () => {
+    document.body.insertAdjacentHTML("beforeend", `<section id="features" data-run-at="3600"></section><section id="use" data-run-at="4600"></section>`);
+    for (const id of ["features", "use"]) document.getElementById(id)!.getBoundingClientRect = () => ({ top: 3600 - scrollY }) as DOMRect;
+  };
+
+  it("reads a section riding the run where run.ts says it stands, not at the pinned box it shares", () => {
+    ride();
+    const memory = startPlaceMemory();
+    scrollY = 4600 - 40; // 07's top 40px down the window, 24px above the masthead's foot
+    window.dispatchEvent(new Event("scroll"));
+    vi.advanceTimersToNextFrame();
+    memory.stop();
+    expect(parsePlace(window.sessionStorage.getItem(PLACE_KEY))).toEqual({ entry: "k1", id: "use", offset: -24 });
+  });
+
+  it("restores a place in the run where run.ts says it stands", () => {
+    ride();
+    store({ entry: "k1", id: "use", offset: -24 });
+    const memory = startPlaceMemory();
+    memory.restore();
+    expect(scrolls).toEqual([4600 - 64 + 24]);
+    memory.stop();
+  });
+```
+
 - [ ] **Step 2: Run them to verify they fail**
 
-Run: `npx vitest run tests/unit/components/landing/journey/run.test.tsx tests/unit/components/landing/journey/station-progress.test.tsx`
+Run: `npx vitest run tests/unit/components/landing/journey/run.test.tsx tests/unit/components/landing/journey/station-progress.test.tsx tests/unit/components/landing/journey/place-memory.test.tsx`
 Expected: FAIL.
 - `run.test.tsx` fails with `Failed to resolve import "@/components/landing/journey/run"`.
 - The station test fails with `expected 7 to be 8` (it reads `#use`'s pinned box).
+- The first run test in place-memory stores `id: "features"`, offset −1024 (the pinned box both share), where `"use"`, −24 was expected; the second fails with `expected [ 3560 ] to deeply equal [ 4560 ]`.
 
 - [ ] **Step 3: Write `run.ts`**
 
@@ -2879,6 +3130,18 @@ In `src/components/landing/journey/start-journey.ts`, add `import { startRun } f
 ```ts
 export const MODULES: readonly JourneyModule[] = [startArrivals, startBoard, startStationProgress, startHero, startChapters, startBerths, startClock, startRoute, startRun, startCursor, startSound, startDrawing, startStill];
 ```
+In `src/components/landing/journey/place-memory.ts`, after `mastheadFoot`, add:
+```ts
+/** A section's top in the window, where the reader reads it: while it rides the window-seat run, where run.ts says it
+ * stands (data-run-at, the page y it would have were it not riding, as station-progress.ts reads it; J6-9), not the
+ * pinned box it shares with the other; otherwise its own box. */
+function topOf(el: HTMLElement): number {
+  const riding = Number(el.dataset.runAt);
+  return el.dataset.runAt !== undefined && Number.isFinite(riding) ? riding - window.scrollY : el.getBoundingClientRect().top;
+}
+```
+In `placeNow`, replace `return el?.isConnected ? [{ id, top: el.getBoundingClientRect().top }] : [];` with `return el?.isConnected ? [{ id, top: topOf(el) }] : [];`. In `restore`, replace `const by = el.getBoundingClientRect().top - mastheadFoot() - place.offset;` with `const by = topOf(el) - mastheadFoot() - place.offset;`. A reader who left at 07 is stored on `#use`. On their return they land at 07: at its first station, by `data-run-at`, if the run has pinned by then; at `#use`'s own top if it waits below them.
+
 `start-journey-paced.test.tsx` counts the modules: if it asserts twelve, make it thirteen and say why in the test's comment. Check it with `grep -n "12\|twelve" tests/unit/components/landing/journey/start-journey-paced.test.tsx`. The e2e helper's comment in `waitForJourney` (Task 2) names drawing.ts "the eleventh of twelve": make it "the twelfth of thirteen".
 
 - [ ] **Step 4: The run's CSS**
@@ -2991,6 +3254,16 @@ function offTrain(page: Page, i: number): Promise<number> {
 const here = (page: Page) => page.locator("#run [data-station]").evaluateAll((els) => els.findIndex((el) => el.classList.contains("is-here")));
 const stationOf = (page: Page, selector: string) => page.locator("#run [data-station]").evaluateAll((els, sel) => els.findIndex((el) => el.matches(sel) || el.querySelector(sel) !== null || el.closest(sel) !== null), selector);
 const running = (page: Page) => expect(page.locator("#run")).toHaveClass(/is-running/);
+/** How far 07's top stands from the masthead's foot, read as place-memory reads it (J6-9): where run.ts says it stands
+ * while the run is pinned (data-run-at), its own box otherwise. 0 when the reader is at 07. */
+const from07 = (page: Page) =>
+  page.evaluate(() => {
+    const use = document.getElementById("use");
+    if (!use) throw new Error("#use is missing");
+    const foot = document.querySelector("header")?.getBoundingClientRect().bottom ?? 0;
+    const top = use.dataset.runAt === undefined ? use.getBoundingClientRect().top : Number(use.dataset.runAt) - window.scrollY;
+    return Math.abs(Math.round(top - foot));
+  });
 
 test.describe("the window-seat run (spec §3.A)", () => {
   test.beforeEach(async ({ page }) => {
@@ -3041,6 +3314,28 @@ test.describe("the window-seat run (spec §3.A)", () => {
     expect(await page.evaluate(() => document.activeElement?.id)).toBe("use");
     // 07's row: the board's rows follow the stations after DEP, one each (departure-board.tsx)
     await expect(page.locator('.board tr[data-stop="8"] td.board-status')).toHaveText(/At\s*platform/i);
+  });
+
+  test("Back from 07, inside the run, returns the reader to 07, not 06 (J6-9)", async ({ page, isMobile }) => {
+    test.skip(isMobile, "one project is enough");
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/");
+    await waitForJourney(page);
+    await running(page);
+    // 07's first station to the window, at the place run.ts gives it (data-run-at, less the masthead)
+    await page.evaluate(() => {
+      const use = document.getElementById("use");
+      const head = document.querySelector("header")?.getBoundingClientRect().bottom ?? 0;
+      window.scrollTo({ top: Number(use?.dataset.runAt) - head, behavior: "instant" });
+    });
+    const first07 = await stationOf(page, "#use *");
+    await expect.poll(() => offTrain(page, first07)).toBeLessThanOrEqual(3);
+    await frames(page); // the scroll has been sampled
+    await page.getByLabel("Primary").getByRole("link", { name: "Watchlist" }).click();
+    await expect(page).toHaveURL(/\/watchlist/);
+    await page.goBack();
+    await waitForJourney(page);
+    await expect.poll(() => from07(page)).toBeLessThanOrEqual(4); // the restore has landed, on 07
   });
 
   test("Tab brings each card to the window, never under the masthead (spec §3.G; WCAG 2.4.11)", async ({ page, isMobile }) => {
@@ -3195,7 +3490,7 @@ In `DESIGN.md`'s landing journey list, after the "Nothing moves under the reader
 
 ```bash
 npm run check
-git add src/components/landing/journey/run.ts src/components/landing/journey/station-progress.ts src/components/landing/journey/start-journey.ts src/styles/journey-island.css DESIGN.md tests/unit/components/landing/journey/run.test.tsx tests/unit/components/landing/journey/station-progress.test.tsx tests/e2e/journey
+git add src/components/landing/journey/run.ts src/components/landing/journey/station-progress.ts src/components/landing/journey/place-memory.ts src/components/landing/journey/start-journey.ts src/styles/journey-island.css DESIGN.md tests/unit/components/landing/journey/run.test.tsx tests/unit/components/landing/journey/station-progress.test.tsx tests/unit/components/landing/journey/place-memory.test.tsx tests/e2e/journey
 git add -u tests/unit tests/e2e
 git commit -m "feat(journey): the window-seat run: 06 and 07 ride past the window, and every link and Tab stop brings its station there"
 ```
@@ -3215,7 +3510,7 @@ The new page is then revealed by a clip-path circle on `::view-transition-new(ro
 - Create: `src/components/theme/night-falls.ts`
 - Modify: `src/components/theme/theme-toggle.tsx`, `src/styles/motion.css`, `DESIGN.md`
 - Create: `tests/e2e/journey/night-falls.spec.ts`
-- Test: `tests/unit/components/theme/night-falls.test.ts`, `tests/unit/components/theme-toggle.test.tsx` (unchanged, must stay green)
+- Test: `tests/unit/components/theme/night-falls.test.tsx`, `tests/unit/components/theme-toggle.test.tsx` (unchanged, must stay green)
 
 **Interfaces:**
 - Consumes: `THEME_EVENT` and `emit` (`journey-events.ts`), and `ThemeChoice` (`use-theme.ts`).
@@ -3229,9 +3524,9 @@ The new page is then revealed by a clip-path circle on `::view-transition-new(ro
 
 - [ ] **Step 1: Write the failing unit tests**
 
-Create `tests/unit/components/theme/night-falls.test.ts`:
+Create `tests/unit/components/theme/night-falls.test.tsx`. It is a `.tsx` file, so it runs under jsdom (vitest.config.mts: `*.test.ts` runs in node, where `document` does not exist):
 
-```ts
+```tsx
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { THEME_EVENT } from "@/components/landing/journey/journey-events";
 import { SWEEP_MS, nightFalls, sweepFrom, themeApplied } from "@/components/theme/night-falls";
@@ -3311,14 +3606,21 @@ describe("nightFalls", () => {
     theme.stop();
   });
 
-  it("switches at once with Motion off, even where View Transitions exist", () => {
+  it("switches at once with Motion off, even where View Transitions exist", async () => {
     html.dataset.motion = "off";
+    html.dataset.theme = "light";
     const start = vi.fn();
     Object.defineProperty(document, "startViewTransition", { configurable: true, value: start });
-    const apply = vi.fn();
+    const theme = listen();
+    // the theme is written, as next-themes would: a themeApplied left waiting would redraw inside the next test
+    const apply = vi.fn(() => {
+      html.dataset.theme = "dark";
+    });
     nightFalls(button(), apply, "dark");
     expect(apply).toHaveBeenCalledTimes(1);
     expect(start).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(theme.heard()).toBe(1));
+    theme.stop();
   });
 
   it("sweeps out from the button: the change inside a view transition, the train redrawn in it, the new page revealed by a widening circle", async () => {
@@ -3360,7 +3662,7 @@ describe("nightFalls", () => {
 
 - [ ] **Step 2: Run them to verify they fail**
 
-Run: `npx vitest run tests/unit/components/theme/night-falls.test.ts`
+Run: `npx vitest run tests/unit/components/theme/night-falls.test.tsx`
 Expected: FAIL with `Failed to resolve import "@/components/theme/night-falls"`.
 
 - [ ] **Step 3: Write `night-falls.ts`**
@@ -3476,7 +3778,7 @@ html[data-theme-sweep] header {
 
 - [ ] **Step 4: Run the unit tests to verify they pass**
 
-Run: `npx vitest run tests/unit/components/theme/night-falls.test.ts tests/unit/components/theme-toggle.test.tsx tests/unit/styles`
+Run: `npx vitest run tests/unit/components/theme/night-falls.test.tsx tests/unit/components/theme-toggle.test.tsx tests/unit/styles`
 Expected: PASS.
 - `theme-toggle.test.tsx` runs in jsdom, which has no `document.startViewTransition`, so every click takes the instant path and `setTheme` is called as before.
 - `motion.contract.test.ts` still holds the reduced-motion and Motion-off blocks to each other: the sweep's rules sit outside both.
@@ -3598,7 +3900,7 @@ In `DESIGN.md`'s Motion section, replace "The other movements: the theme button'
 
 ```bash
 npm run check
-git add src/components/theme/night-falls.ts src/components/theme/theme-toggle.tsx src/styles/motion.css DESIGN.md tests/unit/components/theme/night-falls.test.ts tests/e2e/journey/night-falls.spec.ts
+git add src/components/theme/night-falls.ts src/components/theme/theme-toggle.tsx src/styles/motion.css DESIGN.md tests/unit/components/theme/night-falls.test.tsx tests/e2e/journey/night-falls.spec.ts
 git commit -m "feat(theme): Night falls: the theme sweeps out from its button in a circle, the drawn train redrawn inside it"
 ```
 
@@ -3616,13 +3918,13 @@ The chunk budgets now gate every PR (Task 1) and the nightly (Task 9), so J5's f
 
 **Files:**
 - Create: `src/components/landing/journey/hud-mark.ts`
-- Modify: `src/components/landing/journey/hud.ts` (re-exports the mark), `scripts/journey-budgets.mjs`, `scripts/journey-perf.mjs`
-- Test: `tests/unit/scripts/journey-budgets.test.ts`, `tests/unit/scripts/journey-perf.test.ts`
+- Modify: `src/components/landing/journey/hud.ts` (writes the mark onto its own root element), `scripts/journey-budgets.mjs`, `scripts/journey-perf.mjs`
+- Test: `tests/unit/scripts/journey-budgets.test.ts`, `tests/unit/scripts/journey-perf.test.ts`, `tests/unit/components/landing/journey/hud.test.tsx`
 
 **Interfaces:**
 - Consumes: Task 2's `startLocalProduction` and `refusals` (`scripts/serve-local-production.mjs`).
 - Produces:
-  - `HUD_CHUNK_MARK = "tt-hud-chunk"`;
+  - `HUD_CHUNK_MARK = "tt-hud-chunk"`, which the frame meter's root element carries as `data-chunk`;
   - `MARKS.hud === HUD_CHUNK_MARK`;
   - `softwareFailures(run: { rate: number; foreign: readonly string[]; cls: number; why: string | null; q: string | null; heaviest: boolean }): string[]`;
   - the CLIs `node scripts/journey-perf.mjs` (real GPU) and `node scripts/journey-perf.mjs --software`, which Task 9 runs.
@@ -3641,6 +3943,16 @@ In `tests/unit/scripts/journey-budgets.test.ts`, add `import { HUD_CHUNK_MARK } 
   it("with requireLoader, fails when no loader fetches the scene: what loads beside it would go uncounted", () => {
     const r = measure([page, journey, anime, { ...loaders, text: loads("hud.js") }, scene, three, hud], { requireLoader: true });
     expect(r.failures.join(" ")).toMatch(/no loader fetches the scene chunk/);
+  });
+```
+
+In `tests/unit/components/landing/journey/hud.test.tsx`, add `import { HUD_CHUNK_MARK } from "@/components/landing/journey/hud-mark";`, and add inside the `describe`:
+
+```tsx
+  it("carries its chunk's mark on its own root, so the chunk budgets can tell its chunk apart (J6-15)", () => {
+    const stop = startHud();
+    expect(document.querySelector<HTMLElement>(".journey-hud")?.dataset.chunk).toBe(HUD_CHUNK_MARK);
+    stop();
   });
 ```
 
@@ -3672,10 +3984,10 @@ describe("softwareFailures: what a software GPU's run can fail on (J6-3)", () =>
 
 - [ ] **Step 2: Run them to verify they fail**
 
-Run: `npx vitest run tests/unit/scripts/journey-budgets.test.ts tests/unit/scripts/journey-perf.test.ts`
+Run: `npx vitest run tests/unit/scripts/journey-budgets.test.ts tests/unit/scripts/journey-perf.test.ts tests/unit/components/landing/journey/hud.test.tsx`
 Expected: FAIL.
 - `Failed to resolve import "@/components/landing/journey/hud-mark"`.
-- After Step 3's first file exists, the budgets tests fail on `expected "Close the frame meter" to be "tt-hud-chunk"` and the two new failure messages.
+- After Step 3's first file exists, the budgets tests fail on `expected "Close the frame meter" to be "tt-hud-chunk"` and the two new failure messages, and the meter's test on `expected undefined to be "tt-hud-chunk"`.
 - `softwareFailures is not a function`.
 
 - [ ] **Step 3: The frame meter's mark, and the budgets' four hardenings**
@@ -3683,12 +3995,18 @@ Expected: FAIL.
 Create `src/components/landing/journey/hud-mark.ts`:
 ```ts
 /** A string only the frame meter's chunk carries, so the chunk budgets tell it from the journey's and the scene's
- * (J5-10, J6-15). hud.ts re-exports it, which keeps it in that chunk. */
+ * (J5-10, J6-15). hud.ts writes it onto the meter's own root element (data-chunk): a value the code reads is one no
+ * bundler can drop, where an unread re-export could be, and only hud.ts imports this file, so it lands in that chunk. */
 export const HUD_CHUNK_MARK = "tt-hud-chunk";
 ```
-In `src/components/landing/journey/hud.ts`, after its imports, add:
+In `src/components/landing/journey/hud.ts`, add `import { HUD_CHUNK_MARK } from "./hud-mark";` to its imports, and in `startHud`, replace:
 ```ts
-export { HUD_CHUNK_MARK } from "./hud-mark";
+  el.className = "journey-hud";
+```
+with:
+```ts
+  el.className = "journey-hud";
+  el.dataset.chunk = HUD_CHUNK_MARK; // the chunk budgets find the meter's chunk by this (journey-budgets.mjs)
 ```
 In `scripts/journey-budgets.mjs`:
 - In the header comment, replace "never the frame meter (`?journey-hud`, previews and development only; J5-10), found by its close button's label." with "never the frame meter (`?journey-hud`, previews and development only; J5-10), found by its own mark (hud-mark.ts).".
@@ -3733,8 +4051,9 @@ In `scripts/journey-perf.mjs`:
 //   npm run build && node scripts/journey-perf.mjs              the real-GPU run, by hand, on the owner's Mac (run it
 //                                                                twice: a fresh server's first answers are cold)
 //   npm run build && node scripts/journey-perf.mjs --software   the nightly's throttled run, on a runner with no GPU
-// It refuses port 4210 when another server answers there (`lsof -nP -iTCP:4210 -sTCP:LISTEN`). JOURNEY_PERF_URL points it
-// at a server already running instead. Either run fails when the server's offline guard refused anything, or when the
+// It refuses port 4210 when another server answers there (`lsof -nP -iTCP:4210 -sTCP:LISTEN`), and, through the serve
+// script, a working tree holding any .env file but .env.example (J6-2). JOURNEY_PERF_URL points it at a server already
+// running instead. Either run fails when the server's offline guard refused anything, or when the
 // page asked any host but this one. It never submits a PNR. Exits 1 on a missed budget.
 //
 // The real-GPU run: a headed Chromium on the real GPU (Metal on a Mac), a fresh one for each, loads "/" twice:
@@ -3908,13 +4227,13 @@ Expected:
 - the software run prints four lines and exits 0: CLS within budget, no other host, and at 10× a stored quality step or the still for `quality`;
 - the offline guard refused nothing.
 
-If the chunk budgets fail with "the journey loads …hud…, which no budget can place", the mark did not reach the meter's chunk: report it with the chunk's name.
+The meter writes its mark onto its root, so the bundler keeps the string in its chunk. If the chunk budgets still fail with "the journey loads …hud…, which no budget can place", report it with the chunk's name.
 
 - [ ] **Step 7: The gate, then commit**
 
 ```bash
 npm run check
-git add src/components/landing/journey/hud-mark.ts src/components/landing/journey/hud.ts scripts/journey-budgets.mjs scripts/journey-perf.mjs tests/unit/scripts/journey-budgets.test.ts tests/unit/scripts/journey-perf.test.ts
+git add src/components/landing/journey/hud-mark.ts src/components/landing/journey/hud.ts scripts/journey-budgets.mjs scripts/journey-perf.mjs tests/unit/scripts/journey-budgets.test.ts tests/unit/scripts/journey-perf.test.ts tests/unit/components/landing/journey/hud.test.tsx
 git commit -m "test(journey): harden the chunk budgets, and let the perf script serve its own build and run on a software GPU"
 ```
 
@@ -3938,7 +4257,7 @@ The §3.H frame-time and long-task budgets are not measured here, and the workfl
 
 **Files:**
 - Create: `.github/workflows/journey-nightly.yml`, `playwright.nightly.config.ts`, `tests/e2e/nightly/sizes.spec.ts`, `tests/e2e/nightly/screens.spec.ts`
-- Modify: `tests/e2e/journey/live-drawing.spec.ts` (WebKit without WebGL 2 skips, saying so), `.gitignore`
+- Modify: `tests/e2e/journey/journey-helpers.ts` (`skipWithoutWebgl2`, which `waitForLive` calls: a WebKit without WebGL 2 skips, saying so), `tests/e2e/journey/live-drawing.spec.ts` (its own skip reuses it), `.gitignore`
 - Modify: `docs/superpowers/specs/2026-09-24-landing-journey-design.md` (§5 Nightly, §7, §8, §9)
 - Test: `tests/unit/ci-workflows.contract.test.ts`
 
@@ -3950,6 +4269,7 @@ The §3.H frame-time and long-task budgets are not measured here, and the workfl
   - Task 8's `journey-perf.mjs --software`;
   - `collisionsTopToBottom(page, { panels, skip, step })`, and `waitForLive` and `scrollIntoChapter` (J5).
 - Produces:
+  - `skipWithoutWebgl2(page)`, exported from `journey-helpers.ts` and called by `waitForLive`, so every spec that needs the live drawing skips in a WebKit that has no WebGL 2 (J6-12);
   - the workflow's jobs `production` and `journey`;
   - the Playwright projects `sizes`, `screens`, `webkit` and `webkit-phone`.
 
@@ -3984,7 +4304,9 @@ describe("journey-nightly.yml", () => {
   });
 
   it("measures what a GPU-less runner can: the chunk budgets, the production build, the throttled runs, the wide e2e", () => {
-    const order = ["npm run build", "node scripts/journey-budgets.mjs", "npx playwright test -c playwright.production.config.ts", "node scripts/journey-perf.mjs --software"].map((step) => nightly.indexOf(step));
+    // read from `jobs:` on: the header comment names `npm run build` too, and must not stand in for the build step
+    const steps = nightly.slice(nightly.search(/^jobs:$/m));
+    const order = ["npm run build", "node scripts/journey-budgets.mjs", "npx playwright test -c playwright.production.config.ts", "node scripts/journey-perf.mjs --software"].map((step) => steps.indexOf(step));
     expect(order.every((i) => i >= 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     expect(nightly).toContain("npx playwright test -c playwright.nightly.config.ts --shard=${{ matrix.shard }}/3");
@@ -4013,7 +4335,7 @@ Create `.github/workflows/journey-nightly.yml`:
 # - production: this checkout's production build, served on the runner with sample data and nothing live
 #   (scripts/serve-local-production.mjs, an offline guard in the server): the chunk budgets, the production-build smoke
 #   (the security policy scrolled end to end, no other host, a sample check), and the throttled runs at 4×, 6× and 10×.
-# - journey: the fixture-mode `next dev` every PR uses: collisions at fifteen sizes and at 200% text, every chapter
+# - journey: the fixture-mode `next dev` every PR runs on. Collisions at fifteen sizes and at 200% text, every chapter
 #   photographed in Day, Night and on a phone (kept as an artifact), and the journey's specs in WebKit.
 # What it does NOT measure: §3.H's frame times and long tasks. GitHub's runners have no GPU (Chromium draws WebGL through
 # SwiftShader, on the CPU), so the throttled runs judge only what holds on any machine and print the rest. Those budgets
@@ -4022,8 +4344,8 @@ Create `.github/workflows/journey-nightly.yml`:
 name: Journey nightly
 
 on:
+  # 03:00 IST: after the day's merges, before the availability crawler (05:30 IST)
   schedule:
-    # 03:00 IST: after the day's merges, before the availability crawler (05:30 IST)
     - cron: "30 21 * * *"
   workflow_dispatch:
   # The pull request that changes this file proves it before it merges; no other pull request runs it.
@@ -4121,7 +4443,8 @@ jobs:
         run: npx playwright install-deps chromium webkit
       - run: npx playwright test -c playwright.nightly.config.ts --shard=${{ matrix.shard }}/3
       - name: Keep the report and the photographs
-        if: always()
+        # kept whether the shard passed or failed, for a person to look at; a cancelled run keeps nothing
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: journey-${{ matrix.shard }}
@@ -4169,9 +4492,10 @@ import { LANDING_INSTRUMENTS, collisionsTopToBottom } from "../journey/collision
 import { waitForJourney } from "../journey/journey-helpers";
 
 // Nightly (spec §5, §9; J6-13): the landing top to bottom, Motion on, at fifteen sizes, and with its text at 200% at the
-// three sizes every PR checks. The sweep is denser than the PR's, a quarter window a step, so every stop of the three
-// pinned pieces (the drawing chapter, 02's dial, the run) is looked at. The live drawing draws through the runner's
-// software GPU, which is slow, not wrong (J5-12). A size is a phone's when its short side is under 500px.
+// three sizes every PR checks. The sweep is as dense as the PR's densest (collisions.spec.ts's sweep through 02 pinned:
+// 0.15 of a window a step), here over the whole page, so every stop of the three pinned pieces (the drawing chapter,
+// 02's dial, the run) is looked at. The live drawing draws through the runner's software GPU, which is slow, not wrong
+// (J5-12). A size is a phone's when its short side is under 500px.
 
 const SIZES = [
   [1440, 900],
@@ -4199,19 +4523,19 @@ for (const [width, height] of SIZES) {
     test.use({ viewport: { width, height }, isMobile: phone, hasTouch: phone });
 
     test("nothing collides, top to bottom", async ({ page }) => {
-      test.setTimeout(300_000);
+      test.setTimeout(600_000);
       await gotoReady(page, "/");
       await waitForJourney(page);
-      expect(await collisionsTopToBottom(page, { ...LANDING_INSTRUMENTS, step: 0.25 })).toEqual([]);
+      expect(await collisionsTopToBottom(page, { ...LANDING_INSTRUMENTS, step: 0.15 })).toEqual([]);
     });
 
     if (AT_200.has(name)) {
       test("nothing collides with its text at 200%", async ({ page }) => {
-        test.setTimeout(300_000);
+        test.setTimeout(600_000);
         await page.addInitScript(() => document.addEventListener("DOMContentLoaded", () => document.documentElement.style.setProperty("font-size", "200%")));
         await gotoReady(page, "/");
         await waitForJourney(page);
-        expect(await collisionsTopToBottom(page, { ...LANDING_INSTRUMENTS, step: 0.25 })).toEqual([]);
+        expect(await collisionsTopToBottom(page, { ...LANDING_INSTRUMENTS, step: 0.15 })).toEqual([]);
       });
     }
   });
@@ -4277,15 +4601,32 @@ for (const { face, theme, viewport, phone } of FACES) {
 }
 ```
 
-In `tests/e2e/journey/live-drawing.spec.ts`, add at the top, after the imports:
+In `tests/e2e/journey/journey-helpers.ts`, change the first import to `import { expect, test, type Locator, type Page } from "@playwright/test";`, and replace `waitForLive` with:
 ```ts
-// WebKit on a GPU-less Linux runner (the nightly's webkit projects, J6-12) may have no WebGL 2: there the live drawing
-// cannot be drawn at all, and these specs say so instead of failing on the missing context. Chromium always runs them.
-test.beforeEach(async ({ page, browserName }) => {
-  if (browserName !== "webkit") return;
+/** The drawing is live and pinned: the scene loaded, the engine built, the chapter began. Where the browser cannot draw
+ * it at all (a WebKit with no WebGL 2), the test skips there, saying so (skipWithoutWebgl2). */
+export async function waitForLive(page: Page): Promise<void> {
+  await waitForJourney(page);
+  await skipWithoutWebgl2(page);
+  await expect(page.locator("#anatomy")).toHaveClass(/is-live/, { timeout: 25_000 });
+  await expect(page.locator("html")).toHaveAttribute("data-drawing", "live");
+}
+
+/** WebKit on a GPU-less Linux runner (the nightly's webkit projects, J6-12) may have no WebGL 2: there the live drawing
+ * cannot be drawn at all, so a test that needs it skips, saying so, instead of failing on the missing context. One
+ * place for every spec: waitForLive calls it (place, drawing-modes, night-falls), and live-drawing.spec.ts's own skip
+ * reuses it. Chromium always runs them. */
+export async function skipWithoutWebgl2(page: Page): Promise<void> {
+  if (page.context().browser()?.browserType().name() !== "webkit") return;
   const webgl2 = await page.evaluate(() => document.createElement("canvas").getContext("webgl2") !== null);
-  test.skip(!webgl2, "this WebKit has no WebGL 2: the live drawing is proven in Chromium and on the owner's devices");
-});
+  test.info().skip(!webgl2, "this WebKit has no WebGL 2: the live drawing is proven in Chromium and on the owner's devices");
+}
+```
+In `tests/e2e/journey/live-drawing.spec.ts`, add `skipWithoutWebgl2` to the import from `./journey-helpers`, and add at the top, after the imports:
+```ts
+// Every test here needs the live drawing: in a WebKit with no WebGL 2 (J6-12) each skips before it starts, saying so,
+// by the same check waitForLive makes.
+test.beforeEach(async ({ page }) => skipWithoutWebgl2(page));
 ```
 In `.gitignore`, under `# testing`, add `/playwright-report-nightly/`.
 
@@ -4296,13 +4637,13 @@ npx vitest run tests/unit/ci-workflows.contract.test.ts
 node -e "require('js-yaml').load(require('fs').readFileSync('.github/workflows/journey-nightly.yml','utf8')); console.log('parsed')"
 npx playwright install webkit
 lsof -nP -iTCP:4210 -sTCP:LISTEN
-npx playwright test -c playwright.nightly.config.ts --project=sizes --grep "1440×900|390×844|2560×1440"
+npx playwright test -c playwright.nightly.config.ts --project=sizes --grep "1440×900|390×844|844×390|2560×1440"
 npx playwright test -c playwright.nightly.config.ts --project=screens
 npx playwright test -c playwright.nightly.config.ts --project=webkit --project=webkit-phone
 ```
 Expected:
 - the contract tests PASS, and `parsed` prints;
-- the sizes and screens runs pass. The photographs are in `test-results/`: look at the run's three and the drawing's four, in each face;
+- the sizes and screens runs pass. The photographs are in `test-results/`: look at the run's three and the drawing's four, in each face. 844×390 at 200% text is the longest sweep (the shortest window over the tallest page): report its time, and if `collisionsTopToBottom` throws its 400-position cap anywhere, report the size. Do not raise the cap or coarsen the step by guesswork;
 - the WebKit projects run on this Mac's WebKit. Report every failure with its test and message:
   - a real WebKit fault (sticky with `overflow: clip`, `svh`, root scroll snapping, View Transitions: §8's list) is fixed in this task if it is small;
   - otherwise it is reported to the owner, with the spec named, and not skipped silently.
@@ -4336,7 +4677,7 @@ In `docs/superpowers/specs/2026-09-24-landing-journey-design.md`:
   ```
 - §7, replace "Decide whether the nightly workflow may run on a schedule (it costs CI minutes)." with "Decide whether the nightly workflow may run on a schedule. J6 ships it at 03:00 IST: the repository is public, so its Actions minutes are free (J6-11). Removing the two `schedule` lines keeps it manual."
 - §8, replace the rows:
-  - "iOS Safari: …" → mitigation "The place, run, Night falls and drawing specs in WebKit, desktop and phone, in the nightly run; the live drawing's specs skip, saying why, where that WebKit has no WebGL 2; static fallbacks";
+  - "iOS Safari: …" → mitigation "The place, run, Night falls and drawing specs in WebKit, desktop and phone, in the nightly run; every test that needs the live drawing skips, saying why, where that WebKit has no WebGL 2; static fallbacks";
   - "CI e2e time grows" → mitigation "Four Playwright shards and the console suite in parallel on every PR (J6-1); heavy suites nightly";
   - "Bundle creep" → mitigation "Budgets checked on every PR (`verify`) and in the nightly run; `experimental-analyze` in review".
 - §9, replace "§3.H budgets met in the nightly run; no collisions at the 15 sizes or at 200% text in the journey's sections." with "§3.H's chunk budgets met on every PR and in the nightly run; its frame-time and long-task budgets met on a real GPU (`journey-perf.mjs`) before each journey PR merges; CLS and the governor held in the nightly's throttled runs; no collisions at the 15 sizes or at 200% text in the journey's sections."
@@ -4345,7 +4686,7 @@ In `docs/superpowers/specs/2026-09-24-landing-journey-design.md`:
 
 ```bash
 npm run check
-git add .github/workflows/journey-nightly.yml playwright.nightly.config.ts tests/e2e/nightly tests/e2e/journey/live-drawing.spec.ts tests/unit/ci-workflows.contract.test.ts .gitignore docs/superpowers/specs/2026-09-24-landing-journey-design.md
+git add .github/workflows/journey-nightly.yml playwright.nightly.config.ts tests/e2e/nightly tests/e2e/journey/journey-helpers.ts tests/e2e/journey/live-drawing.spec.ts tests/unit/ci-workflows.contract.test.ts .gitignore docs/superpowers/specs/2026-09-24-landing-journey-design.md
 git commit -m "ci(journey): the nightly: budgets, a production-build smoke, throttled runs, fifteen sizes, photographs and WebKit"
 ```
 
@@ -4365,8 +4706,8 @@ The spec keeps J6's rulings as it kept J3's to J5's, and the J6 row is marked do
 - [ ] **Step 1: The spec's record**
 
 In `docs/superpowers/specs/2026-09-24-landing-journey-design.md`:
-- §3.B, the **Page (server)** item: replace "the run's window layers" with "the run's frame (its window's lines are drawn by `run.ts` from `geometry/run.ts`, since they follow the cards' measured widths; J6-6)".
-- §3.B, the module map's Client island row: delete `theme-sweep.ts` and add `keep-place.ts`. Under the table, add: "Night falls lives with the theme button, not the journey: `src/components/theme/night-falls.ts` (J6-10)."
+- §3.B, the **Page (server)** item: replace "the run's window layers" with "the run's frame (its window's lines are drawn by `run.ts` from `geometry/run.ts`, since they follow the cards' measured widths; J6-6, accepted at J6's pre-flight)".
+- §3.B, the module map's Client island row: delete `theme-sweep.ts` and add `keep-place.ts`. Under the table, add: "Night falls lives with the theme button, not the journey: `src/components/theme/night-falls.ts`, shared by every traveller page (J6-10, accepted at J6's pre-flight)."
 - §3.F: after its last sentence, add "It runs on every traveller page where Motion is on (`html[data-motion="on"]`); the console, which has no Motion switch, always switches at once (J6-10)."
 - §6: after "Decided while planning J5 (2026-09-27):" and its list, add:
   ```markdown
@@ -4377,9 +4718,17 @@ In `docs/superpowers/specs/2026-09-24-landing-journey-design.md`:
   - the nightly measures what a GPU-less runner can; frame times and long tasks are measured by hand on a real GPU (J6-3);
   - one rule for where the reader goes, `readerPlace`, for every piece that changes height (J6-4);
   - `fit` judged before the scene is fetched, by a trial layout (J6-5);
-  - the run's frame is server markup, its lines drawn by `run.ts` (J6-6); it pins by `#run.is-running` inside `keepPlace`,
-    only while the reader is not below it (J6-7); links to 06 and 07 bring their stations to the window (J6-8);
-  - Night falls on every traveller page with Motion on, from the theme button's own module (J6-10);
+  - the run's frame is server markup, its lines drawn by `run.ts` (J6-6; a departure from §3.B, accepted at J6's
+    pre-flight); it pins by `#run.is-running` inside `keepPlace`, only while the reader is not below it (J6-7); links
+    to 06 and 07 bring their stations to the window (J6-8);
+  - J5-17 amended (the owner, 2026-09-28): only the reader's own scroll (a mostly vertical wheel that is not a
+    pinch-zoom, a finger dragging, a scroll key outside a text field with no Alt, Ctrl or Meta) cancels the Back
+    restore; a trackpad's swipe back, a tap and every other key leave it pending (J6-9);
+  - Back into the run returns the reader where they left: a section riding it is read where `run.ts` says it stands
+    (`data-run-at`), so a reader who left at 07 comes back to 07 (J6-9);
+  - Night falls on every traveller page with Motion on, from the theme button's own module,
+    `src/components/theme/night-falls.ts`, not the journey's `theme-sweep.ts` (J6-10; a departure from §3.B, accepted
+    at J6's pre-flight);
   - the nightly on a schedule, and on the pull request that changes it (J6-11); WebKit in the nightly (J6-12); 200% text
     at the PR's three sizes (J6-13).
   ```
@@ -4421,7 +4770,7 @@ git commit -m "docs(journey): J6's rulings in the spec, and v3 complete"
   - `scripts/serve-local-production.mjs`;
   - `tests/unit/scripts/serve-local-production.test.ts`;
   - `tests/unit/ci-workflows.contract.test.ts`.
-- [ ] **On a real GPU** (the owner's Mac: the spec's reference desktop and 4× CPU phone, §3.H). Check `lsof -nP -iTCP:4210 -sTCP:LISTEN`, then run `npm run build && node scripts/journey-perf.mjs` twice. Report both runs' lines as measured, over budget or not. The run adds a pinned piece below the drawing and the scroll test crosses only `#anatomy`, so also report one run of the same script with `#anatomy` replaced by `#run` in `scrollThrough`: a scratch copy in the session's scratchpad, never in the repo.
+- [ ] **On a real GPU** (the owner's Mac: the spec's reference desktop and 4× CPU phone, §3.H), in this worktree, which has no `.env` file (the serve script refuses a working tree that has one, such as the primary checkout). Check `lsof -nP -iTCP:4210 -sTCP:LISTEN`, then run `npm run build && node scripts/journey-perf.mjs` twice. Report both runs' lines as measured, over budget or not. The run adds a pinned piece below the drawing and the scroll test crosses only `#anatomy`, so also report one run of the same script with `#anatomy` replaced by `#run` in `scrollThrough`: a scratch copy in the session's scratchpad, never in the repo.
 - [ ] **Screenshots** into the workspace:
   - the run at progress 0, 0.5 and 1, at 1440×900 in Day and Night, and at 390×844;
   - Night falls mid-sweep: a screenshot taken 300 ms after the click, where the fixed wait is itself the evidence;
@@ -4429,7 +4778,8 @@ git commit -m "docs(journey): J6's rulings in the spec, and v3 complete"
 - [ ] **The owner's device check.** On a preview deployment, on an iPhone (Safari) and a mid-range Android phone:
   - the run: pinning, a swipe settling a card at the window, a link from the board;
   - Night falls;
-  - a reload at `/#principles` (J6-4).
+  - a reload at `/#principles` (J6-4);
+  - Back to "/" (J6-9): with no scroll, it lands on the stored place, a trackpad's swipe back included; from 07 in the run, it returns to 07.
 - [ ] **Push and open the PR only on the owner's word.** Then read the first CI run:
   - each `e2e shard n/4` well inside 20 minutes;
   - `console` green;
@@ -4438,11 +4788,11 @@ git commit -m "docs(journey): J6's rulings in the spec, and v3 complete"
 
 ## What remains after J6
 
-- v3 is complete on the landing. What the spec asked and J6 did not do is ruled out above (J6-15's table), each with its reason, or asked of the owner below.
-- The owner's questions, which the PR repeats:
-  - the nightly's schedule (§7; J6-11);
-  - the still that vanishes until `scrollend` after `place` clears (J5 final review, minor 8);
-  - whether any key or a trackpad swipe should cancel the Back restore (J5 Task 5).
+- v3 is complete on the landing. What the spec asked and J6 did not do is ruled out above (J6-15's table), each with its reason.
+- The owner answered the plan's questions on 2026-09-28, and the PR repeats the answers:
+  - the nightly runs on its 03:00 IST schedule (§7; J6-11);
+  - the still keeps J5's behaviour until the pin after `place` clears (J5 final review, minor 8);
+  - only the reader's own scroll cancels the Back restore (J5 Task 5; J6-9).
 
 ## Self-review notes
 
@@ -4461,7 +4811,7 @@ git commit -m "docs(journey): J6's rulings in the spec, and v3 complete"
      - theme sweep: Task 7;
      - axe at run, Night run and phone run: Task 6.
 
-     The Nightly: Task 9. §7's schedule: Task 9, and asked. §8's WebKit, CI time and CSP smoke: Tasks 1, 2 and 9. §9: Tasks 9 and 10.
+     The Nightly: Task 9. §7's schedule: Task 9, and the owner's (2026-09-28). §8's WebKit, CI time and CSP smoke: Tasks 1, 2 and 9. §9: Tasks 9 and 10.
 2. **J5's inheritance:**
    - Night falls sends `tt:theme` after `themeApplied`: Task 7.
    - The nightly runs the budgets and the 4×, 6× and 10× checks, governor steps counted from `tt.q`: Tasks 8 and 9.
@@ -4475,6 +4825,7 @@ git commit -m "docs(journey): J6's rulings in the spec, and v3 complete"
    - `RunLayout`, `layers` and the rest (Task 5), used by Task 6;
    - `LANDING_INSTRUMENTS` and `scrollIntoRun` (Task 6), used by Task 9;
    - `startLocalProduction` and `refusals` (Task 2), used by Task 8;
+   - `place-memory.ts`'s `ownScroll` (Task 3), beside which Task 6 adds `topOf`;
    - `softwareFailures` (Task 8), whose CLI Task 9 runs;
    - `HUD_CHUNK_MARK` (Task 8).
 4. No commit carries a `Co-Authored-By` or any trailer: `git log --format=%B origin/main..HEAD | grep -ci co-authored-by` prints `0`.
