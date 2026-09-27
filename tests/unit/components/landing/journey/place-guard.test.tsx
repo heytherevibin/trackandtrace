@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { MOTION_BEFORE_EVENT, MOTION_EVENT } from "@/components/motion/use-motion";
 import { startPlaceGuard } from "@/components/landing/journey/chapters";
 import { LAYOUT_EVENT } from "@/components/landing/journey/journey-events";
 
@@ -104,6 +105,40 @@ describe("02's place guard", () => {
     doc.height = 3300; // and 02 pins
     observed([], {} as ResizeObserver);
     expect(scrollTo).toHaveBeenCalledWith({ top: 1000 - 80, behavior: "instant" }); // 02's start, as they were inside it
+    stop();
+  });
+
+  it("settles Motion's collapse of 02 as Motion changes, before the rebuild's teardowns, so a move they make below 02 stands (J6-7)", () => {
+    let observed: ResizeObserverCallback = () => undefined;
+    window.ResizeObserver = class {
+      constructor(callback: ResizeObserverCallback) {
+        observed = callback;
+      }
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
+    };
+    document.body.innerHTML = `<header></header><section id="how"></section>`;
+    const how = document.getElementById("how")!;
+    how.style.scrollMarginTop = "80px";
+    const doc = { top: 1000, height: 3000 };
+    let y = 0;
+    vi.spyOn(window, "scrollY", "get").mockImplementation(() => y);
+    how.getBoundingClientRect = () => ({ top: doc.top - y, bottom: doc.top - y + doc.height, width: 800, height: doc.height }) as DOMRect;
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(((opts: ScrollToOptions) => {
+      y = opts.top ?? y;
+    }) as typeof window.scrollTo);
+    const stop = startPlaceGuard();
+    y = 9000; // far past 02: reading 08, below the pinned run
+    window.dispatchEvent(new Event("scroll"));
+    window.dispatchEvent(new Event(MOTION_BEFORE_EVENT));
+    doc.height = 2600; // the rewrite of <html data-motion> collapses 02 by the CSS selector alone
+    window.dispatchEvent(new Event(MOTION_EVENT));
+    expect(y).toBe(9000 - 400); // settled at once, before the rebuild's listeners run
+    y -= 2565; // the rebuild tears the run down: its keepPlace moves the reader by its own collapse, below 02
+    observed([], {} as ResizeObserver); // 02's observer, a frame later
+    expect(y).toBe(9000 - 400 - 2565); // the run's move stands
+    expect(scrollTo).toHaveBeenCalledTimes(1);
     stop();
   });
 });

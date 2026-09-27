@@ -18,6 +18,10 @@ export function keepPlace(section: HTMLElement | null, change: () => void): void
   const before = section.getBoundingClientRect();
   const scrollY = window.scrollY;
   change();
-  const to = placeAfter(before, section.getBoundingClientRect(), { scrollY, viewport: window.innerHeight, masthead: mastheadBottom() });
+  const after = section.getBoundingClientRect();
+  // A shrink near the page's foot clamps the scroll as the change lays out: its box is then read against the clamped
+  // scroll, and put back against the one before, so a reader inside it still lands on its start.
+  const drift = window.scrollY - scrollY;
+  const to = placeAfter(before, { top: after.top + drift, height: after.height }, { scrollY, viewport: window.innerHeight, masthead: mastheadBottom() });
   if (to !== null) window.scrollTo({ top: to, behavior: "instant" });
 }

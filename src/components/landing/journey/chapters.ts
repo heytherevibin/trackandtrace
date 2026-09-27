@@ -1,5 +1,5 @@
 import { animate, onScroll, stagger, utils, type JSAnimation } from "animejs";
-import { MOTION_BEFORE_EVENT } from "@/components/motion/use-motion";
+import { MOTION_BEFORE_EVENT, MOTION_EVENT } from "@/components/motion/use-motion";
 import { messages } from "@/messages";
 import { formatPnr } from "@/utils/pnr";
 import { barWidth, chapterAt, stepLit, typedCount } from "./chapters-progress";
@@ -113,16 +113,23 @@ export function startPlaceGuard(): Teardown {
   // reader who never left where they were reading. The box this guard compares against still refreshes every
   // time (so a later, real resize is judged from here, never a stale one) — only the relocation itself waits
   // for #how's own box to actually change size.
-  const observer = new ResizeObserver(() => {
+  const settle = () => {
     const resized = !unchanged();
     lastSize = sizeOf(section);
     if (resized) place = settlePlace(section, place);
     else place = { ...place, box: docBox(section) };
-  });
+  };
+  const observer = new ResizeObserver(settle);
   observer.observe(section, { box: "border-box" });
+  // Motion's rewrite collapses 02 at once, and the journey's rebuild then tears down the pieces below it: the run's
+  // unpin moves the reader by its own change (keepPlace), from wherever they stand by then. Settled here, as Motion
+  // changes and before the rebuild (this listener is added first), 02's move is made first and the run's lands on it;
+  // settled by the observer a frame later, from the place kept before both, it would undo the run's (J6-7).
+  window.addEventListener(MOTION_EVENT, settle);
   return () => {
     window.removeEventListener("scroll", learn);
     window.removeEventListener(MOTION_BEFORE_EVENT, learn);
+    window.removeEventListener(MOTION_EVENT, settle);
     window.removeEventListener(LAYOUT_EVENT, refresh);
     observer.disconnect();
   };
