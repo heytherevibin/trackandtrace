@@ -45,18 +45,7 @@ export async function scrollIntoChapter(page: Page, p: number): Promise<void> {
     const run = section.offsetHeight - window.innerHeight + stick;
     window.scrollTo({ top: start + run * at, behavior: "instant" });
   }, p);
-  await expect
-    .poll(
-      () =>
-        page.evaluate(() => {
-          // anime's scroll sync sleeps once 500 ms of its clock pass without a scroll event, and one software-GPU frame
-          // under a parallel run can take that long: nudge it on, as a reader's own scroll would
-          window.dispatchEvent(new Event("scroll"));
-          return window.__ttJourney?.anatomy() ?? -1;
-        }),
-      { timeout: 20_000 },
-    )
-    .toBeCloseTo(p, 1);
+  await expect.poll(() => page.evaluate(() => window.__ttJourney?.anatomy() ?? -1), { timeout: 20_000 }).toBeCloseTo(p, 1);
 }
 
 /** Aborts the scene chunk (three.js and the live drawing). */

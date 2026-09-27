@@ -31,6 +31,29 @@ test.describe("the train, drawn live (spec §3.A, §3.C)", () => {
     expect(seen.at(-1)).toBeGreaterThan(0.5);
   });
 
+  test("catches up with the page by itself after the main thread stalls past half a second (a slow phone's long frame)", async ({ page }) => {
+    await page.goto("/");
+    await waitForLive(page);
+    await scrollIntoChapter(page, 0.1);
+    // one scroll on to 0.5, a couple of frames for the drawing to start following it, then a stall longer than the
+    // 500 ms anime's scroll sync stays awake after a scroll event; no scroll event comes after it
+    await page.evaluate(() => {
+      const section = document.getElementById("anatomy")!;
+      const pin = section.querySelector(".anatomy-pin")!;
+      const stick = Number.parseFloat(getComputedStyle(pin).top) || 0;
+      const start = section.getBoundingClientRect().top + window.scrollY - stick;
+      window.scrollTo({ top: start + (section.offsetHeight - window.innerHeight + stick) * 0.5, behavior: "instant" });
+    });
+    await frames(page, 2);
+    await page.evaluate(() => {
+      const end = performance.now() + 800;
+      while (performance.now() < end) {
+        // the main thread is held, as a long frame holds it
+      }
+    });
+    await expect.poll(() => page.evaluate(() => window.__ttJourney?.anatomy() ?? -1), { timeout: 15_000 }).toBeCloseTo(0.5, 2);
+  });
+
   test("tells the horn once as the train pulls away on the way down, and not on the way back", async ({ page }) => {
     await page.goto("/");
     await waitForLive(page);

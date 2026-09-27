@@ -1,4 +1,4 @@
-import { animate, onScroll } from "animejs";
+import { animate, onScroll, type ScrollObserver } from "animejs";
 import { Vector3, type PerspectiveCamera } from "three";
 import { QUALITY_STORAGE_KEY } from "@/components/motion/motion-boot";
 import { messages } from "@/messages";
@@ -235,6 +235,10 @@ function startLive(engine: Engine, ask: Ask): Teardown {
   engine.setQuality(governor.level());
 
   // ---- draw only while a stage is on (or about to come on) screen, and only when something changed
+  // anime's scroll sync stays awake for 500 ms of its clock after each scroll event, so one long frame (a slow phone's
+  // stall) can spend that in a single tick and leave the drawing short of the page until the reader scrolls again. A
+  // frame with nothing to draw while a progress still disagrees with its scroll wakes the sync, so it catches up.
+  const behind = (observer: ScrollObserver | null, p: number): boolean => observer !== null && Math.abs(observer.progress - p) > 1e-4;
   const onScreen = new Set<Element>();
   let raf = 0;
   const loop = (now: number) => {
@@ -243,7 +247,11 @@ function startLive(engine: Engine, ask: Ask): Teardown {
       drawnKey = key;
       engine.frame();
       governor.drew(now);
-    } else governor.idle();
+    } else {
+      governor.idle();
+      if (behind(observeA, A.p)) observeA.container.handleScroll();
+      else if (observeT && behind(observeT, T.p)) observeT.container.handleScroll();
+    }
     raf = onScreen.size > 0 ? requestAnimationFrame(loop) : 0;
   };
   const io = new IntersectionObserver(
