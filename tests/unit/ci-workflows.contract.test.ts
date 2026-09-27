@@ -61,6 +61,39 @@ describe("ci.yml", () => {
     expect(ci).toContain("npx playwright test");
     expect(ci).toMatch(/if: failure\(\)\n\s+uses: actions\/upload-artifact@/);
   });
+
+  it("shards the browser suite over four parallel jobs, and the e2e check waits for every shard and the console suite", () => {
+    expect(ci).toMatch(/^ {2}e2e-shard:$/m);
+    expect(ci).toContain("shard: [1, 2, 3, 4]");
+    expect(ci).toContain("npx playwright test --shard=${{ matrix.shard }}/4");
+    expect(ci).toMatch(/^ {2}console:$/m);
+    const gate = ci.slice(ci.search(/^ {2}e2e:$/m));
+    expect(gate).toContain("needs: [e2e-shard, console]");
+    // a failed or timed-out shard still reaches the gate; a run superseded by a newer push does not report
+    expect(gate).toContain("if: ${{ !cancelled() }}");
+    expect(gate).toContain("npx playwright merge-reports --reporter html ./all-blob-reports");
+  });
+
+  it("runs the database tests and the console suite against a local Supabase stack, in their own job", () => {
+    const job = ci.slice(ci.search(/^ {2}console:$/m), ci.search(/^ {2}e2e:$/m));
+    expect(job).toContain("npx supabase@2.117.0 test db");
+    expect(job).toContain("npm run test:e2e:console");
+  });
+
+  it("gives every job a time limit", () => {
+    expect((ci.match(/timeout-minutes:/g) ?? []).length).toBe((ci.match(/runs-on:/g) ?? []).length);
+  });
+
+  it("holds the journey's chunk budgets on every pull request, after the production build", () => {
+    const build = ci.indexOf("npm run build");
+    expect(build).toBeGreaterThan(-1);
+    expect(ci.indexOf("node scripts/journey-budgets.mjs")).toBeGreaterThan(build);
+  });
+
+  it("keeps each shard's results as a blob report, for the gate to merge when a shard fails", () => {
+    const config = readFileSync(join(process.cwd(), "playwright.config.ts"), "utf8");
+    expect(config).toContain('reporter: process.env.CI ? [["github"], ["blob"]] : [["list"]]');
+  });
 });
 
 describe("audit.yml", () => {

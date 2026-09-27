@@ -21,7 +21,8 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : [["list"]],
+  // On CI each shard writes a blob; the e2e job merges a failing run's blobs into one HTML report (ci.yml).
+  reporter: process.env.CI ? [["github"], ["blob"]] : [["list"]],
   use: {
     baseURL,
     trace: "on-first-retry",

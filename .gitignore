@@ -12,6 +12,8 @@
 
 # testing
 /coverage
+/blob-report/
+/all-blob-reports/
 
 # next.js
 /.next/
