@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MODULES, lifetime, startJourney } from "@/components/landing/journey/start-journey";
 
-// A module that throws on the journey's first build: startJourney throws before it can hand back its teardown,
-// so it must stop everything it started itself — the place guard above all, which would otherwise keep
-// scrolling a reader inside #how on a page marked "failed".
+// A module that throws on the journey's first build, which starts a module at a time: the loader's teardown is
+// not what ends it, so startJourney must stop everything it started itself — the place guard above all, which
+// would otherwise keep scrolling a reader inside #how on a page marked "failed".
 
 vi.mock("@/components/landing/journey/chapters", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/components/landing/journey/chapters")>()),
@@ -52,11 +52,16 @@ describe("startJourney, when its first build throws", () => {
     document.body.replaceChildren();
   });
 
-  it("rethrows, marks the journey failed, and leaves nothing listening or observing", () => {
-    expect(() => startJourney()).toThrow("boom");
-    expect(document.documentElement.getAttribute("data-journey")).toBe("failed");
+  it("reports the error, marks the journey failed, and leaves nothing listening or observing", async () => {
+    const reported = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const stop = startJourney();
+    await vi.waitFor(() => expect(document.documentElement.getAttribute("data-journey")).toBe("failed"));
+    await vi.waitFor(() => expect(reported).toHaveBeenCalledWith(new Error("boom")));
     expect(observing.size).toBe(0);
     expect(listening.map((l) => l.type)).toEqual([]);
+    stop(); // the loader's own teardown, later, is harmless
+    expect(document.documentElement.getAttribute("data-journey")).toBe("failed");
+    reported.mockRestore();
   });
 });
 

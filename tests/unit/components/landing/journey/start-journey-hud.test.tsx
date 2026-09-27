@@ -7,6 +7,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // page.tsx) is proved separately, on the pure hudAllowed(), in hud.test.tsx.
 const startHud = vi.fn(() => () => {});
 vi.mock("@/components/landing/journey/hud", () => ({ startHud }));
+// The first build waits for the page between modules; here each wait ends at once, so 10 ms sees the build through.
+vi.mock("@/components/landing/journey/pause", () => ({ pause: () => Promise.resolve() }));
 
 import { startJourney } from "@/components/landing/journey/start-journey";
 
