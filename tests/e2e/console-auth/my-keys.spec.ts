@@ -29,6 +29,8 @@ test.describe("My keys", () => {
     await expectSignedInAs(page, owner.name, owner.role);
 
     // --- View: both keys, their types, and the profile (spec's first bullet). ---
+    // "/" is Overview since 01 was built; My keys has its own address, and this spec is about it.
+    await gotoReady(page, "/keys");
     await expect(page.getByRole("heading", { level: 1, name: "My keys" })).toBeVisible();
     await expect(page.getByText("2 keys")).toBeVisible();
     const firstRow = page.getByRole("row").filter({ hasText: "YubiKey 5C" });
@@ -79,7 +81,7 @@ test.describe("My keys", () => {
     await expect(renameDialog).not.toBeVisible();
     await expect(page.getByText("Desk YubiKey")).toBeVisible();
     await expect(page.getByRole("row").filter({ hasText: "YubiKey 5C" })).toHaveCount(0);
-    await gotoReady(page, "/");
+    await gotoReady(page, "/keys");
     await expect(page.getByRole("heading", { level: 1, name: "My keys" })).toBeVisible();
     await expect(page.getByText("Desk YubiKey")).toBeVisible();
 
@@ -222,7 +224,7 @@ test.describe("My keys", () => {
 
     // Re-read from the server, not just the database: the page a member would actually see still
     // shows three keys.
-    await gotoReady(page, "/");
+    await gotoReady(page, "/keys");
     await expect(page.getByText("3 keys")).toBeVisible();
   });
 
@@ -271,7 +273,7 @@ test.describe("My keys", () => {
     // Back on the first device: the Sessions plate now has something to sign out. Re-read from the
     // server -- a client-side poll would only prove this page's own state, not that the second
     // session genuinely exists in the database.
-    await gotoReady(page, "/");
+    await gotoReady(page, "/keys");
     await expect(page.getByRole("button", { name: "Sign out other sessions" })).toBeVisible();
     await page.getByRole("button", { name: "Sign out other sessions" }).click();
     // ConfirmDialog (src/components/ui/confirm-dialog.tsx) is Base UI's AlertDialog, not Dialog --
@@ -294,7 +296,7 @@ test.describe("My keys", () => {
     expect(live, "this device's own session").toBe("1");
 
     // This device is untouched -- re-read from the server, not merely still true in memory.
-    await gotoReady(page, "/");
+    await gotoReady(page, "/keys");
     await expectSignedInAs(page, owner.name, owner.role);
 
     await otherContext.close();

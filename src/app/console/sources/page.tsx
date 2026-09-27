@@ -5,7 +5,7 @@ import { ConsoleFrame } from "@/console/components/console-frame";
 import { NoAccessState } from "@/console/components/frame-states";
 import { consoleHref } from "@/console/href";
 import { consoleMessages } from "@/console/messages";
-import { SourcePlate, type Fuse } from "@/console/sources/source-plate";
+import { FUSE_CALLERS, SourcePlate, type Fuse } from "@/console/sources/source-plate";
 import { readSourceUsage } from "@/console/sources/sources";
 import { readBreakerState } from "@/services/breaker";
 import { activePnrSource, isThirdPartySource } from "@/services/env";
@@ -19,7 +19,6 @@ const m = consoleMessages.sources;
 export const metadata: Metadata = { title: m.pageTitle };
 
 const HISTORY_DAYS = 30;
-const CALLERS = ["pnr", "availability", "route"] as const;
 
 /**
  * Module 02, Sources & usage (Console Sources.dc.html). Owner, Admin and Viewer — the sheet says
@@ -64,7 +63,7 @@ export default async function SourcesPage() {
     ? await Promise.all([
         readUsageHistory(kv, prefix, source, HISTORY_DAYS),
         Promise.all(
-          CALLERS.map(async (caller): Promise<Fuse> => ({ caller, state: await readBreakerState(kv, breakerScopeFor(source, caller, prefix)) })),
+          FUSE_CALLERS.map(async (caller): Promise<Fuse> => ({ caller, state: await readBreakerState(kv, breakerScopeFor(source, caller, prefix)) })),
         ),
       ])
     : [[] as readonly UsageDay[], [] as readonly Fuse[]];
