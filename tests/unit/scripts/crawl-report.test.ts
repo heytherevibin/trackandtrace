@@ -139,13 +139,54 @@ describe("summarise", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// The exit code answers ONE question: was this run able to do its job.
+//
+// It used to answer "is the dataset whole", and those are different questions
+// with different audiences. Wholeness is a statement about the data and it is
+// still printed in full. The exit code is an ALARM, and an alarm that fires on
+// the ordinary case is an alarm that gets ignored.
+//
+// The ordinary case is a refusal. The first scheduled run, 2026-09-27, asked 14,
+// answered 13 and wrote 42 rows — and exited 1, because one rolling ask came back
+// SOURCE_UNAVAILABLE. A provider refusing one train out of twelve is a Tuesday.
+// Red every Tuesday teaches an operator to stop reading the red.
+//
+// So a refusal no longer sets the code, and four things still do, because each is
+// the run failing rather than the provider answering no:
+//   * a GATE stopped it — the ceiling, the day's budget, a resting breaker
+//   * an ask was never SENT
+//   * a sweep RESTARTED — our own cursor lost its place, and those journey dates
+//     are gone for good
+//   * NOTHING answered — which is what an outage looks like from in here
+// ---------------------------------------------------------------------------
+
 describe("exitCodeFor", () => {
   it("is zero only when every combo answered and nothing stopped the run", async () => {
     expect(exitCodeFor(await run({ ask: stubAsk(() => OK) }))).toBe(0);
   });
 
-  it("is non-zero when a combo failed, so an operator reading only the exit code still learns of the hole", async () => {
-    expect(exitCodeFor(await run({ ask: stubAsk((n) => (n === 0 ? REFUSED : OK)) }))).toBe(1);
+  it("is ZERO when the provider refused one ask and the rest answered, because that is a Tuesday", async () => {
+    // The case that inverted. The run made every ask it planned and wrote rows;
+    // one train's provider said no. The hole is named in the report, and the
+    // report is where a hole belongs — an exit code that cries every day is one
+    // nobody reads on the day it matters.
+    const summary = await run({ ask: stubAsk((n) => (n === 0 ? REFUSED : OK)) });
+
+    expect(summary.failures).toHaveLength(1);
+    expect(summary.whole).toBe(false);
+    expect(summary.rows).toBeGreaterThan(0);
+    expect(exitCodeFor(summary)).toBe(0);
+  });
+
+  it("is non-zero when NOTHING answered, which is an outage rather than a refusal", async () => {
+    // Every ask refused. Individually each is a Tuesday; all of them together is
+    // the provider being down, and the report says as much: "a whole run of
+    // refusals and no verdict is what an outage looks like from in here."
+    const summary = await run({ ask: stubAsk(() => REFUSED) });
+
+    expect(summary.rows).toBe(0);
+    expect(exitCodeFor(summary)).toBe(1);
   });
 
   it("is non-zero when the run stopped at a gate", async () => {
