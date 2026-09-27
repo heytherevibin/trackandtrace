@@ -47,7 +47,7 @@ Settled with the user between 2026-09-24 rounds 1–4, A–E, and the v3 approva
   drawing with hidden lines removed. Heading kept: "Every part answers to the source".
 - **v2 features (all 14):** kinetic headline, living dial, chart countdown ring, plotter intro once per visit,
   label↔part highlight, dimensions and title block, berth plan (03), station clock (04), track-laying
-  roadmap (05), departure board under the hero, route strip in the masthead, plate morph, registration-mark
+  roadmap (05), departure board under the hero, route strip (a left rail since 2026-09-27), plate morph, registration-mark
   cursor (desktop, motion on), sound off by default (rail clack, departure horn) behind a footer switch.
 - **v3 additions:** the window-seat run through 06–07, Night falls (theme sweep), line side passing at the
   departure, headlight beam at Night, scan reveal, adaptive quality, Data Saver, and the frame meter (a review
@@ -72,7 +72,7 @@ Top to bottom, as in v3:
 
 | Where | What happens | Motion off |
 |---|---|---|
-| Masthead (on "/") | A second row: the route strip. Stations DEP, GA, 01–08, END on a rail; a train glyph runs right as the page scrolls, leaning into speed; odometer KM 000→781; the current station's name. Phones: a hairline rail in the masthead's bottom edge. | Glyph moves, no lean |
+| Masthead (on "/") | The route rail (from 48rem; approved 2026-09-27): a fixed 4rem column down the page's left edge, from the masthead's foot to the window's, with a hairline on its right; the page stands clear of it. Stations DEP, GA, 01–08, END top to bottom on a rail, each a full-width link at least 44px tall (an eleventh of the rail each in a window too short for that, never overlapping); a train glyph runs down the rail nose first as the page scrolls, leaning into speed; odometer KM 000→781 at the column's foot; the current stop is highlighted (no spelled-out station name). The masthead keeps its own height. Phones: a hairline rail in the masthead's bottom edge. | Glyph moves, no lean |
 | Hero | Letters of the h1 rise; the plotter draws the masthead rule and the plate's hairlines once per visit; the living dial behind the plate lights segments as digits are typed; after a result, a 24-hour face marks the chart time printed in the record (never computed) with "Chart HH:MM IST · in 3 h 12 min". | Dial and face drawn still |
 | Departure board (new) | "Departures · Platform 3": the page's sections as departures with code, km and status (NEXT, AT PLATFORM, DEPARTED); rows flip in; names link to their sections. | Static board |
 | The drawn train (new, pinned) | A solid steel locomotive; a scan gate sweeps it nose to tail into the line drawing; it turns and comes apart into ten labelled parts (label↔part highlight on fine pointers); side elevation with dimensions; coaches couple, the pantograph rises, the train departs with the camera riding along past masts, a signal gantry and Platform 3's nameboard; the strip glyph takes over. Night: light-on-dark, steel glow, headlight beam. | The still drawing |

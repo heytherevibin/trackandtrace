@@ -13,15 +13,28 @@ test.describe("the route", () => {
 });
 
 test.describe("the route strip", () => {
-  test("sits in the landing's masthead, and its stops jump to their sections below the masthead", async ({ page, isMobile }) => {
+  test("stands as its own column left of the page, not in the masthead, and its stops jump to their sections below the masthead", async ({ page, isMobile }) => {
     test.skip(isMobile, "on a phone the strip is a hairline rail without labels");
     await gotoReady(page, "/");
-    const strip = page.getByRole("banner").getByRole("navigation", { name: "Route through this page" });
+    await expect(page.getByRole("banner").getByRole("navigation", { name: "Route through this page" })).toHaveCount(0);
+    const strip = page.getByRole("navigation", { name: "Route through this page" });
     await expect(strip).toBeVisible();
+    const rail = (await strip.boundingBox())!;
+    const main = (await page.locator("#main").boundingBox())!;
+    expect(rail.x).toBe(0);
+    expect(main.x).toBeGreaterThanOrEqual(rail.x + rail.width);
     await strip.getByRole("link", { name: "03 · The record you get" }).click();
     await expect(page).toHaveURL(/#record$/);
-    const gap = await page.evaluate(() => document.getElementById("record")!.getBoundingClientRect().top - document.querySelector("header")!.getBoundingClientRect().bottom);
-    expect(gap).toBeGreaterThanOrEqual(0);
+    // The anchor lands clear of the masthead, which is back to its own height: just below it.
+    await expect
+      .poll(() => page.evaluate(() => Math.round(document.getElementById("record")!.getBoundingClientRect().top - document.querySelector("header")!.getBoundingClientRect().bottom)))
+      .toBeGreaterThanOrEqual(0);
+    await expect
+      .poll(() => page.evaluate(() => Math.round(document.getElementById("record")!.getBoundingClientRect().top - document.querySelector("header")!.getBoundingClientRect().bottom)))
+      .toBeLessThanOrEqual(24);
+    expect(await page.locator("header").evaluate((h) => h.getBoundingClientRect().height)).toBeLessThanOrEqual(65);
+    await strip.getByRole("link", { name: "08 · Questions" }).click();
+    await expect(page).toHaveURL(/#faq$/);
     await gotoReady(page, "/watchlist");
     await expect(page.getByRole("navigation", { name: "Route through this page" })).toHaveCount(0);
   });

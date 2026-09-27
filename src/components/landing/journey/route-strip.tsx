@@ -1,5 +1,5 @@
 import { messages } from "@/messages";
-import { STATIONS, kmFigure, stopLeft, stopName } from "./stations";
+import { STATIONS, kmFigure, stopName, stopTop } from "./stations";
 import { TrainGlyph } from "./train-glyph";
 
 function Train() {
@@ -13,42 +13,46 @@ function Train() {
 }
 
 /**
- * The masthead's second row on the landing (from 48rem): the page's stations on a rail, each a named link to its
- * section. The odometer, the current station and the train are the journey's: they show only while it runs
- * (journey-island.css), because only then do they stay true as the page scrolls. Below 48rem the strip is a
- * hairline rail along the masthead's foot, carrying the train alone; it is its own aria-hidden element, so phones
- * never expose an empty navigation landmark.
+ * The landing's route rail (from 48rem): a fixed column down the page's left edge, below the masthead, with the
+ * page's stations on a rail from top to bottom, each a named link to its section. The odometer at the column's
+ * foot and the train are the journey's: they show only while it runs (journey-island.css), because only then do
+ * they stay true as the page scrolls. The current stop is marked by the journey (aria-current); nothing spells
+ * its name out beside the rail. Below 48rem the column is not shown, and {@link PhoneRail} carries the train.
  */
 export function RouteStrip() {
   const m = messages.journey.strip;
   return (
-    <>
-      <nav id="route-strip" aria-label={m.label} className="route-strip">
-        <div className="page-frame strip-row">
-          <span className="strip-odo tnum" aria-hidden="true">
-            {m.km(kmFigure(0))}
-          </span>
-          <div className="strip-track">
-            <div className="strip-rail rail" aria-hidden="true" />
-            <ol className="strip-stops">
-              {STATIONS.map((station, i) => (
-                <li key={station.id} style={{ left: stopLeft(i, STATIONS.length) }}>
-                  <a href={`#${station.id}`} aria-label={stopName(station)} className="tap-44">
-                    {station.code}
-                  </a>
-                </li>
-              ))}
-            </ol>
-            <Train />
-          </div>
-          <span className="strip-now" aria-hidden="true">
-            {stopName(STATIONS[0]!)}
-          </span>
+    <nav id="route-strip" aria-label={m.label} className="route-strip">
+      <div className="strip-row">
+        <div className="strip-track">
+          <div className="strip-rail" aria-hidden="true" />
+          <ol className="strip-stops">
+            {STATIONS.map((station, i) => (
+              <li key={station.id} style={{ top: stopTop(i, STATIONS.length) }}>
+                <a href={`#${station.id}`} aria-label={stopName(station)}>
+                  {station.code}
+                </a>
+              </li>
+            ))}
+          </ol>
+          <Train />
         </div>
-      </nav>
-      <div className="phone-rail" aria-hidden="true">
-        <Train />
+        <span className="strip-odo tnum" aria-hidden="true">
+          {m.km(kmFigure(0))}
+        </span>
       </div>
-    </>
+    </nav>
+  );
+}
+
+/**
+ * Below 48rem: a hairline rail along the masthead's foot, carrying the train alone (the journey's). It is its own
+ * aria-hidden element inside the masthead, so phones never expose an empty navigation landmark.
+ */
+export function PhoneRail() {
+  return (
+    <div className="phone-rail" aria-hidden="true">
+      <Train />
+    </div>
   );
 }

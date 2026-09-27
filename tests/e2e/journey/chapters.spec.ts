@@ -3,6 +3,10 @@ import { JOURNEY_CHUNK_MARK } from "@/components/landing/journey/journey-mark";
 import { collisionsInView } from "./collisions";
 import { motionOff, scrollToId, waitForJourney } from "./journey-helpers";
 
+// A window too short for every stop of 02 to fit pinned below the masthead. The masthead is one row since the
+// route strip became a left rail (2026-09-27), 32px shorter than with the strip's row, so 02 now fits pinned from
+// about 340px tall at 1440 wide; 320 keeps the room below the masthead these tests were written for (263px then).
+const TOO_SHORT_TO_PIN = { width: 1440, height: 320 } as const;
 const PANELS = { panels: [".board", ".berth-plan", ".station-clock", ".route-map", ".chapter-card"], skip: [".hero-dial"] };
 
 /** Waits for window.scrollY to stop moving: in-page anchors glide (base.css) once the journey has started
@@ -314,7 +318,7 @@ test.describe("02 · the chapters, pinned", () => {
   });
 
   test("a window that grows tall enough never pins 02 while the reader is below it", async ({ page }) => {
-    await page.setViewportSize({ width: 1440, height: 360 });
+    await page.setViewportSize(TOO_SHORT_TO_PIN);
     await page.goto("/");
     await waitForJourney(page);
     await expect(page.locator("#how")).not.toHaveClass(/is-pinned/);
@@ -336,7 +340,7 @@ test.describe("02 · the chapters, pinned", () => {
     await expect(page.locator("#how")).toHaveClass(/is-pinned/);
   });
   test("a window that turns wide and tall with the reader just inside a plain 02 keeps them at 02's start", async ({ page }) => {
-    await page.setViewportSize({ width: 1440, height: 360 });
+    await page.setViewportSize(TOO_SHORT_TO_PIN);
     await page.goto("/");
     await waitForJourney(page);
     await expect(page.locator("#how")).not.toHaveClass(/is-pinned/);

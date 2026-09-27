@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { STATIONS, kmFigure, stopLeft, stopName } from "@/components/landing/journey/stations";
+import { STATIONS, kmFigure, stopName, stopTop } from "@/components/landing/journey/stations";
 
 describe("the route through the landing", () => {
   it("runs DEP, 01 to 08, END, in order of kilometres, with a name for each", () => {
@@ -13,10 +13,10 @@ describe("the route through the landing", () => {
     expect(STATIONS[1]).toEqual({ id: "anatomy", code: "GA", km: 12, name: "The train, drawn" });
   });
 
-  it("spaces the stops evenly along the strip", () => {
-    expect(stopLeft(0, 10)).toBe("0.000%");
-    expect(stopLeft(3, 10)).toBe("33.333%");
-    expect(stopLeft(9, 10)).toBe("100.000%");
+  it("spaces the stops evenly down the rail, the first at its top and the last a stop's height from its foot", () => {
+    expect(stopTop(0, 10)).toBe("calc((100% - var(--stop-h)) * 0.0000)");
+    expect(stopTop(3, 10)).toBe("calc((100% - var(--stop-h)) * 0.3333)");
+    expect(stopTop(9, 10)).toBe("calc((100% - var(--stop-h)) * 1.0000)");
   });
 
   it("prints kilometres as three figures", () => {

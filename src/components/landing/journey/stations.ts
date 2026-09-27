@@ -28,9 +28,10 @@ const ROUTE: readonly { readonly id: StationId; readonly code: string; readonly 
 
 export const STATIONS: readonly Station[] = ROUTE.map((stop) => ({ ...stop, name: messages.journey.stations[stop.id] }));
 
-/** Where a stop sits along the strip's track, as a percentage. */
-export function stopLeft(index: number, count: number): string {
-  return `${((index / (count - 1)) * 100).toFixed(3)}%`;
+/** Where a stop's box stands down the rail's track: evenly spaced, the first at the top and the last a stop's
+ * height (`--stop-h`, journey.css) from the foot, so every stop's box stays inside the track. */
+export function stopTop(index: number, count: number): string {
+  return `calc((100% - var(--stop-h)) * ${(index / (count - 1)).toFixed(4)})`;
 }
 
 /** Kilometres as the board prints them: three figures. */
