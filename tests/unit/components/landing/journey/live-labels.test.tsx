@@ -37,6 +37,23 @@ describe("the labels while the drawing is live (J5-5)", () => {
     expect(labels?.pin.getAttribute("style") ?? "").not.toContain("--anatomy-copy-h");
   });
 
+  it("leave the drawing a zone while the list leaves it room, and none once the words take the window (spec §3.C's fit)", () => {
+    vi.stubGlobal("matchMedia", () => ({ matches: true })); // narrow: the list, never columns
+    document.body.innerHTML = `<section id="anatomy"><div class="anatomy-pin"><div class="anatomy-copy"></div><ol class="callouts"></ol><ol class="anatomy-legend"></ol><div class="title-block"></div><p class="anatomy-caption"></p></div></section>`;
+    const section = document.getElementById("anatomy")!;
+    const box = (el: Element, top: number, bottom: number, width = 390) => {
+      el.getBoundingClientRect = () => DOMRect.fromRect({ x: 0, y: top, width, height: bottom - top });
+    };
+    const labels = createLiveLabels(section)!;
+    box(labels.pin, 0, 844);
+    box(section.querySelector(".anatomy-copy")!, 0, 200);
+    const legend = section.querySelector(".anatomy-legend")!;
+    box(legend, 700, 840); // the list under the drawing leaves it 700 - 12 - (200 + 16) = 472px
+    expect(labels.layout()).toEqual({ l: 8, r: window.innerWidth - 8, t: 216, b: 688 });
+    box(legend, 370, 840); // 370 - 12 - 216 = 142px: less than the drawing's 150
+    expect(labels.layout()).toBeNull();
+  });
+
   it("are nothing without the chapter's markup", () => {
     document.body.innerHTML = `<section id="anatomy"></section>`;
     expect(createLiveLabels(document.getElementById("anatomy")!)).toBeNull();

@@ -178,7 +178,8 @@ While `place` is the only reason, the scene still loads and builds, so the switc
 **Still** is the same drawing baked at build time (§3.D): unpinned, fully apart, every label beside it with
 leaders to its part (or listed under it), label↔part highlight kept; the terminus shows the arrived train. A
 still page never downloads three.js, except while `place` is the only reason, when the scene prepares in the
-background (J5-2). Switching mid-chapter keeps the reader at the chapter's start.
+background (J5-2), or when the scene's own fit check finds the drawing cannot fit its window (it needs the scene
+to measure). Switching mid-chapter keeps the reader at the chapter's start.
 
 **Adaptive quality.** A governor watches intervals between frames the drawing actually drew within one scroll
 gesture. p90 over 26 ms for 30 frames steps down (resolution 2× → 1.5× → 1×; Night effects off; coaches 3 →
@@ -232,7 +233,7 @@ reader's hand.
 |---|---|---|
 | Check interactive | never waits on journey code | holds; a blocked CDN still leaves Run working |
 | Journey chunk | ≤ 70 KB compressed | Anime.js 39 KB (full) + modules |
-| Scene chunk | ≤ 240 KB compressed, live only | three.js ~188 KB (full) + scene |
+| Scene chunk | ≤ 240 KB compressed, live only, except while `place` is the only reason, or when the scene's own fit check finds the drawing cannot fit its window (§3.C) | three.js ~188 KB (full) + scene |
 | Still drawings | ≤ 60 KB compressed per page | 23 + 34 KB |
 | Longest journey task at load, 4× CPU phone | ≤ 120 ms | scene steps ≤ 61 ms (page total 202 ms incl. first layout) |
 | Scroll, reference desktop | p95 ≤ 12 ms, 0% > 25 ms | p95 9.8 ms, 0% |

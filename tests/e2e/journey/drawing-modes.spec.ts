@@ -4,23 +4,45 @@ import { blockJourneyChunk, blockSceneChunk, drawStill, motionOff, scrollIntoCha
 
 const drawn = (page: import("@playwright/test").Page) => page.locator("#anatomy .anatomy-still:not(.is-noscript) use[href]");
 
+/** Every script response carrying three.js; its renderer's own message text survives minification. */
+function watchThree(page: import("@playwright/test").Page): () => readonly string[] {
+  const seen: string[] = [];
+  page.on("response", async (r) => {
+    if (!r.url().endsWith(".js")) return;
+    try {
+      if ((await r.text()).includes("THREE.WebGLRenderer")) seen.push(r.url());
+    } catch {
+      // a body the browser already let go of
+    }
+  });
+  return () => seen;
+}
+
 test.describe("every drawing mode draws the train (spec §4)", () => {
-  test("Motion off: still, and the page says why", async ({ page }) => {
+  test("Motion off: still, the page says why, and three.js never downloaded", async ({ page }) => {
+    const three = watchThree(page);
     await motionOff(page);
     await page.goto("/");
     await expect(page.locator("html")).toHaveAttribute("data-drawing", "still"); // the head script, before first paint
     await waitForJourney(page);
     await expect(page.locator("html")).toHaveAttribute("data-drawing-why", "motion"); // still from the start: the live drawing is never asked for
     await expect(drawn(page).first()).toBeAttached();
+    // A window is the assertion: a download that never starts has no state to wait on.
+    await page.waitForTimeout(1_500);
+    expect(three()).toEqual([]);
   });
 
-  test("Data Saver: still from the first paint", async ({ page }) => {
+  test("Data Saver: still from the first paint, and three.js never downloaded", async ({ page }) => {
+    const three = watchThree(page);
     await stubSaveData(page);
     await page.goto("/");
     await expect(page.locator("html")).toHaveAttribute("data-saver", "on");
     await expect(page.locator("html")).toHaveAttribute("data-drawing", "still");
     await waitForJourney(page);
     await expect(page.locator("html")).toHaveAttribute("data-drawing-why", "saver");
+    // A window is the assertion: a download that never starts has no state to wait on.
+    await page.waitForTimeout(1_500);
+    expect(three()).toEqual([]);
   });
 
   test("a journey that never loads still draws the train, and never touches Motion", async ({ page }) => {
@@ -78,20 +100,6 @@ test.describe("every drawing mode draws the train (spec §4)", () => {
     await expect(page.locator("#terminus .terminus-still:not(.is-noscript) use[href]").first()).toBeAttached();
   });
 });
-
-/** Every script response carrying three.js; its renderer's own message text survives minification. */
-function watchThree(page: import("@playwright/test").Page): () => readonly string[] {
-  const seen: string[] = [];
-  page.on("response", async (r) => {
-    if (!r.url().endsWith(".js")) return;
-    try {
-      if ((await r.text()).includes("THREE.WebGLRenderer")) seen.push(r.url());
-    } catch {
-      // a body the browser already let go of
-    }
-  });
-  return () => seen;
-}
 
 test.describe("J5: every reason not to draw live (spec §3.C, §4)", () => {
   test("reduced motion: still, and three.js never downloaded", async ({ page }) => {
@@ -164,6 +172,19 @@ test.describe("J5: every reason not to draw live (spec §3.C, §4)", () => {
     // A window is the assertion: a download that never starts has no state to wait on.
     await page.waitForTimeout(1_500);
     expect(three()).toEqual([]);
+  });
+
+  test("words too large for the window, even as a list: still (fit)", async ({ page }) => {
+    // A phone with its text at 200%: the lead and the parts list leave the drawing less than its 150px (spec §3.C).
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.addInitScript(() => document.addEventListener("DOMContentLoaded", () => document.documentElement.style.setProperty("font-size", "200%")));
+    await page.goto("/");
+    await waitForJourney(page);
+    // the scene's own check decides it, after the scene has loaded to measure (spec §3.C)
+    await expect(page.locator("html")).toHaveAttribute("data-drawing-why", "fit", { timeout: 25_000 });
+    await expect(page.locator("html")).toHaveAttribute("data-drawing", "still");
+    await expect(page.locator("#anatomy")).not.toHaveClass(/is-live/);
+    await expect(drawn(page).first()).toBeAttached();
   });
 
   test("a reader landing below the chapter: still (place) until they come back above it", async ({ page }) => {

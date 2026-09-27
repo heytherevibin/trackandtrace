@@ -129,10 +129,10 @@ The controller's pre-flight scan raised 25 findings; each ruling below is alread
   - Every file stays under 500 lines, `scripts/**/*.mjs` included.
 - **TDD.** Write the failing test first, and watch it fail for the right reason before implementing.
 - **Pins.** `three` stays `0.186.0` and `animejs` stays `4.5.0`. Add no dependency.
-- **three.js only in the scene chunk.** Only `src/components/landing/journey/scene/*.ts` and `scripts/bake/page.ts` import `"three"`. The journey chunk reaches the scene only through the dynamic `import("./scene/live")` in `drawing.ts`. Type-only imports (`import type`) are allowed anywhere. A still page never downloads three.js, except while `place` is the only reason, when the scene prepares in the background (J5-2).
+- **three.js only in the scene chunk.** Only `src/components/landing/journey/scene/*.ts` and `scripts/bake/page.ts` import `"three"`. The journey chunk reaches the scene only through the dynamic `import("./scene/live")` in `drawing.ts`. Type-only imports (`import type`) are allowed anywhere. A still page never downloads three.js, except while `place` is the only reason, when the scene prepares in the background (J5-2), or when the scene's own fit check finds the drawing cannot fit its window (it needs the scene to measure).
 - **Budgets, verbatim from spec §3.H:**
   - Journey chunk ≤ 70 KB compressed;
-  - Scene chunk ≤ 240 KB compressed, live only;
+  - Scene chunk ≤ 240 KB compressed, live only, except while `place` is the only reason, or when the scene's own fit check finds the drawing cannot fit its window (§3.C);
   - Still drawings ≤ 60 KB compressed per page;
   - Longest journey task at load, 4× CPU phone ≤ 120 ms (scene steps ≤ 61 ms);
   - Scroll, reference desktop: p95 ≤ 12 ms, 0% > 25 ms;
