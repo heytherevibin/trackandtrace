@@ -7,6 +7,7 @@ import { Hero } from "@/components/landing/hero";
 import { HowItWorks } from "@/components/landing/how-it-works";
 import { DepartureBoard } from "@/components/landing/journey/departure-board";
 import { DrawingChapter } from "@/components/landing/journey/drawing-chapter";
+import { hudAllowed } from "@/components/landing/journey/hud-gate";
 import { JourneyLoader } from "@/components/landing/journey/journey-loader";
 import { PhotoSplit } from "@/components/landing/photo-split";
 import { PrinciplesSheet } from "@/components/landing/principles-sheet";
@@ -27,7 +28,8 @@ export const metadata: Metadata = {
 export default async function HomePage() {
   // Per request: service status and sample mode read the live configuration, and the specimen's retrieval time is real.
   await connection();
-  const source = activePnrSource(env());
+  const current = env();
+  const source = activePnrSource(current);
   const sampleMode = source === "fixture";
   const status = serviceStatus();
   const connected = !sampleMode && status.checks === "operational";
@@ -46,7 +48,7 @@ export default async function HomePage() {
       <PhotoSplit />
       <Faq />
       <ClosingCta sampleMode={sampleMode} connected={connected} />
-      <JourneyLoader />
+      <JourneyLoader hud={hudAllowed(current)} />
     </div>
   );
 }

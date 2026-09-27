@@ -2,8 +2,8 @@ import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { startBoard } from "@/components/landing/journey/board";
 import { DepartureBoard } from "@/components/landing/journey/departure-board";
-import { STATION_EVENT, type ResultDetail, type StationDetail } from "@/components/landing/journey/journey-events";
-import { keep } from "@/components/landing/journey/start-journey";
+import { STATION_EVENT, type StationDetail } from "@/components/landing/journey/journey-events";
+import { testContext } from "./journey-context";
 
 // Every build starts the board at station 0 and the strip then announces where the page really is. That first
 // station is where the board already stood before the rebuild, so it is set, never flipped; only a station the
@@ -15,7 +15,7 @@ describe("the departure board's statuses", () => {
   it("are set without a flip for a build's first station, and flip for the next", () => {
     const { container } = render(<DepartureBoard />);
     const cells = [...container.querySelectorAll<HTMLElement>("td.board-status")];
-    const stop = startBoard({ motion: true, intro: false, result: keep<ResultDetail | null>(null), still: keep({ columns: false, height: null }) });
+    const stop = startBoard(testContext());
 
     station(3);
     expect(cells.map((c) => c.querySelector(".flap-char"))).toEqual(cells.map(() => null));

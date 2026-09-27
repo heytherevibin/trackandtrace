@@ -114,6 +114,7 @@ for (const blocked of [false, true]) {
 
 test("Tab never leaves focus under the masthead or behind a pinned piece", async ({ page, isMobile }) => {
   test.skip(isMobile, "keyboard");
+  test.setTimeout(90_000); // 80 steps, each scrolling a page whose live drawing a software GPU draws slowly
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/");
   await waitForJourney(page);

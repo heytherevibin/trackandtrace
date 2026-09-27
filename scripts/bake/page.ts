@@ -24,7 +24,7 @@ import { applyPose } from "@/components/landing/journey/scene/apply-pose";
 import { FILL_OFFSET, type Palette } from "@/components/landing/journey/scene/lines";
 import { buildWorld } from "@/components/landing/journey/scene/world";
 import { CALLOUT_PARTS } from "@/components/landing/journey/train-parts";
-import { cropBox, f1, idColour, idReader, pathsByPart, walkRuns, type EdgeMeta, type LineClass, type Run, type ScreenSeg } from "./trace";
+import { cropBox, half, idColour, idReader, pathsByPart, walkRuns, type EdgeMeta, type LineClass, type Run, type ScreenSeg } from "./trace";
 
 declare global {
   interface Window {
@@ -129,6 +129,8 @@ function bake({ kind, W, H, coaches = 3, minRun = 1.5, margin = 0.04 }: BakeConf
   idLines.layers.set(2);
   scene.add(idLines);
 
+  // Hidden-line removal needs nothing painted behind the fills: a background would fill the ID pass's pixels.
+  if (scene.background !== null) throw new Error("bake: the scene has a background; hidden-line removal needs none");
   const canvas = document.createElement("canvas");
   // No antialiasing: a blended pixel would read as a neighbouring edge's id.
   const renderer = new WebGLRenderer({ canvas, antialias: false, alpha: true });
@@ -140,7 +142,7 @@ function bake({ kind, W, H, coaches = 3, minRun = 1.5, margin = 0.04 }: BakeConf
     renderer.setPixelRatio(1);
     renderer.setSize(W, H, false);
     renderer.setRenderTarget(rt);
-    renderer.setClearColor(0x000000, 0);
+    renderer.setClearColor(new Color(0, 0, 0), 0);
     renderer.clear(true, true, true);
     const fog = scene.fog;
     scene.fog = null;
@@ -200,10 +202,10 @@ function bake({ kind, W, H, coaches = 3, minRun = 1.5, margin = 0.04 }: BakeConf
   if (kind === "anatomy") {
     for (const id of CALLOUT_PARTS) {
       const s = rig.anchor(id).project(camera);
-      anchors[id] = [f1(((s.x + 1) / 2) * W - box.l), f1(((1 - s.y) / 2) * H - box.t)];
+      anchors[id] = [half(((s.x + 1) / 2) * W - box.l), half(((1 - s.y) / 2) * H - box.t)];
     }
   }
-  return { viewBox: [0, 0, f1(box.r - box.l), f1(box.b - box.t)], paths, anchors, segments: segs.length, runs: runs.length };
+  return { viewBox: [0, 0, half(box.r - box.l), half(box.b - box.t)], paths, anchors, segments: segs.length, runs: runs.length };
 }
 
 window.bake = bake;

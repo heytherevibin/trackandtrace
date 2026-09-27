@@ -40,25 +40,27 @@ function span(el: Element | null): Span | null {
 // "scroll" events while #how is the size this guard last settled, and read afresh just before Motion rewrites
 // the page. A "scroll" event can land after #how changed size and before the observer settles it (the reader's
 // last scroll had not reached a frame yet: a slow device); it reports the browser's move, never the reader's.
-let placeBox: Span = { top: 0, bottom: 0 };
-let lastScrollY = 0;
-
 /** #how's box in document coordinates, measured now. */
 function docBox(section: HTMLElement): Span {
   const r = section.getBoundingClientRect();
   return { top: r.top + window.scrollY, bottom: r.bottom + window.scrollY };
 }
 
+/** Where the reader was, and #how's document box then: the guard's state, kept in its closure. */
+interface Place {
+  readonly box: Span;
+  readonly y: number;
+}
+
 /** Above 02's old start: nothing. Inside it: 02's new start, at its landing under the masthead. At or past its
- * old end: the same distance past its new end (the height's change, plus its top's when the width moved it). */
-function settlePlace(section: HTMLElement): void {
-  const was = placeBox;
+ * old end: the same distance past its new end (the height's change, plus its top's when the width moved it).
+ * Returns the place to judge the next change from. */
+function settlePlace(section: HTMLElement, was: Place): Place {
   const now = docBox(section);
-  placeBox = now;
-  const y = lastScrollY;
-  if (y >= was.bottom) window.scrollTo({ top: y + now.bottom - was.bottom, behavior: "instant" });
-  else if (y > was.top) window.scrollTo({ top: now.top - Number.parseFloat(getComputedStyle(section).scrollMarginTop), behavior: "instant" });
-  lastScrollY = window.scrollY;
+  const { y } = was;
+  if (y >= was.box.bottom) window.scrollTo({ top: y + now.bottom - was.box.bottom, behavior: "instant" });
+  else if (y > was.box.top) window.scrollTo({ top: now.top - Number.parseFloat(getComputedStyle(section).scrollMarginTop), behavior: "instant" });
+  return { box: now, y: window.scrollY };
 }
 
 /** #how's own border-box size, at the same precision a ResizeObserver entry reports (never offsetWidth/
@@ -73,16 +75,28 @@ function sizeOf(section: HTMLElement): { readonly width: number; readonly height
 export function startPlaceGuard(): Teardown {
   const section = document.getElementById("how");
   if (!section) return () => {};
-  placeBox = docBox(section);
-  lastScrollY = window.scrollY;
+  let place: Place = { box: docBox(section), y: window.scrollY };
   let lastSize = sizeOf(section);
+  const unchanged = () => {
+    const size = sizeOf(section);
+    return size.width === lastSize.width && size.height === lastSize.height;
+  };
   // The reader's place, only while #how is still the size this guard last settled.
   const learn = () => {
-    const size = sizeOf(section);
-    if (size.width === lastSize.width && size.height === lastSize.height) lastScrollY = window.scrollY;
+    if (unchanged()) place = { ...place, y: window.scrollY };
   };
   window.addEventListener("scroll", learn, { passive: true });
   window.addEventListener(MOTION_BEFORE_EVENT, learn);
+  // The drawing above 02 (GA, J5) pins and unpins, which moves #how's document box without resizing it, and moves
+  // its reader with it by an instant scroll before it tells tt:layout. While #how is the size this guard last
+  // settled, every layout change refreshes the box it judges against, and the reader's scroll with it: that move's
+  // own "scroll" event lands a frame later, and a resize judged before it would read the reader's old place against
+  // the new box. A change that did resize #how is the observer's, below, and must be judged against the box from
+  // before it.
+  const refresh = () => {
+    if (unchanged()) place = { box: docBox(section), y: window.scrollY };
+  };
+  window.addEventListener(LAYOUT_EVENT, refresh);
   // A freshly observed target always delivers one initial notification, even when nothing has actually
   // changed (the spec guarantees it) — this observer never fires on its own just because something above
   // #how changed size and moved it; only #how's own border-box actually changing size does that, or this
@@ -93,16 +107,16 @@ export function startPlaceGuard(): Teardown {
   // time (so a later, real resize is judged from here, never a stale one) — only the relocation itself waits
   // for #how's own box to actually change size.
   const observer = new ResizeObserver(() => {
-    const size = sizeOf(section);
-    const resized = size.width !== lastSize.width || size.height !== lastSize.height;
-    lastSize = size;
-    if (resized) settlePlace(section);
-    else placeBox = docBox(section);
+    const resized = !unchanged();
+    lastSize = sizeOf(section);
+    if (resized) place = settlePlace(section, place);
+    else place = { ...place, box: docBox(section) };
   });
   observer.observe(section, { box: "border-box" });
   return () => {
     window.removeEventListener("scroll", learn);
     window.removeEventListener(MOTION_BEFORE_EVENT, learn);
+    window.removeEventListener(LAYOUT_EVENT, refresh);
     observer.disconnect();
   };
 }

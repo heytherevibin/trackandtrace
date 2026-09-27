@@ -51,7 +51,7 @@ Settled with the user between 2026-09-24 rounds 1–4, A–E, and the v3 approva
   cursor (desktop, motion on), sound off by default (rail clack, departure horn) behind a footer switch.
 - **v3 additions:** the window-seat run through 06–07, Night falls (theme sweep), line side passing at the
   departure, headlight beam at Night, scan reveal, adaptive quality, Data Saver, and the frame meter (a review
-  tool: preview deployments only, §3.J).
+  tool: preview deployments and development only, §3.J; J5-10).
 - **Motion off** (device setting or the footer Motion switch) means still drawings and static layouts.
   Phones get the same journey, lighter.
 - **Copy:** the new words shown in v3 (the drawing chapter's heading and lead, the ten part labels, the
@@ -82,7 +82,7 @@ Top to bottom, as in v3:
 | Masthead (on "/") | ~~The route rail (from 48rem; approved 2026-09-27): a fixed 4rem column down the page's left edge, from the masthead's foot to the window's, with a hairline on its right; the page stands clear of it. Stations DEP, GA, 01–08, END top to bottom on a rail, each a full-width link at least 44px tall (an eleventh of the rail each in a window too short for that, never overlapping); a train glyph runs down the rail nose first as the page scrolls, leaning into speed; odometer KM 000→781 at the column's foot; the current stop is highlighted (no spelled-out station name). Phones: a hairline rail in the masthead's bottom edge.~~ **Removed by the owner, 2026-09-27: nothing of the strip or its rail survives, on desktop or on a phone.** The masthead keeps its own plain 4rem row, nothing added. | Glyph moves, no lean |
 | Hero | Letters of the h1 rise; the plotter draws the masthead rule and the plate's hairlines once per visit; the living dial behind the plate lights segments as digits are typed; after a result, a 24-hour face marks the chart time printed in the record (never computed) with "Chart HH:MM IST · in 3 h 12 min". | Dial and face drawn still |
 | Departure board (new) | "Departures · Platform 3": the page's sections as departures with code, km and status (NEXT, AT PLATFORM, DEPARTED); rows flip in; names link to their sections. | Static board |
-| The drawn train (new, pinned) | A solid steel locomotive; a scan gate sweeps it nose to tail into the line drawing; it turns and comes apart into ten labelled parts (label↔part highlight on fine pointers); side elevation with dimensions; coaches couple, the pantograph rises, the train departs with the camera riding along past masts, a signal gantry and Platform 3's nameboard; ~~the strip glyph takes over~~ (moot: the strip was removed by the owner, 2026-09-27). Night: light-on-dark, steel glow, headlight beam. | The still drawing |
+| The drawn train (new, pinned) | A solid steel locomotive; a scan gate sweeps it nose to tail into the line drawing; it turns and comes apart into ten labelled parts (label↔part highlight on fine pointers); side elevation with dimensions; coaches couple, the pantograph rises, the train departs with the camera riding along past masts, a signal gantry and Platform 3's nameboard, and leaves the frame (J5-1). Night: light-on-dark, steel glow, headlight beam. | The still drawing |
 | 01 Principles | Kicker flips in; rows rise into place (transform only). | Static |
 | 02 How it works (pinned) | Three stops play inside one instrument dial; a request-trace card prints each stop. | Plain section |
 | 03 Record | Coach B1 · 3A berth plan beside the specimen; the sample passenger's berth lights. | Plan drawn still |
@@ -122,11 +122,12 @@ Three layers, loaded in order, so the check never waits for, or depends on, the 
    boundary and a watchdog (15 s) turn a failed journey into the motion-off page — by writing
    `data-journey="failed"`: every moving or pinned state requires `data-journey="on"`, and the reader's Motion
    choice is never changed (J3-1).
-3. **Live drawing (client, on demand).** When the drawing is live, the journey dynamically imports the scene
-   chunk (three.js + scene, ≤ 240 KB compressed). The rig is built a part at a time, yielding between parts
-   (≤ 61 ms per step at 4× CPU slowdown); coaches and bogie frames share geometry; shaders compile in the
-   background (`compileAsync`). One fixed canvas draws each visible stage into its own scissored rectangle, and
-   draws only when a stage is on screen and its progress or position changed.
+3. **Live drawing (client, on demand).** When the drawing is live, or held still only by `place` (then the
+   scene prepares in the background, J5-2), the journey dynamically imports the scene chunk (three.js + scene,
+   ≤ 240 KB compressed). The rig is built a part at a time, yielding between parts (≤ 61 ms per step at 4× CPU
+   slowdown); coaches and bogie frames share geometry; shaders compile in the background (`compileAsync`). One
+   fixed canvas draws each visible stage into its own scissored rectangle, and draws only when a stage is on
+   screen and its progress or position changed.
 
 The plate morph (a result growing out of the plate; ruling J3-13) tweens height imperatively — `animate` on a
 Motion value, not the declarative `animate` prop — between the entry's and the record's measured heights,
@@ -138,8 +139,9 @@ swap.
 
 **State.** A small inline script in the `(site)` root layout's `<head>` writes, before first paint:
 `data-motion` (`on`/`off` from reduced motion and `tt.motion`), `data-saver`, and `data-drawing`
-(`live`/`still`). CSS pins sections only under `html[data-motion="on"]` and draws live only under
-`html[data-drawing="live"]`, so the no-JS default is static. The journey adds `data-journey` and
+(`live`/`still`). CSS pins sections only under `html[data-motion="on"]`, and pins and draws the drawing
+chapter live only under `#anatomy.is-live`, which the journey writes while the live drawing runs, alongside
+`html[data-drawing="live"]` (J5-3), so the no-JS default is static. The journey adds `data-journey` and
 `data-drawing-why`. Events on `window`: `tt:layout`, `tt:theme`, `tt:station`, `tt:depart`, `tt:drawing`,
 `tt:webgl`. One shared registry of scroll observers is refreshed on `tt:layout`. Section entrances are
 checked live against boxes, so jumps and reloads never strand anything. Each one resets when its section
@@ -153,8 +155,8 @@ reduced-motion rules (motion.css) to every traveller page, so the switch means t
 |---|---|
 | Server markup | ~~`route-strip.tsx`~~ (removed by the owner, 2026-09-27), `departure-board.tsx`, `hero-dial.tsx`, `drawing-chapter.tsx`, `chapters-instrument.tsx`, `berth-plan.tsx`, `route-map.tsx`, `window-run.tsx`, `terminus-stage.tsx`, `journey-switches.tsx` |
 | Pure geometry and logic (unit-tested) | `geometry/dial.ts`, `geometry/clock.ts`, `geometry/berths.ts`, `geometry/route.ts`, `geometry/run.ts`, `pose.ts` (anatomy and terminus poses), `governor.ts`, `labels-layout.ts`, ~~`strip-position.ts`~~ (removed by the owner, 2026-09-27), `drawing-mode.ts`, `fit.ts`, `chart-countdown.ts` |
-| Client island | `journey-loader.tsx`, `start-journey.ts`, `observers.ts`, `motion-tokens.ts`, `intro.ts`, ~~`strip.ts`~~ (removed by the owner, 2026-09-27), `board.ts`, `hero.ts`, `chapters.ts`, `berths.ts`, `station-clock.tsx`, `clock.ts`, `route.ts`, `run.ts`, `arrivals.ts`, `cursor.ts`, `sound.ts`, `drawing.ts`, `still.ts`, `theme-sweep.ts` |
-| Scene (three.js) | `scene/engine.ts`, `scene/rig.ts`, `scene/rig-parts.ts`, `scene/lines.ts`, `scene/line-world.ts`, `scene/departure.ts`, `scene/beam.ts`, `scene/scan.ts`, `scene/fit.ts`, `scene/apply-pose.ts`, `scene/palette.ts`, `scene/journey.ts` |
+| Client island | `journey-loader.tsx`, `start-journey.ts`, `observers.ts`, `motion-tokens.ts`, `intro.ts`, ~~`strip.ts`~~ (removed by the owner, 2026-09-27), `board.ts`, `hero.ts`, `chapters.ts`, `berths.ts`, `station-clock.tsx`, `clock.ts`, `route.ts`, `run.ts`, `arrivals.ts`, `cursor.ts`, `sound.ts`, `drawing.ts`, `still.ts`, `theme-sweep.ts`, `live-labels.ts`, `webgl-probe.ts`, `hud.ts`, `hud-gate.ts` |
+| Scene (three.js) | `scene/engine.ts`, `scene/rig.ts`, `scene/rig-parts.ts`, `scene/lines.ts`, `scene/line-world.ts`, `scene/departure.ts`, `scene/beam.ts`, `scene/scan.ts`, `scene/fit.ts`, `scene/apply-pose.ts`, `scene/palette.ts`, `scene/live.ts`, `scene/glow.ts`, `scene/scene-mark.ts` |
 | Build-time | `scripts/bake-train-stills.mjs`, generated `still-manifest.ts` |
 
 ### C. Drawing modes
@@ -169,10 +171,17 @@ The train is drawn **live** unless a reason holds; reasons come and go and the p
 | `quality` | adaptive quality's floor (below) | next session |
 | `load` | the scene chunk failed or took over 20 s | next visit |
 | `fit` | the chapter cannot fit its words even as a list | the next rebuild |
+| `place` | the reader is below the chapter's top when the live drawing would begin | they come back above it |
+
+While `place` is the only reason, the scene still loads and builds, so the switch is immediate (J5-2).
 
 **Still** is the same drawing baked at build time (§3.D): unpinned, fully apart, every label beside it with
 leaders to its part (or listed under it), label↔part highlight kept; the terminus shows the arrived train. A
-still page never downloads three.js. Switching mid-chapter keeps the reader at the chapter's start.
+still page never downloads three.js, except while `place` is the only reason, when the scene prepares in the
+background (J5-2), or when the live chapter's fit check finds the drawing cannot fit its window. That check
+(`live-labels.ts` `layout()`) is a DOM measurement with no three.js, but of the pinned layout, which exists only
+once the live chapter is laid out, after the scene has loaded. Switching mid-chapter keeps the reader at the
+chapter's start.
 
 **Adaptive quality.** A governor watches intervals between frames the drawing actually drew within one scroll
 gesture. p90 over 26 ms for 30 frames steps down (resolution 2× → 1.5× → 1×; Night effects off; coaches 3 →
@@ -197,7 +206,7 @@ A unit test fails when the scene sources change without a re-bake.
 ### E. Scene colours and tokens
 
 No hex in the scene: `scene/palette.ts` reads the theme's tokens at runtime (`--surface-0`, `--ink-1`,
-`--accent`, `--accent-text`, `--line`) with `getComputedStyle`, parses them into three.js colours, and derives
+`--accent`, `--accent-text`; J5-8) with `getComputedStyle`, parses them into three.js colours, and derives
 the scan's steel shades by mixing `--accent` with ink and ground. It re-reads on `tt:theme`. Canvas text (the
 nameboard) uses the heading face from its CSS variable once `document.fonts` has it.
 
@@ -226,7 +235,7 @@ reader's hand.
 |---|---|---|
 | Check interactive | never waits on journey code | holds; a blocked CDN still leaves Run working |
 | Journey chunk | ≤ 70 KB compressed | Anime.js 39 KB (full) + modules |
-| Scene chunk | ≤ 240 KB compressed, live only | three.js ~188 KB (full) + scene |
+| Scene chunk | ≤ 240 KB compressed, live only, except while `place` is the only reason, or when the live chapter's fit check finds the drawing cannot fit its window (§3.C) | three.js ~188 KB (full) + scene |
 | Still drawings | ≤ 60 KB compressed per page | 23 + 34 KB |
 | Longest journey task at load, 4× CPU phone | ≤ 120 ms | scene steps ≤ 61 ms (page total 202 ms incl. first layout) |
 | Scroll, reference desktop | p95 ≤ 12 ms, 0% > 25 ms | p95 9.8 ms, 0% |
@@ -245,8 +254,8 @@ same-origin static SVG without scripts. Web Audio needs no permission or CSP cha
 ### J. Not shipped from the prototype
 
 The Prototype panel (a review tool). The plate re-enactment and captured markup (the app has the real
-components). The CDN import map (the app bundles). The frame meter ships only on preview deployments, behind
-`?journey-hud`; production never renders it.
+components). The CDN import map (the app bundles). The frame meter ships only on preview deployments and in
+development, behind `?journey-hud`; production never renders it.
 
 ## 4. Failure behaviour
 
@@ -291,7 +300,7 @@ components). The CDN import map (the app bundles). The frame meter ships only on
 | J2 | Server instruments: route strip, departure board (without its status column), hero dial, berth plan, station clock, route map, all static, with their copy and container sizes; DESIGN.md's round-instruments rule | The new instruments, drawn still |
 | J3 | Journey island: `animejs` added; loader, observers, arrivals, intro and headline, strip, board, hero dial, chapters (pinned, fit rules), berths, clock, route, cursor, the Sound switch and its clack, plate morph; journey motion tokens; DESIGN.md's motion and hero-entrance rules; the chapters instrument; the departure board's status column | The page moves (except the train and the run) |
 | J4 | Still drawing: `three` added; the rig, poses and fit the bake and the live scene share; bake script, sprite, manifest, drawing chapter and terminus markup with the still; the head script gains `data-saver` and `data-drawing`; GA joins ~~the strip and~~ the board (the strip removed by the owner, 2026-09-27) | The train, drawn still |
-| J5 | Live drawing: engine, anatomy and terminus, scan, departure line side, beam, governor, WebGL loss, the departure horn | The train comes alive |
+| J5 | Live drawing: engine, anatomy and terminus, scan, departure line side, beam, governor, WebGL loss, the departure horn, the frame meter | The train comes alive |
 | J6 | Window-seat run and Night falls; nightly workflow; performance budgets | v3 complete |
 
 Moved while planning J2 (2026-09-25): the chapters instrument and the board's status only exist with
@@ -308,6 +317,15 @@ Decided while planning J4 (2026-09-26):
   J5, their only caller (J4-5; J3-8's pulse moves to J5, then is moot: the strip removed by the owner, 2026-09-27);
 - the parts list is the page's own layout; the journey stands the labels beside the drawing when they fit (J4-7).
 
+Decided while planning J5 (2026-09-27):
+- the rail is gone, so the departure hands over to nothing: the train leaves the frame (J5-1);
+- a seventh reason, `place`, keeps a reader below the chapter on the still until they come back above it (J5-2);
+- one owner, `drawing.ts`, for the live pin's height changes and the reader's place around them (J5-3);
+- the engine lives for the journey and is reused across rebuilds and restores (J5-4);
+- labels while live wipe in and rise, never fade, with their own writers (J5-5);
+- the palette reads four tokens (J5-8);
+- the frame meter ships with J5, for the owner's real-device check (J5-10).
+
 Each PR brings the dependency, copy, tokens and DESIGN.md rules its own code first uses, so nothing lands
 unused, and nothing a traveller can see is inert (a Sound switch with no sound). Each runs `npm run check`
 and the e2e suite, ships behind nothing (every PR leaves the landing whole), and merges only with the user's
@@ -320,7 +338,7 @@ go-ahead. Each PR's plan is written when the one before it merges, from the code
   theme icon turn), as a device's reduced-motion setting already does.~~ **Confirmed 2026-09-24: yes,
   site-wide.** J1 is built on it.
 - Try the result on a real mid-range Android phone before J5 merges (a hidden `?journey-hud` query shows the
-  frame meter on preview deployments only).
+  frame meter on preview deployments and in development only; J5-10).
 - Decide whether the nightly workflow may run on a schedule (it costs CI minutes).
 
 ## 8. Risks

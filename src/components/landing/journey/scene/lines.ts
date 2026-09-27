@@ -22,6 +22,9 @@ export interface LineOpacity {
 /** Day's ink weights. Night's arrive with the live drawing (J5); the still takes its weights from CSS. */
 export const DAY_OPACITY: LineOpacity = { line: 0.8, faint: 0.1, near: 0.42 };
 
+/** Night's ink weights (v3): lighter lines on the dark sheet. The still takes its own from CSS (--still-line). */
+export const NIGHT_OPACITY: LineOpacity = { line: 0.74, faint: 0.13, near: 0.4 };
+
 /** How far a fill is pushed back in depth: the live drawing and the bake must agree. */
 export const FILL_OFFSET = { factor: 1.5, units: 2 } as const;
 
@@ -46,6 +49,17 @@ export function createStyle(palette: Palette, opacity: LineOpacity = DAY_OPACITY
     accent: new LineBasicMaterial({ color: palette.steel, transparent: true, opacity: 1, fog: true }),
     dim: new LineBasicMaterial({ color: palette.steelText, transparent: true, opacity: 0, fog: false, depthTest: false }),
   };
+}
+
+/** Recolours the drawing's shared materials in place: a theme change needs no rebuild (J5). */
+export function restyle(style: LineStyle, palette: Palette, opacity: LineOpacity): void {
+  style.fill.color.copy(palette.ground);
+  for (const [m, o] of [[style.line, opacity.line], [style.faint, opacity.faint], [style.near, opacity.near]] as const) {
+    m.color.copy(palette.ink);
+    m.opacity = o;
+  }
+  style.accent.color.copy(palette.steel);
+  style.dim.color.copy(palette.steelText);
 }
 
 const BASE = "baseMat";
@@ -123,12 +137,12 @@ export function drawHierarchy<T extends Object3D>(root: T, style: LineStyle, opt
     if (o instanceof Mesh) meshes.push(o);
   });
   for (const m of meshes) {
+    const parent = m.parent;
+    if (!parent) throw new Error("drawHierarchy: a mesh has no parent to receive its drawing");
     const d = drawn(m.geometry, style, opts);
     d.position.copy(m.position);
     d.quaternion.copy(m.quaternion);
     d.scale.copy(m.scale);
-    const parent = m.parent;
-    if (!parent) throw new Error("drawHierarchy: a mesh has no parent to receive its drawing — the rig built a detached mesh");
     parent.add(d);
     parent.remove(m);
   }

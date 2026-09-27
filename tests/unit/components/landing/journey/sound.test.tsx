@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { chooseSound } from "@/components/shell/use-sound";
-import { startSound } from "@/components/landing/journey/sound";
+import { DEPART_EVENT } from "@/components/landing/journey/journey-events";
+import { HORN_KEY, startSound } from "@/components/landing/journey/sound";
 
 // The rail clack's audio context follows the Sound switch: off suspends it, so nothing keeps the audio device
 // awake; on (or the next gesture) resumes it.
@@ -70,5 +71,98 @@ describe("the rail clack's audio context", () => {
     expect(made).toHaveLength(1);
     stop();
     expect(ctx.close).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("the departure horn (J5-18)", () => {
+  const real = window.AudioContext;
+  const tones: number[] = [];
+  let failHorn = false;
+  class HornContext extends FakeContext {
+    readonly createOscillator = () => {
+      if (failHorn) throw new Error("no oscillator this time");
+      const o = { ...node(), frequency: { value: 0 }, type: "", start: () => tones.push(o.frequency.value) };
+      return o;
+    };
+  }
+  beforeEach(() => {
+    window.AudioContext = HornContext as unknown as typeof AudioContext;
+    window.sessionStorage.clear();
+    tones.length = 0;
+    failHorn = false;
+  });
+  afterEach(() => {
+    window.AudioContext = real;
+    made.length = 0;
+    failHorn = false;
+    chooseSound(false);
+  });
+
+  it("sounds its two tones once per visit as the train departs, while Sound is on", () => {
+    const stop = startSound();
+    chooseSound(true); // the switch is the reader's own gesture: the audio wakes
+    window.dispatchEvent(new Event(DEPART_EVENT));
+    expect(tones).toEqual([311, 392]);
+    expect(window.sessionStorage.getItem(HORN_KEY)).toBe("1");
+    window.dispatchEvent(new Event(DEPART_EVENT));
+    expect(tones).toEqual([311, 392]);
+    stop();
+  });
+
+  it("stays silent with Sound off, and before any gesture has woken the audio, and remembers nothing then", () => {
+    const stop = startSound();
+    window.dispatchEvent(new Event(DEPART_EVENT));
+    expect(tones).toEqual([]);
+    window.localStorage.setItem("tt.sound", "on"); // a remembered "on", but no gesture yet this visit
+    window.dispatchEvent(new Event(DEPART_EVENT));
+    expect(tones).toEqual([]);
+    expect(window.sessionStorage.getItem(HORN_KEY)).toBeNull();
+    window.localStorage.removeItem("tt.sound");
+    stop();
+  });
+
+  it("stays silent while the audio context is not running, though Sound is on", () => {
+    const stop = startSound();
+    chooseSound(true); // the reader's gesture wakes the context: it starts running
+    const ctx = made[made.length - 1]!;
+    ctx.state = "suspended"; // e.g. suspended again between the wake and this departure
+    window.dispatchEvent(new Event(DEPART_EVENT));
+    expect(tones).toEqual([]);
+    expect(window.sessionStorage.getItem(HORN_KEY)).toBeNull();
+    stop();
+  });
+
+  it("stays silent with Sound off, even when the context is still running", () => {
+    const stop = startSound();
+    chooseSound(true); // wakes the context
+    const ctx = made[made.length - 1]!;
+    chooseSound(false); // Sound off (the switch also suspends the context in production)
+    ctx.state = "running"; // isolate the Sound guard from the context-state guard
+    window.dispatchEvent(new Event(DEPART_EVENT));
+    expect(tones).toEqual([]);
+    expect(window.sessionStorage.getItem(HORN_KEY)).toBeNull();
+    stop();
+  });
+
+  it("does not mark the horn as sounded when it fails to play, and the failure never escapes the listener", () => {
+    const stop = startSound();
+    chooseSound(true); // wakes the context, Sound on
+    failHorn = true; // the horn itself throws when it tries to play
+    // A listener's uncaught throw never rethrows synchronously to dispatchEvent's caller (DOM
+    // spec / jsdom): it surfaces instead as an `error` event on window. Catching one here is
+    // the only way this test can tell a caught failure from an escaped one.
+    const onError = vi.fn((e: Event) => e.preventDefault());
+    window.addEventListener("error", onError);
+    window.dispatchEvent(new Event(DEPART_EVENT));
+    window.removeEventListener("error", onError);
+    expect(onError).not.toHaveBeenCalled();
+    expect(tones).toEqual([]);
+    expect(window.sessionStorage.getItem(HORN_KEY)).toBeNull();
+    failHorn = false;
+    // A later departure this visit may still try again, since nothing was marked.
+    window.dispatchEvent(new Event(DEPART_EVENT));
+    expect(tones).toEqual([311, 392]);
+    expect(window.sessionStorage.getItem(HORN_KEY)).toBe("1");
+    stop();
   });
 });

@@ -28,11 +28,18 @@ export const BAKE_SOURCES = [
   "scripts/bake/trace.ts",
   "scripts/bake/page.ts",
   "scripts/bake/emit.mjs",
+  "scripts/bake-train-stills.mjs",
 ];
 
-/** @param {string} root @param {readonly string[]} [files] */
-export function sourceHash(root, files = BAKE_SOURCES) {
+/** @param {string} root */
+export function threeVersion(root) {
+  return JSON.parse(readFileSync(join(root, "node_modules/three/package.json"), "utf8")).version;
+}
+
+/** @param {string} root @param {readonly string[]} [files] @param {string} [three] */
+export function sourceHash(root, files = BAKE_SOURCES, three = threeVersion(root)) {
   const hash = createHash("sha256");
+  hash.update(`three@${three}\0`);
   for (const file of files) hash.update(`${file}\0${readFileSync(join(root, file), "utf8").replace(/\r\n/g, "\n")}\0`);
   return hash.digest("hex").slice(0, 16);
 }
@@ -49,13 +56,20 @@ export function partsOf(paths) {
 
 const WEIGHT = { line: "var(--still-line,.8)", faint: "var(--still-faint,.14)", near: "var(--still-near,.42)" };
 
+/** @param {string} key */
+function classOf(key) {
+  const [part, cls] = key.split("|");
+  if (!part || cls === undefined || !Object.hasOwn(WEIGHT, cls)) throw new Error(`shapeSvg: "${key}" names no line class (line, faint or near)`);
+  return cls;
+}
+
 /** @param {Record<string, string>} paths keyed "part|class" */
 export function shapeSvg(paths) {
   const groups = partsOf(paths).map((part) => {
     const body = Object.keys(paths)
       .filter((key) => key.split("|")[0] === part)
       .sort()
-      .map((key) => `<path d="${paths[key]}" vector-effect="non-scaling-stroke" style="stroke-opacity:${WEIGHT[key.split("|")[1]]}"/>`)
+      .map((key) => `<path d="${paths[key]}" vector-effect="non-scaling-stroke" style="stroke-opacity:${WEIGHT[classOf(key)]}"/>`)
       .join("");
     return `<g id="${part}" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">${body}</g>`;
   });

@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "../fixtures";
 import { PNR } from "../helpers";
-import { motionOff, waitForJourney } from "./journey-helpers";
+import { frames, motionOff, waitForJourney } from "./journey-helpers";
 
 // Every module's teardown puts the server's markup back (spec §3.B). One generic proof: a page that ran the
 // whole journey with Motion on — the intro, every section scrolled through and back, a check to a result and
@@ -10,7 +10,7 @@ import { motionOff, waitForJourney } from "./journey-helpers";
 // (a drawn stroke's dash, a revert's stale transform, a class) shows up as a difference.
 
 /** Inline style properties the journey's modules write; every other inline style is React's or the browser's. */
-const STYLE = ["transform", "opacity", "left", "top", "height", "stroke-width", "stroke-dasharray", "stroke-dashoffset", "stroke-linecap"] as const;
+const STYLE = ["transform", "opacity", "left", "top", "height", "stroke-width", "stroke-dasharray", "stroke-dashoffset", "stroke-linecap", "clip-path"] as const;
 
 interface Live {
   readonly selector: string;
@@ -118,11 +118,14 @@ test.describe("the journey's teardown", () => {
     // Motion off with the footer's own switch, then back to the top, where the baseline was read.
     await page.getByRole("contentinfo").getByRole("switch", { name: "Motion" }).click();
     await expect(page.locator("html")).toHaveAttribute("data-motion", "off");
-    await page.waitForTimeout(300);
+    await frames(page); // the switch's teardown and still rebuild have had their turn
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
-    await page.waitForTimeout(500);
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+    await frames(page); // the scroll's observers have had theirs
     await expect(page.locator("html")).toHaveAttribute("data-journey", "on");
 
-    expect(await snapshot(page)).toEqual(before);
+    // the rebuilt page settles over a few frames (the still's columns, the board's station), which a busy runner may
+    // take a while to draw: wait for the markup to settle, then it must be the Motion-off page's exactly
+    await expect.poll(() => snapshot(page), { timeout: 15_000 }).toEqual(before);
   });
 });

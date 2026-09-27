@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { keepsPlace, modeOf, startingReasons, whyOf, withReason, type Reasons } from "@/components/landing/journey/drawing-mode";
+import { modeOf, placeAfter, startingReasons, wantsScene, whyOf, withReason, type Reasons } from "@/components/landing/journey/drawing-mode";
 
 const none: Reasons = new Set();
 
@@ -22,16 +22,31 @@ describe("the drawing's mode (spec §3.C)", () => {
   });
 
   it("starts from Motion, Data Saver and this session's quality floor", () => {
-    expect([...startingReasons({ motion: true, saver: false, quality: null })]).toEqual([]);
-    expect(whyOf(startingReasons({ motion: false, saver: true, quality: "still" }))).toBe("motion saver quality");
-    expect(whyOf(startingReasons({ motion: true, saver: false, quality: "2" }))).toBe("");
+    expect([...startingReasons({ motion: true, saver: false, quality: null, place: false })]).toEqual([]);
+    expect(whyOf(startingReasons({ motion: false, saver: true, quality: "still", place: false }))).toBe("motion saver quality");
+    expect(whyOf(startingReasons({ motion: true, saver: false, quality: "2", place: false }))).toBe("");
   });
 
-  it("keeps a reader inside the chapter at its start, only when its height changed", () => {
-    const inside = { top: -300, bottom: 900, height: 1200 };
-    expect(keepsPlace(inside, 1500, 800)).toBe(true);
-    expect(keepsPlace(inside, 1200, 800)).toBe(false);
-    expect(keepsPlace({ top: 0, bottom: 1200, height: 1200 }, 1500, 800)).toBe(false); // at its start already
-    expect(keepsPlace({ top: -1000, bottom: 200, height: 1200 }, 1500, 800)).toBe(false); // leaving it
+  it("names place last, and starts with it when the reader is below the chapter (J5-2)", () => {
+    expect(whyOf(startingReasons({ motion: false, saver: false, quality: null, place: true }))).toBe("motion place");
+  });
+
+  it("wants the scene only when nothing but the reader's place holds the drawing still", () => {
+    expect(wantsScene(new Set())).toBe(true);
+    expect(wantsScene(new Set(["place"]))).toBe(true);
+    expect(wantsScene(new Set(["place", "saver"]))).toBe(false);
+    expect(wantsScene(new Set(["webgl"]))).toBe(false);
+  });
+
+  it("places the reader once the chapter changed height under them (J5-3)", () => {
+    const at = { scrollY: 5000, viewport: 800, masthead: 64 };
+    // the chapter's top is visible: the change lands below the reader
+    expect(placeAfter({ top: 100, bottom: 4260, height: 4160 }, { top: 100, height: 900 }, at)).toBeNull();
+    // inside it: back to its start, under the masthead
+    expect(placeAfter({ top: -2000, bottom: 2160, height: 4160 }, { top: -2000, height: 900 }, at)).toBe(5000 - 2000 - 64);
+    // past it: by exactly the change, so what they read stays put
+    expect(placeAfter({ top: -5000, bottom: -840, height: 4160 }, { top: -5000, height: 900 }, at)).toBe(5000 - 3260);
+    // no change, no move
+    expect(placeAfter({ top: -2000, bottom: 2160, height: 4160 }, { top: -2000, height: 4160.5 }, at)).toBeNull();
   });
 });

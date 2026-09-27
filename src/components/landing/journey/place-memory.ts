@@ -33,7 +33,7 @@ export function parsePlace(raw: string | null): Place | null {
   }
   if (typeof value !== "object" || value === null) return null;
   const { entry, id, offset } = value as Record<string, unknown>;
-  if (typeof entry !== "string" || typeof id !== "string" || !IDS.includes(id)) return null;
+  if (typeof entry !== "string" || entry === "" || typeof id !== "string" || !IDS.includes(id)) return null;
   if (typeof offset !== "number" || !Number.isFinite(offset)) return null;
   return { entry, id, offset };
 }
@@ -55,6 +55,15 @@ function entryKey(): string | null {
   const key: unknown = Reflect.get(entry, "key");
   return typeof key === "string" && key ? key : null;
 }
+
+/** The Navigation API's target, where the browser has one. */
+function navigationTarget(): EventTarget | null {
+  const nav: unknown = Reflect.get(window, "navigation");
+  return nav instanceof EventTarget ? nav : null;
+}
+
+/** The reader's own hand: any of these before the restore means they have moved on, and nothing is restored under them. */
+const HAND = ["wheel", "touchstart", "keydown"] as const;
 
 function mastheadFoot(): number {
   return document.querySelector("header")?.getBoundingClientRect().bottom ?? 0;
@@ -100,27 +109,59 @@ export interface PlaceMemory {
 
 /** Started once per startJourney: reads (and clears) the stored place, then watches where the reader stands. The
  * page's sections are already gone by the time the journey's teardown runs on a client navigation, so the place
- * is sampled as the reader scrolls, and at every click (a link's, before its navigation starts). */
+ * is sampled as the reader scrolls, and as a navigation starts. */
 export function startPlaceMemory(): PlaceMemory {
   const stored = take();
   const here = entryKey();
   let pending = stored && here === stored.entry ? stored : null;
   let last: Place | null = null;
   let frame = 0;
+  let leaving = false;
 
+  const read = () => {
+    last = placeNow() ?? last;
+  };
   const sample = () => {
     frame = 0;
-    last = placeNow() ?? last;
+    if (!leaving) read();
   };
   const onScroll = () => {
     if (!frame) frame = requestAnimationFrame(sample);
   };
   window.addEventListener("scroll", onScroll, { passive: true });
-  document.addEventListener("click", sample, true);
+  // Sampled as a navigation starts (a link, Back or Forward): the sections still stand, and the entry being left is
+  // still the current one (J5-17). Never a reload, and never a replace: a replace overwrites its own entry, so Back can
+  // never return to it, and the router's same-URL replace after a Forward lands with the destination already current
+  // while these sections still stand; sampling it would re-key the place to an entry that is not this page's.
+  // That one sample is the last: until the new page renders, the destination's entry is current while these sections
+  // still stand, so a scroll sampled then would be stamped with the wrong entry. A same-document hash change keeps
+  // this page, so sampling goes on, on the entry it made. A navigation that fails (navigateerror, which fires
+  // whenever its transition's finished promise rejects) leaves the reader here, so sampling resumes.
+  const navigation = navigationTarget();
+  const onNavigate = (event: Event) => {
+    const type: unknown = Reflect.get(event, "navigationType");
+    if (type !== "push" && type !== "traverse") return;
+    read();
+    if (Reflect.get(event, "hashChange") !== true) leaving = true;
+  };
+  const onNavigateError = () => {
+    leaving = false;
+  };
+  navigation?.addEventListener("navigate", onNavigate);
+  navigation?.addEventListener("navigateerror", onNavigateError);
+  const stopHand = () => {
+    for (const type of HAND) window.removeEventListener(type, onHand, true);
+  };
+  const onHand = () => {
+    pending = null;
+    stopHand();
+  };
+  for (const type of HAND) window.addEventListener(type, onHand, { capture: true, passive: true });
   sample();
 
   return {
     restore: () => {
+      stopHand();
       const place = pending;
       pending = null;
       const el = place ? document.getElementById(place.id) : null;
@@ -134,7 +175,9 @@ export function startPlaceMemory(): PlaceMemory {
       if (frame) cancelAnimationFrame(frame);
       frame = 0;
       window.removeEventListener("scroll", onScroll);
-      document.removeEventListener("click", sample, true);
+      navigation?.removeEventListener("navigate", onNavigate);
+      navigation?.removeEventListener("navigateerror", onNavigateError);
+      stopHand();
       if (last) put(last);
     },
   };

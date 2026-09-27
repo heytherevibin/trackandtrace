@@ -191,6 +191,8 @@ html:not([data-motion]) .still-drawing:not(.is-noscript) { display: none; }
 [data-theme="dark"] .still-drawing { --still-line: 0.74; }
 .still-drawing [data-hot] { color: var(--accent); --still-line: 1; --still-faint: 1; --still-near: 1; }
 .callout-lines, .title-block { display: none; }
+/* the live drawing's stage, figures and caption: only while it runs (journey-island.css) */
+.anatomy-stage, .anatomy-caption, .dim-label { display: none; }
 .callouts { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); margin: 0; padding: 0; list-style: none; }
 .anatomy-legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); gap: 2px 14px; margin: 0; padding: 8px 0 0; list-style: none; border-top: 1px solid var(--line); }
 .anatomy-legend li { display: flex; gap: 6px; min-width: 0; font-size: var(--text-xs); line-height: var(--text-xs--line-height); color: var(--ink-2); }

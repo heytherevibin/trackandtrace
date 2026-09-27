@@ -1,10 +1,23 @@
 import { SOUND_EVENT, soundOn, type SoundDetail } from "@/components/shell/use-sound";
+import { DEPART_EVENT } from "./journey-events";
 import { START_PACE, paceStep } from "./sound-pace";
 import type { Teardown } from "./start-journey";
 
 // The rail clack (spec §2, §3.A Footer, §3.G): synthesised, no samples. A quarter-second of decaying noise,
 // made once, is band-passed into two knocks 55ms apart. The audio context is made only by the reader's own
 // gesture: the switch itself, or a first pointer or key press while a remembered choice is on.
+// …and the departure horn (J5): two sawtooth tones, once per visit, as the drawn train pulls away.
+
+/** The horn has sounded this visit (sessionStorage). */
+export const HORN_KEY = "tt.horn";
+
+function hornedThisVisit(): boolean {
+  try {
+    return window.sessionStorage.getItem(HORN_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
 interface Audio {
   readonly ctx: AudioContext;
@@ -54,6 +67,42 @@ export function startSound(): Teardown {
     knock(a, now, level);
     knock(a, now + 0.055, level * 0.8);
   };
+  // v3's horn: two sawtooth tones a minor third apart, low-passed, a 60 ms swell, held to 620 ms, gone by 950.
+  const horn = (a: Audio) => {
+    const now = a.ctx.currentTime;
+    const lowpass = a.ctx.createBiquadFilter();
+    lowpass.type = "lowpass";
+    lowpass.frequency.value = 1700;
+    const gain = a.ctx.createGain();
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.1, now + 0.06);
+    gain.gain.setValueAtTime(0.1, now + 0.62);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.95);
+    lowpass.connect(gain).connect(a.master);
+    for (const f of [311, 392]) {
+      const o = a.ctx.createOscillator();
+      o.type = "sawtooth";
+      o.frequency.value = f;
+      o.connect(lowpass);
+      o.start(now);
+      o.stop(now + 1);
+    }
+  };
+  const onDepart = () => {
+    // Only a context the reader's own gesture made and woke; never one made here (spec §3.G).
+    if (!audio || audio.ctx.state !== "running" || !soundOn() || hornedThisVisit()) return;
+    try {
+      horn(audio);
+    } catch {
+      // A failed play is skipped, not marked: it may sound again on the next departure this visit.
+      return;
+    }
+    try {
+      window.sessionStorage.setItem(HORN_KEY, "1");
+    } catch {
+      // no session storage: it may sound again on the next departure this visit
+    }
+  };
 
   const onScroll = () => {
     const y = window.scrollY;
@@ -82,11 +131,13 @@ export function startSound(): Teardown {
 
   window.addEventListener("scroll", onScroll, { passive: true });
   window.addEventListener(SOUND_EVENT, onChoice);
+  window.addEventListener(DEPART_EVENT, onDepart);
   window.addEventListener("pointerdown", onGesture, { once: true });
   window.addEventListener("keydown", onGesture, { once: true });
   return () => {
     window.removeEventListener("scroll", onScroll);
     window.removeEventListener(SOUND_EVENT, onChoice);
+    window.removeEventListener(DEPART_EVENT, onDepart);
     window.removeEventListener("pointerdown", onGesture);
     window.removeEventListener("keydown", onGesture);
     void audio?.ctx.close().catch(() => undefined);

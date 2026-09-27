@@ -7,7 +7,7 @@ import type { DrawingMode, DrawingReason } from "./drawing-mode";
 export const LAYOUT_EVENT = "tt:layout";
 /** The drawing switched live ⇄ still, or its reasons changed. */
 export const DRAWING_EVENT = "tt:drawing";
-/** The strip reached another station. */
+/** The scroll reached another station (station-progress.ts announces it; the departure board follows). */
 export const STATION_EVENT = "tt:station";
 /** A piece's fit changed (chapters pinned ⇄ static): the whole journey rebuilds around it. */
 export const REBUILD_EVENT = "tt:rebuild";
@@ -17,6 +17,15 @@ export const PLATE_EVENT = "tt:plate";
 export const RUN_EVENT = "tt:run";
 /** A check plate shows a result: its kind, and the record's own chart time when the source sent one. */
 export const RESULT_EVENT = "tt:result";
+/** The live drawing's GPU context: "lost" (draw still) or "restored" (live again). Heard by drawing.ts, never by the
+ * live module, which is torn down while the context is gone (v3's gotcha). */
+export const WEBGL_EVENT = "tt:webgl";
+export type WebglDetail = "lost" | "restored";
+/** The drawn train pulls away (progress 0.88, scrolling down): the horn's cue. */
+export const DEPART_EVENT = "tt:depart";
+/** Redraw the live drawing in the current theme now: the live drawing re-reads its tokens and draws at once. Night
+ * falls (J6) sends it inside its view transition, as journey.redrawNow() (J5-9). */
+export const THEME_EVENT = "tt:theme";
 
 export interface StationDetail {
   readonly index: number;

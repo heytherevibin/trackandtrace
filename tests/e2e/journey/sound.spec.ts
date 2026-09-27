@@ -81,7 +81,8 @@ test.describe("the Sound switch", () => {
       await scrollBy(page, -200);
       await page.waitForTimeout(100);
     }
-    expect((await audio(page)).knocks).toBeGreaterThan(2);
+    // the rail's knocks follow the scroll a frame or more later, which a busy runner may take a while to draw
+    await expect.poll(async () => (await audio(page)).knocks).toBeGreaterThan(2);
   });
 
   test("remembered, yet silent until the reader's own gesture", async ({ page }) => {

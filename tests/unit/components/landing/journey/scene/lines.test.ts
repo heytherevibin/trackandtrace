@@ -1,6 +1,6 @@
 import { BoxGeometry, BufferAttribute, BufferGeometry, Color, Group, LineSegments, Mesh, MeshBasicMaterial } from "three";
 import { describe, expect, it } from "vitest";
-import { baseOf, cloneShared, createStyle, drawHierarchy, drawn, edgesOf, mergeAll, type Palette } from "@/components/landing/journey/scene/lines";
+import { NIGHT_OPACITY, baseOf, cloneShared, createStyle, drawHierarchy, drawn, edgesOf, mergeAll, restyle, type Palette } from "@/components/landing/journey/scene/lines";
 
 const INK = new Color(0, 0, 0);
 const PALETTE: Palette = { ground: INK, ink: INK, steel: INK, steelText: INK };
@@ -69,7 +69,8 @@ describe("the drawing's lines", () => {
     expect(drawing.position.toArray()).toEqual([1, 2, 3]);
     expect(drawing.scale.toArray()).toEqual([2, 2, 2]);
     expect(drawing.quaternion.equals(wantQuaternion)).toBe(true);
-    const [fill, edges] = (drawing as Group).children;
+    if (!(drawing instanceof Group)) throw new Error("the drawing is not a group");
+    const [fill, edges] = drawing.children;
     expect(fill).toBeInstanceOf(Mesh);
     expect(edges).toBeInstanceOf(LineSegments);
   });
@@ -81,5 +82,19 @@ describe("the drawing's lines", () => {
     root.add(detached);
     root.remove(detached); // now parentless, as a bug in a builder might leave one
     expect(() => drawHierarchy(detached, style)).toThrow(/no parent/);
+  });
+
+  it("restyles its materials in place for another palette and weights, so a theme change needs no rebuild", () => {
+    const style = createStyle(PALETTE);
+    const line = style.line;
+    const white = new Color(1, 1, 1);
+    const steel = new Color(0.5, 0.6, 0.7);
+    restyle(style, { ground: white, ink: white, steel, steelText: white }, NIGHT_OPACITY);
+    expect(style.line).toBe(line);
+    expect(style.fill.color.equals(white)).toBe(true);
+    for (const m of [style.line, style.faint, style.near]) expect(m.color.equals(white)).toBe(true);
+    expect([style.line.opacity, style.faint.opacity, style.near.opacity]).toEqual([0.74, 0.13, 0.4]);
+    expect(style.accent.color.equals(steel)).toBe(true);
+    expect(style.dim.color.equals(white)).toBe(true);
   });
 });

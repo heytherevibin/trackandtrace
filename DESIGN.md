@@ -78,11 +78,15 @@ sized in the drawing's own units, so they scale with it; HTML text anywhere stil
 
 **The drawn train.** The landing's drawing chapter (GA) and terminus draw a WAP-7-style locomotive and LHB rake as
 a hairline technical drawing: edges only, hidden lines removed, ink on the sheet in Day and Night, and the lit part
-in steel. The still drawing is baked from the same three.js rig the live drawing (J5) uses
-(`npm run bake:stills`, after any change to the scene); it is one SVG file per shape in `public/journey/`, coloured
-by `currentColor`, fetched only when the page draws still. The drawing is decoration (`aria-hidden`); its ten
-labels are a real list, beside the drawing with leaders on wide screens while the journey runs, and a parts list
-under it everywhere else.
+in steel. Drawn live (three.js, fetched only when the page may draw it), the chapter pins while a scan gate turns the
+steel locomotive into its drawing; it comes apart into its ten labelled parts, shows its dimensions, takes its coaches
+and departs past the line side, and the terminus draws the arrived train. Its colours are the theme's own tokens,
+read again whenever the theme changes. Whenever it may not draw live (Motion off, Data Saver, no WebGL, a device too
+slow, a failed load, words too large to fit, or a reader below the chapter), the page shows the still drawing, baked
+from the same rig (`npm run bake:stills`, after any change to the scene) as one SVG file per shape in
+`public/journey/`, coloured by `currentColor`. The drawing is decoration (`aria-hidden`); its ten labels are a real
+list, beside the drawing with leaders on wide screens while the journey runs, and a parts list under it everywhere
+else. They rise and wipe in; they never fade.
 
 ## Shell
 

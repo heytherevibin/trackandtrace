@@ -1,8 +1,8 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { SHAPES, contentHash, manifestSource, partsOf, shapeSvg, sourceHash } from "../../../scripts/bake/emit.mjs";
+import { BAKE_SOURCES, SHAPES, contentHash, manifestSource, partsOf, shapeSvg, sourceHash } from "../../../scripts/bake/emit.mjs";
 
 const PATHS = { "shell|line": "M0 0l1 0", "shell|faint": "M2 2l0 1", "coach|line": "M5 5l1 1", "world|near": "M9 9l1 0" };
 
@@ -37,14 +37,14 @@ describe("writing a baked shape", () => {
     const root = mkdtempSync(join(tmpdir(), "bake-"));
     writeFileSync(join(root, "a.ts"), "one");
     writeFileSync(join(root, "b.ts"), "two");
-    const before = sourceHash(root, ["a.ts", "b.ts"]);
+    const before = sourceHash(root, ["a.ts", "b.ts"], "0.186.0");
     expect(before).toMatch(/^[0-9a-f]{16}$/);
     writeFileSync(join(root, "b.ts"), "two\r\n");
-    const crlf = sourceHash(root, ["a.ts", "b.ts"]);
+    const crlf = sourceHash(root, ["a.ts", "b.ts"], "0.186.0");
     writeFileSync(join(root, "b.ts"), "two\n");
-    expect(sourceHash(root, ["a.ts", "b.ts"])).toBe(crlf); // line endings never ask for a re-bake
+    expect(sourceHash(root, ["a.ts", "b.ts"], "0.186.0")).toBe(crlf); // line endings never ask for a re-bake
     writeFileSync(join(root, "b.ts"), "three");
-    expect(sourceHash(root, ["a.ts", "b.ts"])).not.toBe(before);
+    expect(sourceHash(root, ["a.ts", "b.ts"], "0.186.0")).not.toBe(before);
   });
 
   it("writes still-manifest.ts as typed, generated data", () => {
@@ -53,5 +53,22 @@ describe("writing a baked shape", () => {
     expect(text).toContain('import type { StillManifest } from "./still-shapes";');
     expect(text).toContain("as const satisfies StillManifest;");
     expect(text).toContain('"href": "/journey/anatomy-wide.0123456789.svg"');
+  });
+
+  it("hashes three's version too, and counts the bake's own driver among its sources", () => {
+    expect(BAKE_SOURCES).toContain("scripts/bake-train-stills.mjs");
+    const root = mkdtempSync(join(tmpdir(), "bake-"));
+    writeFileSync(join(root, "a.ts"), "one");
+    mkdirSync(join(root, "node_modules/three"), { recursive: true });
+    writeFileSync(join(root, "node_modules/three/package.json"), JSON.stringify({ version: "0.186.0" }));
+    const before = sourceHash(root, ["a.ts"]);
+    expect(before).toBe(sourceHash(root, ["a.ts"], "0.186.0"));
+    writeFileSync(join(root, "node_modules/three/package.json"), JSON.stringify({ version: "0.187.0" }));
+    expect(sourceHash(root, ["a.ts"])).not.toBe(before);
+  });
+
+  it("refuses a path keyed with no known line class", () => {
+    expect(() => shapeSvg({ "shell|bold": "M0 0l1 0" })).toThrow(/line class/);
+    expect(() => shapeSvg({ shell: "M0 0l1 0" })).toThrow(/line class/);
   });
 });

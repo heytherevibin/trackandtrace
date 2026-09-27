@@ -2,7 +2,7 @@
 import type { StillManifest } from "./still-shapes";
 
 export const STILL_MANIFEST = {
-  "sourceHash": "2243477d612dd911",
+  "sourceHash": "22819ad7c64465d3",
   "shapes": {
     "anatomyWide": {
       "href": "/journey/anatomy-wide.f3d026ef40.svg",

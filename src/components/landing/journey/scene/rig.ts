@@ -1,3 +1,8 @@
+// The drawn train: a WAP-7-style locomotive split into parts that can separate (an exploded view), and
+// LHB coaches that couple up behind it. Built as a sequence of steps, one part each, so the page can build
+// it a slice at a time between frames (J5's buildRigAsync) and never hold the main thread for long. Identical
+// pieces — the coaches, the two bogie frames, every wheel — are built once and share their geometry.
+// Ported from prototype v3's scene/rig.js (263 lines).
 import { BufferGeometry, Float32BufferAttribute, Group, LineSegments, Mesh, Vector3, type Object3D } from "three";
 import { box, cyl, mesh } from "./util";
 import { baseOf, cloneShared, drawHierarchy, type LineStyle } from "./lines";
@@ -12,6 +17,7 @@ import {
   cabNose,
   coachSteps,
   drawnPart,
+  drawnPartSteps,
   extrudeSection,
   featureLines,
   pantograph,
@@ -20,13 +26,7 @@ import {
   type WheelInstance,
   type WheelReg,
 } from "./rig-parts";
-import type { PartId } from "../train-parts";
-
-// The drawn train: a WAP-7-style locomotive split into parts that can separate (an exploded view), and
-// LHB coaches that couple up behind it. Built as a sequence of steps, one part each, so the page can build
-// it a slice at a time between frames (J5's buildRigAsync) and never hold the main thread for long. Identical
-// pieces — the coaches, the two bogie frames, every wheel — are built once and share their geometry.
-// Ported from prototype v3's scene/rig.js (263 lines).
+import { CALLOUT_PARTS, type PartId } from "@/components/landing/journey/train-parts";
 
 export type RigPartId = PartId | "tanks";
 
@@ -39,11 +39,29 @@ export interface RigPart {
   readonly delay: number;
 }
 
+/** The rig's eleven parts: the ten the labels name, and the tanks. */
+export const RIG_PARTS: readonly RigPartId[] = [...CALLOUT_PARTS, "tanks"];
+
+export function isRigPart(v: string): v is RigPartId {
+  return RIG_PARTS.some((id) => id === v);
+}
+
+/** The parts record, checked whole: a builder that forgot a part fails here, not as an undefined later. */
+export function allParts(parts: Partial<Record<RigPartId, RigPart>>): Record<RigPartId, RigPart> {
+  const missing = RIG_PARTS.filter((id) => !parts[id]);
+  if (missing.length) throw new Error(`rig: missing ${missing.join(", ")}`);
+  return Object.fromEntries(RIG_PARTS.map((id) => [id, parts[id]])) as Record<RigPartId, RigPart>;
+}
+
 /** The v3 general-arrangement dimension anchors: overall length (below the rails), height (ahead of the nose). */
 export type DimAnchorId = "length" | "height";
 
 export interface Rig {
   readonly group: Group;
+  /** The locomotive's own group (every part hangs on it): the scan reads its fills (J5). */
+  readonly loco: Group;
+  /** The trailing pantograph's collector head: the Night glow hangs on it (J5). */
+  readonly pantoHead: Group;
   readonly parts: Readonly<Record<RigPartId, RigPart>>;
   readonly coaches: readonly { readonly obj: Object3D; readonly baseX: number }[];
   /** 0 = assembled, 1 = fully apart; each part leaves a little after the one before. */
@@ -102,7 +120,8 @@ export function* rigSteps(style: LineStyle, opts: { readonly coaches?: number },
   };
 
   const prof = bodyProfile({ hw: hw - 0.05, bottom: LOCO.bottom + 0.05, eave: LOCO.eave, crown: LOCO.crown - 0.05, eaveW: 0.26 });
-  const shell = drawnPart((g) => {
+  const body: { part?: Group } = {};
+  yield* drawnPartSteps((g) => {
     g.add(mesh(extrudeSection(prof.pts, bodyHalf * 2, 0.1), M.x));
     for (const s of [-1, 1]) {
       const z = s * (hw + 0.004);
@@ -116,7 +135,9 @@ export function* rigSteps(style: LineStyle, opts: { readonly coaches?: number },
       box(g, M.x, 0.6, 0.42, 0.03, -6.9, 2.95, s * (hw + 0.02), 0.02);
       box(g, M.x, bodyHalf * 2 + 1.2, 0.26, 0.08, 0, 1.12, s * (hw - 0.02));
     }
-  }, style);
+  }, style, body);
+  const shell = body.part;
+  if (!shell) throw new Error("rig: the locomotive's shell finished without a part");
   shell.add(featureLines(prof, bodyHalf * 2, style));
   part("shell", shell, [0, 0.9, 0], [2.9, 2.95, hw + 0.03]);
   yield;
@@ -234,9 +255,11 @@ export function* rigSteps(style: LineStyle, opts: { readonly coaches?: number },
   }
 
   const tmp = new Vector3();
-  const rigParts = parts as Record<RigPartId, RigPart>;
+  const rigParts = allParts(parts);
   out.rig = {
     group,
+    loco,
+    pantoHead: pantos[1].head,
     parts: rigParts,
     coaches: coachList,
     setExplode(t: number): void {
@@ -299,9 +322,9 @@ export function* rigSteps(style: LineStyle, opts: { readonly coaches?: number },
 /** Build the whole rig at once (the bake step, tests). */
 export function buildRig(style: LineStyle, opts: { readonly coaches?: number } = {}): Rig {
   const out: { rig?: Rig } = {};
-  for (const _step of rigSteps(style, opts, out)) {
-    // Draining the generator builds the whole rig in one go.
-  }
+  const steps = rigSteps(style, opts, out);
+  let done = false;
+  while (!done) done = steps.next().done === true;
   if (!out.rig) throw new Error("rig: buildRig finished without producing a rig");
   return out.rig;
 }

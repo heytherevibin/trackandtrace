@@ -2,13 +2,14 @@ import type { Page } from "@playwright/test";
 
 // The landing journey's shared collision checker (spec 2026-09-24 §5), prototype v3's in-page gate cut down to
 // its general part. It measures what a person sees. Each line of text counts as its line-height band (tight
-// display leading is not a collision), cut by any ancestor that clips it, below the sticky masthead and inside
-// the window. Every box outside the masthead is also cut to the masthead's own bottom edge, so a line or panel
-// the masthead paints over never counts as colliding with what nobody can see it touch. An overlay actually
-// painted above the masthead (a sheet, dialog or popover) is cut at the same edge regardless — the checker
-// only knows it isn't inside <header>, not that it is drawn on top. "Panels" are boxes that must never cover
-// text outside themselves, nor each other. Findings name both parties. The journey's own checks (leader lines,
-// the drawing's box, the dial ring) join this file in the PRs that draw those pieces.
+// display leading is not a collision), cut by any ancestor that clips it (overflow, or an inset() clip-path such as
+// a label wiping in), below the sticky masthead and inside the window. Every box outside the masthead is also cut
+// to the masthead's own bottom edge, so a line or panel the masthead paints over never counts as colliding with
+// what nobody can see it touch. An overlay actually painted above the masthead (a sheet, dialog or popover) is cut
+// at the same edge regardless — the checker only knows it isn't inside <header>, not that it is drawn on top.
+// "Panels" are boxes that must never cover text outside themselves, nor each other. Findings name both parties.
+// The journey's own checks (leader lines, the drawing's box, the dial ring) join this file in the PRs that draw
+// those pieces.
 
 export interface CollisionOptions {
   /** Boxes that must never cover text outside themselves, nor each other. */
@@ -58,12 +59,27 @@ export async function collisionsInView(page: Page, options: CollisionOptions = {
         }
         return el;
       };
-      /** What the ancestors that clip (a scroller, an ellipsis) leave visible. */
+      /** An inset() clip-path's cut of a box (a label wiping in, J5-5), or null for any other clip. */
+      const insetOf = (value: string, box: DOMRect): Box | null => {
+        const args = /^inset\((.*)\)$/.exec(value.trim())?.[1]?.split(/\s+round\s+/)[0]?.trim().split(/\s+/);
+        if (!args?.length) return null;
+        const [t = "0", r = t, b = t, l = r] = args;
+        const len = (v: string, of: number) => (v.endsWith("%") ? (Number.parseFloat(v) / 100) * of : Number.parseFloat(v) || 0);
+        return { left: box.left + len(l, box.width), right: box.right - len(r, box.width), top: box.top + len(t, box.height), bottom: box.bottom - len(b, box.height) };
+      };
+      /** What the ancestors that clip (a scroller, an ellipsis, an inset clip-path) leave visible. */
       const clipOf = (el: Element): Box => {
         const clip: Box = { left: -Infinity, top: -Infinity, right: Infinity, bottom: Infinity };
         for (let node: Element | null = el; node && node !== document.body; node = node.parentElement) {
           const style = getComputedStyle(node);
           const box = node.getBoundingClientRect();
+          const inset = insetOf(style.clipPath, box);
+          if (inset) {
+            clip.left = Math.max(clip.left, inset.left);
+            clip.right = Math.min(clip.right, inset.right);
+            clip.top = Math.max(clip.top, inset.top);
+            clip.bottom = Math.min(clip.bottom, inset.bottom);
+          }
           if (style.overflowX !== "visible") {
             clip.left = Math.max(clip.left, box.left);
             clip.right = Math.min(clip.right, box.right);

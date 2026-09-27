@@ -1,7 +1,9 @@
-import { Box3, Color, Group, LineSegments, Vector3 } from "three";
+import { Box3, Color, Group, LineSegments, Mesh, Object3D, Vector3 } from "three";
 import { describe, expect, it } from "vitest";
-import { buildRig, rigSteps, type Rig } from "@/components/landing/journey/scene/rig";
+import { RIG_PARTS, allParts, buildRig, rigSteps, type Rig } from "@/components/landing/journey/scene/rig";
 import { baseOf, createStyle, edgesOf, type LineStyle } from "@/components/landing/journey/scene/lines";
+import { coachSteps, drawnPart, drawnPartSteps } from "@/components/landing/journey/scene/rig-parts";
+import { box } from "@/components/landing/journey/scene/util";
 import { CALLOUT_PARTS } from "@/components/landing/journey/train-parts";
 
 const INK = new Color(0, 0, 0);
@@ -13,6 +15,20 @@ const offset = (id: keyof Rig["parts"]) => rig.parts[id].obj.position.clone().su
 describe("the drawn train's rig", () => {
   it("has the ten labelled parts, and the tanks", () => {
     expect(Object.keys(rig.parts).sort()).toEqual([...CALLOUT_PARTS, "tanks"].sort());
+  });
+
+  it("exposes the locomotive and the trailing pantograph's head, for the scan and the glow (J5)", () => {
+    expect(rig.loco.parent).toBe(rig.group);
+    for (const id of RIG_PARTS) expect(rig.parts[id].obj.parent).toBe(rig.loco);
+    const chain: Object3D[] = [];
+    for (let o: Object3D | null = rig.pantoHead; o; o = o.parent) chain.push(o);
+    expect(chain).toContain(rig.parts.pantoRear.obj);
+  });
+
+  it("refuses a rig missing any of its eleven parts", () => {
+    const ten = Object.fromEntries(Object.entries(rig.parts).filter(([id]) => id !== "tanks"));
+    expect(() => allParts(ten)).toThrow(/tanks/);
+    expect(Object.keys(allParts(rig.parts)).sort()).toEqual([...RIG_PARTS].sort());
   });
 
   it("takes each part apart along its own line, the roof a little after the shell", () => {
@@ -90,6 +106,28 @@ describe("the drawn train's rig", () => {
     }
     expect(steps).toBeGreaterThanOrEqual(9);
     expect(out.rig?.coaches).toHaveLength(1);
+  });
+
+  it("yields between each shell's merged fill and its edges, the two costliest steps split (spec §3.H: ≤ 61 ms each)", () => {
+    // before the split: 10 steps for a one-coach rig (and 1 in the coach's own); the loco's shell and the coach's body
+    // each gain one
+    expect([...rigSteps(style, { coaches: 1 }, {})]).toHaveLength(12);
+    expect([...coachSteps(style, [], {})]).toHaveLength(2);
+  });
+
+  it("draws a part a step at a time exactly as at once: the fill merged first, then after a yield its edges", () => {
+    const build = (g: Group) => {
+      box(g, style.fill, 1, 2, 3, 0.5, 0, 0);
+      box(g, style.fill, 2, 1, 1, -1, 1, 0);
+    };
+    const whole = drawnPart(build, style, { threshold: 22 });
+    const out: { part?: Group } = {};
+    const steps = drawnPartSteps(build, style, out, { threshold: 22 });
+    expect(steps.next().done).toBe(false);
+    expect(out.part).toBeUndefined();
+    expect(steps.next().done).toBe(true);
+    const positions = (g: Group | undefined) => (g?.children ?? []).map((c) => (c instanceof Mesh || c instanceof LineSegments ? [...c.geometry.getAttribute("position").array] : []));
+    expect(positions(out.part)).toEqual(positions(whole));
   });
 
   it("draws only hairlines over fills", () => {
