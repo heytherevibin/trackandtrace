@@ -310,10 +310,16 @@ test.describe("the Audit log", () => {
     const admin = ownerIdentity(email).name;
     const them = await inviteAndSignIn(page, email, "Admin", "Second pair of eyes on the console.");
     try {
-      // The rail an Admin gets. Configure is 13 Team's group and Team is Owner-only, so its absence
-      // is the access map holding rather than a missing link.
+      // The rail an Admin gets. Configure holds two built modules — 11 Switches & settings
+      // (Owner+Admin) and 13 Team (Owner-only) — so for an Admin the GROUP is present and Team is
+      // not in it. That is the access map holding, stated on the link rather than on the group:
+      // until 11 shipped on 2026-09-27 the group was absent entirely, and asserting its absence
+      // was the same claim by accident. It stopped being the same claim the moment a second module
+      // joined the group, which is what this assertion now says out loud.
       const rail = them.getByRole("navigation", { name: "Console" });
-      await expect(rail.getByText("Configure"), "13 Team is not an Admin's").toHaveCount(0);
+      await expect(rail.getByText("Configure"), "11 Switches is an Admin's, so the group renders").toHaveCount(1);
+      await expect(rail.getByRole("link", { name: /Team/ }), "13 Team is not an Admin's").toHaveCount(0);
+      await expect(rail.getByRole("link", { name: /Switches/ })).toHaveAttribute("href", "/settings");
       await rail.getByRole("link", { name: /Audit log/ }).click();
       await expect(them.getByRole("heading", { level: 1, name: "Audit log" })).toBeVisible();
       // The Owner's own history, read by somebody else: the invite that created this Admin is in it.
