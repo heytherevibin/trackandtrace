@@ -148,7 +148,14 @@ describe("the departure horn (J5-18)", () => {
     const stop = startSound();
     chooseSound(true); // wakes the context, Sound on
     failHorn = true; // the horn itself throws when it tries to play
-    expect(() => window.dispatchEvent(new Event(DEPART_EVENT))).not.toThrow();
+    // A listener's uncaught throw never rethrows synchronously to dispatchEvent's caller (DOM
+    // spec / jsdom): it surfaces instead as an `error` event on window. Catching one here is
+    // the only way this test can tell a caught failure from an escaped one.
+    const onError = vi.fn((e: Event) => e.preventDefault());
+    window.addEventListener("error", onError);
+    window.dispatchEvent(new Event(DEPART_EVENT));
+    window.removeEventListener("error", onError);
+    expect(onError).not.toHaveBeenCalled();
     expect(tones).toEqual([]);
     expect(window.sessionStorage.getItem(HORN_KEY)).toBeNull();
     failHorn = false;
