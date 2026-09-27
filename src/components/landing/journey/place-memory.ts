@@ -116,10 +116,14 @@ export function startPlaceMemory(): PlaceMemory {
   let pending = stored && here === stored.entry ? stored : null;
   let last: Place | null = null;
   let frame = 0;
+  let leaving = false;
 
+  const read = () => {
+    last = placeNow() ?? last;
+  };
   const sample = () => {
     frame = 0;
-    last = placeNow() ?? last;
+    if (!leaving) read();
   };
   const onScroll = () => {
     if (!frame) frame = requestAnimationFrame(sample);
@@ -129,12 +133,22 @@ export function startPlaceMemory(): PlaceMemory {
   // still the current one (J5-17). Never a reload, and never a replace: a replace overwrites its own entry, so Back can
   // never return to it, and the router's same-URL replace after a Forward lands with the destination already current
   // while these sections still stand; sampling it would re-key the place to an entry that is not this page's.
+  // That one sample is the last: until the new page renders, the destination's entry is current while these sections
+  // still stand, so a scroll sampled then would be stamped with the wrong entry. A same-document hash change keeps
+  // this page, so sampling goes on, on the entry it made. A navigation that fails (navigateerror, which fires
+  // whenever its transition's finished promise rejects) leaves the reader here, so sampling resumes.
   const navigation = navigationTarget();
   const onNavigate = (event: Event) => {
     const type: unknown = Reflect.get(event, "navigationType");
-    if (type === "push" || type === "traverse") sample();
+    if (type !== "push" && type !== "traverse") return;
+    read();
+    if (Reflect.get(event, "hashChange") !== true) leaving = true;
+  };
+  const onNavigateError = () => {
+    leaving = false;
   };
   navigation?.addEventListener("navigate", onNavigate);
+  navigation?.addEventListener("navigateerror", onNavigateError);
   const stopHand = () => {
     for (const type of HAND) window.removeEventListener(type, onHand, true);
   };
@@ -162,6 +176,7 @@ export function startPlaceMemory(): PlaceMemory {
       frame = 0;
       window.removeEventListener("scroll", onScroll);
       navigation?.removeEventListener("navigate", onNavigate);
+      navigation?.removeEventListener("navigateerror", onNavigateError);
       stopHand();
       if (last) put(last);
     },

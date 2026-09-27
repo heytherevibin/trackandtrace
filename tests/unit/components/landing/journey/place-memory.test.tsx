@@ -150,6 +150,44 @@ describe("startPlaceMemory", () => {
     expect(parsePlace(window.sessionStorage.getItem(PLACE_KEY))).toEqual({ entry: "k1", id: "record", offset: -24 });
   });
 
+  it("a scroll while a traverse is leaving never re-keys the place", () => {
+    // Back or Forward: the destination's entry is current before the new page renders, while this page's sections
+    // still stand; a scroll sampled in that window would store this page's place under that entry.
+    const memory = startPlaceMemory();
+    scrollY = 3000 - 40;
+    nav.dispatchEvent(Object.assign(new Event("navigate"), { navigationType: "traverse" }));
+    nav.currentEntry = { key: "k2" };
+    scrollY = 2000 - 40;
+    window.dispatchEvent(new Event("scroll"));
+    vi.advanceTimersToNextFrame();
+    memory.stop();
+    expect(parsePlace(window.sessionStorage.getItem(PLACE_KEY))).toEqual({ entry: "k1", id: "record", offset: -24 });
+  });
+
+  it("samples again once the navigation it was leaving for fails", () => {
+    const memory = startPlaceMemory();
+    scrollY = 3000 - 40;
+    nav.dispatchEvent(Object.assign(new Event("navigate"), { navigationType: "push" }));
+    nav.dispatchEvent(new Event("navigateerror"));
+    scrollY = 2000 - 40;
+    window.dispatchEvent(new Event("scroll"));
+    vi.advanceTimersToNextFrame();
+    memory.stop();
+    expect(parsePlace(window.sessionStorage.getItem(PLACE_KEY))).toEqual({ entry: "k1", id: "how", offset: -24 });
+  });
+
+  it("keeps sampling after a same-document hash change, on the entry it made", () => {
+    const memory = startPlaceMemory();
+    scrollY = 3000 - 40;
+    nav.dispatchEvent(Object.assign(new Event("navigate"), { navigationType: "push", hashChange: true }));
+    nav.currentEntry = { key: "k2" };
+    scrollY = 2000 - 40;
+    window.dispatchEvent(new Event("scroll"));
+    vi.advanceTimersToNextFrame();
+    memory.stop();
+    expect(parsePlace(window.sessionStorage.getItem(PLACE_KEY))).toEqual({ entry: "k2", id: "how", offset: -24 });
+  });
+
   it("restores nothing once the reader has scrolled by their own hand", () => {
     store({ entry: "k1", id: "record", offset: 136 });
     const memory = startPlaceMemory();
@@ -164,7 +202,7 @@ describe("startPlaceMemory", () => {
     const removeNav = vi.spyOn(nav, "removeEventListener");
     startPlaceMemory().stop();
     expect(removeWindow.mock.calls.map((c) => c[0])).toContain("scroll");
-    expect(removeNav.mock.calls.map((c) => c[0])).toContain("navigate");
+    expect(removeNav.mock.calls.map((c) => c[0])).toEqual(expect.arrayContaining(["navigate", "navigateerror"]));
   });
 
   it("survives storage that throws", () => {
