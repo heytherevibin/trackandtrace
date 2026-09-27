@@ -102,6 +102,39 @@ export function weightsFor(night: boolean): LineOpacity {
   return night ? NIGHT_OPACITY : DAY_OPACITY;
 }
 
+/** Hears a canvas's WebGL context drop and return. On a drop it asks for the context back (preventDefault).
+ * Returns the function that stops listening. */
+export function watchContext(canvas: EventTarget, onChange: (state: WebglDetail) => void): () => void {
+  const onLost = (event: Event) => {
+    event.preventDefault();
+    onChange("lost");
+  };
+  const onRestored = () => onChange("restored");
+  canvas.addEventListener("webglcontextlost", onLost);
+  canvas.addEventListener("webglcontextrestored", onRestored);
+  return () => {
+    canvas.removeEventListener("webglcontextlost", onLost);
+    canvas.removeEventListener("webglcontextrestored", onRestored);
+  };
+}
+
+/** Waits for the shaders' compile, or for the context to drop, whichever comes first, and never throws. On a lost
+ * context three's compileAsync polls forever (a lost program's status reads null, never ready), so waiting on it
+ * alone would leave the engine unbuilt, never kept and never disposed. Skips the compile when the context is gone. */
+export async function compileUnlessLost(compile: () => Promise<unknown>, canvas: EventTarget, isLost: () => boolean): Promise<void> {
+  if (isLost()) return;
+  const stop = new AbortController();
+  const dropped = new Promise<void>((resolve) => canvas.addEventListener("webglcontextlost", () => resolve(), { once: true, signal: stop.signal }));
+  const compiled = (async () => {
+    await compile();
+  })().catch(() => undefined); // no parallel compile: the shaders compile on the first draw instead
+  try {
+    await Promise.race([compiled, dropped]);
+  } finally {
+    stop.abort();
+  }
+}
+
 export interface EngineOptions {
   readonly palette: ScenePalette;
   readonly coaches: number;
@@ -154,19 +187,15 @@ export async function createEngine(canvas: HTMLCanvasElement, options: EngineOpt
   let level = 0;
   let night = options.palette.night;
   let lost = false;
+  let built = false;
 
-  const onLost = (event: Event) => {
-    event.preventDefault(); // ask for the context back
-    lost = true;
-    emit<WebglDetail>(WEBGL_EVENT, "lost");
-  };
-  const onRestored = () => {
-    lost = false;
-    size = { w: 0, h: 0 };
-    emit<WebglDetail>(WEBGL_EVENT, "restored");
-  };
-  canvas.addEventListener("webglcontextlost", onLost);
-  canvas.addEventListener("webglcontextrestored", onRestored);
+  // A drop while the engine is still being built is reported once it is built (below), when there is an engine to
+  // settle on the still and to dispose.
+  const stopWatching = watchContext(canvas, (state) => {
+    lost = state === "lost";
+    if (!lost) size = { w: 0, h: 0 };
+    if (built) emit<WebglDetail>(WEBGL_EVENT, state);
+  });
   renderer.setPixelRatio(dprFor(level, window.devicePixelRatio));
 
   const resize = () => {
@@ -226,9 +255,7 @@ export async function createEngine(canvas: HTMLCanvasElement, options: EngineOpt
       parts.scan.set(0.5);
       parts.beam.set(true, 1);
       departure.group.visible = true;
-      await renderer.compileAsync(scene, camera);
-    } catch {
-      // no parallel compile: the shaders compile on the first draw instead
+      await compileUnlessLost(() => renderer.compileAsync(scene, camera), canvas, () => lost || renderer.getContext().isContextLost());
     } finally {
       parts.scan.set(1);
       parts.beam.set(false, 0);
@@ -237,6 +264,9 @@ export async function createEngine(canvas: HTMLCanvasElement, options: EngineOpt
   };
   await pause();
   await warm();
+  lost ||= renderer.getContext().isContextLost();
+  built = true;
+  if (lost) emit<WebglDetail>(WEBGL_EVENT, "lost");
 
   return {
     world,
@@ -283,11 +313,10 @@ export async function createEngine(canvas: HTMLCanvasElement, options: EngineOpt
       return inked / (w * h);
     },
     dispose: () => {
-      canvas.removeEventListener("webglcontextlost", onLost);
-      canvas.removeEventListener("webglcontextrestored", onRestored);
+      stopWatching();
       views.clear();
       renderer.dispose();
-      renderer.forceContextLoss(); // the element itself is scene/live.ts's to remove
+      if (!lost) renderer.forceContextLoss(); // the element itself is scene/live.ts's to remove
     },
   };
 }

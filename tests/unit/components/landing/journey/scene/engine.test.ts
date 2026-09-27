@@ -1,9 +1,9 @@
 import { Color, Mesh, PerspectiveCamera, Texture } from "three";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { anatomyPose } from "@/components/landing/journey/pose";
 import { createBeam } from "@/components/landing/journey/scene/beam";
 import { buildDeparture } from "@/components/landing/journey/scene/departure";
-import { QUALITY, applyLive, dprFor, pickables, qualityAt, toLinePalette, viewport, weightsFor } from "@/components/landing/journey/scene/engine";
+import { QUALITY, applyLive, compileUnlessLost, dprFor, pickables, qualityAt, toLinePalette, viewport, watchContext, weightsFor } from "@/components/landing/journey/scene/engine";
 import { createGlow } from "@/components/landing/journey/scene/glow";
 import { NIGHT_OPACITY } from "@/components/landing/journey/scene/lines";
 import { createScan } from "@/components/landing/journey/scene/scan";
@@ -63,5 +63,47 @@ describe("the engine's pure pieces (spec §3.B–C; v3's engine.js)", () => {
     const p = toLinePalette({ night: true, ground: { r: 0, g: 0, b: 0 }, ink: { r: 1, g: 1, b: 1 }, steel: { r: 1, g: 0, b: 0 }, steelText: { r: 0, g: 0, b: 1 }, scanDark: { r: 0, g: 0, b: 0 }, scanLight: { r: 0, g: 0, b: 0 } });
     expect(p.ink.equals(new Color(1, 1, 1))).toBe(true);
     expect(weightsFor(true)).toBe(NIGHT_OPACITY);
+  });
+});
+
+describe("the engine and a lost GPU (spec §4: every failure settles on the still, never hangs)", () => {
+  const lostEvent = () => new Event("webglcontextlost", { cancelable: true });
+
+  it("asks for the context back on a loss, reports the loss and the return, and hears nothing once removed", () => {
+    const canvas = new EventTarget();
+    const heard: string[] = [];
+    const stop = watchContext(canvas, (state) => heard.push(state));
+    const lost = lostEvent();
+    canvas.dispatchEvent(lost);
+    expect(lost.defaultPrevented).toBe(true);
+    canvas.dispatchEvent(new Event("webglcontextrestored"));
+    expect(heard).toEqual(["lost", "restored"]);
+    stop();
+    const after = lostEvent();
+    canvas.dispatchEvent(after);
+    canvas.dispatchEvent(new Event("webglcontextrestored"));
+    expect(heard).toEqual(["lost", "restored"]);
+    expect(after.defaultPrevented).toBe(false);
+  });
+
+  it("stops waiting on the shaders when the context drops mid-compile (a lost program never reports ready)", async () => {
+    const canvas = new EventTarget();
+    const warming = compileUnlessLost(() => new Promise<never>(() => undefined), canvas, () => false);
+    canvas.dispatchEvent(lostEvent());
+    await expect(warming).resolves.toBeUndefined();
+  });
+
+  it("settles when the compile finishes or fails, and skips it when the context is already gone", async () => {
+    const canvas = new EventTarget();
+    await expect(compileUnlessLost(() => Promise.resolve("scene"), canvas, () => false)).resolves.toBeUndefined();
+    await expect(compileUnlessLost(() => Promise.reject(new Error("no parallel compile")), canvas, () => false)).resolves.toBeUndefined();
+    await expect(
+      compileUnlessLost(() => {
+        throw new Error("thrown before a promise");
+      }, canvas, () => false),
+    ).resolves.toBeUndefined();
+    const compile = vi.fn(() => new Promise<never>(() => undefined));
+    await expect(compileUnlessLost(compile, canvas, () => true)).resolves.toBeUndefined();
+    expect(compile).not.toHaveBeenCalled();
   });
 });
