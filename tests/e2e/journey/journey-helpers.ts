@@ -4,10 +4,16 @@ import { SCENE_CHUNK_MARK } from "@/components/landing/journey/scene/scene-mark"
 
 /** The journey marks <html data-journey="on"> as it takes the page over, then starts its modules a turn at a time;
  * outside production it says when the last has started and the page has settled (window.__ttJourneyStarted), and
- * specs act only after that. */
+ * specs act only after that. A production build has no such probe (it is compiled out): there, drawing.ts's own
+ * decision (data-drawing-why, written by the eleventh of twelve modules) and two frames stand in for it. */
 export async function waitForJourney(page: Page): Promise<void> {
   await expect(page.locator("html")).toHaveAttribute("data-journey", "on", { timeout: 15_000 });
-  await page.waitForFunction(() => Reflect.get(window, "__ttJourneyStarted") === true, undefined, { timeout: 15_000 });
+  if (await page.evaluate(() => "__ttJourneyStarted" in window)) {
+    await page.waitForFunction(() => Reflect.get(window, "__ttJourneyStarted") === true, undefined, { timeout: 15_000 });
+    return;
+  }
+  await expect(page.locator("html")).toHaveAttribute("data-drawing-why", /.*/, { timeout: 15_000 });
+  await frames(page, 2);
 }
 
 /** Aborts the one script chunk that carries `mark`, found by its content, so its hashed name never matters. */

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { accountsConfigured, env, fixtureAllowed, googleSignInEnabled, liveRequestsPerDay, parseEnv, passkeysEnabled, resetEnvCache, sharedStoreConfig } from "@/services/env";
+import { accountsConfigured, activePnrSource, env, fixtureAllowed, googleSignInEnabled, liveRequestsPerDay, parseEnv, passkeysEnabled, resetEnvCache, sharedStoreConfig } from "@/services/env";
 
 const dev = { NODE_ENV: "development" } as const;
 
@@ -372,5 +372,50 @@ describe("the retired fallback, now that no environment carries one", () => {
 
     expect(env().PNR_FALLBACK).toBe("none");
     expect(warn).not.toHaveBeenCalled();
+  });
+});
+
+describe("a production build served on this machine with sample data (LOCAL_FIXTURE, J6-2)", () => {
+  const local = { NODE_ENV: "production", PNR_SOURCE: "fixture", LOCAL_FIXTURE: "1" };
+
+  it("lets a production build serve the fixture only with LOCAL_FIXTURE=1", () => {
+    const parsed = parseEnv(local);
+    if (!parsed.ok) throw new Error(parsed.issues.join("; "));
+    expect(fixtureAllowed(parsed.env)).toBe(true);
+    expect(activePnrSource(parsed.env)).toBe("fixture");
+    expect(parseEnv({ NODE_ENV: "production", PNR_SOURCE: "fixture" }).ok).toBe(false);
+  });
+
+  it.each([
+    ["VERCEL", "1"],
+    ["VERCEL_ENV", "preview"],
+    ["VERCEL_ENV", "production"],
+    ["VERCEL_URL", "trakline-git-main.vercel.app"],
+  ])("is refused wherever Vercel runs (%s=%s), so a deployment carrying it fails at boot", (name, value) => {
+    const parsed = parseEnv({ ...local, [name]: value });
+    expect(parsed.ok).toBe(false);
+    if (!parsed.ok) expect(parsed.issues.join(" ")).toMatch(/LOCAL_FIXTURE=1 is refused on Vercel/);
+  });
+
+  it.each([
+    ["RAILKIT_API_KEY", `railkit_${"a".repeat(24)}`],
+    ["DATA_KEY", `${"A".repeat(43)}=`],
+    ["UPSTASH_REDIS_REST_URL", "https://example.upstash.io"],
+    ["KV_REST_API_TOKEN", "token"],
+    ["NEXT_PUBLIC_SUPABASE_URL", "https://example.supabase.co"],
+    ["SUPABASE_SECRET_KEY", `sb_secret_${"a".repeat(20)}`],
+    ["RESEND_API_KEY", `re_${"a".repeat(20)}`],
+  ])("is refused beside a live credential (%s): sample data must reach nothing live", (name, value) => {
+    const parsed = parseEnv({ ...local, [name]: value });
+    expect(parsed.ok).toBe(false);
+    if (!parsed.ok) expect(parsed.issues.join(" ")).toMatch(new RegExp(`LOCAL_FIXTURE=1 is refused beside a live credential \\(${name}`));
+  });
+
+  it("changes nothing without the fixture: a production build that asks the live seam parses as before", () => {
+    expect(parseEnv({ NODE_ENV: "production", LOCAL_FIXTURE: "1" }).ok).toBe(true);
+  });
+
+  it("never unlocks E2E in production", () => {
+    expect(parseEnv({ ...local, E2E: "1" }).ok).toBe(false);
   });
 });

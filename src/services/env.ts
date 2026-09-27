@@ -23,6 +23,21 @@ export function isThirdPartySource(source: PnrSource): source is ThirdPartySourc
 const keyLike = z.string().min(20);
 const flag = z.enum(["0", "1"]);
 
+/** Every variable that reaches a live service or a live account. A production build serving sample data carries none.
+ * Exported so the local production server's test holds its blanked list to this one (J6-2). */
+export const LIVE_CREDENTIALS = [
+  "RAILKIT_API_KEY",
+  "UPSTASH_REDIS_REST_URL",
+  "UPSTASH_REDIS_REST_TOKEN",
+  "KV_REST_API_URL",
+  "KV_REST_API_TOKEN",
+  "DATA_KEY",
+  "NEXT_PUBLIC_SUPABASE_URL",
+  "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+  "SUPABASE_SECRET_KEY",
+  "RESEND_API_KEY",
+] as const;
+
 const envSchema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -102,6 +117,16 @@ const envSchema = z
     E2E: flag.default("0").transform((v) => v === "1"),
     /** Pins the fixture clock so end-to-end runs are deterministic. */
     E2E_NOW: z.iso.datetime().optional(),
+    /**
+     * Lets a production build serve the fixture on this machine: the journey's nightly and its real-GPU run, through
+     * scripts/serve-local-production.mjs and nothing else. Refused wherever Vercel runs and beside any live credential
+     * (below), so a deployment that carried it would fail at boot rather than serve sample data. Never in an .env file.
+     */
+    LOCAL_FIXTURE: flag.default("0").transform((v) => v === "1"),
+    /** Set by Vercel on every build and function ("1"). Read only to refuse LOCAL_FIXTURE there. */
+    VERCEL: z.string().optional(),
+    /** Set by Vercel on every deployment: its own host. Read only to refuse LOCAL_FIXTURE there. */
+    VERCEL_URL: z.string().optional(),
     /** Server only. Resend sending key for console email; entered by the owner through a hidden prompt. */
     RESEND_API_KEY: z.string().min(20).optional(),
     /** Who console email comes from. One default, so no deployment has to set it. */
@@ -121,7 +146,14 @@ const envSchema = z
     if (v.PNR_FALLBACK !== "none" && !isThirdPartySource(v.PNR_SOURCE)) {
       ctx.addIssue({ code: "custom", path: ["PNR_FALLBACK"], message: "PNR_FALLBACK is only asked behind a third-party PNR_SOURCE; nothing would ask it here." });
     }
-    if (v.NODE_ENV === "production" && v.PNR_SOURCE === "fixture") {
+    if (v.LOCAL_FIXTURE && (v.VERCEL || v.VERCEL_ENV || v.VERCEL_URL)) {
+      ctx.addIssue({ code: "custom", path: ["LOCAL_FIXTURE"], message: "LOCAL_FIXTURE=1 is refused on Vercel: it is for a production build served on this machine." });
+    }
+    const live = LIVE_CREDENTIALS.filter((name) => Boolean(v[name]));
+    if (v.LOCAL_FIXTURE && live.length > 0) {
+      ctx.addIssue({ code: "custom", path: ["LOCAL_FIXTURE"], message: `LOCAL_FIXTURE=1 is refused beside a live credential (${live.join(", ")}): a build that serves sample data must reach nothing live.` });
+    }
+    if (v.NODE_ENV === "production" && v.PNR_SOURCE === "fixture" && !v.LOCAL_FIXTURE) {
       ctx.addIssue({ code: "custom", path: ["PNR_SOURCE"], message: "PNR_SOURCE=fixture is refused in production." });
     }
     if ((v.NODE_ENV === "production" || v.VERCEL_ENV === "production") && v.E2E) {
@@ -219,9 +251,10 @@ export function passkeysEnabled(current: Env = env()): boolean {
   return accountsConfigured(current) && current.AUTH_PASSKEY_ENABLED;
 }
 
-/** The fixture may serve only outside production, and only when explicitly requested. */
+/** The fixture may serve only when explicitly requested: outside production, or in a production build on this machine
+ * with LOCAL_FIXTURE=1 (refused on Vercel and beside any live credential, above). */
 export function fixtureAllowed(current: Env = env()): boolean {
-  return current.PNR_SOURCE === "fixture" && current.NODE_ENV !== "production";
+  return current.PNR_SOURCE === "fixture" && (current.NODE_ENV !== "production" || current.LOCAL_FIXTURE);
 }
 
 /** Which source answers PNR checks in this deployment, as results and provenance name it. */

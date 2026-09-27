@@ -11,6 +11,8 @@
 !.yarn/versions
 
 # testing
+/.offline-guard.log
+/playwright-report-production/
 /coverage
 /blob-report/
 /all-blob-reports/
