@@ -13,6 +13,7 @@ import { JOURNEY_CHUNK_MARK } from "./journey-mark";
 import { refreshAll, untrackAll } from "./observers";
 import { startPlaceMemory } from "./place-memory";
 import { startRoute } from "./route";
+import type { Engine } from "./scene/engine";
 import { startSound } from "./sound";
 import { startStationProgress } from "./station-progress";
 import { startStill } from "./still";
@@ -40,6 +41,29 @@ export function keep<T>(initial: T): Kept<T> {
   };
 }
 
+export interface Lifetime {
+  atEnd(stop: Teardown): void;
+  end(): void;
+}
+
+/** What must outlive every rebuild but not the journey: the live drawing's engine above all (J5-4). */
+export function lifetime(): Lifetime {
+  const stops: Teardown[] = [];
+  let ended = false;
+  return {
+    atEnd: (stop) => {
+      if (ended) stop();
+      else stops.push(stop);
+    },
+    end: () => {
+      if (ended) return;
+      ended = true;
+      for (const stop of [...stops].reverse()) stop();
+      stops.length = 0;
+    },
+  };
+}
+
 /** The pin's columns state and the height the reader last actually saw it settle on (still.ts). */
 export interface StillPlace {
   readonly columns: boolean;
@@ -56,6 +80,10 @@ export interface JourneyContext {
   /** still.ts's own place, kept for this startJourney's whole lifetime, across every rebuild — never reset by a
    * teardown within that lifetime. A new startJourney (a fresh client navigation back to the page) starts fresh. */
   readonly still: Kept<StillPlace>;
+  /** The live drawing's engine, kept for this startJourney's whole lifetime and reused by every rebuild (J5-4). */
+  readonly scene: Kept<Promise<Engine> | null>;
+  /** Runs `stop` once when this startJourney ends, never on a rebuild; at once if it has already ended. */
+  readonly atEnd: (stop: Teardown) => void;
 }
 export type Teardown = () => void;
 export type JourneyModule = (ctx: JourneyContext) => Teardown;
@@ -70,6 +98,8 @@ export function startJourney(): Teardown {
   let introPlayed = false;
   const result = keep<ResultDetail | null>(null);
   const still = keep<StillPlace>({ columns: false, height: null });
+  const life = lifetime();
+  const scene = keep<Promise<Engine> | null>(null);
 
   const stopAll = () => {
     for (const t of teardowns.reverse()) t();
@@ -81,7 +111,7 @@ export function startJourney(): Teardown {
     const motion = html.getAttribute("data-motion") !== "off";
     const intro = !introPlayed && introWanted(motion);
     introPlayed = true;
-    const ctx: JourneyContext = { motion, intro, result, still };
+    const ctx: JourneyContext = { motion, intro, result, still, scene, atEnd: life.atEnd };
     try {
       if (intro) teardowns.push(startIntro());
       for (const start of MODULES) teardowns.push(start(ctx));
@@ -124,6 +154,8 @@ export function startJourney(): Teardown {
     window.clearTimeout(resizeTimer);
     stopPlaceGuard();
     memory.stop();
+    life.end();
+    scene.set(null);
     throw error;
   }
   settleFrame = requestAnimationFrame(() => {
@@ -145,6 +177,8 @@ export function startJourney(): Teardown {
     cancelAnimationFrame(settleFrame);
     memory.stop();
     stopAll();
+    life.end();
+    scene.set(null);
     stopPlaceGuard();
     if (html.getAttribute("data-journey") === "on") html.removeAttribute("data-journey");
   };

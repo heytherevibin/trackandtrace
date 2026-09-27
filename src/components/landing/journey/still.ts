@@ -1,4 +1,4 @@
-import { DRAWING_EVENT, LAYOUT_EVENT, emit } from "./journey-events";
+import { DRAWING_EVENT, LAYOUT_EVENT, emit, type DrawingDetail } from "./journey-events";
 import { columnsFit, columnsZone, distribute, leaderFrom, letterbox } from "./labels-layout";
 import type { JourneyContext, Teardown } from "./start-journey";
 import { STILL_MANIFEST } from "./still-manifest";
@@ -7,7 +7,8 @@ import { isPartId, partSide } from "./train-parts";
 // The drawn train's labels while the page draws still (spec §3.C; prototype v3's labels.js and still.js; J4-7).
 // On wide screens they stand in two columns beside the drawing, each with a leader to its part, when they fit;
 // otherwise the page's own parts list stands. A fine pointer resting on a label lights its part. Labels never fade
-// (text moves by transform only); the live drawing adds their scroll-tied reveal in J5.
+// (text moves by transform only). When the drawing goes live, the live drawing (J5) takes the labels over, and this
+// module stands aside.
 
 const NS = "http://www.w3.org/2000/svg";
 const WIDE = STILL_MANIFEST.shapes.anatomyWide;
@@ -52,6 +53,9 @@ export function startStill({ still }: JourneyContext): Teardown {
   let leaders: Leader[] = [];
   let frame = 0;
   let alive = true;
+  // Whether the labels are the live drawing's (standAside, below). A build that starts while the drawing is already
+  // live (a rebuild) finds them so.
+  let aside = document.documentElement.dataset.drawing === "live";
 
   const clear = () => {
     pin.classList.remove("is-columns", "is-compact");
@@ -154,6 +158,7 @@ export function startStill({ still }: JourneyContext): Teardown {
   // only) way to learn.
   const layout = () => {
     frame = 0;
+    if (document.documentElement.dataset.drawing !== "still") return standAside();
     const place = still.get();
     const wasColumns = place.columns;
     const beforeRect = pin.getBoundingClientRect();
@@ -177,15 +182,36 @@ export function startStill({ still }: JourneyContext): Teardown {
     if (alive && !frame) frame = requestAnimationFrame(layout);
   };
 
+  // The drawing going live takes the labels over (live-labels.ts, J5-5): let go of them at once, in the same task the
+  // switch happens, so no frame of the still's columns ever shows under the pinned chapter. What was settled for the
+  // still is forgotten; the next still settle measures afresh. The labels are handed over clean once, at the switch:
+  // from then until the drawing is still again, .is-hot is the live drawing's alone, whatever re-runs layout().
+  const standAside = () => {
+    if (frame) cancelAnimationFrame(frame);
+    frame = 0;
+    if (!aside) light(null);
+    aside = true;
+    clear();
+    still.set({ columns: false, height: null });
+  };
+  const onDrawing = (event: Event) => {
+    if ((event as CustomEvent<DrawingDetail>).detail.mode === "live") return standAside();
+    aside = false;
+    schedule();
+  };
+
   const light = (id: string | null) => {
     for (const g of holder.querySelectorAll<SVGGElement>("g[data-part]")) g.toggleAttribute("data-hot", g.dataset.part === id);
     for (const label of labels) label.classList.toggle("is-hot", label.dataset.part === id);
   };
   const pointing = labels.map((label) => {
+    // Only while the still draws, so .is-hot has one writer at a time (the live drawing's while live).
     const enter = () => {
-      if (fine.matches) light(label.dataset.part ?? null);
+      if (fine.matches && document.documentElement.dataset.drawing === "still") light(label.dataset.part ?? null);
     };
-    const leave = () => light(null);
+    const leave = () => {
+      if (document.documentElement.dataset.drawing === "still") light(null);
+    };
     label.addEventListener("pointerenter", enter);
     label.addEventListener("pointerleave", leave);
     return () => {
@@ -194,7 +220,7 @@ export function startStill({ still }: JourneyContext): Teardown {
     };
   });
 
-  window.addEventListener(DRAWING_EVENT, schedule);
+  window.addEventListener(DRAWING_EVENT, onDrawing);
   window.addEventListener(LAYOUT_EVENT, schedule);
   columns.addEventListener("change", schedule);
   // The pin's own box (fixed by CSS in columns mode) never answers a label, the title block or the copy
@@ -214,12 +240,12 @@ export function startStill({ still }: JourneyContext): Teardown {
     alive = false;
     if (frame) cancelAnimationFrame(frame);
     frame = 0;
-    window.removeEventListener(DRAWING_EVENT, schedule);
+    window.removeEventListener(DRAWING_EVENT, onDrawing);
     window.removeEventListener(LAYOUT_EVENT, schedule);
     columns.removeEventListener("change", schedule);
     observer.disconnect();
     for (const stop of pointing) stop();
-    light(null);
+    if (!aside) light(null);
     clear();
   };
 }

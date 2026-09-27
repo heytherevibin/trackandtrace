@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MODULES, startJourney } from "@/components/landing/journey/start-journey";
+import { MODULES, lifetime, startJourney } from "@/components/landing/journey/start-journey";
 
 // A module that throws on the journey's first build: startJourney throws before it can hand back its teardown,
 // so it must stop everything it started itself — the place guard above all, which would otherwise keep
@@ -63,5 +63,19 @@ describe("startJourney, when its first build throws", () => {
 describe("MODULES", () => {
   it("no longer starts the route strip: the owner removed it, on the phone and the desktop rail alike", () => {
     expect(MODULES.map((m) => m.name)).not.toContain("startStrip");
+  });
+});
+
+describe("a journey's lifetime (J5-4)", () => {
+  it("runs what was handed to it once, newest first, when it ends; and at once once it has ended", () => {
+    const life = lifetime();
+    const order: string[] = [];
+    life.atEnd(() => order.push("engine"));
+    life.atEnd(() => order.push("later"));
+    life.end();
+    life.end();
+    expect(order).toEqual(["later", "engine"]);
+    life.atEnd(() => order.push("late"));
+    expect(order).toEqual(["later", "engine", "late"]);
   });
 });
