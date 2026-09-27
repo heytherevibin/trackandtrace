@@ -12,11 +12,14 @@ describe("RouteStrip", () => {
     expect(within(strip).getByRole("link", { name: "DEP · Platform 3 · Departures" })).toHaveAttribute("href", "#top");
   });
 
-  it("is only the rail and its stations: no odometer, no station reading, no train, until J3 moves it", () => {
+  it("carries the odometer, the station reading and the trains for the journey to show, all hidden from assistive tech", () => {
     const { container } = render(<RouteStrip />);
-    expect(screen.queryByText("KM 000")).toBeNull();
-    expect(screen.queryByText("DEP · Platform 3 · Departures")).toBeNull();
-    expect(container.querySelector(".strip-train")).toBeNull();
-    expect(container.querySelector(".strip-stops li:last-child")!.getAttribute("style")).toMatch(/left:\s*100(\.0+)?%/);
+    expect(container.querySelector(".strip-odo")).toHaveTextContent("KM 000");
+    expect(container.querySelector(".strip-odo")).toHaveAttribute("aria-hidden", "true");
+    expect(container.querySelector(".strip-now")).toHaveTextContent("DEP · Platform 3 · Departures");
+    expect(container.querySelector(".strip-now")).toHaveAttribute("aria-hidden", "true");
+    expect(container.querySelectorAll(".strip-train")).toHaveLength(2);
+    expect(container.querySelector(".phone-rail")).toHaveAttribute("aria-hidden", "true");
+    expect(container.querySelector("#route-strip .phone-rail")).toBeNull();
   });
 });

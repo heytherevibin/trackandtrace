@@ -21,6 +21,21 @@
   text-decoration: none;
 }
 .strip-stops a[aria-current="location"] { color: var(--accent-text); }
+.strip-odo, .strip-now, .strip-train, .phone-rail { display: none; }
+.strip-odo, .strip-now {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--text-2xs);
+  line-height: var(--text-2xs--line-height);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.strip-odo { color: var(--accent-text); font-variant-numeric: tabular-nums; min-width: 4.5em; }
+.strip-now { color: var(--ink-3); max-width: 16rem; overflow: hidden; text-overflow: ellipsis; }
+.strip-train { position: absolute; left: 0; top: 13px; width: 30px; height: 12px; transform: translateX(-50%); color: var(--accent); pointer-events: none; }
+.strip-glyph { display: block; width: 100%; height: 100%; transform-origin: 50% 100%; }
+.strip-glyph svg { display: block; width: 100%; height: 100%; }
 /* The strip makes the landing's masthead taller: anchors stop below it (base.css reads --header-height). */
 @media (min-width: 48rem) {
   :root:has(#route-strip) { --header-height: calc(4rem + 32px); /* the row, its rule, and the 30px strip with its rule */ }
@@ -28,6 +43,8 @@
 @media (max-width: 47.99rem) {
   .route-strip { display: none; }
 }
+/* 02's height is undecided until the journey starts: fragments land instantly until then. */
+html:has(#how):not([data-journey]) { scroll-behavior: auto; }
 
 /* ---- Departures · Platform 3 (under the hero) */
 .board-table { width: 100%; border-collapse: collapse; }
@@ -58,11 +75,13 @@
 .board-name a { color: var(--ink-1); text-decoration: none; }
 .board-name a:hover { color: var(--accent-text); }
 .board-km { width: 4.5rem; color: var(--ink-3); }
+.board-status { display: none; width: 9rem; color: var(--ink-3); white-space: nowrap; }
 @media (max-width: 39.99rem) {
   .board-table th,
   .board-table td { padding: 6px 12px; font-size: var(--text-label); }
   .board-km { display: none; }
   .board-code { width: 3rem; }
+  .board-status { width: 6.75rem; }
 }
 /* A finger is not a cursor: on touch screens each row is at least 44px, so every destination answers across 44px. */
 @media (pointer: coarse) {
@@ -91,13 +110,27 @@ main:has(.hero-dial) { overflow-x: clip; } /* the landing clips the dial at the 
   }
 }
 .hero-dial svg { display: block; width: 100%; height: 100%; overflow: visible; }
-.dial-tick { stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
-.dial-tick.is-major { stroke: var(--line-strong); }
+.dial-tick, .dial-hour-tick { stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.dial-tick.is-major, .dial-hour-tick.is-major { stroke: var(--line-strong); }
 .dial-ring { fill: none; stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .dial-ring.is-dashed { stroke-dasharray: 2 7; }
 .dial-seg { fill: none; stroke: var(--line); stroke-width: 7; stroke-linecap: butt; }
 .dial-seg.is-on { stroke: var(--accent); }
 .dial-label { fill: var(--ink-3); font-family: var(--font-display); font-weight: 600; font-size: 13px; /* drawing units */ letter-spacing: var(--tracking-caps); text-transform: uppercase; }
+.dial-host > .dial-readout {
+  position: absolute; left: 0; right: 0; top: calc(100% + 12px); margin: 0; display: none;
+  text-align: center; font-family: var(--font-display); font-weight: 600; font-size: var(--text-2xs);
+  line-height: var(--text-2xs--line-height); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--accent-text);
+}
+.dial-seg.is-current { stroke: var(--accent-busy); }
+.dial-sweep, .dial-face { opacity: 0; }
+.dial-sweep { fill: none; stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.dial-arc { fill: none; stroke: var(--accent); stroke-width: 7; }
+.dial-chart-mark { fill: var(--surface-0); stroke: var(--accent-text); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.dial-needle-line { stroke: var(--accent); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.dial-needle-cap { fill: var(--surface-0); stroke: var(--accent); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.dial-needle { transform-box: view-box; transform-origin: 0 0; }
+[data-theme="dark"] .dial-seg.is-on, [data-theme="dark"] .dial-needle-line { filter: drop-shadow(0 0 4px var(--accent)); }
 
 /* ---- 03 · the berth plan (sample data, beside the specimen record) */
 .berth-plan { margin: 28px 0 0; max-width: 34rem; }
@@ -125,6 +158,7 @@ main:has(.hero-dial) { overflow-x: clip; } /* the landing clips the dial at the 
 .clock-hand { stroke: var(--ink-1); stroke-linecap: butt; }
 .clock-hand.is-hour { stroke-width: 3.5; }
 .clock-hand.is-minute { stroke-width: 2.2; }
+.clock-hand.is-second { display: none; stroke: var(--accent); stroke-width: 1; }
 .clock-cap { fill: var(--surface-0); stroke: var(--ink-1); stroke-width: 1.5; }
 @media (max-width: 39.99rem) {
   .station-clock { width: 124px; height: 124px; }
@@ -145,3 +179,36 @@ main:has(.hero-dial) { overflow-x: clip; } /* the landing clips the dial at the 
 @media (max-width: 39.99rem) {
   .route-map { display: none; }
 }
+
+/* ---- 02 · the chapters instrument: drawn still, the section is plain and the instrument is not shown; the
+   journey pins it (journey-island.css). The dial reuses the hero dial's classes. */
+.chapters-pin { display: block; }
+.chapters-instrument, .rail-marker { display: none; }
+.chapters-steps {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 32px clamp(20px, 3vw, 48px); margin: 20px 0 0; padding: 0; list-style: none;
+}
+.chapters-dial { position: relative; aspect-ratio: 1; }
+.chapters-dial svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.chapter-arc { fill: none; stroke: var(--line); stroke-width: 7; }
+.chapter-arc.is-on { stroke: var(--accent); }
+.chapter-label { font-size: 15px; /* drawing units */ }
+.dial-label.is-steel { fill: var(--accent-text); }
+.chapter-digits { font-size: 64px; /* drawing units */ letter-spacing: 0.06em; }
+.chapter-status { font-size: 54px; /* drawing units */ }
+.chapter-party { font-size: 17px; /* drawing units */ }
+.dial-dot { fill: var(--accent); }
+.chapter-rail { stroke: var(--line-strong); }
+.chapter-pulse { fill: none; stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.chapter-layer:not(.is-current), .chapter-card pre:not(.is-current) { display: none; }
+.chapter-card { position: relative; align-self: flex-end; width: 17.5rem; z-index: 2; }
+.chapter-card pre {
+  margin: 0; padding: 12px 14px; font-family: var(--font-display); font-weight: 500; font-size: var(--text-label);
+  line-height: 1.35rem; letter-spacing: 0.04em; color: var(--ink-2); white-space: pre-wrap; font-variant-numeric: tabular-nums;
+}
+.chapter-card pre b { color: var(--accent-text); font-weight: 600; }
+.rail-marker { position: absolute; top: -3px; left: 0; width: 30px; height: 12px; color: var(--accent); transform: translateX(-50%); }
+.rail-marker svg { display: block; width: 100%; height: 100%; }
+
+/* ---- The footer's Sound switch: shown only once the journey can sound it (journey-island.css) */
+.sound-toggle { display: none; }

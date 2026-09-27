@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { routePath, routeSleepers, routeStops } from "@/components/landing/journey/geometry/route";
+import { routePath, routeSleepers, routeStops, sleeperFractions, stopFractions } from "@/components/landing/journey/geometry/route";
 
 describe("the route map's geometry", () => {
   const stops = routeStops(7);
@@ -36,5 +36,19 @@ describe("the route map's geometry", () => {
         expect(v).toBe(Math.round(v * 100) / 100);
       }
     }
+  });
+
+  it("places each sleeper and each stop along the line, as fractions of its length", () => {
+    const stops = routeStops(7);
+    const sleepers = sleeperFractions(stops);
+    expect(sleepers).toHaveLength(routeSleepers(stops).length);
+    expect(sleepers[0]).toBe(0);
+    expect(sleepers.every((t, i) => i === 0 || t > sleepers[i - 1]!)).toBe(true);
+    expect(sleepers.at(-1)!).toBeLessThanOrEqual(1);
+    const at = stopFractions(stops);
+    expect(at).toHaveLength(7);
+    expect(at[0]!).toBeGreaterThan(0);
+    expect(at.at(-1)!).toBeLessThan(1);
+    expect(at.every((t, i) => i === 0 || t > at[i - 1]!)).toBe(true);
   });
 });

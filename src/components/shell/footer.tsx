@@ -9,8 +9,9 @@ import { FooterSwitch } from "./footer-switch";
 import { IstClock } from "./ist-clock";
 import { MotionToggle } from "./motion-toggle";
 import { PRIMARY_NAV } from "./nav-config";
+import { SoundToggle } from "./sound-toggle";
 
-/** The landing's footer: brand and disclaimer, Sections, Product, Company; then one bar with the copyright, service status, clock and the Motion switch. */
+/** The landing's footer: brand and disclaimer, Sections, Product, Company; then one bar with the copyright, service status, the clock, and the Motion and Sound switches. */
 function FullFooter() {
   const m = messages.shell.footer;
   const status = serviceStatus();
@@ -72,6 +73,7 @@ function FullFooter() {
             <ServicePill status={status} />
             <IstClock />
             <MotionToggle />
+            <SoundToggle />
           </div>
         </div>
       </div>

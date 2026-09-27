@@ -29,6 +29,7 @@ export function Hero({ sampleMode, connected = false }: { readonly sampleMode: b
       <div className="dial-host">
         <HeroDial />
         <PnrTerminal sampleMode={sampleMode} connected={connected} />
+        <p className="dial-readout" aria-hidden="true" />
       </div>
     </section>
   );

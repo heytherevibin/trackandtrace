@@ -148,6 +148,7 @@
   --z-dialog: 60;
   --z-popover: 70;
   --z-toast: 80;
+  --z-cursor: 90; /* the registration-mark cursor: above every overlay, since it replaces the hidden native cursor */
   --z-skip: 100;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --header-height: 4rem;

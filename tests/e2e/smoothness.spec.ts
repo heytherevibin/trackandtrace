@@ -30,9 +30,14 @@ test("a page switch lands at the top without animating the scroll", async ({ pag
 
 test("in-page anchors still glide", async ({ page, isMobile }) => {
   test.skip(isMobile, "desktop viewport keeps the anchor far enough away to sample");
-  await gotoReady(page, "/");
   const html = page.locator("html");
+  // The landing lands fragments instantly until its journey has decided 02's height (journey.css), and
+  // glides from then on; every other page glides from the start.
+  await gotoReady(page, "/");
   await expect(html).toHaveAttribute("data-scroll-behavior", "smooth");
+  await expect(html).toHaveAttribute("data-journey", "on", { timeout: 15_000 });
+  expect(await html.evaluate((el) => getComputedStyle(el).scrollBehavior)).toBe("smooth");
+  await gotoReady(page, "/privacy");
   expect(await html.evaluate((el) => getComputedStyle(el).scrollBehavior)).toBe("smooth");
 });
 

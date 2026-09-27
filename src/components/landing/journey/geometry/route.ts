@@ -53,11 +53,34 @@ function pointAt(s: Segment, t: number): RoutePoint {
   };
 }
 
-/** Sleepers every `spacing` units of arc length, each `2 × half` across the path at that point. */
-export function routeSleepers(stops: readonly RoutePoint[], spacing = 14, half = 6): readonly Sleeper[] {
+interface Sampled {
+  readonly samples: readonly RoutePoint[];
+  readonly lengths: readonly number[];
+  readonly total: number;
+}
+
+/** The path sampled 64 times per segment, with the running arc length at each sample. */
+function sample(stops: readonly RoutePoint[]): Sampled {
   const samples = segments(stops).flatMap((s, index) => Array.from({ length: 64 + (index === 0 ? 1 : 0) }, (_, i) => pointAt(s, (index === 0 ? i : i + 1) / 64)));
   const lengths = samples.reduce<number[]>((acc, p, i) => [...acc, i === 0 ? 0 : acc[i - 1]! + Math.hypot(p.x - samples[i - 1]!.x, p.y - samples[i - 1]!.y)], []);
-  const total = lengths.at(-1)!;
+  return { samples, lengths, total: lengths.at(-1)! };
+}
+
+/** Each sleeper's place along the line, 0–1, in routeSleepers' order. */
+export function sleeperFractions(stops: readonly RoutePoint[], spacing = 14): readonly number[] {
+  const { total } = sample(stops);
+  return Array.from({ length: Math.floor(total / spacing) + 1 }, (_, k) => Math.round(((k * spacing) / total) * 10_000) / 10_000);
+}
+
+/** Each stop's place along the line, 0–1. Stop k ends segment k + 1 (segment 0 is the lead-in). */
+export function stopFractions(stops: readonly RoutePoint[]): readonly number[] {
+  const { lengths, total } = sample(stops);
+  return stops.map((_, k) => Math.round((lengths[64 * (k + 1)]! / total) * 10_000) / 10_000);
+}
+
+/** Sleepers every `spacing` units of arc length, each `2 × half` across the path at that point. */
+export function routeSleepers(stops: readonly RoutePoint[], spacing = 14, half = 6): readonly Sleeper[] {
+  const { samples, lengths, total } = sample(stops);
   return Array.from({ length: Math.floor(total / spacing) + 1 }, (_, k) => {
     const d = k * spacing;
     const j = Math.max(1, lengths.findIndex((l) => l >= d));

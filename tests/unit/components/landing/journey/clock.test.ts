@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clockTicks, handAngles, istTime } from "@/components/landing/journey/geometry/clock";
+import { clockTicks, handAngles, istTime, secondAngle } from "@/components/landing/journey/geometry/clock";
 
 describe("the station clock's geometry", () => {
   it("reads the time in India, whatever the machine's zone", () => {
@@ -29,5 +29,11 @@ describe("the station clock's geometry", () => {
         expect(v).toBe(Math.round(v * 100) / 100);
       }
     }
+  });
+
+  it("turns the second hand 6° a second, sweeping through the milliseconds", () => {
+    expect(secondAngle(new Date("2026-09-17T06:30:00.000Z"))).toBe(0);
+    expect(secondAngle(new Date("2026-09-17T06:30:15.500Z"))).toBe(93);
+    expect(secondAngle(new Date("2026-09-17T06:30:59.999Z"))).toBeCloseTo(359.99, 2);
   });
 });

@@ -81,6 +81,8 @@ export interface TerminalResult {
   readonly facts: readonly TerminalFact[];
   readonly pax: readonly PaxRow[];
   readonly recent: RecentCheck;
+  /** The source's own chart time (spec §3.A, Hero), for an ok result; null otherwise. Never computed here. */
+  readonly chartAt: string | null;
 }
 
 /** A status as the passenger table writes it: CNF, RAC 4, WL 9. */
@@ -145,7 +147,7 @@ export function terminalResult(outcome: PnrOutcome, { pnr, attemptedAt, sampleMo
   const r = messages.check.result;
   const attempted = formatTime(attemptedAt);
   const checkedAt = attemptedAt.toISOString();
-  const base = { pnr, pnrLabel: r.pnr(formatPnr(pnr)), facts: [], pax: [] } as const;
+  const base = { pnr, pnrLabel: r.pnr(formatPnr(pnr)), facts: [], pax: [], chartAt: null } as const;
   const activeSource = sampleMode ? r.sources.fixture : r.sources.live;
 
   if (outcome.ok) {
@@ -163,6 +165,7 @@ export function terminalResult(outcome: PnrOutcome, { pnr, attemptedAt, sampleMo
       facts: factsFor(result),
       pax: result.snapshot.pax.length > 1 ? paxRows(result.snapshot.pax) : [],
       recent: { pnr, label: recentLabelFor(result), status: result.lead.status, position: result.lead.position, checkedAt: result.checkedAt },
+      chartAt: result.snapshot.chartAt ?? null,
     };
   }
 

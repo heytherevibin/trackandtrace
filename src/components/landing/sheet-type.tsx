@@ -21,7 +21,9 @@ export const TABLE_HEAD = "font-display text-2xs font-semibold uppercase leading
 export function SectionKicker({ children, rule }: { readonly children: string; readonly rule: "mb-3" | "mb-6" | "mb-8" }) {
   return (
     <>
-      <span className={`mb-3 ${KICKER}`}>{children}</span>
+      <span data-flap="" className={`mb-3 ${KICKER}`}>
+        {children}
+      </span>
       <hr className={`h-px border-0 bg-line ${rule}`} />
     </>
   );

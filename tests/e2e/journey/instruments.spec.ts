@@ -1,6 +1,7 @@
 import { expect, test } from "../fixtures";
 import { gotoReady } from "../helpers";
 import { STATIONS } from "@/components/landing/journey/stations";
+import { blockJourneyChunk } from "./journey-helpers";
 
 // The journey's instruments, drawn still (spec 2026-09-24 §3.A, J2). Each test names the instrument it holds.
 
@@ -25,7 +26,7 @@ test.describe("the route strip", () => {
     await expect(page.getByRole("navigation", { name: "Route through this page" })).toHaveCount(0);
   });
 
-  test("on a phone, there is no route strip: it waits for J3, with the train that keeps it true", async ({ page, isMobile }) => {
+  test("on a phone, the route strip is hidden and exposes no navigation landmark", async ({ page, isMobile }) => {
     test.skip(!isMobile, "phone layout");
     await gotoReady(page, "/");
     await expect(page.locator("#route-strip")).toBeHidden();
@@ -82,6 +83,9 @@ test.describe("the berth plan", () => {
     await gotoReady(page, "/");
     const plan = page.locator("#record figure.berth-plan");
     await expect(plan).toBeVisible();
+    // In view, so the reading holds whenever the journey starts: below the fold (a phone), a running journey
+    // arms the plan unlit until it is seen, then draws it and lights the berth.
+    await plan.scrollIntoViewIfNeeded();
     await expect(plan.locator(".plan-tag.is-lit")).toHaveText("12 LB");
     await expect(plan).toContainText("berth B1 · 12 LB, lit.");
   });
@@ -102,5 +106,16 @@ test.describe("the route map", () => {
     const map = page.locator("#roadmap .route-map");
     if (isMobile) await expect(map).toBeHidden();
     else await expect(map.locator(".route-stop")).toHaveCount(7);
+  });
+});
+
+test.describe("the chapters instrument", () => {
+  test("02 is a plain section until the journey pins it: three stops side by side, no instrument", async ({ page, isMobile }) => {
+    await blockJourneyChunk(page);
+    await page.goto("/");
+    await expect(page.locator("html")).toHaveAttribute("data-journey", "failed", { timeout: 15_000 });
+    await expect(page.locator("#how .chapters-instrument")).toBeHidden();
+    const tops = await page.locator("#how li[data-chapter]").evaluateAll((lis) => lis.map((li) => Math.round(li.getBoundingClientRect().top)));
+    if (!isMobile) expect(new Set(tops).size).toBe(1);
   });
 });

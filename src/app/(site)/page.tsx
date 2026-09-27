@@ -6,11 +6,12 @@ import { Features } from "@/components/landing/features";
 import { Hero } from "@/components/landing/hero";
 import { HowItWorks } from "@/components/landing/how-it-works";
 import { DepartureBoard } from "@/components/landing/journey/departure-board";
+import { JourneyLoader } from "@/components/landing/journey/journey-loader";
 import { PhotoSplit } from "@/components/landing/photo-split";
 import { PrinciplesSheet } from "@/components/landing/principles-sheet";
 import { Roadmap } from "@/components/landing/roadmap";
 import { ReliabilityBand } from "@/components/landing/reliability-band";
-import { buildSpecimen } from "@/components/landing/specimen-data";
+import { buildSpecimen, chapterTrace } from "@/components/landing/specimen-data";
 import { SpecimenRecord } from "@/components/landing/specimen-record";
 import { activePnrSource, env } from "@/services/env";
 import { serviceStatus } from "@/services/service-status";
@@ -35,7 +36,7 @@ export default async function HomePage() {
       <Hero sampleMode={sampleMode} connected={connected} />
       <DepartureBoard />
       <PrinciplesSheet />
-      <HowItWorks />
+      <HowItWorks trace={specimen ? chapterTrace(specimen) : null} />
       <SpecimenRecord specimen={specimen} />
       <ReliabilityBand checks={status.checks} />
       <Roadmap />
@@ -43,6 +44,7 @@ export default async function HomePage() {
       <PhotoSplit />
       <Faq />
       <ClosingCta sampleMode={sampleMode} connected={connected} />
+      <JourneyLoader />
     </div>
   );
 }
