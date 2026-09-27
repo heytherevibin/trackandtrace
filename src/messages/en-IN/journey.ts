@@ -18,11 +18,6 @@ export const journey = {
     faq: "Questions",
     terminus: "Run a check",
   },
-  strip: {
-    label: "Route through this page",
-    stop: (code: string, name: string) => `${code} · ${name}`,
-    km: (figure: string) => `KM ${figure}`,
-  },
   board: {
     title: "Departures · Platform 3",
     scope: "This page",

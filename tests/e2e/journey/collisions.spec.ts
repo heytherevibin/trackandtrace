@@ -216,35 +216,6 @@ test.describe("the collision checker", () => {
 // text outside itself, nor another instrument.
 const INSTRUMENTS = { panels: [".board", ".berth-plan", ".station-clock", ".route-map", ".chapter-card", ".title-block"], skip: [".hero-dial"] } as const;
 
-// The route rail is a fixed column down the landing's left edge from 48rem: a panel the page must never draw
-// under, at every width it stands.
-const WITH_RAIL = { ...INSTRUMENTS, panels: [...INSTRUMENTS.panels, ".route-strip"] } as const;
-
-test.describe("the route rail, held as a panel", () => {
-  test.skip(({ isMobile }) => isMobile, "the rail stands from 48rem");
-
-  test("the checker sees text drawn under the rail", async ({ page }) => {
-    await gotoReady(page, "/");
-    await page.evaluate(() => {
-      const line = document.createElement("p");
-      line.textContent = "Probe under the rail";
-      line.style.cssText = "position:fixed;left:8px;top:320px;margin:0;font:16px/20px sans-serif";
-      document.body.append(line);
-    });
-    expect(await collisionsInView(page, WITH_RAIL)).toContain('panel nav#route-strip.route-strip × text "Probe under the rail"');
-  });
-
-  for (const viewport of [{ width: 768, height: 1024 }, { width: 1024, height: 768 }, { width: 1280, height: 800 }] as const) {
-    test(`nothing is drawn under the rail, nor collides, top to bottom at ${viewport.width}×${viewport.height}`, async ({ page }) => {
-      await page.setViewportSize(viewport);
-      await gotoReady(page, "/");
-      await waitForJourney(page);
-      await expect(page.locator("#route-strip")).toBeVisible();
-      expect(await collisionsTopToBottom(page, WITH_RAIL)).toEqual([]);
-    });
-  }
-});
-
 // Today's landing, before the journey adds anything: the baseline every journey PR must keep.
 const SIZES = [
   { name: "1440×900", viewport: { width: 1440, height: 900 }, phone: false },

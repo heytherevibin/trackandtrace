@@ -95,21 +95,12 @@ describe("TopNav", () => {
     expect(within(screen.getByRole("link", { name: "Trakline" })).getByText("Trakline").parentElement).not.toHaveClass("hidden");
   });
 
-  it("carries the landing's route rail beside the masthead, and the phone rail inside it, on the landing only", () => {
-    const strip = <nav aria-label="Route through this page" />;
-    const rail = <div data-testid="phone-rail" />;
+  it("carries no route rail: the owner removed it, and the masthead takes no props for one", () => {
     nav.pathname = "/";
-    const { unmount } = render(<TopNav strip={strip} rail={rail} />);
+    const { unmount } = render(<TopNav />);
     const banner = screen.getByRole("banner");
-    // The rail is its own column down the page's left edge: it has left the masthead.
-    expect(within(banner).queryByRole("navigation", { name: "Route through this page" })).toBeNull();
-    expect(screen.getByRole("navigation", { name: "Route through this page" })).toBeInTheDocument();
-    // The phone's hairline rail still runs along the masthead's foot.
-    expect(banner).toContainElement(screen.getByTestId("phone-rail"));
-    unmount();
-    nav.pathname = "/watchlist";
-    render(<TopNav strip={strip} rail={rail} />);
     expect(screen.queryByRole("navigation", { name: "Route through this page" })).toBeNull();
-    expect(screen.queryByTestId("phone-rail")).toBeNull();
+    expect(banner.querySelector(".phone-rail")).toBeNull();
+    unmount();
   });
 });

@@ -28,19 +28,7 @@ const ROUTE: readonly { readonly id: StationId; readonly code: string; readonly 
 
 export const STATIONS: readonly Station[] = ROUTE.map((stop) => ({ ...stop, name: messages.journey.stations[stop.id] }));
 
-/** Where a stop's box stands down the rail's track: evenly spaced, the first at the top and the last a stop's
- * height (`--stop-h`, journey.css) from the foot, so every stop's box stays inside the track. */
-export function stopTop(index: number, count: number): string {
-  return `calc((100% - var(--stop-h)) * ${(index / (count - 1)).toFixed(4)})`;
-}
-
 /** Kilometres as the board prints them: three figures. */
 export function kmFigure(km: number): string {
   return String(km).padStart(3, "0");
-}
-
-/** A stop's accessible name: "01 · Operating principles", "DEP · Platform 3 · Departures" — every stop is named
- * by its code, then its name, so a voice user can say what they see. */
-export function stopName(station: Station): string {
-  return messages.journey.strip.stop(station.code, station.name);
 }

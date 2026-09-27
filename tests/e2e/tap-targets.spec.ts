@@ -95,18 +95,14 @@ for (const route of ROUTES) {
   });
 }
 
-// A phone on its side is wider than 48rem but too short for the route rail's eleven 44px stops: the landing gives
-// it the phone's rail instead, so every control still answers across 44px.
+// A phone on its side is wider than 48rem but too short for eleven 44px stops, which is why the owner-rejected
+// route rail used to fall back to a hairline rail here; the rail is gone entirely now, so this only proves every
+// remaining control still answers across 44px at that size.
 test("/ on a phone on its side answers a finger across 44px", async ({ page, isMobile }) => {
   test.skip(!isMobile, "tap targets are a touch-screen concern");
   await page.setViewportSize({ width: 844, height: 390 });
   await gotoReady(page, "/");
   expect(report(await undersizedTargets(page))).toEqual([]);
-  // The rail's stops sit in a list, which the walk above treats as prose: a shown column would be measured here.
-  const small = await page.locator("#route-strip .strip-stops a").evaluateAll((links) =>
-    links.filter((a) => a.checkVisibility() && a.getBoundingClientRect().height < 44).map((a) => a.textContent),
-  );
-  expect(small).toEqual([]);
 });
 
 test("the masthead sheet's controls answer a finger too", async ({ page, isMobile }) => {

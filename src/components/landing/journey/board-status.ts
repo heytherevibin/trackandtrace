@@ -1,6 +1,6 @@
 // The departure board's status column (v3's board.js): the page's own station is AT PLATFORM, those behind it
 // DEPARTED, the one after it NEXT, the rest blank. `stop` is a row's station index (1 for 01); `station` the
-// strip's current index (0 at DEP).
+// page's current station index (0 at DEP, station-progress.ts).
 
 export type BoardStatus = "departed" | "here" | "next" | "";
 

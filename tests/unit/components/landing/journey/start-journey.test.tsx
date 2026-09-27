@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { startJourney } from "@/components/landing/journey/start-journey";
+import { MODULES, startJourney } from "@/components/landing/journey/start-journey";
 
 // A module that throws on the journey's first build: startJourney throws before it can hand back its teardown,
 // so it must stop everything it started itself — the place guard above all, which would otherwise keep
@@ -57,5 +57,11 @@ describe("startJourney, when its first build throws", () => {
     expect(document.documentElement.getAttribute("data-journey")).toBe("failed");
     expect(observing.size).toBe(0);
     expect(listening.map((l) => l.type)).toEqual([]);
+  });
+});
+
+describe("MODULES", () => {
+  it("no longer starts the route strip: the owner removed it, on the phone and the desktop rail alike", () => {
+    expect(MODULES.map((m) => m.name)).not.toContain("startStrip");
   });
 });
