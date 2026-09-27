@@ -20,6 +20,12 @@ vi.mock("three", async (importOriginal) => {
       return 1;
     }
     setSize(): void {}
+    setScissorTest(): void {}
+    setViewport(): void {}
+    setScissor(): void {}
+    clear(): void {}
+    initTexture(): void {}
+    render(): void {}
     compileAsync(): Promise<void> {
       return Promise.resolve();
     }

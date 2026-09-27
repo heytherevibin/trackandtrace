@@ -1,4 +1,4 @@
-import { Color, Fog, Mesh, Raycaster, SRGBColorSpace, Vector2, WebGLRenderer, type PerspectiveCamera, type Vector3 } from "three";
+import { Color, Fog, Mesh, Raycaster, SRGBColorSpace, Texture, Vector2, WebGLRenderer, type Object3D, type PerspectiveCamera, type Vector3 } from "three";
 import { WEBGL_EVENT, emit, type WebglDetail } from "../journey-events";
 import type { Pose } from "../pose";
 import { createBeam, poolTexture, type Beam } from "./beam";
@@ -135,6 +135,38 @@ export async function compileUnlessLost(compile: () => Promise<unknown>, canvas:
   }
 }
 
+/** Runs `draw` with every object under `root` shown and none frustum-culled, then puts each back as it was: one
+ * throwaway draw that meets every buffer (the first-use upload a first frame on screen would otherwise pay). */
+export function withEverythingShown(root: Object3D, draw: () => void): void {
+  const was: Array<{ readonly o: Object3D; readonly visible: boolean; readonly culled: boolean }> = [];
+  root.traverse((o) => {
+    was.push({ o, visible: o.visible, culled: o.frustumCulled });
+    o.visible = true;
+    o.frustumCulled = false;
+  });
+  try {
+    draw();
+  } finally {
+    for (const { o, visible, culled } of was) {
+      o.visible = visible;
+      o.frustumCulled = culled;
+    }
+  }
+}
+
+/** Every texture a material under `root` maps. */
+export function texturesIn(root: Object3D): Texture[] {
+  const out = new Set<Texture>();
+  root.traverse((o) => {
+    const material: unknown = Reflect.get(o, "material");
+    for (const m of Array.isArray(material) ? material : [material]) {
+      const map: unknown = m !== null && typeof m === "object" ? Reflect.get(m, "map") : null;
+      if (map instanceof Texture) out.add(map);
+    }
+  });
+  return [...out];
+}
+
 export interface EngineOptions {
   readonly palette: ScenePalette;
   readonly coaches: number;
@@ -168,6 +200,7 @@ export interface Engine {
 }
 
 export async function createEngine(canvas: HTMLCanvasElement, options: EngineOptions, pause: Pause): Promise<Engine> {
+  await pause(); // the scene's chunk was evaluated in this task: the first step gets a task of its own (≤ 61 ms)
   const world = await buildWorldAsync(toLinePalette(options.palette), { coaches: options.coaches, opacity: weightsFor(options.palette.night) }, pause);
   await pause();
   const { scene, rig, camera } = world;
@@ -252,21 +285,39 @@ export async function createEngine(canvas: HTMLCanvasElement, options: EngineOpt
     drewLast = true;
   }
 
+  const isLost = () => lost || renderer.getContext().isContextLost();
   /** Compiles every shader off the main thread where the browser can (KHR_parallel_shader_compile). */
   const warm = async () => {
     try {
       parts.scan.set(0.5);
       parts.beam.set(true, 1);
       departure.group.visible = true;
-      await compileUnlessLost(() => renderer.compileAsync(scene, camera), canvas, () => lost || renderer.getContext().isContextLost());
+      await compileUnlessLost(() => renderer.compileAsync(scene, camera), canvas, isLost);
     } finally {
       parts.scan.set(1);
       parts.beam.set(false, 0);
       departure.group.visible = false;
     }
   };
+  /** Uploads every buffer and texture now, at load, rather than in the first frame the reader scrolls to: one draw of
+   * everything into a single pixel, cleared at once (the canvas is still hidden). */
+  const upload = () => {
+    if (isLost()) return;
+    for (const texture of texturesIn(scene)) renderer.initTexture(texture);
+    withEverythingShown(scene, () => {
+      renderer.setScissorTest(true);
+      renderer.setViewport(0, 0, 1, 1);
+      renderer.setScissor(0, 0, 1, 1);
+      renderer.render(scene, camera);
+    });
+    renderer.setScissorTest(false);
+    renderer.clear();
+  };
   await pause();
   await warm();
+  await pause();
+  upload();
+  await pause(); // the drawing's start (scene/live.ts) follows in a task of its own
   lost ||= renderer.getContext().isContextLost();
   built = true;
   if (lost) emit<WebglDetail>(WEBGL_EVENT, "lost");

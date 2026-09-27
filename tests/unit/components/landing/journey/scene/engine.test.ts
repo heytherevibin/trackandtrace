@@ -1,9 +1,9 @@
-import { Color, Mesh, PerspectiveCamera, Texture } from "three";
+import { Color, Group, Mesh, MeshBasicMaterial, PerspectiveCamera, Texture } from "three";
 import { describe, expect, it, vi } from "vitest";
 import { anatomyPose } from "@/components/landing/journey/pose";
 import { createBeam } from "@/components/landing/journey/scene/beam";
 import { buildDeparture } from "@/components/landing/journey/scene/departure";
-import { QUALITY, applyLive, compileUnlessLost, dprFor, pickables, qualityAt, toLinePalette, viewport, watchContext, weightsFor } from "@/components/landing/journey/scene/engine";
+import { QUALITY, applyLive, compileUnlessLost, dprFor, pickables, qualityAt, texturesIn, toLinePalette, viewport, watchContext, weightsFor, withEverythingShown } from "@/components/landing/journey/scene/engine";
 import { createGlow } from "@/components/landing/journey/scene/glow";
 import { NIGHT_OPACITY } from "@/components/landing/journey/scene/lines";
 import { createScan } from "@/components/landing/journey/scene/scan";
@@ -48,6 +48,36 @@ describe("the engine's pure pieces (spec §3.B–C; v3's engine.js)", () => {
     expect(world.rig.group.getObjectByName("beam")?.visible).toBe(false);
     applyLive(parts, camera, anatomyPose(0.95, 2), QUALITY[2], false);
     expect(world.rig.coaches.filter((c) => c.obj.visible)).toHaveLength(1);
+  });
+
+  it("shows everything, culls nothing for one draw, then puts every object back as it was, even when the draw throws", () => {
+    const root = new Group();
+    const hidden = new Group();
+    hidden.visible = false;
+    const unculled = new Mesh();
+    unculled.frustumCulled = false;
+    const inner = new Mesh();
+    hidden.add(inner);
+    root.add(hidden, unculled);
+    const during: Array<[boolean, boolean]> = [];
+    withEverythingShown(root, () => root.traverse((o) => during.push([o.visible, o.frustumCulled])));
+    expect(during).toEqual(Array.from({ length: 4 }, () => [true, false]));
+    expect([root.visible, hidden.visible, inner.visible, unculled.visible]).toEqual([true, false, true, true]);
+    expect([root.frustumCulled, hidden.frustumCulled, inner.frustumCulled, unculled.frustumCulled]).toEqual([true, true, true, false]);
+    expect(() =>
+      withEverythingShown(root, () => {
+        throw new Error("lost");
+      }),
+    ).toThrow("lost");
+    expect(hidden.visible).toBe(false);
+  });
+
+  it("finds every texture the scene's materials map, each once", () => {
+    const map = new Texture();
+    const root = new Group();
+    root.add(new Mesh(undefined, new MeshBasicMaterial({ map })), new Mesh(undefined, [new MeshBasicMaterial(), new MeshBasicMaterial({ map })]));
+    expect(texturesIn(root)).toEqual([map]);
+    expect(texturesIn(parts.world.scene)).toHaveLength(3); // the nameboard, the glow and the pool
   });
 
   it("picks only the locomotive's own fills, each naming its part", () => {

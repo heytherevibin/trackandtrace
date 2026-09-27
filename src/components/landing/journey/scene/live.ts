@@ -59,7 +59,9 @@ function palette(): ScenePalette {
   return p;
 }
 
-/** Waits for the page: scheduler.yield where the browser has it, else a task. */
+/** Waits for the page: scheduler.yield where the browser has it, else a task. The scene keeps its own rather than the
+ * journey's (../pause.ts): a trace (Long Animation Frames) names the work after a yield for the script that called
+ * scheduler.yield, so the scene's steps read as the scene's, and scripts/journey-perf.mjs can hold them to 61 ms. */
 function pause(): Promise<void> {
   const scheduler: unknown = Reflect.get(window, "scheduler");
   const yielding: unknown = typeof scheduler === "object" && scheduler !== null ? Reflect.get(scheduler, "yield") : undefined;
