@@ -88,10 +88,15 @@ export interface JourneyContext {
 export type Teardown = () => void;
 export type JourneyModule = (ctx: JourneyContext) => Teardown;
 
+export interface JourneyOptions {
+  /** The frame meter is allowed here (preview deployments and development, J5-10). */
+  readonly hud?: boolean;
+}
+
 /** In start order. Later tasks append their modules here. */
 export const MODULES: readonly JourneyModule[] = [startArrivals, startBoard, startStationProgress, startHero, startChapters, startBerths, startClock, startRoute, startCursor, startSound, startDrawing, startStill];
 
-export function startJourney(): Teardown {
+export function startJourney(options: JourneyOptions = {}): Teardown {
   const html = document.documentElement;
   let teardowns: Teardown[] = [];
   let resizeTimer = 0;
@@ -157,6 +162,10 @@ export function startJourney(): Teardown {
     life.end();
     scene.set(null);
     throw error;
+  }
+  // The frame meter (J5-10): its own chunk, fetched only when allowed and asked for; it ends with the journey.
+  if (options.hud && new URLSearchParams(window.location.search).has("journey-hud")) {
+    void import("./hud").then(({ startHud }) => life.atEnd(startHud()), () => undefined);
   }
   settleFrame = requestAnimationFrame(() => {
     settleFrame = requestAnimationFrame(() => {

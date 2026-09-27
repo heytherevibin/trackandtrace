@@ -161,3 +161,10 @@ html[data-journey="on"] #anatomy.is-live [data-live="list"] .anatomy-legend { po
 @media (max-height: 520px) and (orientation: landscape) {
   html[data-journey="on"] #anatomy.is-live [data-live="list"] .anatomy-legend { top: calc(var(--anatomy-copy-h, 0px) + 10px); bottom: 10px; left: auto; width: 36%; grid-template-columns: 1fr; align-content: center; border-top: 0; border-left: 1px solid var(--line); padding: 0 0 0 12px; }
 }
+
+/* ---- The frame meter: previews and development only, with ?journey-hud (J5-10) */
+html[data-journey="on"] .journey-hud { position: fixed; right: 12px; bottom: 12px; z-index: var(--z-toast); min-width: 17rem; padding: 6px 10px 8px; background: var(--surface-1); border: 1px solid var(--line-strong); color: var(--ink-1); font-size: var(--text-xs); }
+html[data-journey="on"] .journey-hud > div { display: flex; gap: 8px; align-items: center; }
+html[data-journey="on"] .journey-hud > div > span { flex: 1; font-family: var(--font-display); font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
+html[data-journey="on"] .journey-hud button { min-height: 32px; padding: 0 8px; border: 1px solid var(--line); background: var(--surface-0); }
+html[data-journey="on"] .journey-hud pre { margin: 6px 0 0; font-family: ui-monospace, monospace; white-space: pre; }

@@ -74,4 +74,11 @@ describe("JourneyLoader", () => {
     const live = startJourney.mock.calls.length - stops.filter((s) => s.mock.calls.length > 0).length;
     expect(live).toBe(1);
   });
+
+  it("tells the journey whether the frame meter is allowed", async () => {
+    const startJourney = vi.fn(() => () => {});
+    render(<JourneyLoader load={async () => ({ startJourney })} hud />);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(startJourney).toHaveBeenCalledWith({ hud: true });
+  });
 });
