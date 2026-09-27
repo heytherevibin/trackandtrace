@@ -36,19 +36,22 @@ try {
   await page.route("http://bake.local/", (route) => route.fulfill({ status: 200, contentType: "text/html", body: html }));
   await page.goto("http://bake.local/");
   await page.waitForFunction(() => typeof window.bake === "function", null, { timeout: 30_000 });
-  rmSync(OUT, { recursive: true, force: true });
-  mkdirSync(OUT, { recursive: true });
+  const outputs = [];
   const shapes = {};
   for (const [name, shape] of Object.entries(SHAPES)) {
     const t0 = Date.now();
     const result = await page.evaluate((config) => window.bake(config), { kind: shape.kind, W: shape.W, H: shape.H });
     const svg = shapeSvg(result.paths);
     const file = `${shape.file}.${contentHash(svg)}.svg`;
-    writeFileSync(join(OUT, file), svg);
+    outputs.push([file, svg]);
     shapes[name] = { href: `/journey/${file}`, viewBox: result.viewBox, parts: partsOf(result.paths), anchors: result.anchors };
     console.log(`${name}: ${result.segments} edges, ${result.runs} visible stretches, ${(svg.length / 1024).toFixed(0)} KB, ${(gzipSync(svg).length / 1024).toFixed(1)} KB gzip (${Date.now() - t0} ms)`);
   }
   if (errors.length) throw new Error(`the bake page failed: ${errors.join("; ")}`);
+  // Only now, with every shape in hand, replace what is on disk: a failed bake leaves the last good one.
+  rmSync(OUT, { recursive: true, force: true });
+  mkdirSync(OUT, { recursive: true });
+  for (const [file, svg] of outputs) writeFileSync(join(OUT, file), svg);
   writeFileSync(MANIFEST, manifestSource({ sourceHash: sourceHash(ROOT), shapes }));
 } finally {
   await browser.close();

@@ -104,7 +104,7 @@ export function cropBox(runs: readonly Run[], isTrain: (i: number) => boolean, m
 }
 
 /** Round to the nearest half pixel: finer than a hairline can show, and it keeps a page's stills within budget (§3.H). */
-export const f1 = (v: number): number => Math.round(v * 2) / 2;
+export const half = (v: number): number => Math.round(v * 2) / 2;
 
 /** Chains stretches that meet end to start into one polyline (v3's greedy `byStart`/`used` chain). */
 export function chainPath(list: readonly Quad[]): string {
@@ -120,14 +120,14 @@ export function chainPath(list: readonly Quad[]): string {
   list.forEach((s, idx) => {
     if (used[idx]) return;
     used[idx] = 1;
-    let x = f1(s[0]);
-    let y = f1(s[1]);
+    let x = half(s[0]);
+    let y = half(s[1]);
     d += `M${x} ${y}`;
     let cur = s;
     for (;;) {
-      const nx = f1(cur[2]);
-      const ny = f1(cur[3]);
-      d += `l${f1(nx - x)} ${f1(ny - y)}`;
+      const nx = half(cur[2]);
+      const ny = half(cur[3]);
+      d += `l${half(nx - x)} ${half(ny - y)}`;
       x = nx;
       y = ny;
       const next = (byStart.get(k(cur[2], cur[3])) ?? []).find((j) => !used[j]);

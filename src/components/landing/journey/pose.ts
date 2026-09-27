@@ -44,6 +44,7 @@ const LOCO_CENTRE = -10.15;
 /** Where the chapter rests when it is drawn still: fully apart, its callouts showing. */
 export const STILL_ANATOMY = 0.4;
 
+// z adds target[2], which v3 omitted: inert while every target's z is 0.
 function orbit(target: Vec3, yaw: number, pitch: number, dist: number): Vec3 {
   return [target[0] + Math.sin(yaw) * Math.cos(pitch) * dist, target[1] + Math.sin(pitch) * dist, target[2] + Math.cos(yaw) * Math.cos(pitch) * dist];
 }

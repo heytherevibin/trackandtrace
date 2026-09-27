@@ -1,6 +1,6 @@
-import { Box3, Color, Group, LineSegments, Vector3 } from "three";
+import { Box3, Color, Group, LineSegments, Object3D, Vector3 } from "three";
 import { describe, expect, it } from "vitest";
-import { buildRig, rigSteps, type Rig } from "@/components/landing/journey/scene/rig";
+import { RIG_PARTS, allParts, buildRig, rigSteps, type Rig } from "@/components/landing/journey/scene/rig";
 import { baseOf, createStyle, edgesOf, type LineStyle } from "@/components/landing/journey/scene/lines";
 import { CALLOUT_PARTS } from "@/components/landing/journey/train-parts";
 
@@ -13,6 +13,20 @@ const offset = (id: keyof Rig["parts"]) => rig.parts[id].obj.position.clone().su
 describe("the drawn train's rig", () => {
   it("has the ten labelled parts, and the tanks", () => {
     expect(Object.keys(rig.parts).sort()).toEqual([...CALLOUT_PARTS, "tanks"].sort());
+  });
+
+  it("exposes the locomotive and the trailing pantograph's head, for the scan and the glow (J5)", () => {
+    expect(rig.loco.parent).toBe(rig.group);
+    for (const id of RIG_PARTS) expect(rig.parts[id].obj.parent).toBe(rig.loco);
+    const chain: Object3D[] = [];
+    for (let o: Object3D | null = rig.pantoHead; o; o = o.parent) chain.push(o);
+    expect(chain).toContain(rig.parts.pantoRear.obj);
+  });
+
+  it("refuses a rig missing any of its eleven parts", () => {
+    const ten = Object.fromEntries(Object.entries(rig.parts).filter(([id]) => id !== "tanks"));
+    expect(() => allParts(ten)).toThrow(/tanks/);
+    expect(Object.keys(allParts(rig.parts)).sort()).toEqual([...RIG_PARTS].sort());
   });
 
   it("takes each part apart along its own line, the roof a little after the shell", () => {

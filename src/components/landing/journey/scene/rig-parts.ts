@@ -1,3 +1,7 @@
+// Builders for the drawn train's parts: body sections, bogies, wheels, cab ends, the pantograph and the
+// LHB coach. Geometry is built from primitives in metres (x along the track, the train facing +x, y up
+// from the rail top, z toward the viewer) and drawn as hairline edges (see lines.ts).
+// Ported from prototype v3's scene/rig-parts.js (361 lines).
 import {
   BoxGeometry,
   BufferAttribute,
@@ -20,17 +24,12 @@ import { box, boxGeo, cyl, mesh } from "./util";
 import { cloneShared, drawn, mergeAll, setBase, type LineStyle } from "./lines";
 import { TAU, clamp } from "./math";
 
-// Builders for the drawn train's parts: body sections, bogies, wheels, cab ends, the pantograph and the
-// LHB coach. Geometry is built from primitives in metres (x along the track, the train facing +x, y up
-// from the rail top, z toward the viewer) and drawn as hairline edges (see lines.ts).
-// Ported from prototype v3's scene/rig-parts.js (361 lines).
-
 /** A named set of materials a builder paints with. Materials are irrelevant to a drawing (see `M` below). */
 export type MaterialMap = Readonly<Record<string, MeshBasicMaterial>>;
 
 // Materials are irrelevant to a drawing; every builder receives the same placeholder.
 const PLACEHOLDER = new MeshBasicMaterial();
-export const M: Readonly<Record<string, MeshBasicMaterial>> = new Proxy<Readonly<Record<string, MeshBasicMaterial>>>({}, { get: () => PLACEHOLDER });
+export const M: MaterialMap = new Proxy<MaterialMap>({}, { get: () => PLACEHOLDER });
 
 export const GAUGE_Z = 0.865; // wheel centre, either side of the track axis
 
@@ -265,6 +264,8 @@ export function cabNose(m: MaterialMap): Group {
 /** A single-arm pantograph. Returns its group and a setter for how far it is raised (0..1). */
 export interface Pantograph {
   readonly group: Group;
+  /** The collector head, where the Night glow hangs (J5). */
+  readonly head: Group;
   readonly set: (t: number) => void;
 }
 
@@ -314,7 +315,7 @@ export function pantograph(m: MaterialMap): Pantograph {
     head.rotation.z = -a2;
   };
   set(0);
-  return { group: g, set };
+  return { group: g, head, set };
 }
 
 // ---------------------------------------------------------------------------------------------

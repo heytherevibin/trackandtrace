@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chainPath, cropBox, f1, idColour, idReader, pathsByPart, walkRuns, type IdAt, type Run } from "../../../scripts/bake/trace";
+import { chainPath, cropBox, half, idColour, idReader, pathsByPart, walkRuns, type IdAt, type Run } from "../../../scripts/bake/trace";
 
 /** A synthetic ID image: `paint(x, y)` says which edge id (0 = none) each pixel holds. */
 function image(W: number, H: number, paint: (x: number, y: number) => number): IdAt {
@@ -77,7 +77,7 @@ describe("cropping and writing paths", () => {
   });
 
   it("rounds to the nearest half pixel, which the eye cannot tell from a tenth at a hairline (§3.H budget)", () => {
-    expect([f1(1.24), f1(1.26), f1(-0.3), f1(7.75)]).toEqual([1, 1.5, -0.5, 8]);
+    expect([half(1.24), half(1.26), half(-0.3), half(7.75)]).toEqual([1, 1.5, -0.5, 8]);
     expect(chainPath([[0.2, 0.3, 2.3, 4.8]])).toBe("M0 0.5l2.5 4.5");
   });
 

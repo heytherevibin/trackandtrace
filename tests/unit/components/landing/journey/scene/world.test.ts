@@ -2,7 +2,7 @@ import { Color, Fog, Vector3 } from "three";
 import { describe, expect, it } from "vitest";
 import { STILL_ANATOMY, anatomyPose, terminusPose } from "@/components/landing/journey/pose";
 import { applyPose } from "@/components/landing/journey/scene/apply-pose";
-import { buildWorld } from "@/components/landing/journey/scene/world";
+import { buildWorld, buildWorldAsync } from "@/components/landing/journey/scene/world";
 
 const INK = new Color(0, 0, 0);
 const PALETTE = { ground: INK, ink: INK, steel: INK, steelText: INK };
@@ -35,5 +35,17 @@ describe("the drawn train's world", () => {
     expect(world.rig.coaches.every((c) => c.obj.visible)).toBe(true);
     expect(world.scene.getObjectByName("wires")?.visible).toBe(true);
     expect(world.rig.group.position.x).toBeCloseTo(0, 9);
+  });
+
+  it("builds the same world a part at a time, yielding to the page between parts (J5)", async () => {
+    let pauses = 0;
+    const built = await buildWorldAsync(PALETTE, { coaches: 2 }, async () => {
+      pauses += 1;
+    });
+    expect(pauses).toBeGreaterThanOrEqual(8);
+    expect(built.rig.coaches).toHaveLength(2);
+    expect(built.rig.group.parent).toBe(built.scene);
+    expect(built.scene.getObjectByName("wires")).toBeDefined();
+    expect(built.scene.background).toBeNull();
   });
 });
