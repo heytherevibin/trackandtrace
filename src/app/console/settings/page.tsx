@@ -83,7 +83,7 @@ export default async function SettingsPage() {
         <h1 className="optical-hang tracking-head mt-2 text-4xl">{m.title}</h1>
         <p className="text-ink-1/70 mt-2">{m.lead}</p>
       </header>
-      <LimitsPlate limits={limits} />
+      <LimitsPlate limits={limits} environment={environment} />
     </ConsoleFrame>
   );
 }
