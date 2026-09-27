@@ -7,7 +7,7 @@ import { STAGGER, T } from "./motion-tokens";
 import { watchEntrances } from "./observers";
 import type { JourneyContext, Teardown } from "./start-journey";
 
-// The departure board while the journey runs (spec §3.A): the status column follows the strip's station, and
+// The departure board while the journey runs (spec §3.A): the status column follows the page's station (station-progress.ts), and
 // changed statuses flip in; the rows' names and statuses flip in again whenever the board comes back into view.
 // Flaps are characters on their own axis, turned by transform only, then written back as plain text.
 
