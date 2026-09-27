@@ -185,14 +185,18 @@ describe("today's reality: the rail and its phone trigger render for an Owner an
     expect(within(drawer).getByRole("link", { name: /Audit log/ })).toHaveAttribute("href", "/audit-log");
   });
 
-  // An Admin's rail is the Audit log alone: Team is Owner-only, so the Configure group is dropped
-  // entirely rather than rendered empty.
-  it("gives an Admin the Record group and nothing else", () => {
+  // An Admin now gets Configure too, and with exactly one module in it: 11 Switches & settings
+  // flipped on 2026-09-27 and is Owner+Admin, where 13 Team in the same group is Owner-only. So the
+  // group is rendered, and rendered SHORT — which is the case that would have hidden a bug where a
+  // group's presence was inferred from the Owner's copy of it rather than this role's.
+  it("gives an Admin Configure and Record, with Team absent from Configure", () => {
     render(<ConsoleRail groups={railFor("admin")} />);
     const rail = screen.getByRole("navigation", { name: "Console" });
     expect(within(rail).getByText("Record")).toBeVisible();
-    expect(within(rail).queryByText("Configure")).not.toBeInTheDocument();
-    expect(within(rail).getAllByRole("link")).toHaveLength(1);
+    expect(within(rail).getByText("Configure")).toBeVisible();
+    expect(within(rail).queryByRole("link", { name: /Team/ })).not.toBeInTheDocument();
+    expect(within(rail).getByRole("link", { name: /Switches/ })).toHaveAttribute("href", "/settings");
+    expect(within(rail).getAllByRole("link")).toHaveLength(2);
   });
 });
 

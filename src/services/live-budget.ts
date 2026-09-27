@@ -107,3 +107,22 @@ export function createLiveBudget(options: LiveBudgetOptions): LiveBudget {
     },
   };
 }
+
+/**
+ * Today's spend, read without taking any of it — the meter module 11 draws ("157 used today").
+ *
+ * Null, never zero, when the counter cannot be read. "0 used today" is a claim about a quiet day;
+ * an unread counter is an absence, and drawing the first for the second tells an operator the site
+ * is idle when it may be busy. The key is the one `take` increments, and the IST day is the one it
+ * groups by, so the meter and the limit can never be counting different days.
+ */
+export async function liveSpendToday(kv: Kv, prefix: string, now: () => number = () => Date.now()): Promise<number | null> {
+  try {
+    const raw = await kv.get(`${prefix}:budget:live:${istDate(new Date(now()))}`);
+    if (raw === null) return 0;
+    const used = Number(raw);
+    return Number.isFinite(used) && used >= 0 ? used : null;
+  } catch {
+    return null;
+  }
+}

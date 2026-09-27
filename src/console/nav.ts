@@ -53,7 +53,11 @@ export const CONSOLE_MODULES: readonly ConsoleModule[] = [
   { num: "08", label: "Accounts", group: "people", roles: OWNER_ADMIN, href: consoleHref("/accounts"), built: false },
   { num: "09", label: "Privacy requests", group: "queues", roles: OWNER_ADMIN_SUPPORT, href: consoleHref("/privacy-requests"), built: false },
   { num: "10", label: "Wrong-status reports", group: "queues", roles: OWNER_ADMIN_SUPPORT, href: consoleHref("/wrong-status-reports"), built: false },
-  { num: "11", label: "Switches & settings", group: "configure", roles: OWNER_ADMIN, href: consoleHref("/settings"), built: false },
+  // 2026-09-27: src/app/console/settings/page.tsx exists, so this flips. It draws one plate of the
+  // three the sheet has, and one row of that plate's two — `live_checks_per_day` is the only switch
+  // in console.settings that anything reads, so it is the only one with a control. The rail links
+  // to what is there.
+  { num: "11", label: "Switches & settings", group: "configure", roles: OWNER_ADMIN, href: consoleHref("/settings"), built: true },
   { num: "12", label: "Provider keys", group: "configure", roles: OWNER_ONLY, href: consoleHref("/provider-keys"), built: false },
   // Sheet's access.Admin (Main.dc.html:295) excludes '13': Owner only, not Owner+Admin as the brief's table said.
   // The first module to be built (2d-2 task-8): src/app/console/team/page.tsx exists, so this is the

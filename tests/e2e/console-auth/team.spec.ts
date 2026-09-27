@@ -61,8 +61,10 @@ test.describe("Team", () => {
     const owner = await setUpFirstOwner(page, base);
     await expectSignedInAs(page, owner.name, owner.role);
 
-    // 2015511 made the rail live for the first time: 13 Team is the one module with `built: true`,
-    // and it is Owner-only, so this is the first role for which a rail is drawn at all.
+    // 2015511 made the rail live for the first time: 13 Team was then the one module with
+    // `built: true`, and being Owner-only it made the Owner the first role to get a rail at all.
+    // Three are built now — 11, 13 and 14 — and 11 shares Configure with 13, so the link is clicked
+    // by its exact name rather than by being the only one in its group.
     const rail = page.getByRole("navigation", { name: "Console" });
     await expect(rail.getByText("Configure")).toBeVisible();
     await rail.getByRole("link", { name: "Team", exact: true }).click();
