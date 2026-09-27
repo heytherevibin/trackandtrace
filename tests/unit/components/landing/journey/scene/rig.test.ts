@@ -1,7 +1,9 @@
-import { Box3, Color, Group, LineSegments, Object3D, Vector3 } from "three";
+import { Box3, Color, Group, LineSegments, Mesh, Object3D, Vector3 } from "three";
 import { describe, expect, it } from "vitest";
 import { RIG_PARTS, allParts, buildRig, rigSteps, type Rig } from "@/components/landing/journey/scene/rig";
 import { baseOf, createStyle, edgesOf, type LineStyle } from "@/components/landing/journey/scene/lines";
+import { coachSteps, drawnPart, drawnPartSteps } from "@/components/landing/journey/scene/rig-parts";
+import { box } from "@/components/landing/journey/scene/util";
 import { CALLOUT_PARTS } from "@/components/landing/journey/train-parts";
 
 const INK = new Color(0, 0, 0);
@@ -104,6 +106,28 @@ describe("the drawn train's rig", () => {
     }
     expect(steps).toBeGreaterThanOrEqual(9);
     expect(out.rig?.coaches).toHaveLength(1);
+  });
+
+  it("yields between each shell's merged fill and its edges, the two costliest steps split (spec §3.H: ≤ 61 ms each)", () => {
+    // before the split: 10 steps for a one-coach rig (and 1 in the coach's own); the loco's shell and the coach's body
+    // each gain one
+    expect([...rigSteps(style, { coaches: 1 }, {})]).toHaveLength(12);
+    expect([...coachSteps(style, [], {})]).toHaveLength(2);
+  });
+
+  it("draws a part a step at a time exactly as at once: the fill merged first, then after a yield its edges", () => {
+    const build = (g: Group) => {
+      box(g, style.fill, 1, 2, 3, 0.5, 0, 0);
+      box(g, style.fill, 2, 1, 1, -1, 1, 0);
+    };
+    const whole = drawnPart(build, style, { threshold: 22 });
+    const out: { part?: Group } = {};
+    const steps = drawnPartSteps(build, style, out, { threshold: 22 });
+    expect(steps.next().done).toBe(false);
+    expect(out.part).toBeUndefined();
+    expect(steps.next().done).toBe(true);
+    const positions = (g: Group | undefined) => (g?.children ?? []).map((c) => (c instanceof Mesh || c instanceof LineSegments ? [...c.geometry.getAttribute("position").array] : []));
+    expect(positions(out.part)).toEqual(positions(whole));
   });
 
   it("draws only hairlines over fills", () => {

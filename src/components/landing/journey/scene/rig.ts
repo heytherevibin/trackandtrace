@@ -17,6 +17,7 @@ import {
   cabNose,
   coachSteps,
   drawnPart,
+  drawnPartSteps,
   extrudeSection,
   featureLines,
   pantograph,
@@ -119,7 +120,8 @@ export function* rigSteps(style: LineStyle, opts: { readonly coaches?: number },
   };
 
   const prof = bodyProfile({ hw: hw - 0.05, bottom: LOCO.bottom + 0.05, eave: LOCO.eave, crown: LOCO.crown - 0.05, eaveW: 0.26 });
-  const shell = drawnPart((g) => {
+  const body: { part?: Group } = {};
+  yield* drawnPartSteps((g) => {
     g.add(mesh(extrudeSection(prof.pts, bodyHalf * 2, 0.1), M.x));
     for (const s of [-1, 1]) {
       const z = s * (hw + 0.004);
@@ -133,7 +135,9 @@ export function* rigSteps(style: LineStyle, opts: { readonly coaches?: number },
       box(g, M.x, 0.6, 0.42, 0.03, -6.9, 2.95, s * (hw + 0.02), 0.02);
       box(g, M.x, bodyHalf * 2 + 1.2, 0.26, 0.08, 0, 1.12, s * (hw - 0.02));
     }
-  }, style);
+  }, style, body);
+  const shell = body.part;
+  if (!shell) throw new Error("rig: the locomotive's shell finished without a part");
   shell.add(featureLines(prof, bodyHalf * 2, style));
   part("shell", shell, [0, 0.9, 0], [2.9, 2.95, hw + 0.03]);
   yield;

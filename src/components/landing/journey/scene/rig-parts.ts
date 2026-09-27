@@ -321,10 +321,24 @@ export function pantograph(m: MaterialMap): Pantograph {
 // ---------------------------------------------------------------------------------------------
 // Drawn parts
 
-export function drawnPart(build: (g: Group) => void, style: LineStyle, opts?: { readonly threshold?: number; readonly lineMat?: LineBasicMaterial }): Group {
+type DrawnOptions = { readonly threshold?: number; readonly lineMat?: LineBasicMaterial };
+
+/** A part drawn a step at a time (spec §3.H: ≤ 61 ms a step at 4× CPU): its pieces built and merged into one fill,
+ * then, after a yield, its edges found. The same drawing as drawnPart; the part lands in `out.part`. */
+export function* drawnPartSteps(build: (g: Group) => void, style: LineStyle, out: { part?: Group }, opts?: DrawnOptions): Generator<void, void, void> {
   const g = new Group();
   build(g);
-  return drawn(mergeAll(g), style, opts);
+  const merged = mergeAll(g);
+  yield;
+  out.part = drawn(merged, style, opts);
+}
+
+export function drawnPart(build: (g: Group) => void, style: LineStyle, opts?: DrawnOptions): Group {
+  const out: { part?: Group } = {};
+  const steps = drawnPartSteps(build, style, out, opts);
+  while (!steps.next().done);
+  if (!out.part) throw new Error("drawnPart: its steps finished without a part");
+  return out.part;
 }
 
 /** Long lines along a body where a smooth roof arch would otherwise draw no edge at all. */
@@ -385,7 +399,8 @@ export function* coachSteps(style: LineStyle, wheels: WheelInstance[], out: { co
   const prof = bodyProfile({ hw: hw - 0.05, bottom: COACH.bottom + 0.05, eave: COACH.eave, crown: COACH.crown - 0.05 });
   const coach = new Group();
   const windows: ReadonlyArray<readonly [number, number, number, number]> = [[-4.2, 1.8, 0.5, 0.65], [-1.1, 2.4, 0.42, -0.6], [1.9, 1.4, 0.55, 0.7], [4.4, 1.6, 0.38, -0.5]];
-  const shell = drawnPart((g) => {
+  const body: { part?: Group } = {};
+  yield* drawnPartSteps((g) => {
     g.add(mesh(extrudeSection(prof.pts, L, 0.1), M.x));
     g.add(mesh(roofCap(prof, L - 0.3), M.x));
     for (const s of [-1, 1]) {
@@ -404,7 +419,9 @@ export function* coachSteps(style: LineStyle, wheels: WheelInstance[], out: { co
     }
     box(g, M.x, L - 1.2, 0.3, 2.6, 0, 0.93, 0);
     for (const [x, w, h, z] of windows) box(g, M.x, w, h, 0.9, x, 0.93 - h / 2 - 0.1, z, 0.03);
-  }, style);
+  }, style, body);
+  const shell = body.part;
+  if (!shell) throw new Error("rig: the coach's body finished without a part");
   shell.add(featureLines(prof, L, style));
   coach.add(shell);
   yield;
