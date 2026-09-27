@@ -129,10 +129,10 @@ The controller's pre-flight scan raised 25 findings; each ruling below is alread
   - Every file stays under 500 lines, `scripts/**/*.mjs` included.
 - **TDD.** Write the failing test first, and watch it fail for the right reason before implementing.
 - **Pins.** `three` stays `0.186.0` and `animejs` stays `4.5.0`. Add no dependency.
-- **three.js only in the scene chunk.** Only `src/components/landing/journey/scene/*.ts` and `scripts/bake/page.ts` import `"three"`. The journey chunk reaches the scene only through the dynamic `import("./scene/live")` in `drawing.ts`. Type-only imports (`import type`) are allowed anywhere. A still page never downloads three.js, except while `place` is the only reason, when the scene prepares in the background (J5-2), or when the scene's own fit check finds the drawing cannot fit its window (it needs the scene to measure).
+- **three.js only in the scene chunk.** Only `src/components/landing/journey/scene/*.ts` and `scripts/bake/page.ts` import `"three"`. The journey chunk reaches the scene only through the dynamic `import("./scene/live")` in `drawing.ts`. Type-only imports (`import type`) are allowed anywhere. A still page never downloads three.js, except while `place` is the only reason, when the scene prepares in the background (J5-2), or when the live chapter's fit check finds the drawing cannot fit its window. That check (`live-labels.ts` `layout()`) is a DOM measurement with no three.js, but of the pinned layout, which exists only once the live chapter is laid out, after the scene has loaded.
 - **Budgets, verbatim from spec §3.H:**
   - Journey chunk ≤ 70 KB compressed;
-  - Scene chunk ≤ 240 KB compressed, live only, except while `place` is the only reason, or when the scene's own fit check finds the drawing cannot fit its window (§3.C);
+  - Scene chunk ≤ 240 KB compressed, live only, except while `place` is the only reason, or when the live chapter's fit check finds the drawing cannot fit its window (§3.C);
   - Still drawings ≤ 60 KB compressed per page;
   - Longest journey task at load, 4× CPU phone ≤ 120 ms (scene steps ≤ 61 ms);
   - Scroll, reference desktop: p95 ≤ 12 ms, 0% > 25 ms;
@@ -4867,6 +4867,7 @@ await browser.close();
 - **The dev probe** `window.__ttJourney` does not exist in production builds (J5-13). The nightly's production-build smoke must not use it; the collisions at 15 sizes run on `next dev`, where it does.
 - **WebKit** (spec §8) has not run the live drawing. The nightly's WebKit project should run `live-drawing.spec.ts` and `drawing-modes.spec.ts`.
 - **CI draws through SwiftShader.** If a spec ever meets a governor step, the frames it drew were slow on the CPU rasteriser, not a product fault; hold that spec to `drawStill` only if it is about the still.
+- **The fit check** could run before the scene import, as a trial layout of the pinned chapter (it measures the DOM, not the rig): readers whose window cannot fit the drawing would then be spared the scene's download (~156 KB).
 - **The window-seat run** starts below the terminus of GA's pin. #anatomy is 520vh (430vh narrow) while live, so any fixed-offset assumption in the run's specs must measure, not assume.
 
 ## Self-review notes
