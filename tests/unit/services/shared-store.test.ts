@@ -3,7 +3,7 @@ import { MemoryCache } from "@/services/cache";
 import { parseEnv } from "@/services/env";
 import { EncryptedRedisCache } from "@/services/redis-cache";
 import { UNLIMITED_BUDGET } from "@/services/live-budget";
-import { createPnrCache, createRateLimiter, limitedLogForReading, liveBudget, providerGuard, publicStore, publicStoreForReading, resetLocalState } from "@/services/shared-store";
+import { addressMember, blocksForConsole, createPnrCache, createRateLimiter, limitedLogForReading, liveBudget, providerGuard, publicStore, publicStoreForReading, resetLocalState } from "@/services/shared-store";
 import { readUsageHistory } from "@/services/usage";
 import type { SourceOutcome } from "@/services/sources/outcome";
 
@@ -74,6 +74,32 @@ describe("createRateLimiter and limitedLogForReading", () => {
   it("fails a read when the shared store cannot be reached", async () => {
     const current = envOf({ NODE_ENV: "test", KV_REST_API_URL: "http://127.0.0.1:1", KV_REST_API_TOKEN: "t", DATA_KEY });
     await expect(limitedLogForReading(current).today(10, Date.now())).rejects.toThrow();
+  });
+});
+
+describe("blocking, end to end over this instance's memory", () => {
+  it("refuses a blocked address's next traveller check, and lets it through once lifted", async () => {
+    const current = envOf({ NODE_ENV: "test" });
+    const limiter = createRateLimiter(current);
+    const blocks = blocksForConsole(current);
+    const member = addressMember(current, "192.0.2.44");
+    const now = Date.now();
+
+    await blocks.list.block(member, { note: "", by: "Asha Rao", since: now, until: null, keyId: blocks.keyId });
+    blocks.invalidate();
+    expect((await limiter.check("pnr:192.0.2.44", 20, 60_000)).ok).toBe(false);
+    expect((await limiter.check("pnr:192.0.2.45", 20, 60_000)).ok).toBe(true);
+
+    await blocks.list.unblock(member);
+    blocks.invalidate();
+    expect((await limiter.check("pnr:192.0.2.44", 20, 60_000)).ok).toBe(true);
+  });
+
+  it("hashes an address the way the limited log does, so a Most limited row blocks the same address", () => {
+    const current = envOf({ NODE_ENV: "test" });
+    expect(addressMember(current, "192.0.2.44")).toMatch(/^4\.[A-Za-z0-9_-]{43}$/);
+    expect(addressMember(current, "2001:db8:0:1::5")).toMatch(/^6\./);
+    expect(addressMember(current, "2001:db8:0:1::5")).toBe(addressMember(current, "2001:db8:0:1::9"));
   });
 });
 

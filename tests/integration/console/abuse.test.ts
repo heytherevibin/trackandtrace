@@ -9,12 +9,13 @@ const { requireConsoleMember, redirect, today } = vi.hoisted(() => ({
   today: vi.fn<(n: number, at: number) => Promise<{ readonly total: number; readonly top: readonly never[] }>>(async () => ({ total: 0, top: [] })),
 }));
 vi.mock("@/console/auth/guard", () => ({ requireConsoleMember }));
-vi.mock("next/navigation", () => ({ redirect }));
+vi.mock("next/navigation", () => ({ redirect, useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock("@/console/overview/pings", () => ({ pingStore: async () => "local" }));
 vi.mock("@/services/runtime-settings", () => ({ liveChecksPerDay: async () => 300 }));
 vi.mock("@/services/shared-store", async (original) => ({
   ...(await original<typeof import("@/services/shared-store")>()),
   limitedLogForReading: () => ({ today, record: vi.fn() }),
+  blocksForConsole: () => ({ list: { list: async () => [], block: vi.fn(), unblock: vi.fn(), countRefused: vi.fn() }, keyId: "local", invalidate: vi.fn() }),
 }));
 
 import AbusePage from "@/app/console/abuse/page";

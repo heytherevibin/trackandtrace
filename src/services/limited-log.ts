@@ -80,11 +80,11 @@ function networkOf(address: string): AddressNetwork {
 }
 
 /** What is stored: the kind, a dot, the hash. base64url has no dot, so the first one splits them. */
-function memberFor(address: string, hash: (address: string) => string): string {
+export function memberFor(address: string, hash: (address: string) => string): string {
   return `${KIND[networkOf(address)]}.${hash(address)}`;
 }
 
-function readMember(member: string): { readonly hash: string; readonly network: AddressNetwork } {
+export function readMember(member: string): { readonly hash: string; readonly network: AddressNetwork } {
   const dot = member.indexOf(".");
   const kind = member.slice(0, dot);
   return { hash: member.slice(dot + 1), network: kind === "4" ? "ipv4" : kind === "6" ? "ipv6" : "unknown" };
