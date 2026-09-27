@@ -7,9 +7,10 @@ import { FooterSections } from "./footer-sections";
 import { COLUMN_HEAD, COLUMN_LINK, COLUMN_LIST } from "./footer-styles";
 import { FooterSwitch } from "./footer-switch";
 import { IstClock } from "./ist-clock";
+import { MotionToggle } from "./motion-toggle";
 import { PRIMARY_NAV } from "./nav-config";
 
-/** The landing's footer: brand and disclaimer, Sections, Product, Company; then one bar with the copyright, service status and clock. */
+/** The landing's footer: brand and disclaimer, Sections, Product, Company; then one bar with the copyright, service status, clock and the Motion switch. */
 function FullFooter() {
   const m = messages.shell.footer;
   const status = serviceStatus();
@@ -70,6 +71,7 @@ function FullFooter() {
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
             <ServicePill status={status} />
             <IstClock />
+            <MotionToggle />
           </div>
         </div>
       </div>

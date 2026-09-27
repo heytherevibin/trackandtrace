@@ -1,0 +1,314 @@
+# Landing journey — design
+
+Date: 2026-09-24 · Status: **approved 2026-09-24**, with the J1 plan · Owner: Vibin Mathew
+
+The landing ("/") becomes a train-themed scroll journey in the app's own Industry look: a drawn WAP-7-style
+locomotive that is scanned, taken apart, labelled, coupled up and sent on its way as the page scrolls, and
+every section around it turned into a railway instrument. The approved reference is prototype v3
+(https://claude.ai/artifact/Bimwag2w9J1qTtHGUsd6u2, Version 3, build sha256 `8d830410…`), verified by a
+scripted gate before approval. This spec turns it into the app: what ships, how it fits the codebase, how it
+fails, how it is tested, and in what order it lands.
+
+## 1. Where things stand
+
+- The landing is `src/app/(site)/page.tsx`, a Server Component rendered per request (`await connection()`),
+  with server-only sections in `src/components/landing/` (hero, principles, how it works, specimen record,
+  reliability, roadmap, features, photo split, FAQ, closing plate) and two client parts: the check plates
+  (`src/components/pnr/pnr-terminal.tsx`) and the IST clock.
+- Motion today is small and fixed: the press, the theme icon turn, the invalid shake, the clock flip, the
+  caret, the sweep bar, popup fades (DESIGN.md §Motion). Motion 13 is loaded as `LazyMotion` with
+  `domAnimation` (no layout animations) and `MotionConfig reducedMotion="user"`.
+- Found while planning: the reduced-motion rule meant to stop the press (`:where(button, …):active
+  { transform: none }`) loses on specificity to the press rule (`:active` plus three `:not()`s), so under
+  reduced motion a held button still settles to 96%, only instantly (checked in Chromium). J1 fixes it.
+- The traveller CSP is static in `next.config.ts` (`script-src 'self' 'unsafe-inline'`, `worker-src 'self'`,
+  `img-src 'self' data: blob:`; no nonces, so pages stay cacheable). three.js and Anime.js are not installed.
+- Tests: Vitest (node + jsdom, no WebGL, no IntersectionObserver), Playwright on `next dev` in fixture mode at
+  1280×800 and 390×844, axe on every route in both themes, a CSP spec, a responsive spec (320/360/390/768), a
+  smoothness spec, and a tap-target spec (every control answers a finger across 44px on touch screens). Contract tests forbid raw hex outside the palette files, arbitrary text/rounded/z classes,
+  off-scale spacing, and files over 500 lines.
+- Prototype v3 exists as 41 throwaway ES modules (5.2k lines) plus its verification harness. It is the
+  reference, not the code to ship: the app gets typed, tested modules built to its conventions.
+
+Non-goals: new copy beyond what v3 shows; changes to the check, the API or the record page; the declined v3
+options (a result-personalised drawing, a travelling request indicator in the plate, a platform train in the
+hero, a draggable strip train, part inspection, a status lamp board).
+
+## 2. Decisions already taken
+
+Settled with the user between 2026-09-24 rounds 1–4, A–E, and the v3 approval:
+
+- **Style:** the animejs.com manner in the app's Industry grammar: hairlines, registration marks, condensed
+  capitals, one steel accent, follows Day and Night. Realistic 3D (PBR) was built and rejected.
+- **Libraries:** Anime.js v4 (`animejs@4.5.0`, MIT) on native scroll with its `onScroll` sync; three.js
+  (`three@0.186.0`) for the drawn train only. No GSAP, no Lenis, no scroll hijacking. Motion stays the app's
+  UI motion library (the plate morph uses it).
+- **The train:** a WAP-7-style electric locomotive and LHB coaches in steel, drawn as a 3D hairline technical
+  drawing with hidden lines removed. Heading kept: "Every part answers to the source".
+- **v2 features (all 14):** kinetic headline, living dial, chart countdown ring, plotter intro once per visit,
+  label↔part highlight, dimensions and title block, berth plan (03), station clock (04), track-laying
+  roadmap (05), departure board under the hero, route strip in the masthead, plate morph, registration-mark
+  cursor (desktop, motion on), sound off by default (rail clack, departure horn) behind a footer switch.
+- **v3 additions:** the window-seat run through 06–07, Night falls (theme sweep), line side passing at the
+  departure, headlight beam at Night, scan reveal, adaptive quality, Data Saver, and the frame meter (a review
+  tool: preview deployments only, §3.J).
+- **Motion off** (device setting or the footer Motion switch) means still drawings and static layouts.
+  Phones get the same journey, lighter.
+- **Copy:** the new words shown in v3 (the drawing chapter's heading and lead, the ten part labels, the
+  departure board, the title block and caption, the nameboard "PLATFORM 3 · DEPARTURES", the kilometre posts)
+  were approved with v3 and move into `src/messages/en-IN/home.ts` unchanged.
+
+This changes three written rules, recorded here and in DESIGN.md when the work lands: the Phase 1 brief's
+closed list of motions (the journey is the deferred Phase 6 motion pass); "only lamps and route stops are
+round" (dials, the station clock and route stops are round instruments); and the older note that the hero
+has no entrance animation (the headline's letters rise by transform only; the text is in the server HTML
+and is the page's largest paint either way).
+
+## 3. Design
+
+### A. Experience
+
+Top to bottom, as in v3:
+
+| Where | What happens | Motion off |
+|---|---|---|
+| Masthead (on "/") | A second row: the route strip. Stations DEP, GA, 01–08, END on a rail; a train glyph runs right as the page scrolls, leaning into speed; odometer KM 000→781; the current station's name. Phones: a hairline rail in the masthead's bottom edge. | Glyph moves, no lean |
+| Hero | Letters of the h1 rise; the plotter draws the masthead rule and the plate's hairlines once per visit; the living dial behind the plate lights segments as digits are typed; after a result, a 24-hour face marks the chart time printed in the record (never computed) with "Chart ~HH:MM IST · in 3 h 12 min". | Dial and face drawn still |
+| Departure board (new) | "Departures · Platform 3": the page's sections as departures with code, km and status (NEXT, AT PLATFORM, DEPARTED); rows flip in; names link to their sections. | Static board |
+| The drawn train (new, pinned) | A solid steel locomotive; a scan gate sweeps it nose to tail into the line drawing; it turns and comes apart into ten labelled parts (label↔part highlight on fine pointers); side elevation with dimensions; coaches couple, the pantograph rises, the train departs with the camera riding along past masts, a signal gantry and Platform 3's nameboard; the strip glyph takes over. Night: light-on-dark, steel glow, headlight beam. | The still drawing |
+| 01 Principles | Kicker flips in; rows rise into place (transform only). | Static |
+| 02 How it works (pinned) | Three stops play inside one instrument dial; a request-trace card prints each stop. | Plain section |
+| 03 Record | Coach B1 · 3A berth plan beside the specimen; the sample passenger's berth lights. | Plan drawn still |
+| 04 Reliability | Station clock (IST) with sweeping second hand. | Hands at rest |
+| 05 Roadmap | The route line lays its sleepers; a train follows the curve lighting each row. | Line drawn still |
+| 06–07 Window-seat run (pinned, sideways) | Scroll carries the two sections sideways past a window along a line diagram: kilometre posts KM 530→644 and a platform per station at the train's pace; far masts slower; near posts faster; the train holds the window; the station at the window lights. Tab and station links bring a card to the window; touch stops settle a card at the window. | Sections as today |
+| 08 FAQ | Arrivals. | Static |
+| Terminus | The full train arrives above the closing plate; Night: headlight beam. | The still terminus drawing |
+| Footer (landing) | Motion switch (on; off and disabled with a note under reduced motion) and Sound switch (off). | — |
+| Page-wide | Registration-mark cursor (fine pointer, motion on). Night falls: the theme switch sweeps the new theme out from the button in a circle (same-document View Transition). | Instant theme switch |
+
+**Section entrances replay** (decided 2026-09-25). Four entrances play every time their section scrolls
+back into view, not once per load: the section kickers flipping in, rows rising into place (01, 03, 04, 05,
+06, 08), registration marks snapping onto plates, and the departure board's rows flipping in. Each resets
+out of sight once its section has fully left the window, so nothing moves while a reader can see it. The
+hero headline's letters play once per load, and the plotter intro once per visit. Everything tied to the
+scroll position (the drawing chapter, strip, dial, run, route and berths) already follows the scroll both
+ways. Motion off: static, as before.
+
+Every pinned piece (drawing chapter, chapters dial, run) measures its content against the visible window and
+falls back to its static layout when it cannot fit: short windows show only the current stop's words, phones
+on their side put the dial beside its stops and the parts list beside the drawing, very large text lists the
+parts under the drawing, and anything that still cannot fit unpins.
+
+### B. Architecture
+
+Three layers, loaded in order, so the check never waits for, or depends on, the journey:
+
+1. **Page (server).** Every section's markup, including all new ones, rendered by Server Components from pure
+   geometry and copy modules: the dials, clock face, berth plan, route map, departure board, route strip, the
+   run's window layers, the labels, title block and legend. With no JavaScript the page is complete and static.
+2. **Journey (client island).** `JourneyLoader`, a small client component on "/", imports the journey chunk
+   after hydration when the page is idle (`requestIdleCallback`, 1.5 s timeout) and calls its
+   `startJourney(root)`. The chunk (Anime.js + journey modules, ≤ 70 KB compressed) animates the server
+   markup imperatively, outside React's render loop, and returns one teardown. Every module returns its own
+   teardown, so a rebuild (the Motion switch, Strict Mode's double mount, leaving "/") is idempotent. An error
+   boundary and a watchdog (15 s) turn a failed journey into the motion-off page.
+3. **Live drawing (client, on demand).** When the drawing is live, the journey dynamically imports the scene
+   chunk (three.js + scene, ≤ 240 KB compressed). The rig is built a part at a time, yielding between parts
+   (≤ 61 ms per step at 4× CPU slowdown); coaches and bogie frames share geometry; shaders compile in the
+   background (`compileAsync`). One fixed canvas draws each visible stage into its own scissored rectangle, and
+   draws only when a stage is on screen and its progress or position changed.
+
+The plate morph (a result growing out of the plate) uses Motion's layout animation. The plates get a nested
+`LazyMotion` that loads `domMax` asynchronously; until it arrives, or with motion off, results appear at once.
+
+**State.** A small inline script in the `(site)` root layout's `<head>` writes, before first paint:
+`data-motion` (`on`/`off` from reduced motion and `tt.motion`), `data-saver`, and `data-drawing`
+(`live`/`still`). CSS pins sections only under `html[data-motion="on"]` and draws live only under
+`html[data-drawing="live"]`, so the no-JS default is static. The journey adds `data-journey` and
+`data-drawing-why`. Events on `window`: `tt:layout`, `tt:theme`, `tt:station`, `tt:depart`, `tt:drawing`,
+`tt:webgl`. One shared registry of scroll observers is refreshed on `tt:layout`. Section entrances are
+checked live against boxes, so jumps and reloads never strand anything. Each one resets when its section
+leaves the window entirely and plays again when the section comes back (§3.A). Motion off also applies the site's
+reduced-motion rules (motion.css) to every traveller page, so the switch means the same thing everywhere
+(confirmed, §7; built in J1).
+
+**Module map** (all TypeScript, strict, each file < 500 lines; path `src/components/landing/journey/`):
+
+| Group | Modules |
+|---|---|
+| Server markup | `route-strip.tsx`, `departure-board.tsx`, `hero-dial.tsx`, `drawing-chapter.tsx`, `chapters-instrument.tsx`, `berth-plan.tsx`, `station-clock.tsx`, `route-map.tsx`, `window-run.tsx`, `terminus-stage.tsx`, `journey-switches.tsx` |
+| Pure geometry and logic (unit-tested) | `geometry/dial.ts`, `geometry/berths.ts`, `geometry/route.ts`, `geometry/run.ts`, `pose.ts` (anatomy and terminus poses), `governor.ts`, `labels-layout.ts`, `strip-position.ts`, `drawing-mode.ts`, `fit.ts`, `chart-countdown.ts` |
+| Client island | `journey-loader.tsx`, `start-journey.ts`, `observers.ts`, `motion-tokens.ts`, `intro.ts`, `strip.ts`, `board.ts`, `hero.ts`, `chapters.ts`, `berths.ts`, `clock.ts`, `route.ts`, `run.ts`, `arrivals.ts`, `cursor.ts`, `sound.ts`, `drawing.ts`, `still.ts`, `theme-sweep.ts` |
+| Scene (three.js) | `scene/engine.ts`, `scene/rig.ts`, `scene/rig-parts.ts`, `scene/lines.ts`, `scene/line-world.ts`, `scene/departure.ts`, `scene/beam.ts`, `scene/scan.ts`, `scene/fit.ts`, `scene/apply-pose.ts`, `scene/palette.ts`, `scene/journey.ts` |
+| Build-time | `scripts/bake-train-stills.mjs`, generated `still-manifest.ts` |
+
+### C. Drawing modes
+
+The train is drawn **live** unless a reason holds; reasons come and go and the page follows:
+
+| Reason | When | Back to live |
+|---|---|---|
+| `motion` | Motion off | the switch goes back on |
+| `saver` | Data Saver, a slow-2g/2g/3g connection, `prefers-reduced-data` | next visit without them |
+| `webgl` | no WebGL 2, or the GPU drops the context | the context is restored |
+| `quality` | adaptive quality's floor (below) | next session |
+| `load` | the scene chunk failed or took over 20 s | next visit |
+| `fit` | the chapter cannot fit its words even as a list | the next rebuild |
+
+**Still** is the same drawing baked at build time (§3.D): unpinned, fully apart, every label beside it with
+leaders to its part (or listed under it), label↔part highlight kept; the terminus shows the arrived train. A
+still page never downloads three.js. Switching mid-chapter keeps the reader at the chapter's start.
+
+**Adaptive quality.** A governor watches intervals between frames the drawing actually drew within one scroll
+gesture. p90 over 26 ms for 30 frames steps down (resolution 2× → 1.5× → 1×; Night effects off; coaches 3 →
+2 → 1), waiting 45 frames after each change; p90 under 18.5 ms for 180 frames steps up (at most twice); still
+over 40 ms at the lowest step asks for the still drawing. The step is kept in sessionStorage (`tt.q`).
+
+### D. The still drawing
+
+`scripts/bake-train-stills.mjs` runs the real scene code in headless Chromium: it poses the rig exactly as the
+page would, renders the fills depth-only with the live polygon offset, renders every edge in its own ID colour
+depth-tested against them, and walks each edge across the image keeping only the stretches whose colour
+survived. The result is SVG paths per part (anchors for the ten labels included) for four shapes: drawing
+wide and tall, terminus wide and tall (17–34 KB compressed each). The script writes one sprite,
+`public/journey/stills.<hash>.svg` (symbols per part, strokes `currentColor`), and `still-manifest.ts` (the
+hashed path, viewBoxes, anchors, and a hash of the scene sources it was baked from). `next.config.ts` serves
+`/journey/*` as `public, max-age=31536000, immutable`. The page shows a still by setting `<use href>` per
+part only when still, so a live page never fetches it; a `<noscript>` copy covers pages without JavaScript.
+A unit test fails when the scene sources change without a re-bake.
+
+### E. Scene colours and tokens
+
+No hex in the scene: `scene/palette.ts` reads the theme's tokens at runtime (`--surface-0`, `--ink-1`,
+`--accent`, `--accent-text`, `--line`) with `getComputedStyle`, parses them into three.js colours, and derives
+the scan's steel shades by mixing `--accent` with ink and ground. It re-reads on `tt:theme`. Canvas text (the
+nameboard) uses the heading face from its CSS variable once `document.fonts` has it.
+
+### F. Night falls
+
+The theme toggle's click runs `document.startViewTransition(async () => { flushSync(() => setTheme(next)); await
+themeApplied(next); journey.redrawNow(); })` and animates `::view-transition-new(root)` with a clip-path circle
+from the toggle's centre (640 ms, `--ease-in-out`). `themeApplied` resolves when `data-theme` changes (a
+MutationObserver, 100 ms cap). No View Transitions, reduced motion or Motion off: the switch is instant.
+`::view-transition { pointer-events: none }` keeps clicks working during the sweep.
+
+### G. Accessibility
+
+The drawing and every instrument are decorative (`aria-hidden`); the ten labels are a real list (visually
+hidden, never removed, in the list layout). Reveals move by transform, never opacity, so contrast holds at every
+moment. Focus is never hidden under the masthead (WCAG 2.4.11); every link in the run brings its station to
+the window; the skip link stays the first Tab stop. 200% text reflows (container queries in rem, as in
+`3a8b0f3`). On a touch screen every control the journey adds (switches, station links, the run's stops)
+answers a finger across 44px without changing the drawing (#43's coarse-pointer rule, `.tap-44`,
+`tests/e2e/tap-targets.spec.ts`). Forced colours read in both system themes. Sound starts only by the
+reader's hand.
+
+### H. Performance budgets
+
+| Budget | Target | v3 measured |
+|---|---|---|
+| Check interactive | never waits on journey code | holds; a blocked CDN still leaves Run working |
+| Journey chunk | ≤ 70 KB compressed | Anime.js 39 KB (full) + modules |
+| Scene chunk | ≤ 240 KB compressed, live only | three.js ~188 KB (full) + scene |
+| Still drawings | ≤ 60 KB compressed per page | 23 + 34 KB |
+| Longest journey task at load, 4× CPU phone | ≤ 120 ms | scene steps ≤ 61 ms (page total 202 ms incl. first layout) |
+| Scroll, reference desktop | p95 ≤ 12 ms, 0% > 25 ms | p95 9.8 ms, 0% |
+| Scroll, 4× CPU phone | median ≥ 55 fps, ≤ 2% > 33 ms | 63 fps, 0.7% |
+| Layout shift at load | CLS ≤ 0.05 | 0.009 |
+| Drawing progress | never steps back while scrolling down | 0 |
+
+`npx next experimental-analyze` confirms three.js stays out of the landing's initial bundle.
+
+### I. Security
+
+three.js and Anime.js are bundled from npm (no CDN), with no `eval`, WebAssembly, `data:`/`blob:` fetches or
+blob workers, so the traveller CSP is unchanged. The head script is inline like the theme's. The stills are
+same-origin static SVG without scripts. Web Audio needs no permission or CSP change.
+
+### J. Not shipped from the prototype
+
+The Prototype panel (a review tool). The plate re-enactment and captured markup (the app has the real
+components). The CDN import map (the app bundles). The frame meter ships only on preview deployments, behind
+`?journey-hud`; production never renders it.
+
+## 4. Failure behaviour
+
+| Failure | What the traveller gets |
+|---|---|
+| Journey chunk fails or never starts (offline, blocked, script error) | The check works as today; after the error or the 15 s watchdog: motion off, static layouts, the still drawing. |
+| Scene chunk fails | Still drawing (`load`); everything else keeps moving. |
+| No WebGL 2 | Still drawing from the start; no three.js download. |
+| GPU drops the context | Still drawing at once; live again when restored. |
+| Device too slow | Quality steps down, then still for the session. |
+| Very large text / short window | Parts list, compact stops, unpinned sections, still drawing when nothing else fits. |
+| The still sprite fails to load | Labels and list remain; the drawing area stays empty (no broken image). |
+| Motion switch toggled mid-page | Rebuild in place, reader kept at the same section. |
+
+## 5. Tests written first
+
+- **Unit (Vitest, node):** poses (bounds, phase windows, still pose), governor (synthetic frame streams: step
+  down, up, floor, cool-down), label column placement and zone, strip position, run anchors and current
+  station, drawing-mode reducer, fit checks from boxes, chart countdown, the bake's ID-run extraction on a
+  synthetic buffer, palette parsing of token strings, the still-manifest staleness hash.
+- **Unit (jsdom):** server markup (landmarks, ids, labels list, aria-hidden decoration), switches' state and
+  persistence, the loader's error boundary and watchdog (timers faked).
+- **E2E on every PR** (`tests/e2e/journey/`): collisions (the prototype's in-page checker as a shared helper:
+  text over text, panels over text, the drawing's box over any label, crossing leader lines, sideways scroll)
+  at 1440×900, 390×844 and 844×390, dense through the three pinned pieces; every drawing mode (live, Data
+  Saver, reduced motion, no WebGL, context lost and restored, journey chunk blocked, scene chunk blocked,
+  quality floor); the check on every sample scenario with the journey on and off; run keyboard and station
+  links; theme sweep; axe at 12 positions (top, drawing, chapters, record, Night drawing, motion off, phone
+  drawing, run, Night run, phone run, Data Saver, Night terminus); focus never obscured; existing home, responsive, axe, CSP,
+  smoothness, press and tap-target specs kept green.
+- **Nightly** (`.github/workflows/journey-nightly.yml`, same pinning and permissions rules as CI): collisions
+  at 15 sizes (1440×900, 1280×720, 1024×768, 768×1024, 390×844, 360×740, 320×568, 844×390, 667×375, 280×653,
+  1280×600, 1180×820, 820×1180, 1920×1080, 2560×1440) and at 200% text; CDP-throttled performance at 4×, 6×, 10× (startup tasks, scroll frames,
+  governor steps); a production-build CSP smoke on "/" scrolled end to end; screenshots of every chapter in
+  Day, Night and phone.
+
+## 6. Order of work (one PR each)
+
+| PR | Scope | Visible result |
+|---|---|---|
+| J1 | The Motion switch: the head script (`data-motion`), Motion off applying the site's reduced-motion rules everywhere (with the press fix, §1), Motion's own animations following it, the footer switch, DESIGN.md's Motion section; the shared e2e collision checker, with today's landing as its baseline | The footer's Motion switch |
+| J2 | Server instruments: route strip, departure board, hero dial, berth plan, station clock, route map, chapters instrument, all static, with their copy and container sizes; DESIGN.md's round-instruments rule | The new instruments, drawn still |
+| J3 | Journey island: `animejs` added; loader, observers, arrivals, intro and headline, strip, board, hero dial, chapters (pinned, fit rules), berths, clock, route, cursor, the Sound switch and its clack, plate morph; journey motion tokens; DESIGN.md's motion and hero-entrance rules | The page moves (except the train and the run) |
+| J4 | Still drawing: `three` added; the rig, poses and fit the bake and the live scene share; bake script, sprite, manifest, drawing chapter and terminus markup with the still; the head script gains `data-saver` and `data-drawing` | The train, drawn still |
+| J5 | Live drawing: engine, anatomy and terminus, scan, departure line side, beam, governor, WebGL loss, the departure horn | The train comes alive |
+| J6 | Window-seat run and Night falls; nightly workflow; performance budgets | v3 complete |
+
+Each PR brings the dependency, copy, tokens and DESIGN.md rules its own code first uses, so nothing lands
+unused, and nothing a traveller can see is inert (a Sound switch with no sound). Each runs `npm run check`
+and the e2e suite, ships behind nothing (every PR leaves the landing whole), and merges only with the user's
+go-ahead. Each PR's plan is written when the one before it merges, from the code that actually shipped.
+
+## 7. What only the user can do
+
+- Approve this spec, then each PR's merge.
+- ~~Confirm that Motion off also quiets the app's own small motions on the page (the press, the sweep, the
+  theme icon turn), as a device's reduced-motion setting already does.~~ **Confirmed 2026-09-24: yes,
+  site-wide.** J1 is built on it.
+- Try the result on a real mid-range Android phone before J5 merges (a hidden `?journey-hud` query shows the
+  frame meter on preview deployments only).
+- Decide whether the nightly workflow may run on a schedule (it costs CI minutes).
+
+## 8. Risks
+
+| Risk | Mitigation |
+|---|---|
+| Low-end GPUs (Mali, Adreno 6xx) slower than CPU throttling suggests | Governor steps and the still floor; real-device check before J5 merges |
+| iOS Safari: `svh`/`lvh`, sticky with `overflow: clip`, root scroll snapping, View Transitions (18+) | e2e on WebKit for the journey specs in the nightly run; static fallbacks |
+| Anime.js or three.js API churn | Exact versions pinned; upgrades are their own PRs with the full journey suite |
+| Strict Mode double mounts, route changes | Idempotent teardowns; engine disposed when leaving "/" |
+| CI e2e time grows | Heavy suites nightly; PR suite at three sizes |
+| Dev-only CSP in e2e hides a production-only violation | Nightly production-build CSP smoke |
+| Bundle creep | Budgets checked in the nightly run; `experimental-analyze` in review |
+
+## 9. Acceptance
+
+- Every row of §3.A works in Day, Night and on a phone, and every "Motion off" column holds.
+- Every §4 failure produces the stated result, proven by an e2e test.
+- §3.H budgets met in the nightly run; no collisions at the 15 sizes or at 200% text in the journey's sections.
+- axe clean at the 12 positions; the CSP spec and the production-build smoke clean.
+- `npm run check` green on every PR; no raw hex, no file over 500 lines, no `Co-Authored-By` trailer.

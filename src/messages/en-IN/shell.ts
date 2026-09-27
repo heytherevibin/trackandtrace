@@ -36,6 +36,8 @@ export const shell = {
     terms: "Terms",
     copyright: (year: number) => `© ${year} Trakline`,
     sections: "Sections",
+    motion: "Motion",
+    motionByDevice: "Your device asks for reduced motion",
   },
   install: {
     title: "Install Trakline",
