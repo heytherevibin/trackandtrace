@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { drawingModule, noLiveDrawing, startDrawing, type Ask, type Begin, type LoadLive } from "@/components/landing/journey/drawing";
 import { DRAWING_EVENT, LAYOUT_EVENT, WEBGL_EVENT, emit, type DrawingDetail, type WebglDetail } from "@/components/landing/journey/journey-events";
-import type { JourneyContext } from "@/components/landing/journey/start-journey";
+import type { Engine } from "@/components/landing/journey/scene/engine";
+import { keep, type JourneyContext } from "@/components/landing/journey/start-journey";
 import { testContext } from "./journey-context";
 
 const html = document.documentElement;
@@ -183,6 +184,60 @@ describe("J5: prepare, begin, and the reader's place", () => {
     expect(html.dataset.drawing).toBe("live");
     expect(begin).toHaveBeenCalledTimes(1);
     expect(section.classList.contains("is-live")).toBe(true);
+    stop();
+  });
+
+  it("holds a reader who went below the chapter while the scene loaded at the still, and goes live once they come back above it (J5-2)", async () => {
+    vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
+    const { section, box } = chapter(200);
+    let arrive: (b: Begin) => void = () => {};
+    const begin = vi.fn<Begin>(() => () => undefined);
+    const load = vi.fn<LoadLive>(() => new Promise<Begin>((resolve) => (arrive = resolve)));
+    const stop = drawingModule(load, () => true)(testContext());
+    expect(load).toHaveBeenCalledTimes(1); // preparing while nothing holds the drawing
+    box.top = -600; // the reader scrolls on past the chapter's top before the scene arrives
+    window.dispatchEvent(new Event("scroll"));
+    arrive(begin);
+    await flush();
+    expect(html.dataset.drawing).toBe("still");
+    expect(html.dataset.drawingWhy).toBe("place");
+    expect(begin).not.toHaveBeenCalled();
+    expect(section.classList.contains("is-live")).toBe(false);
+    box.top = 120;
+    window.dispatchEvent(new Event("scroll"));
+    vi.advanceTimersToNextFrame();
+    await flush();
+    expect(html.dataset.drawing).toBe("live");
+    expect(begin).toHaveBeenCalledTimes(1);
+    expect(load).toHaveBeenCalledTimes(1); // the scene it already prepared
+    expect(section.classList.contains("is-live")).toBe(true);
+    stop();
+  });
+
+  it("asks the journey's engine after a rebuild: a GPU lost before it settles the new build on the still, until restored (J5-4)", async () => {
+    chapter(200);
+    const gpu = { gone: false };
+    const scene = keep<Promise<Engine> | null>(Promise.resolve({ lost: () => gpu.gone } as unknown as Engine));
+    const begin = vi.fn<Begin>(() => () => undefined);
+    const load: LoadLive = () => Promise.resolve(begin);
+    let stop = drawingModule(load, () => true)(testContext({ scene }));
+    await flush();
+    expect(begin).toHaveBeenCalledTimes(1);
+    gpu.gone = true;
+    emit<WebglDetail>(WEBGL_EVENT, "lost");
+    expect(html.dataset.drawingWhy).toBe("webgl");
+    stop(); // a rebuild (the Motion switch, a fit change) while the GPU is gone
+    stop = drawingModule(load, () => true)(testContext({ scene }));
+    await flush();
+    expect(html.dataset.drawing).toBe("still");
+    expect(html.dataset.drawingWhy).toBe("webgl");
+    expect(begin).toHaveBeenCalledTimes(1);
+    expect(document.getElementById("anatomy")?.classList.contains("is-live")).toBe(false);
+    gpu.gone = false;
+    emit<WebglDetail>(WEBGL_EVENT, "restored");
+    await flush();
+    expect(html.dataset.drawing).toBe("live");
+    expect(begin).toHaveBeenCalledTimes(2);
     stop();
   });
 

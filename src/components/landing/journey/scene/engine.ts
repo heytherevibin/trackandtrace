@@ -161,6 +161,9 @@ export interface Engine {
   pick(clientX: number, clientY: number, rect: Rect, camera: PerspectiveCamera): RigPartId | null;
   /** The share of an element's box the drawing inked, read in the same task as a fresh frame (the dev probe, J5-13). */
   inked(el: Element): number;
+  /** Whether the GPU's context is gone: from its loss (during the build, too) until it is restored. The engine
+   * outlives every rebuild, so a drawing module built meanwhile asks here rather than having heard it (J5-4). */
+  lost(): boolean;
   dispose(): void;
 }
 
@@ -312,6 +315,7 @@ export async function createEngine(canvas: HTMLCanvasElement, options: EngineOpt
       for (let i = 3; i < px.length; i += 4) if ((px[i] ?? 0) > 0) inked += 1;
       return inked / (w * h);
     },
+    lost: () => lost,
     dispose: () => {
       stopWatching();
       views.clear();

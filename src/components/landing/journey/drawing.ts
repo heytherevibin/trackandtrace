@@ -141,9 +141,16 @@ export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2)
     const begin = () => {
       const mine = prepared;
       if (!mine) return;
-      mine.then(
-        (start) => {
+      const kept = ctx.scene.get();
+      Promise.all([mine, kept?.catch(() => null) ?? null]).then(
+        ([start, engine]) => {
           if (!alive || prepared !== mine || mode !== "live" || live) return;
+          // The engine is the journey's, this module only the build's: a GPU lost before a rebuild was heard by the
+          // module it tore down, never by this one, so the engine is asked. "restored" brings the drawing back.
+          if (engine?.lost()) {
+            ask.still("webgl");
+            return;
+          }
           // The reader went below the chapter while the scene loaded: pinning now would grow it under them.
           if (below()) {
             ask.still("place");
