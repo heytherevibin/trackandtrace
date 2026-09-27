@@ -1,6 +1,7 @@
 import { Corners } from "@/components/ui/corners";
 import { PLATE_TITLE_STACK, plateCellClass } from "@/components/ui/plate";
 import { stackedTable, STACKED_ROLES as R } from "@/components/ui/stacked-table";
+import { queueMovement } from "@/components/ui/queue-movement";
 import { statusTone } from "@/components/ui/status-tone";
 import { messages } from "@/messages";
 import type { AvailabilityAnswer, AvailabilityDay } from "@/services/availability-source";
@@ -43,18 +44,26 @@ function format(iso: string): string {
  * so beside its status, because WAITLIST alone reads as a queue you may still join.
  */
 function Day({ day }: { readonly day: AvailabilityDay & { readonly wlBooking: number | null; readonly wlCurrent: number | null } }) {
-  const waitlisted = day.wlCurrent !== null;
   const colour = statusTone(day);
+  // Read from `rawStatus`, not from the pair. The pair is two integers with their prefixes stripped,
+  // and `GNWL5/RAC48` — issued at waitlist 5, now standing at RAC 48 — put them on one scale and
+  // printed "48 · of 5 when booking opened". `queueMovement` keeps the prefixes and so knows when a
+  // difference means nothing.
+  const move = queueMovement(day.rawStatus);
   return (
     <>
       <div className="flex flex-wrap items-center gap-2">
         <span className={cn(TAG, colour.chip)}>{day.status}</span>
-        {waitlisted && day.wlBooking !== null ? (
+        {move === null ? null : move.kind === "cleared-out" ? (
+          <span className="text-ink-1/70">{m.waitlistCleared}</span>
+        ) : (
           <>
-            <span className={cn("font-data", colour.figure)}>{day.wlCurrent}</span>
-            <span className="text-ink-1/70">{day.wlCurrent === day.wlBooking ? m.nobodyCleared : m.waitlistOf(day.wlBooking)}</span>
+            <span className={cn("font-data", colour.figure)}>{move.now}</span>
+            <span className="text-ink-1/70">
+              {move.kind === "improved" ? m.movedToRac : move.cleared === 0 ? m.nobodyCleared : m.cleared(move.cleared, move.opened)}
+            </span>
           </>
-        ) : null}
+        )}
         {day.canBook ? null : <span className={cn(TAG, "bg-surface-1 text-ink-2")}>{m.closed}</span>}
       </div>
       {/* The sentence that used to sit here said what the chip beside the status already says, and

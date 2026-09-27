@@ -61,7 +61,7 @@ function answerFor(days: readonly AvailabilityDayRecord[], total = 765): Availab
 function row(over: Partial<TrainRow> = {}): TrainRow {
   return {
     train: train(),
-    answers: { SL: answerFor([day({ status: "WL", wlBooking: 136, wlCurrent: 44 })], 765) },
+    answers: { SL: answerFor([day({ status: "WL", rawStatus: "GNWL136/WL44", wlBooking: 136, wlCurrent: 44 })], 765) },
     pending: ["3A", "2A"],
     notCarried: [],
     notBookable: false,
@@ -94,8 +94,8 @@ describe("the route's trains", () => {
 
   it("colours a queue amber however long it is, because the colour is not a forecast", () => {
     draw([
-      row({ answers: { SL: answerFor([day({ status: "WL", wlBooking: 136, wlCurrent: 9 })]) } }),
-      row({ train: train({ trainNo: "12647" }), answers: { SL: answerFor([day({ status: "WL", wlBooking: 136, wlCurrent: 148 })]) } }),
+      row({ answers: { SL: answerFor([day({ status: "WL", rawStatus: "GNWL136/WL9", wlBooking: 136, wlCurrent: 9 })]) } }),
+      row({ train: train({ trainNo: "12647" }), answers: { SL: answerFor([day({ status: "WL", rawStatus: "GNWL244/WL148", wlBooking: 244, wlCurrent: 148 })]) } }),
     ]);
     for (const chip of screen.getAllByText("WL")) expect(chip).toHaveClass("bg-queued-soft");
   });
@@ -135,7 +135,7 @@ describe("the route's trains", () => {
   });
 
   it("says booking is closed on the card, because WAITLIST alone reads as joinable", () => {
-    draw([row({ answers: { SL: answerFor([day({ status: "WL", wlBooking: 136, wlCurrent: 44, canBook: false })]) } })]);
+    draw([row({ answers: { SL: answerFor([day({ status: "WL", rawStatus: "GNWL136/WL44", wlBooking: 136, wlCurrent: 44, canBook: false })]) } })]);
     // `canBook` outranks the status word — production answered canBook false for a date twenty-one
     // days out. Neither the word nor its colour carries that, so the card has to.
     expect(within(screen.getByTestId("class-block")).getByText("Booking closed")).toBeInTheDocument();

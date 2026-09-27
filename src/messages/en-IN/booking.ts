@@ -52,9 +52,26 @@ export const booking = {
     retrieved: (time: string) => `Retrieved ${time} IST from Trakline.`,
     window: "Four dates come back at a time.",
     columns: { date: "Date", availability: "Availability", fare: "Fare" },
-    /** The queue's two ends: where it started when booking opened, and where it is now. */
-    waitlistOf: (opened: number) => `of ${opened} when booking opened`,
+    /**
+     * What has already happened to the queue, which is the one figure on the row a traveller can act
+     * on — and it is in the answer itself, not in any stored history. `GNWL65/WL26` means the next
+     * booking is issued at position 65 and now stands 26th: 39 of the 65 ahead have gone.
+     *
+     * **Past tense, and it must stay past tense.** "39 of 65 ahead have cleared" is a reading. "39
+     * cleared, so yours will too" would be the estimate this site promises never to make. The
+     * sentence may report the queue; it may not finish the thought for the traveller.
+     *
+     * It replaced `of ${opened} when booking opened`, which read the two halves of the pair as one
+     * scale. On `GNWL5/RAC48` — issued at waitlist 5, now standing at RAC 48 — that printed
+     * "48 · of 5 when booking opened", saying the queue had grown tenfold when the position had in
+     * fact improved out of the waitlist. See `queueMovement`.
+     */
+    cleared: (cleared: number, opened: number) => `${cleared} of ${opened} ahead have cleared`,
     nobodyCleared: "nobody has cleared yet",
+    /** A position that left the waitlist for RAC: a shared seat rather than none, and not a figure to subtract. */
+    movedToRac: "now RAC, up from the waitlist",
+    /** `PQWL/AVAILABLE`: the queue is gone and berths are free. No figure, and the best a queue does. */
+    waitlistCleared: "the waitlist has cleared",
     /**
      * Says only what the source said: `canBook` is false. No reason is given, because none is
      * measured — a longer form once read "The chart is prepared. This is how it finished.", which
