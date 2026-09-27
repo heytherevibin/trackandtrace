@@ -287,11 +287,10 @@ test.describe("the Audit log", () => {
       await expect(page.getByText(frame.states.noAccess.title(frame.roleLabel[role]))).toBeVisible();
       await expect(page.getByText(frame.states.noAccess.detail)).toBeVisible();
       await expect(page.getByRole("table")).toHaveCount(0);
-      // A Viewer has had a rail since 02 Sources & usage (Owner, Admin and Viewer); Support still has
-      // none. Either way the rail must not offer the module this page just refused.
+      // Every role has a rail since 01 Overview, which all four may open. Whatever is in it, it must
+      // not offer the module this page just refused.
       const rail = page.getByRole("navigation", { name: "Console" });
-      if (role === "viewer") await expect(rail.getByRole("link", { name: /Sources/ })).toHaveAttribute("href", "/sources");
-      else await expect(rail, "no built module is Support's, so no rail").toHaveCount(0);
+      await expect(rail.getByRole("link", { name: /Overview/ })).toHaveAttribute("href", "/");
       await expect(page.getByRole("link", { name: /Audit log/ }), "the rail never offers a refused module").toHaveCount(0);
       await expectAxeClean(page);
       // `after()` writes the row once the response has already gone out, hence the poll.

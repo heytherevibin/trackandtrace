@@ -151,6 +151,8 @@ test.describe("My keys", () => {
     const base = baseURL ?? BASE;
     const owner = await setUpFirstOwner(page, base);
     await expectSignedInAs(page, owner.name, owner.role);
+    // Setup lands on Overview since 01 was built; this spec is about My keys.
+    await gotoReady(page, "/keys");
 
     // A third key, so the two-key floor is not what refuses the removal below and the refusal can
     // only be the missing tap. Added through the drawn dialog, the same way the test above does it.
