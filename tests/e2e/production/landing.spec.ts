@@ -1,5 +1,3 @@
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import { expect, test } from "../fixtures";
 import { PNR } from "../helpers";
 import { frames, waitForJourney } from "../journey/journey-helpers";
@@ -7,10 +5,8 @@ import { frames, waitForJourney } from "../journey/journey-helpers";
 // "/" as production serves it (J6-2; spec §5's production-build smoke): this checkout's production build on this
 // machine, with sample data and nothing live. The dev-only probes (__ttJourney, __ttJourneyStarted) are compiled out
 // here, so state is read from the page's own attributes. The server's offline guard writes every connection it refused
-// to .offline-guard.log (scripts/serve-local-production.mjs): each test ends by reading that nothing tried.
-
-const GUARD_LOG = join(process.cwd(), ".offline-guard.log");
-const refused = (): string[] => (existsSync(GUARD_LOG) ? readFileSync(GUARD_LOG, "utf8").split("\n").filter((l) => l !== "" && !l.startsWith("#")) : []);
+// to its log (scripts/serve-local-production.mjs); global-teardown.ts reads it once every test has run, from both
+// projects and every worker, and fails the run on a refusal or on a missing log.
 
 declare global {
   interface Window {
@@ -42,7 +38,6 @@ test("'/' scrolled end to end breaks no rule of the security policy and asks no 
   }
   expect(await page.evaluate(() => window.__cspViolations)).toEqual([]);
   expect([...foreign]).toEqual([]);
-  expect(refused()).toEqual([]);
 });
 
 test("a sample PNR is checked from the fixture, never a live source", async ({ page }) => {
@@ -55,7 +50,6 @@ test("a sample PNR is checked from the fixture, never a live source", async ({ p
   await expect(result).toBeVisible();
   await expect(result).toHaveAttribute("data-kind", "ok");
   expect(await page.evaluate(() => window.__cspViolations)).toEqual([]);
-  expect(refused()).toEqual([]);
 });
 
 test("a production build has no frame meter and no dev probes", async ({ page }) => {
