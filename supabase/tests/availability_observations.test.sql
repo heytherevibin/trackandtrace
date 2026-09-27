@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(74);
+select plan(94);
 
 -- ---------------------------------------------------------------------------
 -- The observation store: facts about berths, never about people.
@@ -423,6 +423,96 @@ select is(
   (select outcome from public.availability_observations where train_no = '12625'),
   null,
   'the backfill leaves a future journey alone: it has not happened, so it has no outcome'
+);
+
+-- ---------------------------------------------------------------------------
+-- WHAT the label says, not just which row carries it.
+--
+-- `outcome = status` collapsed four different endings into two words. Measured
+-- on the live store, 453 rows, every form it has ever returned:
+--
+--   312 × a waitlist pair, bookable          still queuing, counter open
+--    43 × AVAILABLE-n / AVAILABLE-n#         berths free
+--    30 × NOT AVAILABLE, not bookable        counter shut while queuing
+--    27 × REGRET, not bookable               likewise
+--    21 × RAC pairs and GNWLn/RACn           a shared seat, which is not a waitlist
+--    11 × TRAIN DEPARTED                     shut, and gone
+--     4 × CLASS NOT EXIST                    not an observation of a queue at all
+--     2 × CURR_AVBL-n                        berths released
+--     2 × PQWL/AVAILABLE                     the queue cleared into availability
+--     1 × CHARTING DONE *                    the chart was made
+--
+-- `status` is WAITLIST for the pairs, for NOT AVAILABLE, for REGRET, for RAC and
+-- for CHARTING DONE alike — so a model trained on it cannot tell a shared seat
+-- from a shut counter. Four labels separate what differs and nothing more;
+-- `raw_status` stays the evidence for anything finer, as its own column says.
+--
+-- **`can_book` outranks the words**, the same rule `statusTone` keeps on the
+-- page: a day the source will not sell is closed however it is labelled.
+-- ---------------------------------------------------------------------------
+
+select has_function(
+  'public',
+  'availability_outcome_label',
+  'reading a raw status into an outcome is callable on its own'
+);
+
+select is(public.availability_outcome_label('AVAILABLE-0042', true), 'AVAILABLE', 'berths free reads as available');
+select is(public.availability_outcome_label('AVAILABLE-0042#', true), 'AVAILABLE', 'the hash the source sometimes appends changes nothing');
+select is(public.availability_outcome_label('CURR_AVBL-0048', true), 'AVAILABLE', 'berths released after the chart are berths');
+select is(public.availability_outcome_label('PQWL/AVAILABLE', true), 'AVAILABLE', 'a queue that cleared into availability is available');
+
+select is(public.availability_outcome_label('RAC  58/RAC  51', true), 'RAC', 'an RAC pair is a shared seat, not a waitlist');
+select is(public.availability_outcome_label('GNWL5/RAC48', true), 'RAC', 'a position that moved into RAC is RAC, whatever it was issued as');
+select is(public.availability_outcome_label('RAC 12', true), 'RAC', 'a bare RAC position is still RAC');
+
+select is(public.availability_outcome_label('GNWL65/WL26', true), 'WAITLIST', 'a queue with the counter open is a waitlist');
+select is(public.availability_outcome_label('TQWL59/WL39', true), 'WAITLIST', 'whatever quota the queue belongs to');
+
+select is(public.availability_outcome_label('NOT AVAILABLE', false), 'CLOSED', 'a shut counter is closed, not a waitlist');
+select is(public.availability_outcome_label('REGRET', false), 'CLOSED', 'and so is a regret');
+select is(public.availability_outcome_label('CHARTING DONE *', false), 'CLOSED', 'the chart being made shuts the counter; the reason stays in raw_status');
+select is(public.availability_outcome_label('TRAIN DEPARTED', false), 'CLOSED', 'a train already gone is closed');
+
+select is(
+  public.availability_outcome_label('AVAILABLE-0042', false),
+  'CLOSED',
+  'can_book outranks the words: AVAILABLE on a day that cannot be booked is closed, the same rule the page keeps'
+);
+
+select is(public.availability_outcome_label('CLASS NOT EXIST', false), null, 'a class the train does not carry is not an outcome of anything');
+select is(public.availability_outcome_label('SOMETHING NEW', true), null, 'a form this store has never seen says nothing rather than something wrong');
+
+-- ---------------------------------------------------------------------------
+-- The trigger writes the refined label — and does not spin when there is none.
+-- ---------------------------------------------------------------------------
+
+insert into public.availability_observations
+  (observed_at, train_no, from_code, to_code, travel_class, quota, journey_date, status, can_book, raw_status)
+values
+  ('2026-10-02T06:00:00Z', '12628', 'MAS', 'NDLS', 'SL', 'GN', '2026-10-03', 'WAITLIST', false, 'NOT AVAILABLE');
+
+select is(
+  (select outcome from public.availability_observations where train_no = '12628'),
+  'CLOSED',
+  'the trigger writes what the raw status means, not the status word'
+);
+
+-- A row whose label is NULL must not be updated at all. The guard is
+-- `outcome is null`, so an update that writes null leaves the row matching its
+-- own trigger: it fires again, matches again, and recurses until the stack ends.
+-- This insert is the whole test — it either returns or it does not.
+select lives_ok(
+  $$insert into public.availability_observations
+      (observed_at, train_no, from_code, to_code, travel_class, quota, journey_date, status, can_book, raw_status)
+    values ('2026-10-02T06:00:00Z', '12629', 'MAS', 'NDLS', 'SL', 'GN', '2026-10-03', 'WAITLIST', false, 'CLASS NOT EXIST')$$,
+  'a day-one row with no readable outcome inserts without the trigger recursing on it'
+);
+
+select is(
+  (select outcome from public.availability_observations where train_no = '12629'),
+  null,
+  'and it is left unlabelled, because there is nothing to label it'
 );
 
 select * from finish();
