@@ -1,7 +1,8 @@
 import { createBreaker } from "./breaker";
 import { pnrCache, type Cache } from "./cache";
 import { deriveDataKeys, keyedHash } from "./data-key";
-import { activePnrSource, env, isThirdPartySource, liveRequestsPerDay, sharedStoreConfig, type Env, type ThirdPartySource } from "./env";
+import { activePnrSource, env, isThirdPartySource, sharedStoreConfig, type Env, type ThirdPartySource } from "./env";
+import { liveChecksPerDay } from "./runtime-settings";
 import { MemoryKv, redisKv, resilientKv, type Kv } from "./kv";
 import { UNLIMITED_BUDGET, createLiveBudget, type LiveBudget } from "./live-budget";
 import { log } from "./log";
@@ -110,7 +111,7 @@ export function liveBudget(current: Env = env()): LiveBudget {
   const made = createLiveBudget({
     kv,
     prefix,
-    limit: () => liveRequestsPerDay(current),
+    limit: () => liveChecksPerDay(current),
     onReached: ({ day, limit }) => log.warn("[budget] today's live-request budget is spent; answering from the cache until 00:00 IST", { day, limit }),
   });
   budgets.set(current, made);
