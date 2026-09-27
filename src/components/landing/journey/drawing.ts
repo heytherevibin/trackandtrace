@@ -2,6 +2,7 @@ import { QUALITY_STORAGE_KEY, resolveDrawing, type MotionState, type SaverState 
 import { modeOf, placeAfter, readerPlace, startingReasons, wantsScene, whyOf, withReason, type DrawingMode, type DrawingReason, type Reasons } from "./drawing-mode";
 import { keepPlace, mastheadBottom } from "./keep-place";
 import { DRAWING_EVENT, LAYOUT_EVENT, WEBGL_EVENT, emit, type DrawingDetail, type WebglDetail } from "./journey-events";
+import { createLiveLabels } from "./live-labels";
 import type { JourneyContext, JourneyModule, Teardown } from "./start-journey";
 import { webgl2 } from "./webgl-probe";
 
@@ -10,8 +11,9 @@ import { webgl2 } from "./webgl-probe";
 // (motion-boot.ts); from here on this module decides. The live drawing comes in two steps (J5-2): prepared (the
 // scene chunk, then the engine, a part at a time) as soon as nothing but the reader's place holds it back, then
 // begun on the pinned chapter once no scroll is in flight. The pin (#anatomy.is-live) is only ever written here,
-// inside keepPlace (J5-3), and every pin and unpin is told as tt:layout, so whatever measures the page below it (02's
-// place guard) re-measures. A resize that changes the pinned chapter's height keeps its reader in place the same way.
+// inside keepPlace (J5-3) but for liveFits's trial, undone in the same task (J6-5), and every pin and unpin is told
+// as tt:layout, so whatever measures the page below it (02's place guard) re-measures. A resize that changes the
+// pinned chapter's height keeps its reader in place the same way.
 
 export interface Ask {
   readonly still: (why: DrawingReason) => void;
@@ -19,8 +21,8 @@ export interface Ask {
 }
 /** Starts the prepared live drawing on the pinned chapter; its teardown stops it. */
 export type Begin = () => Teardown;
-/** Prepares the live drawing and resolves to what begins it. */
-export type LoadLive = (ask: Ask, ctx: JourneyContext) => Promise<Begin>;
+/** Prepares the live drawing and resolves to what begins it. `signal` aborts when the module that asked has ended. */
+export type LoadLive = (ask: Ask, ctx: JourneyContext, signal?: AbortSignal) => Promise<Begin>;
 
 export const noLiveDrawing: LoadLive = () => Promise.reject(new Error("no live drawing in this build"));
 
@@ -49,7 +51,27 @@ function storeFloor(): void {
   }
 }
 
-export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2): JourneyModule {
+/**
+ * Whether the live chapter's words fit its window (spec §3.C, fit), judged before the scene is fetched (J6-5): the pinned
+ * layout, laid out for an instant and measured by the live labels' own layout() (a DOM measurement, no three.js), then
+ * put back in the same task, so nothing paints. A reader below the chapter may have been moved by scroll anchoring
+ * while it stood pinned: the scroll is put back too. The one write of the pin outside keepPlace, and still this
+ * module's. The scene's own check, on every relayout while live, stands behind it. Without the chapter's markup (a
+ * unit test) there is nothing to judge, and the scene decides.
+ */
+export function liveFits(section: HTMLElement | null): boolean {
+  if (!section || section.classList.contains(PINNED)) return true;
+  const y = window.scrollY;
+  section.classList.add(PINNED);
+  const labels = createLiveLabels(section);
+  const fits = labels === null || labels.layout() !== null;
+  labels?.clear();
+  section.classList.remove(PINNED);
+  if (window.scrollY !== y) window.scrollTo({ top: y, behavior: "instant" });
+  return fits;
+}
+
+export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2, fits: (section: HTMLElement | null) => boolean = liveFits): JourneyModule {
   return (ctx: JourneyContext): Teardown => {
     const { motion } = ctx;
     const html = document.documentElement;
@@ -61,6 +83,7 @@ export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2)
     if (wantsScene(reasons) && !probe()) reasons = withReason(reasons, "webgl", true);
     let mode: DrawingMode | null = null;
     let alive = true;
+    const ended = new AbortController(); // a scene that arrives after this module ends builds nothing
     let prepared: Promise<Begin> | null = null;
     let live: Teardown | null = null;
     let warned = false;
@@ -99,7 +122,7 @@ export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2)
 
     const prepare = () => {
       if (prepared) return;
-      const mine = loadLive(ask, ctx);
+      const mine = loadLive(ask, ctx, ended.signal);
       prepared = mine;
       mine.catch((error: unknown) => {
         if (prepared !== mine) return;
@@ -208,16 +231,17 @@ export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2)
     document.addEventListener("click", onClick, true);
 
     // The pinned chapter's height is the window's (520vh), so a resize changes it under a reader past it, whom nothing
-    // else keeps in place (02's guard keeps only its own readers). Its box and the reader's scroll are kept one step
-    // behind, as 02's are (chapters.ts): by the resize the browser has already laid the page out again.
-    let held: { readonly top: number; readonly bottom: number; readonly y: number } | null = null;
+    // else keeps in place (02's guard keeps only its own readers). Its box, the reader's scroll and the window they saw
+    // it in are kept one step behind, as 02's are (chapters.ts): by the resize the browser has already laid the page
+    // out again, in the new window, and the reader is judged by the one they read in.
+    let held: { readonly top: number; readonly bottom: number; readonly y: number; readonly vh: number } | null = null;
     const learn = () => {
       if (!section?.classList.contains(PINNED)) {
         held = null;
         return;
       }
       const r = section.getBoundingClientRect();
-      held = { top: r.top + window.scrollY, bottom: r.bottom + window.scrollY, y: window.scrollY };
+      held = { top: r.top + window.scrollY, bottom: r.bottom + window.scrollY, y: window.scrollY, vh: window.innerHeight };
     };
     const onResize = () => {
       const was = held;
@@ -225,7 +249,7 @@ export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2)
       const r = section.getBoundingClientRect();
       const before = { top: was.top - was.y, bottom: was.bottom - was.y, height: was.bottom - was.top };
       const after = { top: r.top + window.scrollY - was.y, height: r.height };
-      const to = placeAfter(before, after, { scrollY: was.y, viewport: window.innerHeight, masthead: mastheadBottom() });
+      const to = placeAfter(before, after, { scrollY: was.y, viewport: was.vh, masthead: mastheadBottom() });
       if (to !== null) window.scrollTo({ top: to, behavior: "instant" });
       learn();
     };
@@ -235,6 +259,8 @@ export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2)
 
     function apply(): void {
       if (!alive) return;
+      // judged once, just before the first fetch: a chapter that cannot fit its window never downloads the scene (J6-5)
+      if (wantsScene(reasons) && !prepared && !fits(section)) reasons = withReason(reasons, "fit", true);
       if (wantsScene(reasons)) prepare();
       const want = modeOf(reasons);
       if (want !== mode) {
@@ -261,6 +287,7 @@ export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2)
     apply();
     return () => {
       alive = false;
+      ended.abort();
       prepared = null;
       watchPlace(false);
       window.removeEventListener(WEBGL_EVENT, onWebgl);
@@ -299,16 +326,25 @@ interface SceneChunk {
 /** The live drawing's only door: the scene chunk (three.js), imported on demand, then its engine prepared. A unit test
  * passes an import that never settles, to prove the limit (J5 pre-flight #14). */
 export function sceneLoader(importScene: () => Promise<SceneChunk> = () => import("./scene/live")): LoadLive {
-  return (ask, ctx) =>
+  return (ask, ctx, signal) =>
     new Promise<Begin>((resolve, reject) => {
-      const timer = window.setTimeout(() => reject(new Error("the live drawing took over 20 s to arrive")), LOAD_LIMIT_MS);
+      let settled = false; // the limit has passed: a chunk that arrives now builds nothing (J5 final review, minor 2)
+      const timer = window.setTimeout(() => {
+        settled = true;
+        reject(new Error("the live drawing took over 20 s to arrive"));
+      }, LOAD_LIMIT_MS);
       importScene().then(
         (scene) => {
           window.clearTimeout(timer);
-          resolve(scene.prepareLive(ask, ctx));
+          if (settled) return;
+          settled = true;
+          if (signal?.aborted) reject(new Error("the live drawing is no longer wanted"));
+          else resolve(scene.prepareLive(ask, ctx));
         },
         (error: unknown) => {
           window.clearTimeout(timer);
+          if (settled) return;
+          settled = true;
           reject(error);
         },
       );

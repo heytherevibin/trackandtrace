@@ -169,7 +169,7 @@ The train is drawn **live** unless a reason holds; reasons come and go and the p
 | `saver` | Data Saver, a slow-2g/2g/3g connection, `prefers-reduced-data` | next visit without them |
 | `webgl` | no WebGL 2, or the GPU drops the context | the context is restored |
 | `quality` | adaptive quality's floor (below) | next session |
-| `load` | the scene chunk failed or took over 20 s | next visit |
+| `load` | the scene chunk failed or took over 20 s | the next rebuild (a Motion toggle, a fit change) retries |
 | `fit` | the chapter cannot fit its words even as a list | the next rebuild |
 | `place` | the reader is below the chapter's top when the live drawing would begin | they come back above it |
 
@@ -178,10 +178,10 @@ While `place` is the only reason, the scene still loads and builds, so the switc
 **Still** is the same drawing baked at build time (§3.D): unpinned, fully apart, every label beside it with
 leaders to its part (or listed under it), label↔part highlight kept; the terminus shows the arrived train. A
 still page never downloads three.js, except while `place` is the only reason, when the scene prepares in the
-background (J5-2), or when the live chapter's fit check finds the drawing cannot fit its window. That check
-(`live-labels.ts` `layout()`) is a DOM measurement with no three.js, but of the pinned layout, which exists only
-once the live chapter is laid out, after the scene has loaded. Switching mid-chapter keeps the reader at the
-chapter's start.
+background (J5-2). Whether the chapter fits is judged before the scene is fetched: `drawing.ts`'s `liveFits` lays
+the pinned chapter out for an instant, measures it with `live-labels.ts`'s own `layout()` (a DOM measurement, no
+three.js), and puts it back in the same task (J6-5). The scene's own check, on every relayout while live, stands
+behind it. Switching mid-chapter keeps the reader at the chapter's start.
 
 **Adaptive quality.** A governor watches intervals between frames the drawing actually drew within one scroll
 gesture. p90 over 26 ms for 30 frames steps down (resolution 2× → 1.5× → 1×; Night effects off; coaches 3 →
@@ -235,7 +235,7 @@ reader's hand.
 |---|---|---|
 | Check interactive | never waits on journey code | holds; a blocked CDN still leaves Run working |
 | Journey chunk | ≤ 70 KB compressed | Anime.js 39 KB (full) + modules |
-| Scene chunk | ≤ 240 KB compressed, live only, except while `place` is the only reason, or when the live chapter's fit check finds the drawing cannot fit its window (§3.C) | three.js ~188 KB (full) + scene |
+| Scene chunk | ≤ 240 KB compressed, live only, except while `place` is the only reason (§3.C) | three.js ~188 KB (full) + scene |
 | Still drawings | ≤ 60 KB compressed per page | 23 + 34 KB |
 | Longest journey task at load, 4× CPU phone | ≤ 120 ms | scene steps ≤ 61 ms (page total 202 ms incl. first layout) |
 | Scroll, reference desktop | p95 ≤ 12 ms, 0% > 25 ms | p95 9.8 ms, 0% |

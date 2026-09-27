@@ -125,6 +125,7 @@ test.describe("J5: every reason not to draw live (spec §3.C, §4)", () => {
     await page.goto("/");
     await waitForJourney(page);
     await expect(page.locator("html")).toHaveAttribute("data-drawing-why", "webgl");
+    await expect(page.locator("html")).toHaveAttribute("data-drawing", "still");
     await expect(drawn(page).first()).toBeAttached();
     // A window is the assertion: a download that never starts has no state to wait on.
     await page.waitForTimeout(1_500);
@@ -141,6 +142,7 @@ test.describe("J5: every reason not to draw live (spec §3.C, §4)", () => {
       lose.loseContext();
     });
     await expect(page.locator("html")).toHaveAttribute("data-drawing-why", "webgl");
+    await expect(page.locator("html")).toHaveAttribute("data-drawing", "still");
     await expect(page.locator("#anatomy")).not.toHaveClass(/is-live/);
     await expect(drawn(page).first()).toBeAttached();
     await page.evaluate(() => {
@@ -158,6 +160,7 @@ test.describe("J5: every reason not to draw live (spec §3.C, §4)", () => {
     await page.goto("/");
     await waitForJourney(page);
     await expect(page.locator("html")).toHaveAttribute("data-drawing-why", "load", { timeout: 25_000 });
+    await expect(page.locator("html")).toHaveAttribute("data-drawing", "still");
     await expect(drawn(page).first()).toBeAttached();
     await expect(page.locator("html")).toHaveAttribute("data-journey", "on");
     if (!isMobile) await expect(page.locator("#how")).toHaveClass(/is-pinned/);
@@ -169,28 +172,34 @@ test.describe("J5: every reason not to draw live (spec §3.C, §4)", () => {
     await page.goto("/");
     await waitForJourney(page);
     await expect(page.locator("html")).toHaveAttribute("data-drawing-why", "quality");
+    await expect(page.locator("html")).toHaveAttribute("data-drawing", "still");
     // A window is the assertion: a download that never starts has no state to wait on.
     await page.waitForTimeout(1_500);
     expect(three()).toEqual([]);
   });
 
-  test("words too large for the window, even as a list: still (fit)", async ({ page }) => {
+  test("words too large for the window, even as a list: still (fit), and three.js never downloaded (J6-5)", async ({ page }) => {
+    const three = watchThree(page);
     // A phone with its text at 200%: the lead and the parts list leave the drawing less than its 150px (spec §3.C).
     await page.setViewportSize({ width: 390, height: 844 });
     await page.addInitScript(() => document.addEventListener("DOMContentLoaded", () => document.documentElement.style.setProperty("font-size", "200%")));
     await page.goto("/");
     await waitForJourney(page);
-    // the scene's own check decides it, after the scene has loaded to measure (spec §3.C)
-    await expect(page.locator("html")).toHaveAttribute("data-drawing-why", "fit", { timeout: 25_000 });
+    // judged before the scene is fetched: the pinned layout, laid out for an instant and put back
+    await expect(page.locator("html")).toHaveAttribute("data-drawing-why", "fit");
     await expect(page.locator("html")).toHaveAttribute("data-drawing", "still");
     await expect(page.locator("#anatomy")).not.toHaveClass(/is-live/);
     await expect(drawn(page).first()).toBeAttached();
+    // A window is the assertion: a download that never starts has no state to wait on.
+    await page.waitForTimeout(1_500);
+    expect(three()).toEqual([]);
   });
 
   test("a reader landing below the chapter: still (place) until they come back above it", async ({ page }) => {
     await page.goto("/#faq");
     await waitForJourney(page);
     await expect(page.locator("html")).toHaveAttribute("data-drawing-why", "place");
+    await expect(page.locator("html")).toHaveAttribute("data-drawing", "still");
     await expect(page.locator("#anatomy")).not.toHaveClass(/is-live/);
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
     await waitForLive(page);

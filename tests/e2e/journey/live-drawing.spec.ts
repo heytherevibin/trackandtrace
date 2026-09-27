@@ -81,6 +81,23 @@ test.describe("the train, drawn live (spec §3.A, §3.C)", () => {
     await waitForLive(page);
     expect(await page.evaluate(() => window.__ttJourney?.night())).toBe(true);
   });
+
+  test("forced colours: it draws live in the system's own colours, and the labels keep theirs (J5-21)", async ({ page }) => {
+    await page.emulateMedia({ forcedColors: "active" });
+    await page.goto("/");
+    await waitForLive(page);
+    await scrollIntoChapter(page, 0.4);
+    await expect.poll(() => page.evaluate(() => window.__ttJourney?.inked("#anatomy .anatomy-stage") ?? 0)).toBeGreaterThan(0.002);
+    const [label, system] = await page.evaluate(() => {
+      const probe = document.createElement("span");
+      probe.style.color = "CanvasText";
+      document.body.append(probe);
+      const read = [getComputedStyle(document.querySelector("#anatomy .callout-title")!).color, getComputedStyle(probe).color];
+      probe.remove();
+      return read;
+    });
+    expect(label).toBe(system);
+  });
 });
 
 test.describe("the live labels (J5-5)", () => {

@@ -81,4 +81,11 @@ describe("JourneyLoader", () => {
     await vi.advanceTimersByTimeAsync(1);
     expect(startJourney).toHaveBeenCalledWith({ hud: true });
   });
+
+  it("tells the journey the frame meter is not allowed unless the page says so", async () => {
+    const startJourney = vi.fn(() => () => {});
+    render(<JourneyLoader load={async () => ({ startJourney })} />);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(startJourney).toHaveBeenCalledWith({ hud: false });
+  });
 });
