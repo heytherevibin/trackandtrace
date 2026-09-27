@@ -37,7 +37,16 @@ jobs:
 
   e2e:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    # 30, from 20, because the suite outgrew the old number on 2026-09-27 and the job started being
+    # KILLED rather than failing. Measured across two runs an hour apart: the traveller suite went
+    # from 317 specs in 6.1 minutes to 489 in 14.9 when the landing-journey specs landed (#72, #73),
+    # and the console suite's 3 minutes then had nowhere to run — it was cancelled mid-step, which
+    # reads in the checks list exactly like a test failure and is not one.
+    #
+    # This buys room; it does not answer the question. At 18 minutes of wall-clock the honest fix is
+    # to run the two suites in parallel, or to shard the traveller one — both of which change how the
+    # journey specs are grouped, so they belong to whoever owns those specs rather than to a timeout.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
