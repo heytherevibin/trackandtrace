@@ -1,7 +1,9 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "../fixtures";
-import { gotoReady } from "../helpers";
+import { PNR, gotoReady } from "../helpers";
 import { collisionsInView, collisionsTopToBottom } from "./collisions";
+import { drawingCollisions } from "./drawing-checks";
+import { waitForJourney } from "./journey-helpers";
 
 /** Draws two probe lines, the second `gap` px below the first, fixed where the window shows them. */
 async function drawProbeLines(page: Page, gap: number): Promise<void> {
@@ -212,7 +214,36 @@ test.describe("the collision checker", () => {
 // The landing's railway instruments, held as panels: the hero dial is drawn under the plate on purpose (v3's
 // gate skipped it as well), and its left side fades before the words. Every other instrument must never cover
 // text outside itself, nor another instrument.
-const INSTRUMENTS = { panels: [".board", ".berth-plan", ".station-clock", ".route-map"], skip: [".hero-dial"] } as const;
+const INSTRUMENTS = { panels: [".board", ".berth-plan", ".station-clock", ".route-map", ".chapter-card", ".title-block"], skip: [".hero-dial"] } as const;
+
+// The route rail is a fixed column down the landing's left edge from 48rem: a panel the page must never draw
+// under, at every width it stands.
+const WITH_RAIL = { ...INSTRUMENTS, panels: [...INSTRUMENTS.panels, ".route-strip"] } as const;
+
+test.describe("the route rail, held as a panel", () => {
+  test.skip(({ isMobile }) => isMobile, "the rail stands from 48rem");
+
+  test("the checker sees text drawn under the rail", async ({ page }) => {
+    await gotoReady(page, "/");
+    await page.evaluate(() => {
+      const line = document.createElement("p");
+      line.textContent = "Probe under the rail";
+      line.style.cssText = "position:fixed;left:8px;top:320px;margin:0;font:16px/20px sans-serif";
+      document.body.append(line);
+    });
+    expect(await collisionsInView(page, WITH_RAIL)).toContain('panel nav#route-strip.route-strip × text "Probe under the rail"');
+  });
+
+  for (const viewport of [{ width: 768, height: 1024 }, { width: 1024, height: 768 }, { width: 1280, height: 800 }] as const) {
+    test(`nothing is drawn under the rail, nor collides, top to bottom at ${viewport.width}×${viewport.height}`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await gotoReady(page, "/");
+      await waitForJourney(page);
+      await expect(page.locator("#route-strip")).toBeVisible();
+      expect(await collisionsTopToBottom(page, WITH_RAIL)).toEqual([]);
+    });
+  }
+});
 
 // Today's landing, before the journey adds anything: the baseline every journey PR must keep.
 const SIZES = [
@@ -230,6 +261,7 @@ for (const size of SIZES) {
       test(`Motion ${motion}: nothing collides, top to bottom`, async ({ page }) => {
         if (motion === "off") await page.addInitScript(() => window.localStorage.setItem("tt.motion", "off"));
         await gotoReady(page, "/");
+        await waitForJourney(page);
         expect(await collisionsTopToBottom(page, INSTRUMENTS)).toEqual([]);
       });
     }
@@ -256,4 +288,59 @@ test.describe("the landing at 390×844 under the device's reduced motion", () =>
     await expect(page.getByText("Your device asks for reduced motion")).toBeVisible();
     expect(await collisionsTopToBottom(page, INSTRUMENTS)).toEqual([]);
   });
+});
+
+test.describe("the hero dial's chart readout", () => {
+  test("the chart readout never touches the board", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.clock.setFixedTime(new Date("2026-09-17T06:30:00.000Z"));
+    await page.goto("/");
+    await waitForJourney(page);
+    const plate = page.getByTestId("hero-instrument");
+    await plate.getByRole("textbox").fill(PNR.cnf);
+    await plate.getByRole("button", { name: /run/i }).click();
+    await expect(page.locator(".dial-readout")).toBeVisible();
+    await page.locator(".dial-readout").scrollIntoViewIfNeeded();
+    expect(await collisionsInView(page, INSTRUMENTS)).toEqual([]);
+  });
+});
+
+// 02's chapters play across a pinned window as the page scrolls; a dense, small-step sweep catches anything
+// the coarser top-to-bottom sweep's 45% stride could step over while a stop is playing.
+test.describe("02 pinned, a dense sweep", () => {
+  for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }] as const) {
+    test(`Motion on: nothing collides through the chapters at ${viewport.width}×${viewport.height}`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await gotoReady(page, "/");
+      await waitForJourney(page);
+      expect(await collisionsTopToBottom(page, { ...INSTRUMENTS, step: 0.15 })).toEqual([]);
+    });
+  }
+});
+
+// The drawn train's labels stand in columns only from 64rem up: every width that reaches columns must clear
+// both the shared checker (the title block, now a panel above) and the drawing's own checks (labels over the
+// drawn box, crossing leaders).
+test.describe("the drawn train at #anatomy: nothing collides in columns", () => {
+  test.skip(({ isMobile }) => isMobile, "columns only ever stand at desktop widths; one project is enough");
+
+  for (const viewport of [{ width: 1440, height: 900 }, { width: 1280, height: 800 }, { width: 1366, height: 768 }] as const) {
+    test(`nothing collides at ${viewport.width}×${viewport.height}`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await gotoReady(page, "/");
+      await waitForJourney(page);
+      await page.locator("#anatomy").scrollIntoViewIfNeeded();
+      // The still files have loaded once the shown <svg>'s content has a real box.
+      await expect
+        .poll(() =>
+          page.evaluate(() => {
+            const svg = [...document.querySelectorAll<SVGSVGElement>("#anatomy .anatomy-still:not(.is-noscript) svg")].find((s) => s.checkVisibility());
+            return svg ? svg.getBBox().width : 0;
+          }),
+        )
+        .toBeGreaterThan(0);
+      expect(await drawingCollisions(page)).toEqual([]);
+      expect(await collisionsInView(page, INSTRUMENTS)).toEqual([]);
+    });
+  }
 });

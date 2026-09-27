@@ -38,6 +38,7 @@ export const shell = {
     sections: "Sections",
     motion: "Motion",
     motionByDevice: "Your device asks for reduced motion",
+    sound: "Sound",
   },
   install: {
     title: "Install Trakline",

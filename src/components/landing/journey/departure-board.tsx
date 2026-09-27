@@ -3,7 +3,8 @@ import { Corners } from "@/components/ui/corners";
 import { messages } from "@/messages";
 import { STATIONS, kmFigure } from "./stations";
 
-/** Departures · Platform 3, under the hero: the page's sections as departures. J3 adds the status column, which follows the scroll. */
+/** Departures · Platform 3, under the hero: the page's sections as departures. The status column is the
+ * journey's: it shows while the journey runs, and follows the scroll. */
 export function DepartureBoard() {
   const m = messages.journey.board;
   return (
@@ -28,11 +29,14 @@ export function DepartureBoard() {
               <th scope="col" className="board-km">
                 {m.km}
               </th>
+              <th scope="col" className="board-status">
+                {m.status}
+              </th>
             </tr>
           </thead>
           <tbody>
-            {STATIONS.slice(1).map((station) => (
-              <tr key={station.id}>
+            {STATIONS.slice(1).map((station, i) => (
+              <tr key={station.id} data-stop={i + 1}>
                 <td className="board-code">{station.code}</td>
                 <td className="board-name">
                   <a href={`#${station.id}`} className="tap-44">
@@ -40,6 +44,7 @@ export function DepartureBoard() {
                   </a>
                 </td>
                 <td className="board-km tnum">{kmFigure(station.km)}</td>
+                <td className="board-status" />
               </tr>
             ))}
           </tbody>

@@ -168,4 +168,11 @@ describe("result view", () => {
     expect(view.statusLong).toContain("Retry in 42 s.");
     expect(view.provenance).toBe("Attempted 12:00 IST · held back, nothing sent to the source");
   });
+
+  it("carries the source's own chart time on an ok result, and none otherwise", () => {
+    const ok = terminalResult({ ok: true, result: okResult("2345678901") }, { pnr: "2345678901", attemptedAt: NOW, sampleMode: true });
+    expect(ok.chartAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    const missing = terminalResult({ ok: false, code: "NOT_FOUND", message: "" }, { pnr: "2345678900", attemptedAt: NOW, sampleMode: true });
+    expect(missing.chartAt).toBeNull();
+  });
 });

@@ -1,7 +1,7 @@
 import { messages } from "@/messages";
 
 // The landing, drawn as a route (spec 2026-09-24 §3.A): every section a station with its code and kilometre
-// post, in page order. GA, the drawn train, joins with its section in J4.
+// post, in page order. GA, the drawn train, joined with its section in J4.
 
 export type StationId = keyof typeof messages.journey.stations;
 
@@ -14,6 +14,7 @@ export interface Station {
 
 const ROUTE: readonly { readonly id: StationId; readonly code: string; readonly km: number }[] = [
   { id: "top", code: "DEP", km: 0 },
+  { id: "anatomy", code: "GA", km: 12 },
   { id: "principles", code: "01", km: 64 },
   { id: "how", code: "02", km: 138 },
   { id: "record", code: "03", km: 212 },
@@ -27,9 +28,10 @@ const ROUTE: readonly { readonly id: StationId; readonly code: string; readonly 
 
 export const STATIONS: readonly Station[] = ROUTE.map((stop) => ({ ...stop, name: messages.journey.stations[stop.id] }));
 
-/** Where a stop sits along the strip's track, as a percentage. */
-export function stopLeft(index: number, count: number): string {
-  return `${((index / (count - 1)) * 100).toFixed(3)}%`;
+/** Where a stop's box stands down the rail's track: evenly spaced, the first at the top and the last a stop's
+ * height (`--stop-h`, journey.css) from the foot, so every stop's box stays inside the track. */
+export function stopTop(index: number, count: number): string {
+  return `calc((100% - var(--stop-h)) * ${(index / (count - 1)).toFixed(4)})`;
 }
 
 /** Kilometres as the board prints them: three figures. */

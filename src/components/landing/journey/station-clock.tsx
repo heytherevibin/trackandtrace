@@ -15,8 +15,9 @@ const NUMERALS = [
 
 /**
  * 04 · the station clock, in Indian Standard Time. It reads the time on the client every 15 seconds; until then it
- * draws the face without hands, so the server's HTML matches (as IstClock shows "--:--"). J3 adds the sweeping
- * second hand.
+ * draws the face without hands, so the server's HTML matches (as IstClock shows "--:--"). The second hand is the
+ * journey's (clock.ts): it shows and sweeps only while the journey runs with Motion on, so React never writes its
+ * angle.
  */
 export function StationClock() {
   const m = messages.journey.clock;
@@ -51,6 +52,7 @@ export function StationClock() {
           <>
             <line x1={0} y1={10} x2={0} y2={-46} className="clock-hand is-hour" transform={`rotate(${angles.hour})`} />
             <line x1={0} y1={12} x2={0} y2={-70} className="clock-hand is-minute" transform={`rotate(${angles.minute})`} />
+            <line x1={0} y1={16} x2={0} y2={-78} className="clock-hand is-second" />
           </>
         ) : null}
         <circle r={3.6} className="clock-cap" />

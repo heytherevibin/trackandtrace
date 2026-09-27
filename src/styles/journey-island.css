@@ -1,0 +1,142 @@
+/* The landing journey while it runs (spec 2026-09-24 §3.B): every rule here applies only under
+   html[data-journey="on"], so a page whose journey never starts is the still page journey.css draws. */
+
+/* ---- Entrances: a kicker's characters turn on their own axis, so each is its own box */
+html[data-journey="on"] [data-flap] :is(span) { display: inline-block; transform-origin: 50% 55%; backface-visibility: hidden; }
+
+/* ---- The intro's plotter: the masthead rule and the plates' outlines draw themselves once per visit */
+html[data-journey="on"] header.is-plotting { border-bottom-color: transparent; }
+html[data-journey="on"] .blueprint.is-plotting { border-color: transparent; }
+.intro-rule { position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; background: var(--line-strong); transform-origin: 0 50%; pointer-events: none; }
+.intro-outline { position: absolute; inset: -1px; width: calc(100% + 2px); height: calc(100% + 2px); pointer-events: none; overflow: visible; }
+.intro-outline rect { fill: none; stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
+html[data-journey="on"] #hero-title span span { display: inline-block; }
+
+/* ---- The route rail: the train runs down it and the odometer at its foot counts. Phones: a hairline rail in the
+   masthead's foot, with the train alone. */
+html[data-journey="on"] .route-strip :is(.strip-odo, .strip-train) { display: block; }
+/* A finger in a window too short for the column's eleven 44px stops (journey.css) gets this rail too. */
+@media (max-width: 47.99rem), (pointer: coarse) and (max-height: 36.62rem) {
+  /* overflow: hidden keeps the train's centred glyph, half its width past 0% or 100%, from ever widening the
+     page: the rail's own train is held inside its track by strip.ts, but this rail runs edge to edge. */
+  html[data-journey="on"] .phone-rail { display: block; position: absolute; left: 0; right: 0; bottom: -1px; height: 12px; overflow: hidden; pointer-events: none; }
+  html[data-journey="on"] .phone-rail::before { content: ""; position: absolute; left: 0; right: 0; top: 5px; height: 1px; background: var(--line); }
+  html[data-journey="on"] .phone-rail .strip-train { display: block; top: 1px; width: 22px; height: 9px; }
+}
+
+/* ---- The board: the status column follows the scroll; the page's own row is at the platform */
+html[data-journey="on"] .board-status { display: table-cell; }
+html[data-journey="on"] .board-table tr.is-here td { background: var(--accent-wash); }
+html[data-journey="on"] .board-table tr.is-here .board-status { color: var(--accent-text); }
+html[data-journey="on"] .board-table tr.is-next .board-status { color: var(--ink-1); }
+html[data-journey="on"] .board-table .flap-char { display: inline-block; transform-origin: 50% 55%; backface-visibility: hidden; }
+
+/* ---- The hero dial after a result: the digit ring gives way to the 24-hour face, and the readout shows */
+html[data-journey="on"] .hero-dial.is-face .dial-face { opacity: 1; }
+html[data-journey="on"] .hero-dial.is-face .dial-seg { opacity: 0; }
+@media (min-width: 64rem) {
+  html[data-journey="on"] .dial-host.is-face > .dial-readout { display: block; }
+}
+html[data-journey="on"] .hero-dial .is-dashed { transform-box: view-box; transform-origin: 0 0; }
+
+/* ---- 02 · pinned: the section holds under the masthead while its three stops play in one dial. Only while it
+   fits (chapters.ts adds .is-pinned after measuring each stop open); otherwise it stays the plain section. */
+html[data-motion="on"][data-journey="on"] .chapters.is-pinned { position: relative; height: 330vh; padding-top: 0; padding-bottom: 0; }
+html[data-motion="on"][data-journey="on"] .is-pinned .chapters-pin {
+  position: sticky; z-index: 2; top: var(--header-height); height: calc(100svh - var(--header-height)); min-height: 560px;
+  display: grid; grid-template-columns: minmax(0, 27rem) minmax(0, 1fr); column-gap: clamp(24px, 4vw, 64px); align-items: center;
+}
+html[data-motion="on"][data-journey="on"] .is-pinned .chapters-instrument { display: flex; flex-direction: column; align-items: center; gap: 14px; min-width: 0; }
+html[data-motion="on"][data-journey="on"] .is-pinned .rail-marker { display: block; }
+html[data-motion="on"][data-journey="on"] .is-pinned .chapters-dial { width: min(100%, calc(100svh - var(--header-height) - 12.5rem), 560px); }
+html[data-motion="on"][data-journey="on"] .is-pinned .chapters-steps { display: flex; flex-direction: column; gap: 22px; margin-top: 20px; }
+html[data-motion="on"][data-journey="on"] .is-pinned .chapters-steps > li:not(.is-current) :is(h3, p) { color: var(--ink-3); }
+html[data-motion="on"][data-journey="on"] .is-pinned .chapters-steps > li.is-current h3 { color: var(--ink-1); }
+@media (max-width: 63.99rem) {
+  html[data-motion="on"][data-journey="on"] .chapters.is-pinned { height: 300vh; }
+  html[data-motion="on"][data-journey="on"] .is-pinned .chapters-pin { grid-template-columns: 1fr; grid-template-rows: auto auto; align-content: start; row-gap: 4px; padding-top: 12px; min-height: 0; }
+  html[data-motion="on"][data-journey="on"] .is-pinned .chapters-instrument { grid-row: 1; }
+  html[data-motion="on"][data-journey="on"] .is-pinned .chapters-dial { width: min(84%, 34vh, 360px, calc(100svh - var(--header-height) - 21rem)); }
+  html[data-motion="on"][data-journey="on"] .is-pinned .chapters-copy { grid-row: 2; }
+  html[data-motion="on"][data-journey="on"] .is-pinned .chapters-copy > :is(span, hr, .chapters-rail) { display: none; }
+  html[data-motion="on"][data-journey="on"] .is-pinned .chapters-copy h2 { font-size: var(--text-3xl); line-height: var(--text-3xl--line-height); }
+  html[data-motion="on"][data-journey="on"] .is-pinned .chapters-steps { gap: 8px; margin-top: 10px; }
+  html[data-motion="on"][data-journey="on"] .is-pinned .chapters-steps > li:not(.is-current) p { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  html[data-motion="on"][data-journey="on"] .is-pinned .chapter-card { display: none; }
+}
+/* Short windows: only the current stop's words. */
+@media (min-width: 64rem) and (max-height: 760px) {
+  html[data-motion="on"][data-journey="on"] .is-pinned .chapters-pin { min-height: 0; }
+  html[data-motion="on"][data-journey="on"] .is-pinned .chapters-copy > :is(span, hr, .chapters-rail) { display: none; }
+  html[data-motion="on"][data-journey="on"] .is-pinned .chapters-copy h2 { font-size: var(--text-3xl); line-height: var(--text-3xl--line-height); }
+  html[data-motion="on"][data-journey="on"] .is-pinned .chapters-steps { gap: 12px; margin-top: 14px; }
+  html[data-motion="on"][data-journey="on"] .is-pinned .chapters-steps > li:not(.is-current) p { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  html[data-motion="on"][data-journey="on"] .is-pinned .chapters-dial { width: min(100%, calc(100svh - var(--header-height) - 11rem), 520px); }
+}
+/* A phone on its side: the dial beside the stops. */
+@media (max-height: 520px) and (orientation: landscape) {
+  html[data-motion="on"][data-journey="on"] .is-pinned .chapters-pin { grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto; align-content: center; padding-top: 0; column-gap: 24px; }
+  html[data-motion="on"][data-journey="on"] .is-pinned .chapters-copy { grid-row: 1; grid-column: 1; }
+  html[data-motion="on"][data-journey="on"] .is-pinned .chapters-instrument { grid-row: 1; grid-column: 2; }
+  html[data-motion="on"][data-journey="on"] .is-pinned .chapters-dial { width: min(38vw, calc(100svh - var(--header-height) - 28px)); }
+  html[data-motion="on"][data-journey="on"] .is-pinned .chapter-card { display: none; }
+}
+html[data-motion="on"][data-journey="on"] .is-pinned .chapters-dial .is-dashed,
+html[data-motion="on"][data-journey="on"] .is-pinned .dial-sweep { transform-box: view-box; transform-origin: 0 0; }
+/* ---- 04 · the station clock's second hand sweeps, while the journey runs with Motion on */
+html[data-motion="on"][data-journey="on"] .clock-hand.is-second { display: inline; }
+
+/* ---- 05 · the route: a sleeper fades in as the line is laid; a row lights as the train passes its stop */
+html[data-motion="on"][data-journey="on"] .route-sleeper { transition: opacity 160ms var(--ease-out); }
+html[data-journey="on"] #roadmap li.is-passed { background: var(--accent-wash); }
+
+/* ---- The registration-mark cursor (fine pointer, Motion on): the native cursor gives way, except for the
+   caret in text fields */
+html.has-reg-cursor, html.has-reg-cursor * { cursor: none !important; }
+html.has-reg-cursor :is(input, textarea, [contenteditable="true"]) { cursor: text !important; }
+.reg-cursor { position: fixed; left: 0; top: 0; z-index: var(--z-cursor); pointer-events: none; width: 0; height: 0; color: var(--accent); }
+.reg-cursor.is-off { opacity: 0; }
+.reg-cross { position: absolute; left: -11px; top: -11px; width: 22px; height: 22px; transition: opacity 120ms var(--ease-out); }
+.reg-cross::before, .reg-cross::after { content: ""; position: absolute; background: currentColor; }
+.reg-cross::before { left: 10.5px; top: 0; width: 1px; height: 100%; }
+.reg-cross::after { top: 10.5px; left: 0; height: 1px; width: 100%; }
+.reg-cursor.is-snapped .reg-cross { opacity: 0; }
+.reg-frame { position: absolute; left: 0; top: 0; width: 22px; height: 22px; transform: translate(-50%, -50%); opacity: 0; transition: opacity 120ms var(--ease-out); }
+.reg-cursor.is-snapped .reg-frame { opacity: 1; }
+.reg-mark { position: absolute; width: 9px; height: 9px; }
+.reg-mark::before, .reg-mark::after { content: ""; position: absolute; background: currentColor; }
+.reg-mark::before { left: 4px; top: 0; width: 1px; height: 100%; }
+.reg-mark::after { top: 4px; left: 0; height: 1px; width: 100%; }
+.reg-mark.tl { left: -5px; top: -5px; }
+.reg-mark.tr { right: -5px; top: -5px; }
+.reg-mark.bl { left: -5px; bottom: -5px; }
+.reg-mark.br { right: -5px; bottom: -5px; }
+.reg-cursor.is-down .reg-cross { transform: scale(0.8); }
+
+/* ---- The footer's Sound switch: only the journey can sound */
+html[data-journey="on"] .sound-toggle { display: inline-flex; }
+
+/* The drawn train's labels beside the still drawing, with leaders to their parts (still.ts, spec §3.C; J4-7):
+   only when they fit, else the page's own parts list stands (journey.css). */
+html[data-journey="on"] .anatomy-pin.is-columns { height: max(640px, calc(100svh - var(--header-height))); }
+html[data-journey="on"] .is-columns .anatomy-still { position: absolute; margin: 0; aspect-ratio: auto; z-index: 1; }
+html[data-journey="on"] .is-columns .anatomy-legend { display: none; }
+html[data-journey="on"] .is-columns .callout-lines { display: block; position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; overflow: visible; }
+html[data-journey="on"] .callout-lines line { stroke: var(--line-strong); stroke-width: 1; }
+html[data-journey="on"] .callout-lines circle { fill: var(--surface-0); stroke: var(--accent); stroke-width: 1.5; }
+html[data-journey="on"] .is-columns .callouts { inset: 0; width: auto; height: auto; overflow: visible; clip-path: none; z-index: 3; pointer-events: none; }
+html[data-journey="on"] .is-columns .callout { position: absolute; width: 16rem; display: grid; grid-template-columns: auto 1fr; column-gap: 10px; align-items: baseline; padding: 6px 0 7px; border-top: 1px solid var(--line); background: var(--surface-0); pointer-events: auto; }
+html[data-journey="on"] .is-columns .callout[data-side="left"] { left: 0; }
+html[data-journey="on"] .is-columns .callout[data-side="right"] { right: 0; }
+html[data-journey="on"] .is-columns .callout-num { font-family: var(--font-display); font-weight: 600; font-size: var(--text-label); letter-spacing: 0.08em; color: var(--accent-text); }
+html[data-journey="on"] .is-columns .callout-title { font-family: var(--font-display); font-weight: 600; font-size: var(--text-sm); line-height: 1.25rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-1); }
+html[data-journey="on"] .is-columns .callout-detail { grid-column: 2; font-size: var(--text-label); line-height: 1.125rem; color: var(--ink-2); }
+html[data-journey="on"] .is-columns .callout-detail b { font-weight: 600; color: var(--ink-1); }
+html[data-journey="on"] .is-columns .callout.is-hot { border-top-color: var(--accent); }
+html[data-journey="on"] .is-columns .callout.is-hot .callout-title { color: var(--accent-text); }
+html[data-journey="on"] .is-columns.is-compact .callout-detail { display: none; }
+html[data-journey="on"] .is-columns .title-block { display: grid; position: absolute; right: 0; bottom: 16px; z-index: 3; grid-template-columns: minmax(0, 1fr) auto; width: 22rem; background: var(--surface-0); }
+html[data-journey="on"] .is-columns .tb-cell { padding: 4px 10px; font-family: var(--font-display); font-weight: 600; font-size: 0.6875rem; /* drawing units: no token matches v3's title-block instrument at its fixed 22rem width */ line-height: 1rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+html[data-journey="on"] .is-columns .tb-cell:nth-of-type(n + 3) { border-top: 1px solid var(--line); }
+html[data-journey="on"] .is-columns .tb-cell:nth-of-type(even) { border-left: 1px solid var(--line); text-align: right; }
+html[data-journey="on"] .is-columns .tb-cell b { color: var(--ink-1); font-weight: 600; }

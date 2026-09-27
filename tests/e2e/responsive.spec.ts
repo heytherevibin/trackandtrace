@@ -32,6 +32,10 @@ test.describe("phone and tablet widths", () => {
       const failures: string[] = [];
       for (const route of ROUTES) {
         await gotoReady(page, route);
+        // A page still loading shows skeletons, whose sheen (utilities.css) slides past each block's clipped edge
+        // and reads as hidden content mid-slide. The layout measured is the one the reader is left with: on a slow
+        // runner the record's first ask can outlast the sheen's first pass (CI #72, /pnr#… at 360px).
+        await expect(page.locator(".skeleton")).toHaveCount(0, { timeout: 30_000 });
         const breaks = await layoutBreaks(page);
         if (breaks.length > 0) failures.push(`${route}\n  ${breaks.join("\n  ")}`);
       }

@@ -47,7 +47,7 @@ Settled with the user between 2026-09-24 rounds 1–4, A–E, and the v3 approva
   drawing with hidden lines removed. Heading kept: "Every part answers to the source".
 - **v2 features (all 14):** kinetic headline, living dial, chart countdown ring, plotter intro once per visit,
   label↔part highlight, dimensions and title block, berth plan (03), station clock (04), track-laying
-  roadmap (05), departure board under the hero, route strip in the masthead, plate morph, registration-mark
+  roadmap (05), departure board under the hero, route strip (a left rail since 2026-09-27), plate morph, registration-mark
   cursor (desktop, motion on), sound off by default (rail clack, departure horn) behind a footer switch.
 - **v3 additions:** the window-seat run through 06–07, Night falls (theme sweep), line side passing at the
   departure, headlight beam at Night, scan reveal, adaptive quality, Data Saver, and the frame meter (a review
@@ -72,8 +72,8 @@ Top to bottom, as in v3:
 
 | Where | What happens | Motion off |
 |---|---|---|
-| Masthead (on "/") | A second row: the route strip. Stations DEP, GA, 01–08, END on a rail; a train glyph runs right as the page scrolls, leaning into speed; odometer KM 000→781; the current station's name. Phones: a hairline rail in the masthead's bottom edge. | Glyph moves, no lean |
-| Hero | Letters of the h1 rise; the plotter draws the masthead rule and the plate's hairlines once per visit; the living dial behind the plate lights segments as digits are typed; after a result, a 24-hour face marks the chart time printed in the record (never computed) with "Chart ~HH:MM IST · in 3 h 12 min". | Dial and face drawn still |
+| Masthead (on "/") | The route rail (from 48rem; approved 2026-09-27): a fixed 4rem column down the page's left edge, from the masthead's foot to the window's, with a hairline on its right; the page stands clear of it. Stations DEP, GA, 01–08, END top to bottom on a rail, each a full-width link at least 44px tall (an eleventh of the rail each in a window too short for that, never overlapping); a train glyph runs down the rail nose first as the page scrolls, leaning into speed; odometer KM 000→781 at the column's foot; the current stop is highlighted (no spelled-out station name). The masthead keeps its own height. Phones: a hairline rail in the masthead's bottom edge. | Glyph moves, no lean |
+| Hero | Letters of the h1 rise; the plotter draws the masthead rule and the plate's hairlines once per visit; the living dial behind the plate lights segments as digits are typed; after a result, a 24-hour face marks the chart time printed in the record (never computed) with "Chart HH:MM IST · in 3 h 12 min". | Dial and face drawn still |
 | Departure board (new) | "Departures · Platform 3": the page's sections as departures with code, km and status (NEXT, AT PLATFORM, DEPARTED); rows flip in; names link to their sections. | Static board |
 | The drawn train (new, pinned) | A solid steel locomotive; a scan gate sweeps it nose to tail into the line drawing; it turns and comes apart into ten labelled parts (label↔part highlight on fine pointers); side elevation with dimensions; coaches couple, the pantograph rises, the train departs with the camera riding along past masts, a signal gantry and Platform 3's nameboard; the strip glyph takes over. Night: light-on-dark, steel glow, headlight beam. | The still drawing |
 | 01 Principles | Kicker flips in; rows rise into place (transform only). | Static |
@@ -112,15 +112,22 @@ Three layers, loaded in order, so the check never waits for, or depends on, the 
    `startJourney(root)`. The chunk (Anime.js + journey modules, ≤ 70 KB compressed) animates the server
    markup imperatively, outside React's render loop, and returns one teardown. Every module returns its own
    teardown, so a rebuild (the Motion switch, Strict Mode's double mount, leaving "/") is idempotent. An error
-   boundary and a watchdog (15 s) turn a failed journey into the motion-off page.
+   boundary and a watchdog (15 s) turn a failed journey into the motion-off page — by writing
+   `data-journey="failed"`: every moving or pinned state requires `data-journey="on"`, and the reader's Motion
+   choice is never changed (J3-1).
 3. **Live drawing (client, on demand).** When the drawing is live, the journey dynamically imports the scene
    chunk (three.js + scene, ≤ 240 KB compressed). The rig is built a part at a time, yielding between parts
    (≤ 61 ms per step at 4× CPU slowdown); coaches and bogie frames share geometry; shaders compile in the
    background (`compileAsync`). One fixed canvas draws each visible stage into its own scissored rectangle, and
    draws only when a stage is on screen and its progress or position changed.
 
-The plate morph (a result growing out of the plate) uses Motion's layout animation. The plates get a nested
-`LazyMotion` that loads `domMax` asynchronously; until it arrives, or with motion off, results appear at once.
+The plate morph (a result growing out of the plate; ruling J3-13) tweens height imperatively — `animate` on a
+Motion value, not the declarative `animate` prop — between the entry's and the record's measured heights,
+under the app's strict `domAnimation` `LazyMotion`: a prop-driven keyframe update on an already-mounted `m.div`
+does not interpolate `height` there, only the imperative engine does. The new face rises 8px and the old goes
+at once, never fading text; a still-running tween is stopped on every face change before the next one starts,
+so it never writes a stale height or fires a stale `tt:layout`. Motion off, or an unchanged height: an instant
+swap.
 
 **State.** A small inline script in the `(site)` root layout's `<head>` writes, before first paint:
 `data-motion` (`on`/`off` from reduced motion and `tt.motion`), `data-saver`, and `data-drawing`
@@ -171,11 +178,13 @@ over 40 ms at the lowest step asks for the still drawing. The step is kept in se
 page would, renders the fills depth-only with the live polygon offset, renders every edge in its own ID colour
 depth-tested against them, and walks each edge across the image keeping only the stretches whose colour
 survived. The result is SVG paths per part (anchors for the ten labels included) for four shapes: drawing
-wide and tall, terminus wide and tall (17–34 KB compressed each). The script writes one sprite,
-`public/journey/stills.<hash>.svg` (symbols per part, strokes `currentColor`), and `still-manifest.ts` (the
-hashed path, viewBoxes, anchors, and a hash of the scene sources it was baked from). `next.config.ts` serves
+wide and tall, terminus wide and tall (17–34 KB compressed each). The script writes one file per shape,
+`public/journey/<shape>.<hash>.svg` (a group per part, strokes `currentColor`, each ink weight an inherited CSS
+variable), so a page fetches at most two, and `still-manifest.ts` (J4-2, J4-3) (the hashed path, viewBoxes,
+anchors, and a hash of the scene sources it was baked from). `next.config.ts` serves
 `/journey/*` as `public, max-age=31536000, immutable`. The page shows a still by setting `<use href>` per
-part only when still, so a live page never fetches it; a `<noscript>` copy covers pages without JavaScript.
+part, for the shape its width shows, only when it draws still or its journey failed (J4-4); a `<noscript>`
+copy covers pages without JavaScript.
 A unit test fails when the scene sources change without a re-bake.
 
 ### E. Scene colours and tokens
@@ -280,6 +289,17 @@ components). The CDN import map (the app bundles). The frame meter ships only on
 
 Moved while planning J2 (2026-09-25): the chapters instrument and the board's status only exist with
 scroll-driven motion, so they land in J3; GA's station lands with its section in J4.
+
+Decided while planning J3 (2026-09-25):
+- the phone strip is its own aria-hidden rail (J3-7);
+- the strip's hand-off pulse and the departure horn land with their callers in J4/J5 (J3-8);
+- the plate morph tweens height on `domAnimation` (J3-13).
+
+Decided while planning J4 (2026-09-26):
+- one still file per shape, not one sprite, to keep a page within its still budget (J4-2);
+- the camera fit, the governor, the palette, the glow and the strip's hand-off pulse wait for the live drawing in
+  J5, their only caller (J4-5; J3-8's pulse moves to J5);
+- the parts list is the page's own layout; the journey stands the labels beside the drawing when they fit (J4-7).
 
 Each PR brings the dependency, copy, tokens and DESIGN.md rules its own code first uses, so nothing lands
 unused, and nothing a traveller can see is inert (a Sound switch with no sound). Each runs `npm run check`

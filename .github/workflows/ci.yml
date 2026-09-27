@@ -37,20 +37,8 @@ jobs:
 
   e2e:
     runs-on: ubuntu-24.04
-    # 30, from 20, because the suite outgrew the old number on 2026-09-27 and the job started being
-    # KILLED rather than failing. The landing-journey specs (#72, #73) took the traveller suite from
-    # 317 to 490, and the console suite's two minutes then had nowhere to run — it was cancelled
-    # mid-step, which reads in the checks list exactly like a test failure and is not one.
-    #
-    # **The variance is the reason for the margin, not the mean.** Three measured runs of the
-    # traveller suite: 6.1 minutes at 317 specs, then 9.8 and 14.9 at 490 — the same specs, a
-    # 50% spread, on whichever runner the job lands. 20 minutes fitted the good runs and killed the
-    # bad ones, which is the worst way for a limit to be wrong: it fails on the days the machine is
-    # slow and never on the days anything is actually broken.
-    #
-    # This buys room; it does not answer the question. The honest fix is to run the two suites in
-    # parallel, or to shard the traveller one — both of which change how the journey specs are
-    # grouped, so they belong to whoever owns those specs rather than to a timeout.
+    # The Supabase start, the whole Playwright run and the console suite: the journey's specs took the
+    # Playwright run alone to 11–15 minutes, and a rate-limited image pull adds minutes more.
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

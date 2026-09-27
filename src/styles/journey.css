@@ -2,16 +2,40 @@
    takes the type roles. SVG labels are sized in px of the drawing's own units, so they scale with the drawing.
    Colours are tokens only. */
 
-/* ---- The route strip (the masthead's second row on "/") */
-.route-strip { border-top: 1px solid var(--line); background: var(--surface-0); }
-.strip-row { display: block; height: 30px; }
-.strip-track { position: relative; height: 30px; min-width: 0; }
-.strip-rail { position: absolute; left: 0; right: 0; top: 17px; height: 12px; }
+/* ---- The route rail (on "/", from 48rem): a fixed column down the page's left edge, from the masthead's foot
+   to the window's, with the stations top to bottom. The landing's content stands clear of it, so nothing is ever
+   drawn under it. Sized in rem, so text zoom widens it with its words. A finger in a window too short for eleven
+   44px stops (under 36.625rem: see .strip-track) gets the phone's rail instead (journey-island.css), and the
+   page is not inset; a fine pointer keeps the column, its stops shrunk. */
+:root { --rail-width: 4rem; }
+.route-strip, .strip-odo, .strip-train, .phone-rail { display: none; }
+@media (min-width: 48rem) and (min-height: 36.625rem), (min-width: 48rem) and (not (pointer: coarse)) {
+  .route-strip {
+    display: block; position: fixed; z-index: var(--z-nav); left: 0; top: calc(var(--header-height) + 1px); bottom: 0;
+    width: var(--rail-width); border-right: 1px solid var(--line); background: var(--surface-0);
+  }
+  :root:has(#route-strip) :is(#main, #main ~ footer) { margin-left: var(--rail-width); }
+}
+.strip-row { display: flex; flex-direction: column; height: 100%; }
+/* Eleven stops (STATIONS), each a full-width link 44px tall while the track holds eleven of them; in a shorter
+   window each is an eleventh of the track, so they shrink together and never overlap. The track holds eleven
+   44px stops in a window at least 36.625rem (586px) tall: the masthead (4rem and its 1px rule), 484px of stops,
+   and the odometer at the foot (2.25rem and its 1px rule). A coarse pointer below that gets the phone's rail. */
+.strip-track { position: relative; flex: 1 1 auto; min-height: 0; container-type: size; --stop-h: min(44px, 100cqh / 11); }
+.strip-rail {
+  position: absolute; top: calc(var(--stop-h) / 2); bottom: calc(var(--stop-h) / 2); right: 0.75rem; width: 12px;
+  background:
+    linear-gradient(var(--line), var(--line)) 4px 0 / 1px 100% no-repeat,
+    linear-gradient(var(--line), var(--line)) 7px 0 / 1px 100% no-repeat,
+    repeating-linear-gradient(180deg, var(--line) 0 1px, transparent 1px 18px) 0 0 / 12px 100% no-repeat;
+}
 .strip-stops { position: absolute; inset: 0; margin: 0; padding: 0; list-style: none; }
-.strip-stops li { position: absolute; top: 2px; transform: translateX(-50%); }
+.strip-stops li { position: absolute; left: 0; right: 0; height: var(--stop-h); }
 .strip-stops a {
-  display: block;
-  padding: 0 3px;
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding-left: 0.75rem;
   font-family: var(--font-display);
   font-weight: 600;
   font-size: var(--text-3xs);
@@ -20,14 +44,32 @@
   color: var(--ink-3);
   text-decoration: none;
 }
-.strip-stops a[aria-current="location"] { color: var(--accent-text); }
-/* The strip makes the landing's masthead taller: anchors stop below it (base.css reads --header-height). */
-@media (min-width: 48rem) {
-  :root:has(#route-strip) { --header-height: calc(4rem + 32px); /* the row, its rule, and the 30px strip with its rule */ }
+.strip-stops a:hover { color: var(--ink-1); }
+/* The current stop names the station: steel, with a bar on the rail's outer edge. */
+.strip-stops a[aria-current="location"] { color: var(--accent-text); box-shadow: inset 2px 0 0 var(--accent); }
+.strip-odo {
+  flex: none;
+  padding: 0.625rem 0.25rem;
+  border-top: 1px solid var(--line);
+  text-align: center;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--text-2xs);
+  line-height: var(--text-2xs--line-height);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--accent-text);
+  font-variant-numeric: tabular-nums;
 }
-@media (max-width: 47.99rem) {
-  .route-strip { display: none; }
-}
+.strip-train { position: absolute; left: 0; top: 13px; width: 30px; height: 12px; transform: translateX(-50%); color: var(--accent); pointer-events: none; }
+.strip-glyph { display: block; width: 100%; height: 100%; transform-origin: 50% 100%; }
+.strip-glyph svg { display: block; width: 100%; height: 100%; }
+/* On the rail the train runs nose down, its wheels to the left: the journey moves it by transform alone. */
+.route-strip .strip-train { left: auto; right: 0.75rem; top: 0; width: 12px; height: 30px; transform: none; }
+.route-strip .strip-glyph { position: relative; transform-origin: 0 50%; }
+.route-strip .strip-glyph svg { position: absolute; left: 50%; top: 50%; width: 30px; height: 12px; transform: translate(-50%, -50%) rotate(90deg); }
+/* 02's height is undecided until the journey starts: fragments land instantly until then. */
+html:has(#how):not([data-journey]) { scroll-behavior: auto; }
 
 /* ---- Departures · Platform 3 (under the hero) */
 .board-table { width: 100%; border-collapse: collapse; }
@@ -58,11 +100,13 @@
 .board-name a { color: var(--ink-1); text-decoration: none; }
 .board-name a:hover { color: var(--accent-text); }
 .board-km { width: 4.5rem; color: var(--ink-3); }
+.board-status { display: none; width: 9rem; color: var(--ink-3); white-space: nowrap; }
 @media (max-width: 39.99rem) {
   .board-table th,
   .board-table td { padding: 6px 12px; font-size: var(--text-label); }
   .board-km { display: none; }
   .board-code { width: 3rem; }
+  .board-status { width: 6.75rem; }
 }
 /* A finger is not a cursor: on touch screens each row is at least 44px, so every destination answers across 44px. */
 @media (pointer: coarse) {
@@ -91,13 +135,27 @@ main:has(.hero-dial) { overflow-x: clip; } /* the landing clips the dial at the 
   }
 }
 .hero-dial svg { display: block; width: 100%; height: 100%; overflow: visible; }
-.dial-tick { stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
-.dial-tick.is-major { stroke: var(--line-strong); }
+.dial-tick, .dial-hour-tick { stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.dial-tick.is-major, .dial-hour-tick.is-major { stroke: var(--line-strong); }
 .dial-ring { fill: none; stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .dial-ring.is-dashed { stroke-dasharray: 2 7; }
 .dial-seg { fill: none; stroke: var(--line); stroke-width: 7; stroke-linecap: butt; }
 .dial-seg.is-on { stroke: var(--accent); }
 .dial-label { fill: var(--ink-3); font-family: var(--font-display); font-weight: 600; font-size: 13px; /* drawing units */ letter-spacing: var(--tracking-caps); text-transform: uppercase; }
+.dial-host > .dial-readout {
+  position: absolute; left: 0; right: 0; top: calc(100% + 12px); margin: 0; display: none;
+  text-align: center; font-family: var(--font-display); font-weight: 600; font-size: var(--text-2xs);
+  line-height: var(--text-2xs--line-height); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--accent-text);
+}
+.dial-seg.is-current { stroke: var(--accent-busy); }
+.dial-sweep, .dial-face { opacity: 0; }
+.dial-sweep { fill: none; stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.dial-arc { fill: none; stroke: var(--accent); stroke-width: 7; }
+.dial-chart-mark { fill: var(--surface-0); stroke: var(--accent-text); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.dial-needle-line { stroke: var(--accent); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.dial-needle-cap { fill: var(--surface-0); stroke: var(--accent); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.dial-needle { transform-box: view-box; transform-origin: 0 0; }
+[data-theme="dark"] .dial-seg.is-on, [data-theme="dark"] .dial-needle-line { filter: drop-shadow(0 0 4px var(--accent)); }
 
 /* ---- 03 · the berth plan (sample data, beside the specimen record) */
 .berth-plan { margin: 28px 0 0; max-width: 34rem; }
@@ -125,6 +183,7 @@ main:has(.hero-dial) { overflow-x: clip; } /* the landing clips the dial at the 
 .clock-hand { stroke: var(--ink-1); stroke-linecap: butt; }
 .clock-hand.is-hour { stroke-width: 3.5; }
 .clock-hand.is-minute { stroke-width: 2.2; }
+.clock-hand.is-second { display: none; stroke: var(--accent); stroke-width: 1; }
 .clock-cap { fill: var(--surface-0); stroke: var(--ink-1); stroke-width: 1.5; }
 @media (max-width: 39.99rem) {
   .station-clock { width: 124px; height: 124px; }
@@ -145,3 +204,63 @@ main:has(.hero-dial) { overflow-x: clip; } /* the landing clips the dial at the 
 @media (max-width: 39.99rem) {
   .route-map { display: none; }
 }
+
+/* ---- 02 · the chapters instrument: drawn still, the section is plain and the instrument is not shown; the
+   journey pins it (journey-island.css). The dial reuses the hero dial's classes. */
+.chapters-pin { display: block; }
+.chapters-instrument, .rail-marker { display: none; }
+.chapters-steps {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 32px clamp(20px, 3vw, 48px); margin: 20px 0 0; padding: 0; list-style: none;
+}
+.chapters-dial { position: relative; aspect-ratio: 1; }
+.chapters-dial svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.chapter-arc { fill: none; stroke: var(--line); stroke-width: 7; }
+.chapter-arc.is-on { stroke: var(--accent); }
+.chapter-label { font-size: 15px; /* drawing units */ }
+.dial-label.is-steel { fill: var(--accent-text); }
+.chapter-digits { font-size: 64px; /* drawing units */ letter-spacing: 0.06em; }
+.chapter-status { font-size: 54px; /* drawing units */ }
+.chapter-party { font-size: 17px; /* drawing units */ }
+.dial-dot { fill: var(--accent); }
+.chapter-rail { stroke: var(--line-strong); }
+.chapter-pulse { fill: none; stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.chapter-layer:not(.is-current), .chapter-card pre:not(.is-current) { display: none; }
+.chapter-card { position: relative; align-self: flex-end; width: 17.5rem; z-index: 2; }
+.chapter-card pre {
+  margin: 0; padding: 12px 14px; font-family: var(--font-display); font-weight: 500; font-size: var(--text-label);
+  line-height: 1.35rem; letter-spacing: 0.04em; color: var(--ink-2); white-space: pre-wrap; font-variant-numeric: tabular-nums;
+}
+.chapter-card pre b { color: var(--accent-text); font-weight: 600; }
+.rail-marker { position: absolute; top: -3px; left: 0; width: 30px; height: 12px; color: var(--accent); transform: translateX(-50%); }
+.rail-marker svg { display: block; width: 100%; height: 100%; }
+
+/* ---- The footer's Sound switch: shown only once the journey can sound it (journey-island.css) */
+.sound-toggle { display: none; }
+
+/* ------------------------------------------------------------------ the drawn train (GA) and the terminus
+   Drawn still (spec §3.C–D). The page's own layout is the parts list: the words, the drawing, then the list; the
+   ten labels stay a real list for screen readers, and a legend shows them. While the journey runs, still.ts stands
+   the labels beside the drawing with leaders when they fit (journey-island.css, .is-columns). */
+.anatomy-pin { position: relative; }
+.anatomy-copy { position: relative; z-index: 2; max-width: 32rem; }
+.anatomy-still { position: relative; width: 100%; aspect-ratio: 1.6; margin: 18px 0 14px; }
+.still-drawing { color: var(--ink-1); pointer-events: none; }
+.still-drawing svg { display: block; width: 100%; height: 100%; overflow: clip; }
+/* a shape shows once it has something to draw; a page without JavaScript shows its <noscript> copy instead */
+.still-drawing svg:not(:has(use[href])) { display: none; }
+@media (min-width: 48rem) { .still-drawing .still-tall { display: none; } }
+/* the noscript copy draws only the wide shape (§3.H's budget), so it shows at every width */
+@media (max-width: 47.99rem) { .still-drawing:not(.is-noscript) .still-wide { display: none; } }
+html:not([data-motion]) .still-drawing:not(.is-noscript) { display: none; }
+/* ink weights reach into the baked files through <use>, as inherited variables (J4-3) */
+[data-theme="dark"] .still-drawing { --still-line: 0.74; }
+.still-drawing [data-hot] { color: var(--accent); --still-line: 1; --still-faint: 1; --still-near: 1; }
+.callout-lines, .title-block { display: none; }
+.callouts { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); margin: 0; padding: 0; list-style: none; }
+.anatomy-legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); gap: 2px 14px; margin: 0; padding: 8px 0 0; list-style: none; border-top: 1px solid var(--line); }
+.anatomy-legend li { display: flex; gap: 6px; min-width: 0; font-size: var(--text-xs); line-height: var(--text-xs--line-height); color: var(--ink-2); }
+.anatomy-legend b { font-family: var(--font-display); font-weight: 600; color: var(--accent-text); }
+.terminus-stage { position: relative; height: clamp(200px, 30vh, 320px); margin-bottom: 20px; }
+.terminus-caption { position: absolute; left: 0; top: 0; z-index: 2; }
+.terminus-still { position: absolute; inset: 18px 0 0; }

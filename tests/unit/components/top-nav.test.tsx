@@ -95,14 +95,21 @@ describe("TopNav", () => {
     expect(within(screen.getByRole("link", { name: "Trakline" })).getByText("Trakline").parentElement).not.toHaveClass("hidden");
   });
 
-  it("carries the landing's route strip on the landing only", () => {
+  it("carries the landing's route rail beside the masthead, and the phone rail inside it, on the landing only", () => {
     const strip = <nav aria-label="Route through this page" />;
+    const rail = <div data-testid="phone-rail" />;
     nav.pathname = "/";
-    const { unmount } = render(<TopNav strip={strip} />);
-    expect(within(screen.getByRole("banner")).getByRole("navigation", { name: "Route through this page" })).toBeInTheDocument();
+    const { unmount } = render(<TopNav strip={strip} rail={rail} />);
+    const banner = screen.getByRole("banner");
+    // The rail is its own column down the page's left edge: it has left the masthead.
+    expect(within(banner).queryByRole("navigation", { name: "Route through this page" })).toBeNull();
+    expect(screen.getByRole("navigation", { name: "Route through this page" })).toBeInTheDocument();
+    // The phone's hairline rail still runs along the masthead's foot.
+    expect(banner).toContainElement(screen.getByTestId("phone-rail"));
     unmount();
     nav.pathname = "/watchlist";
-    render(<TopNav strip={strip} />);
+    render(<TopNav strip={strip} rail={rail} />);
     expect(screen.queryByRole("navigation", { name: "Route through this page" })).toBeNull();
+    expect(screen.queryByTestId("phone-rail")).toBeNull();
   });
 });
