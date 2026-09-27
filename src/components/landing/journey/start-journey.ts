@@ -154,7 +154,12 @@ export function startJourney(options: JourneyOptions = {}): Teardown {
   };
   const rebuild = () => {
     if (html.getAttribute("data-journey") !== "on") return;
-    build().catch((error: unknown) => console.error(error));
+    // A rebuild that fails ends the journey exactly as a failed first build does (below): nothing stays running,
+    // the kept engine included, on a page marked "failed".
+    build().catch((error: unknown) => {
+      console.error(error);
+      end();
+    });
   };
   const onResize = () => {
     window.clearTimeout(resizeTimer);
