@@ -11,6 +11,14 @@
 // nothing can go back for it. Addendum §4.1 therefore asks that a partial run be LOUD, and that the
 // exit code say whether the run was whole.
 //
+// **The first half of that still holds; the second was wrong and is corrected.** The report is the
+// loud part, and it is louder than ever: every hole below is named with its combo and its date. The
+// EXIT CODE is not a second copy of it. A provider refusing one train leaves a hole and is a
+// Tuesday, and the first scheduled run — 14 asks, 13 answers, 42 rows — exited 1 for exactly that.
+// An alarm that fires on the ordinary case is one an operator learns to stop reading, and then the
+// run that really failed goes past unread with the rest. So the exit code answers the narrower
+// question, "could this run do its job", and `exitCodeFor` sets out what still trips it.
+//
 // Everything below follows from that one rule, including the two sections added after review found
 // them missing:
 //
@@ -225,23 +233,81 @@ export function summarise(summary) {
     for (const one of summary.withoutRows) lines.push(`  ${one.combo}  ${one.runs} runs`);
     lines.push(
       `  A train that runs one day a week still has that day inside any ${RUNS_WITHOUT_ROWS_BEFORE_NOTICE} runs, so this is past what a thin timetable explains. Likely causes, in order: a pinned-only (Tatkal) entry the provider will not answer for, a rolling ask that has died while the pinned one carries the combo, or a store that is writing nothing.`,
-      "  It does not change the exit code: that number is about whether THIS run was whole. Confirm against the sections above, then fix or remove the entry deliberately.",
+      "  It does not change the exit code: that number is about whether this run could DO ITS JOB, and a combo the provider will not answer for is an answer. Confirm against the sections above, then fix or remove the entry deliberately.",
     );
   }
 
-  lines.push("", summary.whole ? "The run was whole: every combo asked and answered." : "The run was NOT whole. The dataset has holes where the lines above say it does.");
+  // Two verdicts, deliberately, because they answer different questions and an operator who reads
+  // only one of them should not be misled by it. WHOLE is about the dataset. The EXIT CODE is about
+  // the run. A provider refusing one train leaves a hole and is not a failure of this run, so the
+  // common case now prints both — "not whole" and "exits 0" — and says why in the same breath,
+  // rather than leaving a reader to wonder which of the two lines to believe.
+  if (summary.whole) lines.push("", "The run was whole: every combo asked and answered.");
+  else if (ranItsPlan(summary)) {
+    lines.push(
+      "",
+      "The run was NOT whole. The dataset has holes where the lines above say it does.",
+      "It still exits 0: every ask it planned was made and rows were written, so the run did what it came to do and the provider answered no to part of it. The holes are named above, which is where a hole can say which combo and which date; an exit code cannot.",
+    );
+  } else {
+    lines.push(
+      "",
+      "The run was NOT whole, and it exits non-zero: it did not do what it came to do. Either a gate stopped it, an ask was never sent, a sweep lost its place, or nothing answered at all — see the sections above for which.",
+    );
+  }
   return lines;
 }
 
 /**
- * Non-zero the moment the run was not whole, so an operator reading only the exit code still learns
- * of the hole.
+ * **Was this run able to do its job.** That is the only question this answers, and it is not the
+ * same question as whether the dataset is whole.
+ *
+ * It used to be `summary.whole ? 0 : 1`, which made a PROVIDER REFUSAL set the exit code. The first
+ * scheduled run, on 2026-09-27, asked 14, answered 13 and wrote 42 rows — and exited 1, because one
+ * rolling ask came back SOURCE_UNAVAILABLE. A provider refusing one train out of twelve is a
+ * Tuesday. Red every Tuesday is how an operator learns to stop reading the red, and then the run
+ * that really failed goes by unread with all the others.
+ *
+ * Wholeness has not gone anywhere: it is still computed, still printed, and still names every hole
+ * in the sections above. A hole belongs in the report, which says WHICH combo and WHICH date. An
+ * exit code cannot say that, and a daily alarm that carries no detail buys nothing.
+ *
+ * Four things still set it, because each is this run failing rather than the provider answering no:
+ *
+ *   * a GATE stopped it — the run's ceiling, the day's budget, a resting breaker. Asks that would
+ *     have been made were not.
+ *   * an ask was never SENT (`notAsked`), for the same reason.
+ *   * a sweep RESTARTED — OUR cursor lost its place, and the journey dates it skipped are gone for
+ *     good, because a past date answers 400. Nobody else caused that one.
+ *   * NOTHING answered. Each refusal alone is a Tuesday; all of them at once is the provider being
+ *     down, and this file already says so in as many words: "a whole run of refusals and no verdict
+ *     is what an outage looks like from in here."
+ *
+ * The store's own health is a different instrument again, cumulative rather than per-run, and it has
+ * its own exit code: `npm run source:report`.
  *
  * @param {Summary} summary
  * @returns {number}
  */
 export function exitCodeFor(summary) {
-  return summary.whole ? 0 : 1;
+  return ranItsPlan(summary) ? 0 : 1;
+}
+
+/**
+ * The predicate behind the exit code, named because the REPORT says the same thing in prose and two
+ * copies of one rule are two rules waiting to disagree — which this store's own migration says in
+ * as many words: "a value two callers compute is a value that will disagree".
+ *
+ * @param {Summary} summary
+ * @returns {boolean}
+ */
+export function ranItsPlan(summary) {
+  const askedItsPlan = summary.stopped === null && summary.notAsked.length === 0 && summary.asks > 0 && summary.asks === summary.planned;
+  const keptItsPlace = summary.restarted.length === 0;
+  // Rows, not answers: a run that was told something and stored none of it has no more to show for
+  // itself than one that was told nothing.
+  const heardSomething = summary.rows > 0;
+  return askedItsPlan && keptItsPlace && heardSomething;
 }
 
 // ---------------------------------------------------------------------------
