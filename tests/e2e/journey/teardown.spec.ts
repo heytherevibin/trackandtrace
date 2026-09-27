@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "../fixtures";
 import { PNR } from "../helpers";
-import { motionOff, waitForJourney } from "./journey-helpers";
+import { frames, motionOff, waitForJourney } from "./journey-helpers";
 
 // Every module's teardown puts the server's markup back (spec §3.B). One generic proof: a page that ran the
 // whole journey with Motion on — the intro, every section scrolled through and back, a check to a result and
@@ -118,9 +118,10 @@ test.describe("the journey's teardown", () => {
     // Motion off with the footer's own switch, then back to the top, where the baseline was read.
     await page.getByRole("contentinfo").getByRole("switch", { name: "Motion" }).click();
     await expect(page.locator("html")).toHaveAttribute("data-motion", "off");
-    await page.waitForTimeout(300);
+    await frames(page); // the switch's teardown and still rebuild have had their turn
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
-    await page.waitForTimeout(500);
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+    await frames(page); // the scroll's observers have had theirs
     await expect(page.locator("html")).toHaveAttribute("data-journey", "on");
 
     // the rebuilt page settles over a few frames (the still's columns, the board's station), which a busy runner may

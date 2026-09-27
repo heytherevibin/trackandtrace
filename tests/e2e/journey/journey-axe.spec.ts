@@ -1,6 +1,6 @@
-import { test } from "../fixtures";
+import { expect, test } from "../fixtures";
 import { expectAxeClean } from "../helpers";
-import { motionOff, scrollToId, stubSaveData, waitForJourney } from "./journey-helpers";
+import { motionOff, scrollIntoChapter, scrollToId, stubSaveData, waitForJourney, waitForLive } from "./journey-helpers";
 
 const POSITIONS: readonly (readonly [name: string, id: string | null, fraction?: number])[] = [
   ["top", null],
@@ -57,6 +57,24 @@ test.describe("axe, while the journey runs", () => {
     await waitForJourney(page);
     await scrollToId(page, "terminus", 40);
     await page.waitForTimeout(1_200);
+    await expectAxeClean(page);
+  });
+
+  test("clean at the drawing, live, with its labels out", async ({ page }) => {
+    await page.goto("/");
+    await waitForLive(page);
+    await scrollIntoChapter(page, 0.4);
+    // out: every label has wiped in whole
+    await expect.poll(() => page.locator("#anatomy .callout").evaluateAll((els) => els.every((el) => getComputedStyle(el).clipPath === "none"))).toBe(true);
+    await expectAxeClean(page);
+  });
+
+  test("clean at Night, at the drawing, live, with its labels out", async ({ page }) => {
+    await page.addInitScript(() => window.localStorage.setItem("tt.theme", "dark"));
+    await page.goto("/");
+    await waitForLive(page);
+    await scrollIntoChapter(page, 0.4);
+    await expect.poll(() => page.locator("#anatomy .callout").evaluateAll((els) => els.every((el) => getComputedStyle(el).clipPath === "none"))).toBe(true);
     await expectAxeClean(page);
   });
 
