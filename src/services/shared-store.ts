@@ -102,6 +102,29 @@ export function publicStore(current: Env = env()): { readonly kv: Kv; readonly p
   return stateStore(current);
 }
 
+const readers = new WeakMap<Env, { readonly kv: Kv; readonly prefix: string }>();
+
+/**
+ * The same store as `publicStore`, for a page that REPORTS on it — without the fallback.
+ *
+ * `publicStore` answers from this instance's memory whenever Upstash errors, which is right for a
+ * breaker deciding whether to call and wrong for a dashboard: an unreachable store then reads as an
+ * empty one, and the page says "Answering" and "0 requests" about a day it knows nothing of. Here a
+ * failed read throws, so `readBreakerState` comes back `known: false` and `readUsageHistory` gives
+ * the day as unknown — the paths they were written with and could never reach.
+ *
+ * Unconfigured, it is the same memory `publicStore` uses, because that is where the counts are.
+ */
+export function publicStoreForReading(current: Env = env()): { readonly kv: Kv; readonly prefix: string } {
+  const config = sharedStoreConfig(current);
+  if (!config) return stateStore(current);
+  const known = readers.get(current);
+  if (known) return known;
+  const made = { kv: redisKv(connectRedis(config.credentials, STATE_TIMEOUT_MS)), prefix: config.prefix };
+  readers.set(current, made);
+  return made;
+}
+
 /** Today's live-request budget, shared by every instance. Sources that spend no provider quota have none. */
 export function liveBudget(current: Env = env()): LiveBudget {
   if (!isThirdPartySource(activePnrSource(current))) return UNLIMITED_BUDGET;

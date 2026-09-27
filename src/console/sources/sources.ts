@@ -14,20 +14,33 @@ import type { UsageDay } from "@/services/usage";
 export interface SourceUsage {
   /** The last day in the list, or null when that day could not be read. */
   readonly today: number | null;
-  /** Summed over the readable days only. Null when none were readable. */
+  /** Summed over the readable days of the last day's CALENDAR month only. Null when none were readable. */
   readonly monthTotal: number | null;
   readonly averagePerDay: number | null;
   /** How many days went into the two figures above — the honest denominator. */
   readonly daysCounted: number;
-  /** The tallest bar, so the chart has something to scale against. */
+  /** The tallest bar across every day drawn, so the chart has something to scale against. */
   readonly busiestDay: number | null;
 }
 
+type KnownDay = UsageDay & { requests: number };
+
+const isKnown = (d: UsageDay): d is KnownDay => d.requests !== null;
+
+/**
+ * The plan resets on the 1st, so "this month" is the calendar month the last day falls in — not the
+ * thirty days the chart draws, which on 2 October would count September against October's quota.
+ * The month comes from the date string ("2026-10-02" → "2026-10"), so it is known even when today's
+ * count is not.
+ */
 export function readSourceUsage(history: readonly UsageDay[]): SourceUsage {
-  const known = history.filter((d): d is UsageDay & { requests: number } => d.requests !== null);
   const last = history.at(-1);
+  const drawn = history.filter(isKnown);
+  const month = last?.day.slice(0, 7);
+  const known = drawn.filter((d) => d.day.slice(0, 7) === month);
+  const busiestDay = drawn.length === 0 ? null : Math.max(...drawn.map((d) => d.requests));
   if (known.length === 0) {
-    return { today: null, monthTotal: null, averagePerDay: null, daysCounted: 0, busiestDay: null };
+    return { today: null, monthTotal: null, averagePerDay: null, daysCounted: 0, busiestDay };
   }
   const total = known.reduce((sum, d) => sum + d.requests, 0);
   return {
@@ -35,6 +48,6 @@ export function readSourceUsage(history: readonly UsageDay[]): SourceUsage {
     monthTotal: total,
     averagePerDay: Math.round(total / known.length),
     daysCounted: known.length,
-    busiestDay: Math.max(...known.map((d) => d.requests)),
+    busiestDay,
   };
 }

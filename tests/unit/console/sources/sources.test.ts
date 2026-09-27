@@ -65,6 +65,34 @@ describe("readSourceUsage", () => {
     expect(usage).toMatchObject({ today: null, monthTotal: null, averagePerDay: null, daysCounted: 0 });
   });
 
+  it("totals the calendar month the last day falls in, not every day the chart draws", () => {
+    // The chart draws thirty days; the plan resets on the 1st. Summing the chart would count
+    // September against October's quota for the whole of October's first month.
+    const history: readonly UsageDay[] = [
+      { day: "2026-09-29", requests: 500 },
+      { day: "2026-09-30", requests: 700 },
+      { day: "2026-10-01", requests: 10 },
+      { day: "2026-10-02", requests: 30 },
+    ];
+    const usage = readSourceUsage(history);
+
+    expect(usage.monthTotal).toBe(40);
+    expect(usage.averagePerDay).toBe(20);
+    expect(usage.daysCounted).toBe(2);
+    // The bars still scale against every day they draw.
+    expect(usage.busiestDay).toBe(700);
+  });
+
+  it("knows the month from the date even when today itself could not be read", () => {
+    const history: readonly UsageDay[] = [
+      { day: "2026-09-30", requests: 700 },
+      { day: "2026-10-01", requests: 10 },
+      { day: "2026-10-02", requests: null },
+    ];
+
+    expect(readSourceUsage(history).monthTotal).toBe(10);
+  });
+
   it("keeps the busiest day, so the bars have something to scale against", () => {
     expect(readSourceUsage(days(10, 45, 30)).busiestDay).toBe(45);
     expect(readSourceUsage(days(null, null)).busiestDay).toBeNull();

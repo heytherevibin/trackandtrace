@@ -10,7 +10,7 @@ import { readSourceUsage } from "@/console/sources/sources";
 import { readBreakerState } from "@/services/breaker";
 import { activePnrSource, isThirdPartySource } from "@/services/env";
 import { AppError } from "@/services/errors";
-import { publicStore, breakerScopeFor } from "@/services/shared-store";
+import { breakerScopeFor, publicStoreForReading } from "@/services/shared-store";
 import { readUsageHistory, type UsageDay } from "@/services/usage";
 import { redirect } from "next/navigation";
 
@@ -56,7 +56,9 @@ export default async function SourcesPage() {
   // own "a source not configured" state covers it, and it is the honest thing to show rather than a
   // plate of zeroes about a provider nobody is asking.
   const configured = isThirdPartySource(source);
-  const { kv, prefix } = publicStore();
+  // The reading store: `publicStore` falls back to this instance's memory when Upstash is down, and
+  // every "cannot say" below would then read as "Answering" and "0 requests".
+  const { kv, prefix } = publicStoreForReading();
 
   const [history, fuses] = configured
     ? await Promise.all([

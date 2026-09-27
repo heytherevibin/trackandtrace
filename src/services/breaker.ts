@@ -288,11 +288,13 @@ export async function readBreakerState(kv: Kv, scope: BreakerScope): Promise<Bre
     // refused key rests far longer than a run of failures — so it is the one an operator is actually
     // waiting on, and naming the shorter would understate the wait.
     const openedBy = providerOpen !== null ? "provider" : endpointOpen !== null ? "endpoint" : null;
-    const seconds = openedBy === "provider" ? providerTtl : openedBy === "endpoint" ? endpointTtl : -1;
+    // `Kv.ttl` answers in MILLISECONDS. Rounded up, so a fuse with a part-second left still reads as
+    // open for a second rather than for none.
+    const ms = openedBy === "provider" ? providerTtl : openedBy === "endpoint" ? endpointTtl : 0;
     return {
       known: true,
       open: openedBy !== null,
-      retryAfterSeconds: openedBy !== null && seconds > 0 ? seconds : null,
+      retryAfterSeconds: openedBy !== null && ms > 0 ? Math.ceil(ms / 1000) : null,
       openedBy,
       failures: counted(fails),
       asks: counted(asks),

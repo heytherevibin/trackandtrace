@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { readBreakerState } from "@/services/breaker";
-import type { Kv } from "@/services/kv";
+import { MemoryKv, type Kv } from "@/services/kv";
 
 // ---------------------------------------------------------------------------
 // The breaker, read rather than asked.
@@ -20,7 +20,8 @@ import type { Kv } from "@/services/kv";
 function store(values: Readonly<Record<string, string>>, ttls: Readonly<Record<string, number>> = {}): Kv {
   return {
     get: vi.fn(async (key: string) => values[key] ?? null),
-    ttl: vi.fn(async (key: string) => ttls[key] ?? -1),
+    // Milliseconds, as `Kv.ttl` is documented to answer, and 0 for an absent key.
+    ttl: vi.fn(async (key: string) => ttls[key] ?? 0),
     set: vi.fn(),
     del: vi.fn(),
     incr: vi.fn(),
@@ -40,7 +41,7 @@ describe("readBreakerState", () => {
   });
 
   it("reports a caller's own fuse, and that failures are what open one", async () => {
-    const state = await readBreakerState(store({ [`${SCOPE.endpoint}:open`]: "30000" }, { [`${SCOPE.endpoint}:open`]: 22 }), SCOPE);
+    const state = await readBreakerState(store({ [`${SCOPE.endpoint}:open`]: "30000" }, { [`${SCOPE.endpoint}:open`]: 22_000 }), SCOPE);
 
     expect(state.open).toBe(true);
     expect(state.retryAfterSeconds).toBe(22);
@@ -50,7 +51,7 @@ describe("readBreakerState", () => {
   it("reports the provider-wide fuse, which opens for a different reason entirely", async () => {
     // Only a refused key or a spent plan opens this one, and neither is a run of
     // bad luck: the operator's next move is different, so the two are not merged.
-    const state = await readBreakerState(store({ [`${SCOPE.provider}:open`]: "600000" }, { [`${SCOPE.provider}:open`]: 540 }), SCOPE);
+    const state = await readBreakerState(store({ [`${SCOPE.provider}:open`]: "600000" }, { [`${SCOPE.provider}:open`]: 540_000 }), SCOPE);
 
     expect(state.open).toBe(true);
     expect(state.openedBy).toBe("provider");
@@ -60,13 +61,36 @@ describe("readBreakerState", () => {
     const state = await readBreakerState(
       store(
         { [`${SCOPE.provider}:open`]: "600000", [`${SCOPE.endpoint}:open`]: "30000" },
-        { [`${SCOPE.provider}:open`]: 540, [`${SCOPE.endpoint}:open`]: 22 },
+        { [`${SCOPE.provider}:open`]: 540_000, [`${SCOPE.endpoint}:open`]: 22_000 },
       ),
       SCOPE,
     );
 
     expect(state.openedBy).toBe("provider");
     expect(state.retryAfterSeconds).toBe(540);
+  });
+
+  it("counts the wait in seconds, off a store whose TTL answers in milliseconds", async () => {
+    // `Kv.ttl` answers in milliseconds (Upstash's PTTL). Read as seconds, a 22-second rest drew as
+    // "not asked for 22000s" — six hours — on the one page an operator opens to decide whether to wait.
+    // A real store, not a mock: the mock above answered in whatever unit its author assumed.
+    const now = { at: 1_000_000 };
+    const kv = new MemoryKv(() => now.at);
+    await kv.set(`${SCOPE.endpoint}:open`, "30000", 22_000);
+
+    const state = await readBreakerState(kv, SCOPE);
+
+    expect(state.retryAfterSeconds).toBe(22);
+  });
+
+  it("rounds a part-second rest up, so a fuse still open never reads as 0s", async () => {
+    const now = { at: 1_000_000 };
+    const kv = new MemoryKv(() => now.at);
+    await kv.set(`${SCOPE.endpoint}:open`, "30000", 400);
+
+    const state = await readBreakerState(kv, SCOPE);
+
+    expect(state.retryAfterSeconds).toBe(1);
   });
 
   it("carries the window's own figures and the trips earned today", async () => {
