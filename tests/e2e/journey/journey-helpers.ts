@@ -3,7 +3,8 @@ import { JOURNEY_CHUNK_MARK } from "@/components/landing/journey/journey-mark";
 import { SCENE_CHUNK_MARK } from "@/components/landing/journey/scene/scene-mark";
 
 /** The journey marks <html data-journey="on"> as it takes the page over, then starts its modules a turn at a time;
- * outside production it says when the last has started (window.__ttJourneyStarted), and specs act only after that. */
+ * outside production it says when the last has started and the page has settled (window.__ttJourneyStarted), and
+ * specs act only after that. */
 export async function waitForJourney(page: Page): Promise<void> {
   await expect(page.locator("html")).toHaveAttribute("data-journey", "on", { timeout: 15_000 });
   await page.waitForFunction(() => Reflect.get(window, "__ttJourneyStarted") === true, undefined, { timeout: 15_000 });

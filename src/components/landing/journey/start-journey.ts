@@ -30,7 +30,8 @@ export { JOURNEY_CHUNK_MARK };
 declare global {
   interface Window {
     /** Outside production builds only: false while the first build is still starting its modules a turn at a time,
-     * true once every module has started (what the e2e specs wait on before they act). */
+     * true once every module has started and the page has settled (its first layout pass and the place restore, two
+     * frames later): what the e2e specs wait on before they act. */
     __ttJourneyStarted?: boolean;
   }
 }
@@ -197,7 +198,6 @@ export function startJourney(options: JourneyOptions = {}): Teardown {
   build(pause).then(
     () => {
       if (ended) return;
-      if (probed) window.__ttJourneyStarted = true;
       // The frame meter (J5-10): its own chunk, fetched only when allowed and asked for; it ends with the journey.
       if (options.hud && new URLSearchParams(window.location.search).has("journey-hud")) {
         void import("./hud").then(({ startHud }) => life.atEnd(startHud()), () => undefined);
@@ -206,6 +206,7 @@ export function startJourney(options: JourneyOptions = {}): Teardown {
         settleFrame = requestAnimationFrame(() => {
           settleFrame = 0;
           memory.restore();
+          if (probed) window.__ttJourneyStarted = true;
         });
       });
     },

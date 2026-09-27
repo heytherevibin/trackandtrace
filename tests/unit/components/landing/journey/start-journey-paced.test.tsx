@@ -74,6 +74,8 @@ describe("startJourney's first build, a module at a time (spec §3.H)", () => {
     const turns = 1 + (await releaseAll());
     expect(turns).toBe(MODULES.length - 1);
     expect(last).toHaveBeenCalledTimes(1);
+    expect(window.__ttJourneyStarted).toBe(false); // not until the first layout pass and the place restore are done
+    await frames();
     expect(window.__ttJourneyStarted).toBe(true);
     await frames();
     expect(layouts).toHaveBeenCalled();
