@@ -123,6 +123,8 @@ test.describe("the journey's teardown", () => {
     await page.waitForTimeout(500);
     await expect(page.locator("html")).toHaveAttribute("data-journey", "on");
 
-    expect(await snapshot(page)).toEqual(before);
+    // the rebuilt page settles over a few frames (the still's columns, the board's station), which a busy runner may
+    // take a while to draw: wait for the markup to settle, then it must be the Motion-off page's exactly
+    await expect.poll(() => snapshot(page), { timeout: 15_000 }).toEqual(before);
   });
 });

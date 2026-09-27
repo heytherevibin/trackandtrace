@@ -87,11 +87,14 @@ export function startPlaceGuard(): Teardown {
   };
   window.addEventListener("scroll", learn, { passive: true });
   window.addEventListener(MOTION_BEFORE_EVENT, learn);
-  // The drawing above 02 (GA, J5) pins and unpins, which moves #how's document box without resizing it. While #how
-  // is the size this guard last settled, every layout change refreshes the box it judges against; a change that did
-  // resize #how is the observer's, below, and must be judged against the box from before it.
+  // The drawing above 02 (GA, J5) pins and unpins, which moves #how's document box without resizing it, and moves
+  // its reader with it by an instant scroll before it tells tt:layout. While #how is the size this guard last
+  // settled, every layout change refreshes the box it judges against, and the reader's scroll with it: that move's
+  // own "scroll" event lands a frame later, and a resize judged before it would read the reader's old place against
+  // the new box. A change that did resize #how is the observer's, below, and must be judged against the box from
+  // before it.
   const refresh = () => {
-    if (unchanged()) place = { ...place, box: docBox(section) };
+    if (unchanged()) place = { box: docBox(section), y: window.scrollY };
   };
   window.addEventListener(LAYOUT_EVENT, refresh);
   // A freshly observed target always delivers one initial notification, even when nothing has actually

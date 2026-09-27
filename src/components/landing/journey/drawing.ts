@@ -8,8 +8,9 @@ import { webgl2 } from "./webgl-probe";
 // data-drawing-why, and told as tt:drawing: live unless a reason holds. The head script guessed before first paint
 // (motion-boot.ts); from here on this module decides. The live drawing comes in two steps (J5-2): prepared (the
 // scene chunk, then the engine, a part at a time) as soon as nothing but the reader's place holds it back, then
-// begun on the pinned chapter. The pin (#anatomy.is-live) is only ever written here, inside keepPlace (J5-3), and
-// every pin and unpin is told as tt:layout, so whatever measures the page below it (02's place guard) re-measures.
+// begun on the pinned chapter once no scroll is in flight. The pin (#anatomy.is-live) is only ever written here,
+// inside keepPlace (J5-3), and every pin and unpin is told as tt:layout, so whatever measures the page below it (02's
+// place guard) re-measures. A resize that changes the pinned chapter's height keeps its reader in place the same way.
 
 export interface Ask {
   readonly still: (why: DrawingReason) => void;
@@ -24,6 +25,9 @@ export const noLiveDrawing: LoadLive = () => Promise.reject(new Error("no live d
 
 const PINNED = "is-live";
 const PLACE_EVENTS = ["scroll", "resize", LAYOUT_EVENT] as const;
+/** How long a scroll may go quiet before it counts as ended: scrollend says so where the browser has it (this only
+ * backs it up), else a short pause does. */
+const quietMs = (): number => ("onscrollend" in window ? 1000 : 150);
 
 /** This session's tt.q: a quality step, "still" (the floor), or nothing. The live chapter imports this one reader
  * for the governor's starting step rather than repeating it (J5 pre-flight #15). */
@@ -78,6 +82,10 @@ export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2)
     let warned = false;
     let watching = false;
     let placeFrame = 0;
+    // The page moving (an anchor's glide, a fling): begin() waits for it to end (below).
+    let moving = false;
+    let quiet = 0;
+    let waiting = false;
 
     const report = (now: DrawingMode) => {
       html.dataset.drawing = now;
@@ -145,6 +153,12 @@ export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2)
       Promise.all([mine, kept?.catch(() => null) ?? null]).then(
         ([start, engine]) => {
           if (!alive || prepared !== mine || mode !== "live" || live) return;
+          // Nothing about the chapter changes while the page moves: pinned, or settled on the still, its height would
+          // shift under a scroll whose end is already set (an anchor's glide), landing the reader somewhere else.
+          if (moving) {
+            waiting = true;
+            return;
+          }
           // The engine is the journey's, this module only the build's: a GPU lost before a rebuild was heard by the
           // module it tore down, never by this one, so the engine is asked. "restored" brings the drawing back.
           if (engine?.lost()) {
@@ -162,7 +176,7 @@ export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2)
             failed(thrown);
             return;
           }
-          emit(LAYOUT_EVENT);
+          emit(LAYOUT_EVENT); // which learn() hears: the pinned box is the one a resize is judged from
         },
         () => undefined,
       );
@@ -187,6 +201,53 @@ export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2)
         placeFrame = 0;
       }
     };
+
+    const settle = () => {
+      window.clearTimeout(quiet);
+      quiet = 0;
+      moving = false;
+      if (!waiting) return;
+      waiting = false;
+      begin(); // where the scroll landed decides: below the chapter holds it still, above it pins
+    };
+    const onScroll = () => {
+      moving = true;
+      window.clearTimeout(quiet);
+      quiet = window.setTimeout(settle, quietMs());
+    };
+    // an in-page link's glide starts a frame after its click, so the page counts as moving from the click
+    const onClick = (event: MouseEvent) => {
+      if (event.target instanceof Element && event.target.closest('a[href^="#"]')) onScroll();
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("scrollend", settle);
+    document.addEventListener("click", onClick, true);
+
+    // The pinned chapter's height is the window's (520vh), so a resize changes it under a reader past it, whom nothing
+    // else keeps in place (02's guard keeps only its own readers). Its box and the reader's scroll are kept one step
+    // behind, as 02's are (chapters.ts): by the resize the browser has already laid the page out again.
+    let held: { readonly top: number; readonly bottom: number; readonly y: number } | null = null;
+    const learn = () => {
+      if (!section?.classList.contains(PINNED)) {
+        held = null;
+        return;
+      }
+      const r = section.getBoundingClientRect();
+      held = { top: r.top + window.scrollY, bottom: r.bottom + window.scrollY, y: window.scrollY };
+    };
+    const onResize = () => {
+      const was = held;
+      if (!was || !section?.classList.contains(PINNED)) return learn();
+      const r = section.getBoundingClientRect();
+      const before = { top: was.top - was.y, bottom: was.bottom - was.y, height: was.bottom - was.top };
+      const after = { top: r.top + window.scrollY - was.y, height: r.height };
+      const to = placeAfter(before, after, { scrollY: was.y, viewport: window.innerHeight, masthead: mastheadBottom() });
+      if (to !== null) window.scrollTo({ top: to, behavior: "instant" });
+      learn();
+    };
+    window.addEventListener("scroll", learn, { passive: true });
+    window.addEventListener(LAYOUT_EVENT, learn);
+    window.addEventListener("resize", onResize);
 
     function apply(): void {
       if (!alive) return;
@@ -219,6 +280,13 @@ export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2)
       prepared = null;
       watchPlace(false);
       window.removeEventListener(WEBGL_EVENT, onWebgl);
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("scrollend", settle);
+      document.removeEventListener("click", onClick, true);
+      window.removeEventListener("scroll", learn);
+      window.removeEventListener(LAYOUT_EVENT, learn);
+      window.removeEventListener("resize", onResize);
+      window.clearTimeout(quiet);
       const pinned = section?.classList.contains(PINNED) ?? false;
       keepPlace(section, stopLive);
       if (pinned) emit(LAYOUT_EVENT);

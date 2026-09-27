@@ -191,6 +191,8 @@ test.describe("02 · the chapters, pinned", () => {
     await waitForJourney(page);
     const top = await page.locator("#roadmap").evaluate((el) => el.getBoundingClientRect().top);
     expect(Math.abs(top - target)).toBeLessThanOrEqual(4);
+    // the live drawing's scene chunk may still be on its way through the route: let it go with the test
+    await page.unrouteAll({ behavior: "ignoreErrors" });
   });
 
   test("on /#faq, 02 never pins under the reader, and #faq stays where the link landed it", async ({ page }) => {
@@ -358,10 +360,13 @@ test.describe("02 · the chapters, pinned", () => {
     await page.waitForTimeout(600);
     await expect(page.locator("#how")).toHaveClass(/is-pinned/);
     await intoHow(page, -100);
-    const before = await page.evaluate(() => window.scrollY);
+    // what the reader sees, not scrollY: the drawn train above may settle meanwhile, and keeps its reader in place by
+    // scrolling with its own height change (drawing.ts)
+    const howTop = () => page.evaluate(() => document.getElementById("how")?.getBoundingClientRect().top ?? Number.NaN);
+    const before = await howTop();
     await page.setViewportSize({ width: 800, height: 900 });
     await page.waitForTimeout(600);
-    expect(Math.abs((await page.evaluate(() => window.scrollY)) - before)).toBeLessThanOrEqual(4);
+    expect(Math.abs((await howTop()) - before)).toBeLessThanOrEqual(4);
   });
 
   test("the device reducing motion mid-02 lands the reader at 02's start", async ({ page }) => {
