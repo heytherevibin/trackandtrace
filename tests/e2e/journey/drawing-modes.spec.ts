@@ -68,6 +68,21 @@ test.describe("every drawing mode draws the train (spec §4)", () => {
     await context.close();
   });
 
+  test.describe("on a phone without JavaScript", () => {
+    test.use({ javaScriptEnabled: false });
+    test.skip(({ isMobile }) => !isMobile, "the wide shape is hidden below 48rem only for the scripted copy; phones only");
+
+    test("the noscript copy still shows the drawn train, with a real box", async ({ page }) => {
+      await page.goto("/");
+      for (const svg of [page.locator("#anatomy .is-noscript svg"), page.locator("#terminus .is-noscript svg")]) {
+        await expect(svg).toBeVisible();
+        const box = await svg.boundingBox();
+        expect(box?.width ?? 0).toBeGreaterThan(0);
+        expect(box?.height ?? 0).toBeGreaterThan(0);
+      }
+    });
+  });
+
   test("the terminus draws the arrived train above the closing plate", async ({ page }) => {
     await page.goto("/");
     await waitForJourney(page);

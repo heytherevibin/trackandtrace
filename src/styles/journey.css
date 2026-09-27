@@ -225,7 +225,8 @@ main:has(.hero-dial) { overflow-x: clip; } /* the landing clips the dial at the 
 /* a shape shows once it has something to draw; a page without JavaScript shows its <noscript> copy instead */
 .still-drawing svg:not(:has(use[href])) { display: none; }
 @media (min-width: 48rem) { .still-drawing .still-tall { display: none; } }
-@media (max-width: 47.99rem) { .still-drawing .still-wide { display: none; } }
+/* the noscript copy draws only the wide shape (§3.H's budget), so it shows at every width */
+@media (max-width: 47.99rem) { .still-drawing:not(.is-noscript) .still-wide { display: none; } }
 html:not([data-motion]) .still-drawing:not(.is-noscript) { display: none; }
 /* ink weights reach into the baked files through <use>, as inherited variables (J4-3) */
 [data-theme="dark"] .still-drawing { --still-line: 0.74; }
