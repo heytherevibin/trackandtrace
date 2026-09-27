@@ -3,7 +3,7 @@ import { expect, test } from "../fixtures";
 import { PNR, gotoReady } from "../helpers";
 import { collisionsInView, collisionsTopToBottom } from "./collisions";
 import { drawingCollisions } from "./drawing-checks";
-import { waitForJourney } from "./journey-helpers";
+import { drawStill, waitForJourney } from "./journey-helpers";
 
 /** Draws two probe lines, the second `gap` px below the first, fixed where the window shows them. */
 async function drawProbeLines(page: Page, gap: number): Promise<void> {
@@ -74,6 +74,27 @@ test.describe("the collision checker", () => {
     const found = await collisionsInView(page);
     expect(found).toContain('text "Probe line one" × text "Probe question"');
     expect(found).not.toContain('text "Probe line two" × text "Probe answer"');
+  });
+
+  test("does not see text wiped away by a clip-path, and judges a partly wiped line by what shows", async ({ page }) => {
+    await gotoReady(page, "/");
+    await page.evaluate(() => {
+      for (const [id, text, clip] of [
+        ["probe-short", "Probe", ""],
+        ["probe-wiped", "Probe line wiped away", "inset(0 100% 0 0)"],
+        ["probe-half", "Probe line half shown here", "inset(0 0 0 60%)"],
+      ] as const) {
+        const line = document.createElement("p");
+        line.id = id;
+        line.textContent = text;
+        line.style.cssText = `position:fixed;left:40px;top:240px;margin:0;font:16px/20px sans-serif;z-index:9999;clip-path:${clip}`;
+        document.body.append(line);
+      }
+    });
+    const probes = (found: string[]) => found.filter((f) => /text "Probe[^"]*" × text "Probe/.test(f));
+    expect(probes(await collisionsInView(page))).toEqual([]);
+    await page.evaluate(() => document.getElementById("probe-half")?.style.setProperty("clip-path", "inset(0 0 0 0)"));
+    expect(probes(await collisionsInView(page))).toContain('text "Probe" × text "Probe line half shown here"');
   });
 
   test("sees a page that scrolls sideways", async ({ page }) => {
@@ -294,6 +315,7 @@ test.describe("02 pinned, a dense sweep", () => {
 // drawn box, crossing leaders).
 test.describe("the drawn train at #anatomy: nothing collides in columns", () => {
   test.skip(({ isMobile }) => isMobile, "columns only ever stand at desktop widths; one project is enough");
+  test.beforeEach(async ({ page }) => drawStill(page));
 
   for (const viewport of [{ width: 1440, height: 900 }, { width: 1280, height: 800 }, { width: 1366, height: 768 }] as const) {
     test(`nothing collides at ${viewport.width}×${viewport.height}`, async ({ page }) => {

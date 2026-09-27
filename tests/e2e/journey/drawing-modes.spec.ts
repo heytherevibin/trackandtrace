@@ -1,7 +1,6 @@
 import { expect, test } from "../fixtures";
-import { JOURNEY_CHUNK_MARK } from "@/components/landing/journey/journey-mark";
 import { STILL_MANIFEST } from "@/components/landing/journey/still-manifest";
-import { blockJourneyChunk, motionOff, stubSaveData, waitForJourney } from "./journey-helpers";
+import { blockJourneyChunk, drawStill, motionOff, scrollIntoChapter, scrollToId, stubSaveData, waitForJourney, waitForLive } from "./journey-helpers";
 
 const drawn = (page: import("@playwright/test").Page) => page.locator("#anatomy .anatomy-still:not(.is-noscript) use[href]");
 
@@ -33,29 +32,18 @@ test.describe("every drawing mode draws the train (spec §4)", () => {
     await expect(drawn(page).first()).toBeAttached();
   });
 
-  test("a live page fetches no still file until the page draws still", async ({ page }) => {
+  test("a live page never fetches a still file", async ({ page }) => {
     const fetched: string[] = [];
     page.on("request", (r) => {
       if (r.url().includes("/journey/")) fetched.push(r.url());
     });
-    let release: () => void = () => {};
-    const held = new Promise<void>((resolve) => (release = resolve));
-    await page.route("**/_next/static/**/*.js", async (route) => {
-      const response = await route.fetch();
-      const body = await response.text();
-      if (body.includes(JOURNEY_CHUNK_MARK)) {
-        await held;
-        return route.fulfill({ response, body });
-      }
-      return route.fulfill({ response, body });
-    });
     await page.goto("/");
-    await expect(page.locator("html")).toHaveAttribute("data-drawing", "live");
-    await page.waitForTimeout(1_500);
+    await waitForLive(page);
+    await scrollIntoChapter(page, 0.5);
+    await scrollToId(page, "terminus");
+    // the terminus has drawn live: every stage this page shows has been drawn, and none asked for a still
+    await expect.poll(() => page.evaluate(() => window.__ttJourney?.inked(".terminus-stage") ?? 0)).toBeGreaterThan(0.002);
     expect(fetched).toEqual([]);
-    release();
-    await waitForJourney(page);
-    await expect.poll(() => fetched.length).toBeGreaterThan(0);
   });
 
   test("a page without JavaScript draws the train from its noscript copy, the wide shape only (§3.H's budget)", async ({ browser }) => {
@@ -83,7 +71,8 @@ test.describe("every drawing mode draws the train (spec §4)", () => {
     });
   });
 
-  test("the terminus draws the arrived train above the closing plate", async ({ page }) => {
+  test("the terminus draws the arrived train still above the closing plate", async ({ page }) => {
+    await drawStill(page); // live, it is live-drawing.spec's
     await page.goto("/");
     await waitForJourney(page);
     await expect(page.locator("#terminus .terminus-still:not(.is-noscript) use[href]").first()).toBeAttached();

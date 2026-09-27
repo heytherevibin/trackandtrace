@@ -1,18 +1,20 @@
 import { expect, test } from "../fixtures";
 import { STILL_MANIFEST } from "@/components/landing/journey/still-manifest";
 import { CALLOUT_PARTS } from "@/components/landing/journey/train-parts";
-import { scrollToId, waitForJourney } from "./journey-helpers";
+import { drawStill, scrollToId, waitForJourney } from "./journey-helpers";
 
 const WIDE = STILL_MANIFEST.shapes.anatomyWide;
 
 test.describe("the drawn train, still (spec §3.C–D)", () => {
+  test.beforeEach(async ({ page }) => drawStill(page));
+
   test("draws every part of the shape its width shows, from immutable files", async ({ page, isMobile }) => {
     const shape = isMobile ? STILL_MANIFEST.shapes.anatomyTall : WIDE;
     const file = page.waitForResponse((r) => r.url().endsWith(shape.href));
     await page.goto("/");
     await waitForJourney(page);
     await expect(page.locator("html")).toHaveAttribute("data-drawing", "still");
-    await expect(page.locator("html")).toHaveAttribute("data-drawing-why", "load");
+    await expect(page.locator("html")).toHaveAttribute("data-drawing-why", "quality");
     const uses = page.locator("#anatomy .anatomy-still:not(.is-noscript) use[href]");
     await expect(uses).toHaveCount(shape.parts.length);
     expect((await file).headers()["cache-control"]).toBe("public, max-age=31536000, immutable");

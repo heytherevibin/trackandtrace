@@ -1,20 +1,66 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 import { JOURNEY_CHUNK_MARK } from "@/components/landing/journey/journey-mark";
+import { SCENE_CHUNK_MARK } from "@/components/landing/journey/scene/scene-mark";
 
 /** The journey marks <html data-journey="on"> once it has taken the page over. */
 export async function waitForJourney(page: Page): Promise<void> {
   await expect(page.locator("html")).toHaveAttribute("data-journey", "on", { timeout: 15_000 });
 }
 
-/** Aborts the one script chunk that carries the journey, found by its content, so its hashed name never matters. */
-export async function blockJourneyChunk(page: Page): Promise<void> {
+/** Aborts the one script chunk that carries `mark`, found by its content, so its hashed name never matters. */
+export async function blockChunk(page: Page, mark: string): Promise<void> {
   await page.route("**/_next/static/**/*.js", async (route) => {
     const response = await route.fetch();
     const body = await response.text();
-    if (body.includes(JOURNEY_CHUNK_MARK)) return route.abort();
+    if (body.includes(mark)) return route.abort();
     return route.fulfill({ response, body });
   });
 }
+
+/** Aborts the journey chunk. */
+export const blockJourneyChunk = (page: Page): Promise<void> => blockChunk(page, JOURNEY_CHUNK_MARK);
+
+/** The drawing is live and pinned: the scene loaded, the engine built, the chapter began. */
+export async function waitForLive(page: Page): Promise<void> {
+  await waitForJourney(page);
+  await expect(page.locator("#anatomy")).toHaveClass(/is-live/, { timeout: 25_000 });
+  await expect(page.locator("html")).toHaveAttribute("data-drawing", "live");
+}
+
+/** Holds the page to the still drawing for its session, as the quality floor does (J5-12): for specs about the still. */
+export async function drawStill(page: Page): Promise<void> {
+  await page.addInitScript(() => window.sessionStorage.setItem("tt.q", "still"));
+}
+
+/** Scrolls the pinned chapter to progress p (0–1): 0 as the pin takes hold, 1 as the chapter's foot reaches the
+ * window's. Waits for the drawing to follow (its progress trails the scroll a little, by design, and a software GPU
+ * under a parallel run draws few frames a second, so the wait is generous). */
+export async function scrollIntoChapter(page: Page, p: number): Promise<void> {
+  await page.evaluate((at) => {
+    const section = document.getElementById("anatomy");
+    const pin = section?.querySelector(".anatomy-pin");
+    if (!section || !pin) throw new Error("#anatomy is missing");
+    const stick = Number.parseFloat(getComputedStyle(pin).top) || 0;
+    const start = section.getBoundingClientRect().top + window.scrollY - stick;
+    const run = section.offsetHeight - window.innerHeight + stick;
+    window.scrollTo({ top: start + run * at, behavior: "instant" });
+  }, p);
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          // anime's scroll sync sleeps once 500 ms of its clock pass without a scroll event, and one software-GPU frame
+          // under a parallel run can take that long: nudge it on, as a reader's own scroll would
+          window.dispatchEvent(new Event("scroll"));
+          return window.__ttJourney?.anatomy() ?? -1;
+        }),
+      { timeout: 20_000 },
+    )
+    .toBeCloseTo(p, 1);
+}
+
+/** Aborts the scene chunk (three.js and the live drawing). */
+export const blockSceneChunk = (page: Page): Promise<void> => blockChunk(page, SCENE_CHUNK_MARK);
 
 /** Scrolls instantly so a section's top sits `offset` px below the window's top. */
 export async function scrollToId(page: Page, id: string, offset = 0): Promise<void> {

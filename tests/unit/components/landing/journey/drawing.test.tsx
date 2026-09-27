@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { drawingModule, noLiveDrawing, startDrawing, type Ask, type Begin, type LoadLive } from "@/components/landing/journey/drawing";
+import { LOAD_LIMIT_MS, drawingModule, noLiveDrawing, sceneLoader, startDrawing, type Ask, type Begin, type LoadLive } from "@/components/landing/journey/drawing";
 import { DRAWING_EVENT, LAYOUT_EVENT, WEBGL_EVENT, emit, type DrawingDetail, type WebglDetail } from "@/components/landing/journey/journey-events";
 import type { Engine } from "@/components/landing/journey/scene/engine";
 import { keep, type JourneyContext } from "@/components/landing/journey/start-journey";
@@ -333,5 +333,24 @@ describe("J5: prepare, begin, and the reader's place", () => {
     ask?.still("webgl");
     expect(scrollTo).toHaveBeenCalledWith({ top: -900 + window.scrollY, behavior: "instant" });
     stop();
+  });
+});
+
+describe("the scene's 20 s limit (spec §3.C, load; J5-11)", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("gives up on a scene chunk that never arrives at 20 s, and draws still for load", async () => {
+    vi.useFakeTimers();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    // an import that never settles: only the limit can end the wait
+    const stop = drawingModule(sceneLoader(() => new Promise(() => undefined)), () => true)(testContext());
+    await vi.advanceTimersByTimeAsync(LOAD_LIMIT_MS - 1);
+    expect(html.dataset.drawingWhy).toBe("");
+    expect(warn).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(html.dataset.drawingWhy).toBe("load");
+    expect(warn).toHaveBeenCalledWith(expect.any(String), new Error("the live drawing took over 20 s to arrive"));
+    stop();
+    warn.mockRestore();
   });
 });

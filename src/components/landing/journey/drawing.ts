@@ -232,4 +232,33 @@ export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2)
   };
 }
 
-export const startDrawing = drawingModule(noLiveDrawing);
+/** The scene chunk may take this long to arrive before the page gives up and draws still (spec §3.C, load; J5-11). */
+export const LOAD_LIMIT_MS = 20_000;
+
+/** The scene chunk's one export this module calls. */
+interface SceneChunk {
+  readonly prepareLive: LoadLive;
+}
+
+/** The live drawing's only door: the scene chunk (three.js), imported on demand, then its engine prepared. A unit test
+ * passes an import that never settles, to prove the limit (J5 pre-flight #14). */
+export function sceneLoader(importScene: () => Promise<SceneChunk> = () => import("./scene/live")): LoadLive {
+  return (ask, ctx) =>
+    new Promise<Begin>((resolve, reject) => {
+      const timer = window.setTimeout(() => reject(new Error("the live drawing took over 20 s to arrive")), LOAD_LIMIT_MS);
+      importScene().then(
+        (scene) => {
+          window.clearTimeout(timer);
+          resolve(scene.prepareLive(ask, ctx));
+        },
+        (error: unknown) => {
+          window.clearTimeout(timer);
+          reject(error);
+        },
+      );
+    });
+}
+
+export const loadScene: LoadLive = sceneLoader();
+
+export const startDrawing = drawingModule(loadScene);
