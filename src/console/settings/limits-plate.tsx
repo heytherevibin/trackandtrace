@@ -32,7 +32,7 @@ export type SaveResult = { readonly ok: true } | { readonly ok: false; readonly 
 type Stage = { readonly kind: "ready" } | { readonly kind: "confirming"; readonly next: number } | { readonly kind: "saving" } | { readonly kind: "saved"; readonly value: number } | { readonly kind: "failed"; readonly stale: boolean };
 
 /** `changed_at` as the console prints times: IST, to the minute. */
-function readWhen(iso: string | null): string | null {
+export function readWhen(iso: string | null): string | null {
   if (iso === null) return null;
   const at = new Date(iso);
   if (Number.isNaN(at.getTime())) return null;

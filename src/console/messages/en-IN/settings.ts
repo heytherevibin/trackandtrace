@@ -40,6 +40,27 @@ export const settings = {
     notWiredYet: "Not connected yet — this deployment still reads its own setting.",
   },
 
+  /** PLATE "Switches". One row of the six is wired: the site notice. Each other row arrives with its wiring. */
+  switches: {
+    title: "Switches",
+    on: "On",
+    off: "Off",
+    save: "Save",
+    phoneOnly: "Open on a larger screen to edit.",
+    notice: {
+      name: "Site notice",
+      effect: "A strip under the masthead on every page, until the traveller closes it.",
+      textLabel: "Notice text",
+      hint: "Up to 160 characters.",
+      previewLabel: "Preview",
+      preview: (text: string) => `Preview of the strip travellers see: ${text}`,
+      empty: "A notice needs its text before it can be turned on.",
+      unchanged: "Nothing has changed.",
+      summary: "This changes what every traveller sees under the masthead, on every page, immediately.",
+      textChange: "Notice text",
+    },
+  },
+
   lastChanged: (when: string, who: string) => `Last changed ${when} by ${who}`,
   neverChanged: "Never changed from this console",
 

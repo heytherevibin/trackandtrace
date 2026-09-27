@@ -34,3 +34,42 @@ test("an Owner changes the live-check limit, and it reaches the database", async
     consoleSql(`update console.settings set live_checks_per_day = ${before === "" ? "null" : before} where environment = 'development'`);
   }
 });
+
+/**
+ * The site notice, end to end: turned on here through a real tap, drawn under the masthead on the
+ * traveller site, closed there, and — the sheet's rule — still closed on the next page for this device.
+ */
+test("an Owner turns the site notice on, and travellers see it until they close it", async ({ page, baseURL }) => {
+  const base = baseURL ?? BASE;
+  const traveller = base.replace("admin.localhost", "localhost");
+  const text = `Planned maintenance tonight, ${Date.now() % 100000}.`;
+  const before = consoleSql("select coalesce(site_notice_on::text, '') || '|' || coalesce(site_notice_text, '') || '|' || coalesce(site_notice_version::text, '') from console.settings where environment = 'development'");
+  try {
+    await setUpFirstOwner(page, base);
+    await gotoReady(page, "/settings");
+    const n = m.switches.notice;
+    await page.getByLabel(n.textLabel).fill(text);
+    await page.getByRole("group", { name: n.name }).getByRole("button", { name: m.switches.on }).click();
+    await page.getByRole("button", { name: m.switches.save }).click();
+    await tapThrough(page, "Warning travellers about tonight's window");
+    await expect(page.getByText(m.state.saved(`${n.name} ${m.switches.on}`))).toBeVisible();
+
+    const strip = page.getByRole("region", { name: "Site notice" });
+    // The traveller side reads settings through a five-second in-process copy, so allow for it.
+    await expect(async () => {
+      await page.goto(`${traveller}/`);
+      await expect(strip).toContainText(text, { timeout: 1000 });
+    }).toPass({ timeout: 20_000 });
+
+    await strip.getByRole("button", { name: "Close this notice" }).click();
+    await expect(strip).toHaveCount(0);
+    await page.goto(`${traveller}/privacy`);
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await expect(strip, "closed stays closed for this notice on this device").toHaveCount(0);
+  } finally {
+    const [on, previous, version] = before.split("|");
+    consoleSql(
+      `update console.settings set site_notice_on = ${on === "" ? "null" : on}, site_notice_text = ${previous === "" ? "null" : `'${(previous ?? "").replace(/'/g, "''")}'`}, site_notice_version = ${version === "" ? "null" : version} where environment = 'development'`,
+    );
+  }
+});

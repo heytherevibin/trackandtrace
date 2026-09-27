@@ -24,3 +24,10 @@ export async function saveLiveChecks(value: number, version: number, reason: str
   if (result.ok) return { ok: true };
   return { ok: false, stale: result.error.message === STALE_VERSION_MESSAGE };
 }
+
+/** The Site notice row's save. The server builds the changes with the same `noticeChanges` the tap was minted over. */
+export async function saveNotice(ask: { readonly on: boolean; readonly text: string; readonly noticeVersion: number | null; readonly version: number; readonly reason: string }): Promise<SaveResult> {
+  const result = await apiRequest("/api/settings/notice", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(ask) }, savedSchema);
+  if (result.ok) return { ok: true };
+  return { ok: false, stale: result.error.message === STALE_VERSION_MESSAGE };
+}

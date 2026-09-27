@@ -50,9 +50,20 @@ export const READ_TIMEOUT_MS = 800;
 const MIN_LIVE_CHECKS = 1;
 const MAX_LIVE_CHECKS = 1_000_000;
 
+/** The console's own limit on a notice (the column allows 200; the Switches sheet draws 160). */
+export const SITE_NOTICE_MAX = 160;
+
+/** The strip travellers see under the masthead. `version` changes with the text, so a closed notice stays closed only until it says something new. */
+export interface SiteNotice {
+  readonly text: string;
+  readonly version: number;
+}
+
 /** What this module has decided the console is asking for. Null on a field means the deployment's default. */
 interface Snapshot {
   readonly liveChecksPerDay: number | null;
+  /** Off is the default: there is no deployment value for a notice. */
+  readonly siteNotice: SiteNotice | null;
   readonly readAt: number;
 }
 
@@ -67,6 +78,8 @@ export interface RuntimeSettingsDeps {
 export interface RuntimeSettings {
   /** Today's live-check limit: the console's, or `fallback` when the console has not set one. */
   liveChecksPerDay: (fallback: number) => Promise<number>;
+  /** The site notice when it is on, or null. */
+  siteNotice: () => Promise<SiteNotice | null>;
 }
 
 /** An integer inside the column's range, or null. Anything else is not a limit and is refused. */
@@ -74,6 +87,18 @@ function readLiveChecks(value: unknown): number | null {
   if (typeof value !== "number" || !Number.isInteger(value)) return null;
   if (value < MIN_LIVE_CHECKS || value > MAX_LIVE_CHECKS) return null;
   return value;
+}
+
+/**
+ * On, with text to show, within the console's limit — or null. A version that is missing or not a
+ * whole number reads as the first, so a device can still close the notice.
+ */
+function readSiteNotice(row: Record<string, unknown>): SiteNotice | null {
+  if (row.site_notice_on !== true) return null;
+  const text = typeof row.site_notice_text === "string" ? row.site_notice_text.trim() : "";
+  if (text === "" || text.length > SITE_NOTICE_MAX) return null;
+  const version = typeof row.site_notice_version === "number" && Number.isInteger(row.site_notice_version) && row.site_notice_version >= 1 ? row.site_notice_version : 1;
+  return { text, version };
 }
 
 function isRow(value: unknown): value is Record<string, unknown> {
@@ -96,7 +121,7 @@ export function createRuntimeSettings(deps: RuntimeSettingsDeps): RuntimeSetting
    * whatever happens.
    */
   function hold(): Snapshot | null {
-    copy = { liveChecksPerDay: lastGood?.liveChecksPerDay ?? null, readAt: deps.now() };
+    copy = { liveChecksPerDay: lastGood?.liveChecksPerDay ?? null, siteNotice: lastGood?.siteNotice ?? null, readAt: deps.now() };
     return lastGood;
   }
 
@@ -122,6 +147,7 @@ export function createRuntimeSettings(deps: RuntimeSettingsDeps): RuntimeSetting
 
     const fresh: Snapshot = {
       liveChecksPerDay: isRow(row) ? readLiveChecks(row.live_checks_per_day) : null,
+      siteNotice: isRow(row) ? readSiteNotice(row) : null,
       readAt: deps.now(),
     };
     copy = fresh;
@@ -133,6 +159,10 @@ export function createRuntimeSettings(deps: RuntimeSettingsDeps): RuntimeSetting
     async liveChecksPerDay(fallback) {
       const snapshot = await current();
       return snapshot?.liveChecksPerDay ?? fallback;
+    },
+    async siteNotice() {
+      const snapshot = await current();
+      return snapshot?.siteNotice ?? null;
     },
   };
 }
@@ -171,4 +201,9 @@ export function runtimeSettings(current: Env = env()): RuntimeSettings {
  */
 export async function liveChecksPerDay(current: Env = env()): Promise<number> {
   return runtimeSettings(current).liveChecksPerDay(liveRequestsPerDay(current));
+}
+
+/** The site notice as it stands right now, for the traveller strip — or null when it is off. Never throws. */
+export async function siteNotice(current: Env = env()): Promise<SiteNotice | null> {
+  return runtimeSettings(current).siteNotice();
 }
