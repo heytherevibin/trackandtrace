@@ -29,8 +29,13 @@ export interface LiveBudgetOptions {
   readonly kv: Kv;
   /** e.g. "tt:production" */
   readonly prefix: string;
-  /** Read on every request, so the limit can change during the day. */
-  readonly limit: () => number;
+  /**
+   * Read on every request, so the limit can change during the day — which it now does: the console
+   * owns this number when it has been set, and `runtime-settings` answers from an in-process copy
+   * that is at most five seconds old. Awaited rather than called, because reaching the console's
+   * value is a read and pretending otherwise would have meant a stale copy on the path instead.
+   */
+  readonly limit: () => number | Promise<number>;
   readonly now?: () => number;
   /** Called once a day, by one instance, when the budget first refuses. Never given a PNR or an address. */
   readonly onReached?: (info: { readonly day: string; readonly limit: number }) => void;
@@ -64,7 +69,7 @@ export function createLiveBudget(options: LiveBudgetOptions): LiveBudget {
     async take() {
       const at = now();
       const day = istDate(new Date(at));
-      const limit = options.limit();
+      const limit = await options.limit();
       let used: number;
       try {
         used = await options.kv.incr(`${options.prefix}:budget:live:${day}`, BUDGET_TTL_MS);
@@ -80,7 +85,7 @@ export function createLiveBudget(options: LiveBudgetOptions): LiveBudget {
     async takeMany(n) {
       const at = now();
       const day = istDate(new Date(at));
-      const limit = options.limit();
+      const limit = await options.limit();
       const key = `${options.prefix}:budget:live:${day}`;
       let used: number;
       try {
