@@ -235,6 +235,39 @@ test.describe("the route rail, moving", () => {
     });
   });
 
+  // A finger in a short window (a phone on its side is 48rem wide and more): eleven stops cannot each be 44px
+  // tall, and cannot be padded to 44px without overlapping, so the column gives way to the phone's rail.
+  test.describe("a phone on its side", () => {
+    test.use({ viewport: { width: 844, height: 390 } });
+    test.skip(({ isMobile }) => !isMobile, "a touch screen: the project that emulates a phone");
+
+    test("shows the phone's hairline rail, not the column, and the page is not inset", async ({ page }) => {
+      await page.goto("/");
+      await waitForJourney(page);
+      await expect(page.locator("#route-strip")).toBeHidden();
+      await expect(page.getByRole("navigation", { name: "Route through this page" })).toHaveCount(0);
+      await expect(page.locator(".phone-rail")).toBeVisible();
+      expect(await page.locator("#main").evaluate((el) => el.getBoundingClientRect().left)).toBe(0);
+      expect(await page.locator("#main ~ footer").evaluate((el) => el.getBoundingClientRect().left)).toBe(0);
+      await scrollToId(page, "roadmap");
+      await expect.poll(() => page.locator(".phone-rail .strip-train").evaluate((el) => parseFloat(el.style.left))).toBeGreaterThan(40);
+    });
+  });
+
+  test.describe("a fine pointer in the same short window", () => {
+    test.use({ viewport: { width: 844, height: 390 } });
+    test.skip(({ isMobile }) => isMobile, "a mouse: the desktop project");
+
+    test("keeps the column, its stops shrunk evenly and never overlapping", async ({ page }) => {
+      await page.goto("/");
+      await waitForJourney(page);
+      await expect(page.locator("#route-strip")).toBeVisible();
+      await expect(page.locator(".phone-rail")).toBeHidden();
+      const boxes = await stopBoxes(page);
+      for (const [k, box] of boxes.entries()) if (k > 0) expect(box.top, box.code ?? "").toBeGreaterThanOrEqual(boxes[k - 1]!.bottom - 0.5);
+    });
+  });
+
   test.describe("phone", () => {
     test.skip(({ isMobile }) => !isMobile, "phones only");
 

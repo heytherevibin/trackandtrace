@@ -4,10 +4,12 @@
 
 /* ---- The route rail (on "/", from 48rem): a fixed column down the page's left edge, from the masthead's foot
    to the window's, with the stations top to bottom. The landing's content stands clear of it, so nothing is ever
-   drawn under it. Sized in rem, so text zoom widens it with its words. */
+   drawn under it. Sized in rem, so text zoom widens it with its words. A finger in a window too short for eleven
+   44px stops (under 36.625rem: see .strip-track) gets the phone's rail instead (journey-island.css), and the
+   page is not inset; a fine pointer keeps the column, its stops shrunk. */
 :root { --rail-width: 4rem; }
 .route-strip, .strip-odo, .strip-train, .phone-rail { display: none; }
-@media (min-width: 48rem) {
+@media (min-width: 48rem) and (min-height: 36.625rem), (min-width: 48rem) and (not (pointer: coarse)) {
   .route-strip {
     display: block; position: fixed; z-index: var(--z-nav); left: 0; top: calc(var(--header-height) + 1px); bottom: 0;
     width: var(--rail-width); border-right: 1px solid var(--line); background: var(--surface-0);
@@ -16,7 +18,9 @@
 }
 .strip-row { display: flex; flex-direction: column; height: 100%; }
 /* Eleven stops (STATIONS), each a full-width link 44px tall while the track holds eleven of them; in a shorter
-   window each is an eleventh of the track, so they shrink together and never overlap. */
+   window each is an eleventh of the track, so they shrink together and never overlap. The track holds eleven
+   44px stops in a window at least 36.625rem (586px) tall: the masthead (4rem and its 1px rule), 484px of stops,
+   and the odometer at the foot (2.25rem and its 1px rule). A coarse pointer below that gets the phone's rail. */
 .strip-track { position: relative; flex: 1 1 auto; min-height: 0; container-type: size; --stop-h: min(44px, 100cqh / 11); }
 .strip-rail {
   position: absolute; top: calc(var(--stop-h) / 2); bottom: calc(var(--stop-h) / 2); right: 0.75rem; width: 12px;
