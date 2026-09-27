@@ -12,7 +12,7 @@ describe("JourneyDetails", () => {
     expect(value("Train")).toHaveTextContent("12627 · Karnataka Express");
     expect(value("Route")).toHaveTextContent("Bengaluru (SBC) → New Delhi (NDLS)");
     expect(value("Journey")).toHaveTextContent(result.snapshot.journeyDateLabel);
-    expect(value("Class")).toHaveTextContent("2S");
+    expect(value("Class")).toHaveTextContent("3A");
     expect(value("Quota")).toHaveTextContent("GN");
     expect(value("Departs")).toHaveTextContent("19:20 IST");
     expect(value("Chart")).toHaveTextContent("15:20 IST");

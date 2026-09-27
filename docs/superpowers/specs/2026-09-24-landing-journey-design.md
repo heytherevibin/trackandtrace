@@ -137,9 +137,9 @@ reduced-motion rules (motion.css) to every traveller page, so the switch means t
 
 | Group | Modules |
 |---|---|
-| Server markup | `route-strip.tsx`, `departure-board.tsx`, `hero-dial.tsx`, `drawing-chapter.tsx`, `chapters-instrument.tsx`, `berth-plan.tsx`, `station-clock.tsx`, `route-map.tsx`, `window-run.tsx`, `terminus-stage.tsx`, `journey-switches.tsx` |
-| Pure geometry and logic (unit-tested) | `geometry/dial.ts`, `geometry/berths.ts`, `geometry/route.ts`, `geometry/run.ts`, `pose.ts` (anatomy and terminus poses), `governor.ts`, `labels-layout.ts`, `strip-position.ts`, `drawing-mode.ts`, `fit.ts`, `chart-countdown.ts` |
-| Client island | `journey-loader.tsx`, `start-journey.ts`, `observers.ts`, `motion-tokens.ts`, `intro.ts`, `strip.ts`, `board.ts`, `hero.ts`, `chapters.ts`, `berths.ts`, `clock.ts`, `route.ts`, `run.ts`, `arrivals.ts`, `cursor.ts`, `sound.ts`, `drawing.ts`, `still.ts`, `theme-sweep.ts` |
+| Server markup | `route-strip.tsx`, `departure-board.tsx`, `hero-dial.tsx`, `drawing-chapter.tsx`, `chapters-instrument.tsx`, `berth-plan.tsx`, `route-map.tsx`, `window-run.tsx`, `terminus-stage.tsx`, `journey-switches.tsx` |
+| Pure geometry and logic (unit-tested) | `geometry/dial.ts`, `geometry/clock.ts`, `geometry/berths.ts`, `geometry/route.ts`, `geometry/run.ts`, `pose.ts` (anatomy and terminus poses), `governor.ts`, `labels-layout.ts`, `strip-position.ts`, `drawing-mode.ts`, `fit.ts`, `chart-countdown.ts` |
+| Client island | `journey-loader.tsx`, `start-journey.ts`, `observers.ts`, `motion-tokens.ts`, `intro.ts`, `strip.ts`, `board.ts`, `hero.ts`, `chapters.ts`, `berths.ts`, `station-clock.tsx`, `clock.ts`, `route.ts`, `run.ts`, `arrivals.ts`, `cursor.ts`, `sound.ts`, `drawing.ts`, `still.ts`, `theme-sweep.ts` |
 | Scene (three.js) | `scene/engine.ts`, `scene/rig.ts`, `scene/rig-parts.ts`, `scene/lines.ts`, `scene/line-world.ts`, `scene/departure.ts`, `scene/beam.ts`, `scene/scan.ts`, `scene/fit.ts`, `scene/apply-pose.ts`, `scene/palette.ts`, `scene/journey.ts` |
 | Build-time | `scripts/bake-train-stills.mjs`, generated `still-manifest.ts` |
 
@@ -272,11 +272,14 @@ components). The CDN import map (the app bundles). The frame meter ships only on
 | PR | Scope | Visible result |
 |---|---|---|
 | J1 | The Motion switch: the head script (`data-motion`), Motion off applying the site's reduced-motion rules everywhere (with the press fix, §1), Motion's own animations following it, the footer switch, DESIGN.md's Motion section; the shared e2e collision checker, with today's landing as its baseline | The footer's Motion switch |
-| J2 | Server instruments: route strip, departure board, hero dial, berth plan, station clock, route map, chapters instrument, all static, with their copy and container sizes; DESIGN.md's round-instruments rule | The new instruments, drawn still |
-| J3 | Journey island: `animejs` added; loader, observers, arrivals, intro and headline, strip, board, hero dial, chapters (pinned, fit rules), berths, clock, route, cursor, the Sound switch and its clack, plate morph; journey motion tokens; DESIGN.md's motion and hero-entrance rules | The page moves (except the train and the run) |
-| J4 | Still drawing: `three` added; the rig, poses and fit the bake and the live scene share; bake script, sprite, manifest, drawing chapter and terminus markup with the still; the head script gains `data-saver` and `data-drawing` | The train, drawn still |
+| J2 | Server instruments: route strip, departure board (without its status column), hero dial, berth plan, station clock, route map, all static, with their copy and container sizes; DESIGN.md's round-instruments rule | The new instruments, drawn still |
+| J3 | Journey island: `animejs` added; loader, observers, arrivals, intro and headline, strip, board, hero dial, chapters (pinned, fit rules), berths, clock, route, cursor, the Sound switch and its clack, plate morph; journey motion tokens; DESIGN.md's motion and hero-entrance rules; the chapters instrument; the departure board's status column | The page moves (except the train and the run) |
+| J4 | Still drawing: `three` added; the rig, poses and fit the bake and the live scene share; bake script, sprite, manifest, drawing chapter and terminus markup with the still; the head script gains `data-saver` and `data-drawing`; GA joins the strip and the board | The train, drawn still |
 | J5 | Live drawing: engine, anatomy and terminus, scan, departure line side, beam, governor, WebGL loss, the departure horn | The train comes alive |
 | J6 | Window-seat run and Night falls; nightly workflow; performance budgets | v3 complete |
+
+Moved while planning J2 (2026-09-25): the chapters instrument and the board's status only exist with
+scroll-driven motion, so they land in J3; GA's station lands with its section in J4.
 
 Each PR brings the dependency, copy, tokens and DESIGN.md rules its own code first uses, so nothing lands
 unused, and nothing a traveller can see is inert (a Sound switch with no sound). Each runs `npm run check`

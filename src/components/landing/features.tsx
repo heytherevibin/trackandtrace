@@ -13,7 +13,7 @@ const FEATURES = [
 export function Features() {
   const m = messages.home.features;
   return (
-    <section aria-label={m.kicker} className="section-pad">
+    <section id="features" aria-label={m.kicker} className="section-pad">
       <SectionKicker rule="mb-8">{m.kicker}</SectionKicker>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,260px),1fr))] gap-[clamp(28px,3vw,48px)]">
         {FEATURES.map(({ key, href }) => {

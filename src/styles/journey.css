@@ -1,0 +1,147 @@
+/* The landing journey's instruments (spec 2026-09-24), drawn still; J3 animates these same elements. HTML text
+   takes the type roles. SVG labels are sized in px of the drawing's own units, so they scale with the drawing.
+   Colours are tokens only. */
+
+/* ---- The route strip (the masthead's second row on "/") */
+.route-strip { border-top: 1px solid var(--line); background: var(--surface-0); }
+.strip-row { display: block; height: 30px; }
+.strip-track { position: relative; height: 30px; min-width: 0; }
+.strip-rail { position: absolute; left: 0; right: 0; top: 17px; height: 12px; }
+.strip-stops { position: absolute; inset: 0; margin: 0; padding: 0; list-style: none; }
+.strip-stops li { position: absolute; top: 2px; transform: translateX(-50%); }
+.strip-stops a {
+  display: block;
+  padding: 0 3px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--text-3xs);
+  line-height: var(--text-3xs--line-height);
+  letter-spacing: var(--tracking-brand);
+  color: var(--ink-3);
+  text-decoration: none;
+}
+.strip-stops a[aria-current="location"] { color: var(--accent-text); }
+/* The strip makes the landing's masthead taller: anchors stop below it (base.css reads --header-height). */
+@media (min-width: 48rem) {
+  :root:has(#route-strip) { --header-height: calc(4rem + 32px); /* the row, its rule, and the 30px strip with its rule */ }
+}
+@media (max-width: 47.99rem) {
+  .route-strip { display: none; }
+}
+
+/* ---- Departures · Platform 3 (under the hero) */
+.board-table { width: 100%; border-collapse: collapse; }
+.board-table th {
+  padding: 8px 20px;
+  text-align: left;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--text-2xs);
+  line-height: var(--text-2xs--line-height);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--ink-3);
+  border-bottom: 1px solid var(--line);
+}
+.board-table td {
+  padding: 7px 20px;
+  border-top: 1px solid var(--line);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--text-body);
+  line-height: 1.25rem; /* v3's board row, tighter than body copy */
+  letter-spacing: var(--tracking-brand);
+  text-transform: uppercase;
+}
+.board-table tbody tr:first-child td { border-top: 0; }
+.board-code { width: 4.5rem; color: var(--accent-text); font-variant-numeric: tabular-nums; }
+.board-name a { color: var(--ink-1); text-decoration: none; }
+.board-name a:hover { color: var(--accent-text); }
+.board-km { width: 4.5rem; color: var(--ink-3); }
+@media (max-width: 39.99rem) {
+  .board-table th,
+  .board-table td { padding: 6px 12px; font-size: var(--text-label); }
+  .board-km { display: none; }
+  .board-code { width: 3rem; }
+}
+/* A finger is not a cursor: on touch screens each row is at least 44px, so every destination answers across 44px. */
+@media (pointer: coarse) {
+  .board-table td { padding-top: 12px; padding-bottom: 12px; }
+}
+
+/* ---- The hero dial: behind the check plate, only where the plate stands beside the words (two columns). Its
+   left side fades out before the words, and the hero clips its width (hero.tsx), so it never scrolls the page. */
+main:has(.hero-dial) { overflow-x: clip; } /* the landing clips the dial at the page's edge, as v3 does */
+.dial-host { position: relative; min-width: 0; }
+.dial-host > :not(.hero-dial) { position: relative; z-index: 1; }
+.hero-dial { display: none; }
+@media (min-width: 64rem) {
+  .hero-dial {
+    display: block;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: min(860px, 160%);
+    aspect-ratio: 1;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 0;
+    mask-image: linear-gradient(to right, transparent 0, black 32%), linear-gradient(to bottom, transparent 0, black 14%, black 86%, transparent 100%);
+    mask-composite: intersect;
+  }
+}
+.hero-dial svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.dial-tick { stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.dial-tick.is-major { stroke: var(--line-strong); }
+.dial-ring { fill: none; stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.dial-ring.is-dashed { stroke-dasharray: 2 7; }
+.dial-seg { fill: none; stroke: var(--line); stroke-width: 7; stroke-linecap: butt; }
+.dial-seg.is-on { stroke: var(--accent); }
+.dial-label { fill: var(--ink-3); font-family: var(--font-display); font-weight: 600; font-size: 13px; /* drawing units */ letter-spacing: var(--tracking-caps); text-transform: uppercase; }
+
+/* ---- 03 · the berth plan (sample data, beside the specimen record) */
+.berth-plan { margin: 28px 0 0; max-width: 34rem; }
+.berth-plan svg { display: block; width: 100%; height: auto; padding: 10px 12px 2px; box-sizing: border-box; }
+.plan-line { fill: none; stroke: var(--line-strong); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.plan-line.is-faint { stroke: var(--line); }
+.plan-berth.is-lit { fill: var(--accent-wash); stroke: var(--accent); stroke-width: 1.5; }
+.plan-num { fill: var(--ink-3); font-family: var(--font-display); font-weight: 600; font-size: 9px; /* drawing units */ letter-spacing: var(--tracking-wide); }
+.plan-tag { fill: var(--ink-3); font-family: var(--font-display); font-weight: 600; font-size: 11px; /* drawing units */ letter-spacing: var(--tracking-caps); }
+.plan-tag.is-lit { fill: var(--accent-text); }
+.berth-cap { margin: 0; padding: 8px 12px 10px; border-top: 1px solid var(--line); font-size: var(--text-label); line-height: 1.25rem; color: var(--ink-2); }
+.berth-cap b { font-weight: 600; color: var(--accent-text); }
+
+/* ---- 04 · the station clock, beside Reliability's heading */
+.rel-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 20px 40px; }
+.rel-head > div { flex: 1 1 22rem; }
+.station-clock { margin: 0; width: 168px; height: 168px; flex: 0 0 auto; }
+.station-clock svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.clock-ring { fill: none; stroke: var(--line-strong); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.clock-ring.is-faint { stroke: var(--line); }
+.clock-tick { stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.clock-tick.is-major { stroke: var(--ink-1); stroke-width: 1.5; }
+.clock-num { fill: var(--ink-1); font-family: var(--font-display); font-weight: 600; font-size: 15px; /* drawing units */ }
+.clock-label { fill: var(--ink-3); font-family: var(--font-display); font-weight: 600; font-size: 8px; /* drawing units */ letter-spacing: 0.12em; }
+.clock-hand { stroke: var(--ink-1); stroke-linecap: butt; }
+.clock-hand.is-hour { stroke-width: 3.5; }
+.clock-hand.is-minute { stroke-width: 2.2; }
+.clock-cap { fill: var(--surface-0); stroke: var(--ink-1); stroke-width: 1.5; }
+@media (max-width: 39.99rem) {
+  .station-clock { width: 124px; height: 124px; }
+}
+
+/* ---- 05 · the roadmap's track (hidden on phones, as in v3) */
+.route-map { margin-top: 24px; }
+.route-map svg { display: block; width: 100%; height: auto; overflow: visible; }
+.route-path-ghost { fill: none; stroke: var(--line); stroke-width: 1; stroke-dasharray: 3 6; vector-effect: non-scaling-stroke; }
+.route-path { fill: none; stroke: var(--line-strong); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.route-sleeper { stroke: var(--line-strong); stroke-width: 1; opacity: 0; vector-effect: non-scaling-stroke; }
+.route-sleeper.is-laid { opacity: 1; }
+.route-stop { fill: var(--surface-0); stroke: var(--line-strong); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.route-num { fill: var(--ink-3); font-family: var(--font-display); font-weight: 600; font-size: 12px; /* drawing units */ letter-spacing: var(--tracking-caps); }
+.is-passed > .route-stop { fill: var(--accent); stroke: var(--accent); }
+.is-passed > .route-num { fill: var(--accent-text); }
+.route-train { color: var(--accent); }
+@media (max-width: 39.99rem) {
+  .route-map { display: none; }
+}

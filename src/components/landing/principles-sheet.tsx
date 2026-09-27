@@ -11,7 +11,7 @@ const ROW =
 export function PrinciplesSheet() {
   const m = messages.home.principles;
   return (
-    <section aria-label={m.label} className="pb-[60px] pt-6">
+    <section id="principles" aria-label={m.label} className="pb-[60px] pt-6">
       <Plate as="div" title={m.title} meta={[m.code, m.sheet]} cells="wide" padding="none">
         <div role="table" aria-label={m.label}>
           {m.rows.map((row, i) => (

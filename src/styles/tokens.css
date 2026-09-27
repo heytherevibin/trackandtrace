@@ -28,6 +28,8 @@
   /* Type scale, read off the Industry sheets: legends 11–13, body 14–17, headings 18–32, page and hero clamp. */
   --text-2xs: 0.6875rem;
   --text-2xs--line-height: 1rem;
+  --text-3xs: 0.625rem; /* the route strip's station codes, as v3 draws them */
+  --text-3xs--line-height: 0.875rem;
   --text-xs: 0.75rem;
   --text-xs--line-height: 1rem;
   --text-label: 0.8125rem;
@@ -73,7 +75,7 @@
   --leading-relaxed: 1.6;
   --leading-stack: 1.15; /* wordmark with descriptor */
 
-  /* The wireframe world is square. Only lamps and route stops are round. */
+  /* The wireframe world is square. Only lamps, route stops and the journey's instruments (dials, the station clock, the route map) are round. */
   --radius-none: 0;
   --radius-full: 9999px;
 

@@ -4,10 +4,11 @@
 
 ```
 Browser
-  components (src/components/*)            — the visual world; no fetch logic
-  motion (src/components/motion/*)         — the reader's Motion: html[data-motion] written before first paint (motion-boot.ts, inline in the site layout's <head>), changed by the footer switch (use-motion.ts), followed by motion.css and SiteMotion (MotionConfig)
-  stores (src/services/stores/*)           — device state: watchlist, recent, share, install, merge
-  api-client (src/services/api-client.ts)  — validated fetch; malformed bodies become errors
+  components (src/components/*)              — the visual world; no fetch logic
+  motion (src/components/motion/*)           — the reader's Motion: html[data-motion] written before first paint (motion-boot.ts, inline in the site layout's <head>), changed by the footer switch (use-motion.ts), followed by motion.css and SiteMotion (MotionConfig)
+  journey (src/components/landing/journey/*) — the landing's railway instruments: server-drawn from pure geometry (journey/geometry/*.ts) and the journey copy module; styled in src/styles/journey.css; the route strip reaches the client masthead as a server-rendered prop; the station clock is the one client piece (J2)
+  stores (src/services/stores/*)             — device state: watchlist, recent, share, install, merge
+  api-client (src/services/api-client.ts)    — validated fetch; malformed bodies become errors
 Next.js server
   pages (src/app/(site)/*)                 — every traveller page under the site's root layout; unmatched addresses get src/app/global-not-found.tsx (the site's not-found page, server-rendered, 404; sign in on the console host)
   route handlers (src/app/api/*)           — thin: guard → validate → repository/query → jsonOk/jsonError

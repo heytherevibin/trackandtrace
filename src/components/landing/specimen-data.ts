@@ -1,4 +1,4 @@
-import { paxRows, type PaxRow } from "@/components/pnr/pnr-terminal-state";
+import { paxRows, statusCode, type PaxRow } from "@/components/pnr/pnr-terminal-state";
 import { messages } from "@/messages";
 import { buildFixtureResult } from "@/services/sources/fixture";
 import { formatTime } from "@/utils/datetime";
@@ -11,25 +11,38 @@ import { statusLabel } from "@/utils/status-tone";
 
 export const SPECIMEN_PNR = "2345678909";
 
+export interface SpecimenSeats {
+  readonly cls: string;
+  readonly coach: string;
+  readonly berth: string;
+  readonly status: string;
+  readonly waiting: readonly { readonly index: number; readonly label: string }[];
+}
+
 export interface Specimen {
   readonly leadTag: string;
   readonly trainLine: string;
   readonly journeyLine: string;
   readonly pax: readonly PaxRow[];
   readonly provenance: string;
+  readonly seats: SpecimenSeats | null;
 }
 
-export function buildSpecimen(now: Date): Specimen | null {
-  const outcome = buildFixtureResult(SPECIMEN_PNR, now);
+export function buildSpecimen(now: Date, pnr: string = SPECIMEN_PNR): Specimen | null {
+  const outcome = buildFixtureResult(pnr, now);
   if (!outcome.ok) return null;
   const { snapshot, lead, checkedAt } = outcome.result;
   const m = messages.home.record;
   const r = messages.check.result;
+  const waiting = snapshot.pax.filter((p) => !p.berth).map((p) => ({ index: p.index, label: statusCode(p.currentStatus, p.position) }));
+  // The berth plan draws a 3A coach, so it shows only a lead with a berth in one.
+  const seats = lead.coach && lead.berth && snapshot.cls === "3A" ? { cls: snapshot.cls, coach: lead.coach, berth: lead.berth, status: statusCode(lead.status, lead.position), waiting } : null;
   return {
     leadTag: m.leadTag(statusLabel(lead.status, lead.position)),
     trainLine: m.trainLine(snapshot.train.number, snapshot.train.name ?? "", r.values.route(snapshot.train.from.code, snapshot.train.to.code)),
     journeyLine: m.journeyLine(snapshot.journeyDateLabel, snapshot.train.depTime ?? "", lead.quota),
     pax: paxRows(snapshot.pax),
     provenance: r.provenance.retrieved(formatTime(checkedAt), r.sources.fixture),
+    seats,
   };
 }

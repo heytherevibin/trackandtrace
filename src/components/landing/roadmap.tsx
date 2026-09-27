@@ -1,5 +1,6 @@
 import { SheetTag } from "@/components/pnr/pnr-terminal-tags";
 import { messages } from "@/messages";
+import { RouteMap } from "./journey/route-map";
 import { H2, ROW_NUM, SectionKicker } from "./sheet-type";
 
 /** 05 · On the roadmap: seven planned extensions on one hairline-bordered list. */
@@ -14,6 +15,7 @@ export function Roadmap() {
         </h2>
         <p className="max-w-[44ch] text-sm leading-normal text-ink-1/70">{m.lead}</p>
       </div>
+      <RouteMap count={m.items.length} />
       <ul className="mt-[28px] list-none border border-line p-0">
         {m.items.map((item, i) => (
           <li key={item.num} className={`flex flex-wrap items-baseline gap-x-4 gap-y-2 px-6 py-3.5 ${i > 0 ? "border-t border-line" : ""}`}>
