@@ -27,11 +27,7 @@ const LIVE: readonly Live[] = [
   { selector: 'span[role="img"][aria-label$=" IST"]', drop: ["subtree"] },
   // The hands' angles are the time itself (React draws the hour and minute hands at mount).
   { selector: ".clock-hand", drop: ["transform"] },
-  // The rail's odometer follows the scroll position, which the two runs reach differently.
-  { selector: ".strip-odo", drop: ["text"] },
-  // The current stop follows the scroll position, as above.
-  { selector: ".strip-stops a", drop: ["aria-current"] },
-  // The board's statuses follow the strip's station, as above.
+  // The board's statuses follow the scroll position, which the two runs reach differently.
   { selector: "td.board-status", drop: ["text"] },
   // The check legitimately adds a recent chip: the plate's own record, not the journey's.
   { selector: '[data-testid="recent-strip"]', drop: ["subtree"] },
@@ -39,7 +35,7 @@ const LIVE: readonly Live[] = [
   { selector: '[data-testid="hero-instrument"] [aria-live]', drop: ["text"] },
 ];
 
-/** The masthead, the route rail and the page, one line per element: tag, classes, attributes, the journey's inline styles, own text. */
+/** The masthead and the page, one line per element: tag, classes, attributes, the journey's inline styles, own text. */
 async function snapshot(page: Page): Promise<string[]> {
   return page.evaluate(
     ({ style, live }) => {
@@ -64,7 +60,7 @@ async function snapshot(page: Page): Promise<string[]> {
         lines.push(`${"  ".repeat(depth)}<${el.tagName.toLowerCase()}${classes ? `.${classes}` : ""} ${attrs.join(" ")}>${text ? ` "${text}"` : ""}`);
         for (const child of el.children) walk(child, depth + 1);
       };
-      for (const root of [document.querySelector("header"), document.getElementById("route-strip"), document.querySelector("main")]) if (root) walk(root, 0);
+      for (const root of [document.querySelector("header"), document.querySelector("main")]) if (root) walk(root, 0);
       return lines;
     },
     { style: STYLE, live: LIVE },

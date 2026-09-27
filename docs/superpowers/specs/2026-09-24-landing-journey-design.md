@@ -47,7 +47,7 @@ Settled with the user between 2026-09-24 rounds 1–4, A–E, and the v3 approva
   drawing with hidden lines removed. Heading kept: "Every part answers to the source".
 - **v2 features (all 14):** kinetic headline, living dial, chart countdown ring, plotter intro once per visit,
   label↔part highlight, dimensions and title block, berth plan (03), station clock (04), track-laying
-  roadmap (05), departure board under the hero, route strip (a left rail since 2026-09-27), plate morph, registration-mark
+  roadmap (05), departure board under the hero, ~~route strip (a left rail since 2026-09-27)~~ (removed by the owner, 2026-09-27), plate morph, registration-mark
   cursor (desktop, motion on), sound off by default (rail clack, departure horn) behind a footer switch.
 - **v3 additions:** the window-seat run through 06–07, Night falls (theme sweep), line side passing at the
   departure, headlight beam at Night, scan reveal, adaptive quality, Data Saver, and the frame meter (a review
@@ -64,6 +64,13 @@ round" (dials, the station clock and route stops are round instruments); and the
 has no entrance animation (the headline's letters rise by transform only; the text is in the server HTML
 and is the page's largest paint either way).
 
+**Removed by the owner, 2026-09-27:** the route rail (#77) — "Actually we don't need this, remove it
+completely," and, asked explicitly, the phone's hairline rail too. Nothing of it survives: the left column
+(`#route-strip`), the phone rail (`PhoneRail` / `.phone-rail`), their journey modules (`strip.ts`,
+`strip-position.ts`), their CSS, and their tests. "/" is full width again and the masthead is its plain 4rem
+row; every other row below still holds. The mentions of the strip further down are kept, struck through, so
+the history of what shipped and was then withdrawn stays readable.
+
 ## 3. Design
 
 ### A. Experience
@@ -72,10 +79,10 @@ Top to bottom, as in v3:
 
 | Where | What happens | Motion off |
 |---|---|---|
-| Masthead (on "/") | The route rail (from 48rem; approved 2026-09-27): a fixed 4rem column down the page's left edge, from the masthead's foot to the window's, with a hairline on its right; the page stands clear of it. Stations DEP, GA, 01–08, END top to bottom on a rail, each a full-width link at least 44px tall (an eleventh of the rail each in a window too short for that, never overlapping); a train glyph runs down the rail nose first as the page scrolls, leaning into speed; odometer KM 000→781 at the column's foot; the current stop is highlighted (no spelled-out station name). The masthead keeps its own height. Phones: a hairline rail in the masthead's bottom edge. | Glyph moves, no lean |
+| Masthead (on "/") | ~~The route rail (from 48rem; approved 2026-09-27): a fixed 4rem column down the page's left edge, from the masthead's foot to the window's, with a hairline on its right; the page stands clear of it. Stations DEP, GA, 01–08, END top to bottom on a rail, each a full-width link at least 44px tall (an eleventh of the rail each in a window too short for that, never overlapping); a train glyph runs down the rail nose first as the page scrolls, leaning into speed; odometer KM 000→781 at the column's foot; the current stop is highlighted (no spelled-out station name). Phones: a hairline rail in the masthead's bottom edge.~~ **Removed by the owner, 2026-09-27: nothing of the strip or its rail survives, on desktop or on a phone.** The masthead keeps its own plain 4rem row, nothing added. | Glyph moves, no lean |
 | Hero | Letters of the h1 rise; the plotter draws the masthead rule and the plate's hairlines once per visit; the living dial behind the plate lights segments as digits are typed; after a result, a 24-hour face marks the chart time printed in the record (never computed) with "Chart HH:MM IST · in 3 h 12 min". | Dial and face drawn still |
 | Departure board (new) | "Departures · Platform 3": the page's sections as departures with code, km and status (NEXT, AT PLATFORM, DEPARTED); rows flip in; names link to their sections. | Static board |
-| The drawn train (new, pinned) | A solid steel locomotive; a scan gate sweeps it nose to tail into the line drawing; it turns and comes apart into ten labelled parts (label↔part highlight on fine pointers); side elevation with dimensions; coaches couple, the pantograph rises, the train departs with the camera riding along past masts, a signal gantry and Platform 3's nameboard; the strip glyph takes over. Night: light-on-dark, steel glow, headlight beam. | The still drawing |
+| The drawn train (new, pinned) | A solid steel locomotive; a scan gate sweeps it nose to tail into the line drawing; it turns and comes apart into ten labelled parts (label↔part highlight on fine pointers); side elevation with dimensions; coaches couple, the pantograph rises, the train departs with the camera riding along past masts, a signal gantry and Platform 3's nameboard; ~~the strip glyph takes over~~ (moot: the strip was removed by the owner, 2026-09-27). Night: light-on-dark, steel glow, headlight beam. | The still drawing |
 | 01 Principles | Kicker flips in; rows rise into place (transform only). | Static |
 | 02 How it works (pinned) | Three stops play inside one instrument dial; a request-trace card prints each stop. | Plain section |
 | 03 Record | Coach B1 · 3A berth plan beside the specimen; the sample passenger's berth lights. | Plan drawn still |
@@ -144,9 +151,9 @@ reduced-motion rules (motion.css) to every traveller page, so the switch means t
 
 | Group | Modules |
 |---|---|
-| Server markup | `route-strip.tsx`, `departure-board.tsx`, `hero-dial.tsx`, `drawing-chapter.tsx`, `chapters-instrument.tsx`, `berth-plan.tsx`, `route-map.tsx`, `window-run.tsx`, `terminus-stage.tsx`, `journey-switches.tsx` |
-| Pure geometry and logic (unit-tested) | `geometry/dial.ts`, `geometry/clock.ts`, `geometry/berths.ts`, `geometry/route.ts`, `geometry/run.ts`, `pose.ts` (anatomy and terminus poses), `governor.ts`, `labels-layout.ts`, `strip-position.ts`, `drawing-mode.ts`, `fit.ts`, `chart-countdown.ts` |
-| Client island | `journey-loader.tsx`, `start-journey.ts`, `observers.ts`, `motion-tokens.ts`, `intro.ts`, `strip.ts`, `board.ts`, `hero.ts`, `chapters.ts`, `berths.ts`, `station-clock.tsx`, `clock.ts`, `route.ts`, `run.ts`, `arrivals.ts`, `cursor.ts`, `sound.ts`, `drawing.ts`, `still.ts`, `theme-sweep.ts` |
+| Server markup | ~~`route-strip.tsx`~~ (removed by the owner, 2026-09-27), `departure-board.tsx`, `hero-dial.tsx`, `drawing-chapter.tsx`, `chapters-instrument.tsx`, `berth-plan.tsx`, `route-map.tsx`, `window-run.tsx`, `terminus-stage.tsx`, `journey-switches.tsx` |
+| Pure geometry and logic (unit-tested) | `geometry/dial.ts`, `geometry/clock.ts`, `geometry/berths.ts`, `geometry/route.ts`, `geometry/run.ts`, `pose.ts` (anatomy and terminus poses), `governor.ts`, `labels-layout.ts`, ~~`strip-position.ts`~~ (removed by the owner, 2026-09-27), `drawing-mode.ts`, `fit.ts`, `chart-countdown.ts` |
+| Client island | `journey-loader.tsx`, `start-journey.ts`, `observers.ts`, `motion-tokens.ts`, `intro.ts`, ~~`strip.ts`~~ (removed by the owner, 2026-09-27), `board.ts`, `hero.ts`, `chapters.ts`, `berths.ts`, `station-clock.tsx`, `clock.ts`, `route.ts`, `run.ts`, `arrivals.ts`, `cursor.ts`, `sound.ts`, `drawing.ts`, `still.ts`, `theme-sweep.ts` |
 | Scene (three.js) | `scene/engine.ts`, `scene/rig.ts`, `scene/rig-parts.ts`, `scene/lines.ts`, `scene/line-world.ts`, `scene/departure.ts`, `scene/beam.ts`, `scene/scan.ts`, `scene/fit.ts`, `scene/apply-pose.ts`, `scene/palette.ts`, `scene/journey.ts` |
 | Build-time | `scripts/bake-train-stills.mjs`, generated `still-manifest.ts` |
 
@@ -283,7 +290,7 @@ components). The CDN import map (the app bundles). The frame meter ships only on
 | J1 | The Motion switch: the head script (`data-motion`), Motion off applying the site's reduced-motion rules everywhere (with the press fix, §1), Motion's own animations following it, the footer switch, DESIGN.md's Motion section; the shared e2e collision checker, with today's landing as its baseline | The footer's Motion switch |
 | J2 | Server instruments: route strip, departure board (without its status column), hero dial, berth plan, station clock, route map, all static, with their copy and container sizes; DESIGN.md's round-instruments rule | The new instruments, drawn still |
 | J3 | Journey island: `animejs` added; loader, observers, arrivals, intro and headline, strip, board, hero dial, chapters (pinned, fit rules), berths, clock, route, cursor, the Sound switch and its clack, plate morph; journey motion tokens; DESIGN.md's motion and hero-entrance rules; the chapters instrument; the departure board's status column | The page moves (except the train and the run) |
-| J4 | Still drawing: `three` added; the rig, poses and fit the bake and the live scene share; bake script, sprite, manifest, drawing chapter and terminus markup with the still; the head script gains `data-saver` and `data-drawing`; GA joins the strip and the board | The train, drawn still |
+| J4 | Still drawing: `three` added; the rig, poses and fit the bake and the live scene share; bake script, sprite, manifest, drawing chapter and terminus markup with the still; the head script gains `data-saver` and `data-drawing`; GA joins ~~the strip and~~ the board (the strip removed by the owner, 2026-09-27) | The train, drawn still |
 | J5 | Live drawing: engine, anatomy and terminus, scan, departure line side, beam, governor, WebGL loss, the departure horn | The train comes alive |
 | J6 | Window-seat run and Night falls; nightly workflow; performance budgets | v3 complete |
 
@@ -291,14 +298,14 @@ Moved while planning J2 (2026-09-25): the chapters instrument and the board's st
 scroll-driven motion, so they land in J3; GA's station lands with its section in J4.
 
 Decided while planning J3 (2026-09-25):
-- the phone strip is its own aria-hidden rail (J3-7);
-- the strip's hand-off pulse and the departure horn land with their callers in J4/J5 (J3-8);
+- ~~the phone strip is its own aria-hidden rail (J3-7)~~ (removed by the owner, 2026-09-27);
+- ~~the strip's hand-off pulse~~ and the departure horn land with their callers in J4/J5 (J3-8; the pulse is moot, the strip removed 2026-09-27);
 - the plate morph tweens height on `domAnimation` (J3-13).
 
 Decided while planning J4 (2026-09-26):
 - one still file per shape, not one sprite, to keep a page within its still budget (J4-2);
-- the camera fit, the governor, the palette, the glow and the strip's hand-off pulse wait for the live drawing in
-  J5, their only caller (J4-5; J3-8's pulse moves to J5);
+- the camera fit, the governor, the palette, the glow and ~~the strip's hand-off pulse~~ wait for the live drawing in
+  J5, their only caller (J4-5; J3-8's pulse moves to J5, then is moot: the strip removed by the owner, 2026-09-27);
 - the parts list is the page's own layout; the journey stands the labels beside the drawing when they fit (J4-7).
 
 Each PR brings the dependency, copy, tokens and DESIGN.md rules its own code first uses, so nothing lands

@@ -12,38 +12,32 @@ test.describe("the route", () => {
   });
 });
 
-test.describe("the route strip", () => {
-  test("stands as its own column left of the page, not in the masthead, and its stops jump to their sections below the masthead", async ({ page, isMobile }) => {
-    test.skip(isMobile, "on a phone the strip is a hairline rail without labels");
+// The owner rejected the route rail (#77) on 2026-09-27: nothing of it survives, on desktop or on a phone.
+test.describe("no route strip", () => {
+  test("leaves no #route-strip, no .phone-rail, and no [class*=\"strip-\"] element anywhere on the page", async ({ page }) => {
     await gotoReady(page, "/");
-    await expect(page.getByRole("banner").getByRole("navigation", { name: "Route through this page" })).toHaveCount(0);
-    const strip = page.getByRole("navigation", { name: "Route through this page" });
-    await expect(strip).toBeVisible();
-    const rail = (await strip.boundingBox())!;
-    const main = (await page.locator("#main").boundingBox())!;
-    expect(rail.x).toBe(0);
-    expect(main.x).toBeGreaterThanOrEqual(rail.x + rail.width);
-    await strip.getByRole("link", { name: "03 · The record you get" }).click();
-    await expect(page).toHaveURL(/#record$/);
-    // The anchor lands clear of the masthead, which is back to its own height: just below it.
-    await expect
-      .poll(() => page.evaluate(() => Math.round(document.getElementById("record")!.getBoundingClientRect().top - document.querySelector("header")!.getBoundingClientRect().bottom)))
-      .toBeGreaterThanOrEqual(0);
-    await expect
-      .poll(() => page.evaluate(() => Math.round(document.getElementById("record")!.getBoundingClientRect().top - document.querySelector("header")!.getBoundingClientRect().bottom)))
-      .toBeLessThanOrEqual(24);
-    expect(await page.locator("header").evaluate((h) => h.getBoundingClientRect().height)).toBeLessThanOrEqual(65);
-    await strip.getByRole("link", { name: "08 · Questions" }).click();
-    await expect(page).toHaveURL(/#faq$/);
-    await gotoReady(page, "/watchlist");
+    await expect(page.locator("#route-strip")).toHaveCount(0);
+    await expect(page.locator(".phone-rail")).toHaveCount(0);
+    await expect(page.locator('[class*="strip-"]')).toHaveCount(0);
     await expect(page.getByRole("navigation", { name: "Route through this page" })).toHaveCount(0);
   });
 
-  test("on a phone, the route strip is hidden and exposes no navigation landmark", async ({ page, isMobile }) => {
-    test.skip(!isMobile, "phone layout");
+  test("#main carries no left inset from the rail, and spans the same width as on another page", async ({ page }) => {
     await gotoReady(page, "/");
-    await expect(page.locator("#route-strip")).toBeHidden();
-    await expect(page.getByRole("navigation", { name: "Route through this page" })).toHaveCount(0);
+    const landing = await page.locator("#main").evaluate((el) => ({ marginLeft: getComputedStyle(el).marginLeft, left: el.getBoundingClientRect().left, width: el.getBoundingClientRect().width }));
+    expect(landing.marginLeft).toBe("0px");
+    expect(landing.left).toBe(0);
+    await gotoReady(page, "/watchlist");
+    const other = await page.locator("#main").evaluate((el) => el.getBoundingClientRect().width);
+    expect(landing.width).toBe(other);
+  });
+
+  test("the masthead is its plain 4rem row, nothing added", async ({ page }) => {
+    await gotoReady(page, "/");
+    const headerHeight = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--header-height").trim());
+    expect(headerHeight).toBe("4rem");
+    const measured = await page.locator("header").evaluate((h) => h.getBoundingClientRect().height);
+    expect(measured).toBeLessThanOrEqual(65);
   });
 });
 

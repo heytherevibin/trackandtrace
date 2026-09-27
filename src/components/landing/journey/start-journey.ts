@@ -14,8 +14,8 @@ import { refreshAll, untrackAll } from "./observers";
 import { startPlaceMemory } from "./place-memory";
 import { startRoute } from "./route";
 import { startSound } from "./sound";
+import { startStationProgress } from "./station-progress";
 import { startStill } from "./still";
-import { startStrip } from "./strip";
 
 // The journey chunk's entry (spec §3.B). JourneyLoader imports this file after hydration, when the page is
 // idle, and calls startJourney(). It marks <html data-journey="on"> and starts every module on the server's
@@ -61,7 +61,7 @@ export type Teardown = () => void;
 export type JourneyModule = (ctx: JourneyContext) => Teardown;
 
 /** In start order. Later tasks append their modules here. */
-export const MODULES: readonly JourneyModule[] = [startArrivals, startBoard, startStrip, startHero, startChapters, startBerths, startClock, startRoute, startCursor, startSound, startDrawing, startStill];
+export const MODULES: readonly JourneyModule[] = [startArrivals, startBoard, startStationProgress, startHero, startChapters, startBerths, startClock, startRoute, startCursor, startSound, startDrawing, startStill];
 
 export function startJourney(): Teardown {
   const html = document.documentElement;
