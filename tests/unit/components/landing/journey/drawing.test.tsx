@@ -1,97 +1,120 @@
-import { render } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
-import { startBerths } from "@/components/landing/journey/berths";
-import { drawStrokes } from "@/components/landing/journey/drawing";
-import { HeroDial } from "@/components/landing/journey/hero-dial";
-import { startHero } from "@/components/landing/journey/hero";
-import { RESULT_EVENT, type ResultDetail } from "@/components/landing/journey/journey-events";
-import { keep } from "@/components/landing/journey/start-journey";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { drawingModule, startDrawing, type LoadLive } from "@/components/landing/journey/drawing";
+import { DRAWING_EVENT, type DrawingDetail, type ResultDetail } from "@/components/landing/journey/journey-events";
+import { keep, type JourneyContext } from "@/components/landing/journey/start-journey";
 
-// A drawn stroke's teardown (svg.createDrawable): the handle is cancelled, never reverted, and everything
-// drawable.js wrote is removed, so a rebuild finds the server's stroke and not a hidden "0 0" one.
+const html = document.documentElement;
+const ctx = (motion: boolean): JourneyContext => ({ motion, intro: false, result: keep<ResultDetail | null>(null), still: keep({ columns: false, height: null }) });
+const heard: DrawingDetail[] = [];
+const hear = (e: Event) => heard.push((e as CustomEvent<DrawingDetail>).detail);
 
-const NS = "http://www.w3.org/2000/svg";
-const WRITTEN = ["pathLength", "draw", "stroke-dasharray", "stroke-dashoffset"] as const;
-
-/** Every trace drawable.js leaves on a stroke: its attributes and the inline linecap. */
-function traces(el: Element): string[] {
-  const left: string[] = WRITTEN.filter((name) => el.hasAttribute(name));
-  if ((el as SVGElement).style.getPropertyValue("stroke-linecap")) left.push("style:stroke-linecap");
-  return left;
-}
-
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+beforeEach(() => {
+  heard.length = 0;
+  window.addEventListener(DRAWING_EVENT, hear);
+  html.dataset.drawing = "live";
+  html.dataset.saver = "off";
+});
 
 afterEach(() => {
-  document.body.replaceChildren();
+  window.removeEventListener(DRAWING_EVENT, hear);
+  delete html.dataset.drawing;
+  delete html.dataset.drawingWhy;
+  delete html.dataset.saver;
+  window.sessionStorage.clear();
+  document.body.innerHTML = "";
 });
 
-describe("drawStrokes", () => {
-  it("clears a draw cancelled midway, and it never writes again", async () => {
-    const svg = document.createElementNS(NS, "svg");
-    const path = document.createElementNS(NS, "path");
-    path.setAttribute("d", "M0 0 L100 0");
-    svg.append(path);
-    document.body.append(svg);
-    const drawing = drawStrokes([path]);
-    drawing.play({ draw: ["0 0", "0 1"], duration: 200 });
-    expect(traces(path)).not.toEqual([]);
-    drawing.clear();
-    expect(traces(path)).toEqual([]);
-    await wait(320);
-    expect(traces(path)).toEqual([]);
-  });
-
-  it("holds strokes at a drawn state, and clears that too", () => {
-    const svg = document.createElementNS(NS, "svg");
-    const line = document.createElementNS(NS, "line");
-    svg.append(line);
-    document.body.append(svg);
-    const drawing = drawStrokes([line]);
-    drawing.hold("0 0");
-    expect(line.getAttribute("draw")).toBe("0 0");
-    drawing.clear();
-    expect(traces(line)).toEqual([]);
-  });
-});
-
-describe("the hero dial's strokes", () => {
-  const mount = () =>
-    render(
-      <div className="dial-host">
-        <HeroDial />
-        <p className="dial-readout" />
-      </div>,
-    );
-
-  it("are the server's again after the intro's rings are torn down", () => {
-    const { container } = mount();
-    const stop = startHero({ motion: true, intro: true, result: keep<ResultDetail | null>(null) });
-    const rings = [...container.querySelectorAll(".hero-dial svg > .dial-ring")];
-    expect(rings).toHaveLength(3);
+describe("the drawing's mode on the page", () => {
+  it("draws still at once with Motion off, and says why", () => {
+    const stop = startDrawing(ctx(false));
+    expect(html.dataset.drawing).toBe("still");
+    expect(html.dataset.drawingWhy).toBe("motion");
+    expect(heard.at(-1)).toEqual({ mode: "still", reasons: ["motion"] });
     stop();
-    for (const ring of rings) expect(traces(ring)).toEqual([]);
   });
 
-  it("are the server's again after the chart face's arc is torn down", () => {
-    const { container } = mount();
-    const stop = startHero({ motion: true, intro: false, result: keep<ResultDetail | null>(null) });
-    window.dispatchEvent(new CustomEvent<ResultDetail>(RESULT_EVENT, { detail: { hero: true, kind: "ok", chartAt: new Date(Date.now() + 3 * 3_600_000).toISOString() } }));
-    const arc = container.querySelector(".dial-arc")!;
-    expect(arc.getAttribute("d")).toMatch(/^M/);
+  it("settles still with Motion on, because J4 has no live drawing to load", async () => {
+    const stop = startDrawing(ctx(true));
+    await vi.waitFor(() => expect(html.dataset.drawingWhy).toBe("load"));
+    expect(html.dataset.drawing).toBe("still");
     stop();
-    expect(traces(arc)).toEqual([]);
   });
-});
 
-describe("the berth plan's strokes", () => {
-  it("carry no drawn state once torn down", () => {
-    document.body.innerHTML = `<figure class="berth-plan"><svg><rect class="plan-line"/><line class="plan-line is-faint"/><rect class="plan-line plan-berth is-lit"/></svg></figure>`;
-    // Off screen in jsdom (an empty box), so the entrance arms: every stroke is held hidden, at "0 0".
-    const stop = startBerths({ motion: true, intro: false, result: keep<ResultDetail | null>(null) });
-    const strokes = [...document.querySelectorAll(".plan-line")];
-    expect(strokes.every((s) => s.getAttribute("draw") === "0 0")).toBe(true);
+  it("never asks for the live drawing on Data Saver, or once the session fell to the floor", () => {
+    const load = vi.fn<LoadLive>(() => Promise.reject(new Error("no")));
+    html.dataset.saver = "on";
+    let stop = drawingModule(load)(ctx(true));
+    expect(html.dataset.drawingWhy).toBe("saver");
     stop();
-    for (const stroke of strokes) expect(traces(stroke)).toEqual([]);
+    html.dataset.saver = "off";
+    window.sessionStorage.setItem("tt.q", "still");
+    stop = drawingModule(load)(ctx(true));
+    expect(html.dataset.drawingWhy).toBe("quality");
+    expect(load).not.toHaveBeenCalled();
+    stop();
+  });
+
+  it("draws live when the live drawing loads, stops it on teardown, and follows its reasons", async () => {
+    const liveStop = vi.fn();
+    let ask = null as Parameters<LoadLive>[0] | null;
+    const load = vi.fn<LoadLive>((a) => {
+      ask = a;
+      return Promise.resolve(liveStop);
+    });
+    const stop = drawingModule(load)(ctx(true));
+    await vi.waitFor(() => expect(load).toHaveBeenCalledTimes(1));
+    await Promise.resolve();
+    expect(html.dataset.drawing).toBe("live");
+    ask?.still("webgl");
+    expect(html.dataset.drawing).toBe("still");
+    expect(liveStop).toHaveBeenCalledTimes(1);
+    ask?.live("webgl");
+    await vi.waitFor(() => expect(load).toHaveBeenCalledTimes(2));
+    stop();
+  });
+
+  it("stops a live drawing that arrives after the journey was torn down", async () => {
+    const liveStop = vi.fn();
+    let arrive: (t: () => void) => void = () => {};
+    const stop = drawingModule(() => new Promise((resolve) => (arrive = resolve)))(ctx(true));
+    stop();
+    arrive(liveStop);
+    await vi.waitFor(() => expect(liveStop).toHaveBeenCalledTimes(1));
+  });
+
+  it("writes back the drawing the boot script's own rule would choose on teardown, dropping data-drawing-why", async () => {
+    // Motion on, no saver, no stored quality floor: the boot script's own rule (resolveDrawing) says "live".
+    // The module still settles "still" at runtime, for its own reason ("load", since J4 has no live drawing) —
+    // teardown must write back what a fresh mount's boot script would choose, not leave that runtime reason
+    // stuck in the markup for the next mount to find (spec, J4-4 minor #4).
+    const stop = startDrawing(ctx(true));
+    await vi.waitFor(() => expect(html.dataset.drawingWhy).toBe("load"));
+    expect(html.dataset.drawing).toBe("still");
+    stop();
+    expect(html.dataset.drawing).toBe("live");
+    expect(html.dataset.drawingWhy).toBeUndefined();
+  });
+
+  it("writes back still on teardown when Motion is off, matching the boot script", () => {
+    const stop = startDrawing(ctx(false));
+    expect(html.dataset.drawing).toBe("still");
+    stop();
+    expect(html.dataset.drawing).toBe("still");
+    expect(html.dataset.drawingWhy).toBeUndefined();
+  });
+
+  it("keeps a reader inside the chapter at its start when the switch changes its height", () => {
+    const section = document.createElement("section");
+    section.id = "anatomy";
+    document.body.append(section);
+    const boxes = [
+      { top: -300, bottom: 900, height: 1200 },
+      { top: -300, bottom: 1200, height: 1500 },
+    ];
+    vi.spyOn(section, "getBoundingClientRect").mockImplementation(() => DOMRect.fromRect({ y: boxes[0].top, height: boxes.shift()?.height ?? 1500 }));
+    Object.defineProperty(window, "scrollY", { value: 2000, configurable: true });
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    startDrawing(ctx(false))();
+    expect(scrollTo).toHaveBeenCalledWith({ top: 1700, behavior: "instant" });
   });
 });

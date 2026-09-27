@@ -83,9 +83,21 @@ export function startPlaceGuard(): Teardown {
   };
   window.addEventListener("scroll", learn, { passive: true });
   window.addEventListener(MOTION_BEFORE_EVENT, learn);
+  // A freshly observed target always delivers one initial notification, even when nothing has actually
+  // changed (the spec guarantees it) — this observer never fires on its own just because something above
+  // #how changed size and moved it; only #how's own border-box actually changing size does that, or this
+  // guaranteed-but-empty first delivery. Treating that first delivery as a real resize (the previous bug
+  // here) reads whatever #how's box happens to be at that moment — including a document position already
+  // shifted by content above it, before #how itself ever resized — as #how's own change, and relocates a
+  // reader who never left where they were reading. The box this guard compares against still refreshes every
+  // time (so a later, real resize is judged from here, never a stale one) — only the relocation itself waits
+  // for #how's own box to actually change size.
   const observer = new ResizeObserver(() => {
-    lastSize = sizeOf(section);
-    settlePlace(section);
+    const size = sizeOf(section);
+    const resized = size.width !== lastSize.width || size.height !== lastSize.height;
+    lastSize = size;
+    if (resized) settlePlace(section);
+    else placeBox = docBox(section);
   });
   observer.observe(section, { box: "border-box" });
   return () => {

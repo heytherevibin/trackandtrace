@@ -22,6 +22,18 @@ test.describe("the route strip, moving", () => {
       expect(left).toBeLessThan(45);
     });
 
+    test("GA stands between DEP and 01, and lights while #anatomy is the section under the masthead", async ({ page }) => {
+      await page.goto("/");
+      await waitForJourney(page);
+      const strip = page.locator("#route-strip");
+      const codes = await strip.locator(".strip-stops a").allTextContents();
+      expect(codes.indexOf("GA")).toBe(codes.indexOf("DEP") + 1);
+      expect(codes.indexOf("01")).toBe(codes.indexOf("GA") + 1);
+      await scrollToId(page, "anatomy");
+      await expect(strip.locator('.strip-stops a[href="#anatomy"]')).toHaveAttribute("aria-current", "location");
+      await expect(strip.locator(".strip-now")).toHaveText("GA · The train, drawn");
+    });
+
     test("Motion off: the train still moves, but never leans", async ({ page }) => {
       await motionOff(page);
       await page.goto("/");

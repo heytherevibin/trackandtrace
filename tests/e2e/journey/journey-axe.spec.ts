@@ -1,12 +1,14 @@
 import { test } from "../fixtures";
 import { expectAxeClean } from "../helpers";
-import { motionOff, scrollToId, waitForJourney } from "./journey-helpers";
+import { motionOff, scrollToId, stubSaveData, waitForJourney } from "./journey-helpers";
 
 const POSITIONS: readonly (readonly [name: string, id: string | null, fraction?: number])[] = [
   ["top", null],
   ["chapters, midway", "how", 0.5],
   ["record", "record"],
   ["roadmap", "roadmap"],
+  ["drawing", "anatomy"],
+  ["terminus", "terminus"],
 ];
 
 test.describe("axe, while the journey runs", () => {
@@ -36,6 +38,33 @@ test.describe("axe, while the journey runs", () => {
     await page.addInitScript(() => window.localStorage.setItem("tt.theme", "dark"));
     await page.goto("/");
     await waitForJourney(page);
+    await page.waitForTimeout(1_200);
+    await expectAxeClean(page);
+  });
+
+  test("clean at Night, at the drawing", async ({ page }) => {
+    await page.addInitScript(() => window.localStorage.setItem("tt.theme", "dark"));
+    await page.goto("/");
+    await waitForJourney(page);
+    await scrollToId(page, "anatomy", 40);
+    await page.waitForTimeout(1_200);
+    await expectAxeClean(page);
+  });
+
+  test("clean at Night, at the terminus", async ({ page }) => {
+    await page.addInitScript(() => window.localStorage.setItem("tt.theme", "dark"));
+    await page.goto("/");
+    await waitForJourney(page);
+    await scrollToId(page, "terminus", 40);
+    await page.waitForTimeout(1_200);
+    await expectAxeClean(page);
+  });
+
+  test("clean on Data Saver, at the drawing", async ({ page }) => {
+    await stubSaveData(page);
+    await page.goto("/");
+    await waitForJourney(page);
+    await scrollToId(page, "anatomy", 40);
     await page.waitForTimeout(1_200);
     await expectAxeClean(page);
   });

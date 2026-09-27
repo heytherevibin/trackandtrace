@@ -1,7 +1,7 @@
 import { messages } from "@/messages";
 
 // The landing, drawn as a route (spec 2026-09-24 §3.A): every section a station with its code and kilometre
-// post, in page order. GA, the drawn train, joins with its section in J4.
+// post, in page order. GA, the drawn train, joined with its section in J4.
 
 export type StationId = keyof typeof messages.journey.stations;
 
@@ -14,6 +14,7 @@ export interface Station {
 
 const ROUTE: readonly { readonly id: StationId; readonly code: string; readonly km: number }[] = [
   { id: "top", code: "DEP", km: 0 },
+  { id: "anatomy", code: "GA", km: 12 },
   { id: "principles", code: "01", km: 64 },
   { id: "how", code: "02", km: 138 },
   { id: "record", code: "03", km: 212 },

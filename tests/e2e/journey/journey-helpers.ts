@@ -38,3 +38,14 @@ export async function transformOf(locator: Locator): Promise<string> {
 export async function motionOff(page: Page): Promise<void> {
   await page.addInitScript(() => window.localStorage.setItem("tt.motion", "off"));
 }
+
+/** Data Saver, stubbed via navigator.connection: on the prototype where this Chromium allows it, else the instance. */
+export async function stubSaveData(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    try {
+      Object.defineProperty(Navigator.prototype, "connection", { configurable: true, get: () => ({ saveData: true, effectiveType: "4g" }) });
+    } catch {
+      Object.defineProperty(window.navigator, "connection", { configurable: true, get: () => ({ saveData: true, effectiveType: "4g" }) });
+    }
+  });
+}

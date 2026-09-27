@@ -1,5 +1,5 @@
 import { animate, createTimer, stagger, type JSAnimation, type Timer } from "animejs";
-import { drawStrokes } from "./drawing";
+import { drawStrokes } from "./strokes";
 import { ease } from "./ease";
 import { T } from "./motion-tokens";
 import { watchEntrances } from "./observers";

@@ -25,14 +25,14 @@ describe("the hero dial's chart face", () => {
     const arc = container.querySelector(".dial-arc")!;
     const kept = keep<ResultDetail | null>(null);
 
-    let stop = startHero({ motion: true, intro: false, result: kept });
+    let stop = startHero({ motion: true, intro: false, result: kept, still: keep({ columns: false, height: null }) });
     result({ hero: true, kind: "ok", chartAt: chartAt() });
     expect(dial).toHaveClass("is-face");
     stop();
     expect(dial).not.toHaveClass("is-face");
 
     // The Motion switch rebuilds the journey still: the face is a true reading, so it is drawn again at once.
-    stop = startHero({ motion: false, intro: false, result: kept });
+    stop = startHero({ motion: false, intro: false, result: kept, still: keep({ columns: false, height: null }) });
     expect(dial).toHaveClass("is-face");
     expect(arc.getAttribute("d")).toMatch(/^M/);
     expect(container.querySelector(".dial-readout")!.textContent).toMatch(/^Chart /);
@@ -41,7 +41,7 @@ describe("the hero dial's chart face", () => {
     plate({ hero: true, digits: 0, running: false, done: false });
     expect(dial).not.toHaveClass("is-face");
     stop();
-    stop = startHero({ motion: true, intro: false, result: kept });
+    stop = startHero({ motion: true, intro: false, result: kept, still: keep({ columns: false, height: null }) });
     expect(dial).not.toHaveClass("is-face");
     expect(arc.getAttribute("d")).toBe("");
     stop();
@@ -52,7 +52,7 @@ describe("the hero dial's teardown", () => {
   it("reverts its tweens newest first, so the dashed ring ends as the server drew it", async () => {
     const { container } = mount();
     const dashed = container.querySelector<SVGCircleElement>(".dial-ring.is-dashed")!;
-    const stop = startHero({ motion: true, intro: false, result: keep<ResultDetail | null>(null) });
+    const stop = startHero({ motion: true, intro: false, result: keep<ResultDetail | null>(null), still: keep({ columns: false, height: null }) });
     await wait(60);
     // A digit nudges the dashed ring on top of its slow turn: this nudge's "original" is the turn's mid-value.
     plate({ hero: true, digits: 1, running: false, done: false });

@@ -119,3 +119,28 @@ html.has-reg-cursor :is(input, textarea, [contenteditable="true"]) { cursor: tex
 
 /* ---- The footer's Sound switch: only the journey can sound */
 html[data-journey="on"] .sound-toggle { display: inline-flex; }
+
+/* The drawn train's labels beside the still drawing, with leaders to their parts (still.ts, spec §3.C; J4-7):
+   only when they fit, else the page's own parts list stands (journey.css). */
+html[data-journey="on"] .anatomy-pin.is-columns { height: max(640px, calc(100svh - var(--header-height))); }
+html[data-journey="on"] .is-columns .anatomy-still { position: absolute; margin: 0; aspect-ratio: auto; z-index: 1; }
+html[data-journey="on"] .is-columns .anatomy-legend { display: none; }
+html[data-journey="on"] .is-columns .callout-lines { display: block; position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; overflow: visible; }
+html[data-journey="on"] .callout-lines line { stroke: var(--line-strong); stroke-width: 1; }
+html[data-journey="on"] .callout-lines circle { fill: var(--surface-0); stroke: var(--accent); stroke-width: 1.5; }
+html[data-journey="on"] .is-columns .callouts { inset: 0; width: auto; height: auto; overflow: visible; clip-path: none; z-index: 3; pointer-events: none; }
+html[data-journey="on"] .is-columns .callout { position: absolute; width: 16rem; display: grid; grid-template-columns: auto 1fr; column-gap: 10px; align-items: baseline; padding: 6px 0 7px; border-top: 1px solid var(--line); background: var(--surface-0); pointer-events: auto; }
+html[data-journey="on"] .is-columns .callout[data-side="left"] { left: 0; }
+html[data-journey="on"] .is-columns .callout[data-side="right"] { right: 0; }
+html[data-journey="on"] .is-columns .callout-num { font-family: var(--font-display); font-weight: 600; font-size: var(--text-label); letter-spacing: 0.08em; color: var(--accent-text); }
+html[data-journey="on"] .is-columns .callout-title { font-family: var(--font-display); font-weight: 600; font-size: var(--text-sm); line-height: 1.25rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-1); }
+html[data-journey="on"] .is-columns .callout-detail { grid-column: 2; font-size: var(--text-label); line-height: 1.125rem; color: var(--ink-2); }
+html[data-journey="on"] .is-columns .callout-detail b { font-weight: 600; color: var(--ink-1); }
+html[data-journey="on"] .is-columns .callout.is-hot { border-top-color: var(--accent); }
+html[data-journey="on"] .is-columns .callout.is-hot .callout-title { color: var(--accent-text); }
+html[data-journey="on"] .is-columns.is-compact .callout-detail { display: none; }
+html[data-journey="on"] .is-columns .title-block { display: grid; position: absolute; right: 0; bottom: 16px; z-index: 3; grid-template-columns: minmax(0, 1fr) auto; width: 22rem; background: var(--surface-0); }
+html[data-journey="on"] .is-columns .tb-cell { padding: 4px 10px; font-family: var(--font-display); font-weight: 600; font-size: 0.6875rem; /* drawing units: no token matches v3's title-block instrument at its fixed 22rem width */ line-height: 1rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+html[data-journey="on"] .is-columns .tb-cell:nth-of-type(n + 3) { border-top: 1px solid var(--line); }
+html[data-journey="on"] .is-columns .tb-cell:nth-of-type(even) { border-left: 1px solid var(--line); text-align: right; }
+html[data-journey="on"] .is-columns .tb-cell b { color: var(--ink-1); font-weight: 600; }

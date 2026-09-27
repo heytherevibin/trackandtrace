@@ -212,3 +212,30 @@ main:has(.hero-dial) { overflow-x: clip; } /* the landing clips the dial at the 
 
 /* ---- The footer's Sound switch: shown only once the journey can sound it (journey-island.css) */
 .sound-toggle { display: none; }
+
+/* ------------------------------------------------------------------ the drawn train (GA) and the terminus
+   Drawn still (spec §3.C–D). The page's own layout is the parts list: the words, the drawing, then the list; the
+   ten labels stay a real list for screen readers, and a legend shows them. While the journey runs, still.ts stands
+   the labels beside the drawing with leaders when they fit (journey-island.css, .is-columns). */
+.anatomy-pin { position: relative; }
+.anatomy-copy { position: relative; z-index: 2; max-width: 32rem; }
+.anatomy-still { position: relative; width: 100%; aspect-ratio: 1.6; margin: 18px 0 14px; }
+.still-drawing { color: var(--ink-1); pointer-events: none; }
+.still-drawing svg { display: block; width: 100%; height: 100%; overflow: clip; }
+/* a shape shows once it has something to draw; a page without JavaScript shows its <noscript> copy instead */
+.still-drawing svg:not(:has(use[href])) { display: none; }
+@media (min-width: 48rem) { .still-drawing .still-tall { display: none; } }
+/* the noscript copy draws only the wide shape (§3.H's budget), so it shows at every width */
+@media (max-width: 47.99rem) { .still-drawing:not(.is-noscript) .still-wide { display: none; } }
+html:not([data-motion]) .still-drawing:not(.is-noscript) { display: none; }
+/* ink weights reach into the baked files through <use>, as inherited variables (J4-3) */
+[data-theme="dark"] .still-drawing { --still-line: 0.74; }
+.still-drawing [data-hot] { color: var(--accent); --still-line: 1; --still-faint: 1; --still-near: 1; }
+.callout-lines, .title-block { display: none; }
+.callouts { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); margin: 0; padding: 0; list-style: none; }
+.anatomy-legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); gap: 2px 14px; margin: 0; padding: 8px 0 0; list-style: none; border-top: 1px solid var(--line); }
+.anatomy-legend li { display: flex; gap: 6px; min-width: 0; font-size: var(--text-xs); line-height: var(--text-xs--line-height); color: var(--ink-2); }
+.anatomy-legend b { font-family: var(--font-display); font-weight: 600; color: var(--accent-text); }
+.terminus-stage { position: relative; height: clamp(200px, 30vh, 320px); margin-bottom: 20px; }
+.terminus-caption { position: absolute; left: 0; top: 0; z-index: 2; }
+.terminus-still { position: absolute; inset: 18px 0 0; }
