@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { createBreaker, type BreakerScope } from "./breaker";
 import { pnrCache, type Cache } from "./cache";
 import { deriveDataKeys, keyedHash } from "./data-key";
@@ -5,6 +6,7 @@ import { activePnrSource, env, isThirdPartySource, sharedStoreConfig, type Env, 
 import { liveChecksPerDay } from "./runtime-settings";
 import { MemoryKv, redisKv, resilientKv, type Kv } from "./kv";
 import { UNLIMITED_BUDGET, createLiveBudget, type LiveBudget } from "./live-budget";
+import { memoryLimitedLog, recordingLimiter, redisLimitedLog, type LimitedLog, type RecordingLimiter } from "./limited-log";
 import { log } from "./log";
 import { MemoryRateLimiter, SharedRateLimiter, type RateLimiter } from "./rate-limit";
 import { EncryptedRedisCache } from "./redis-cache";
@@ -67,8 +69,37 @@ function store(current: Env): SharedStore | null {
   return stores.get(current) ?? null;
 }
 
-export function createRateLimiter(current: Env = env()): RateLimiter {
-  return store(current)?.limiter ?? new MemoryRateLimiter();
+/** Without a shared store there is no DATA_KEY to hash with, so this instance hashes with a key of its own that never leaves memory. */
+const randomKey = randomBytes(32);
+const localLimited = memoryLimitedLog((address) => keyedHash(randomKey, `address:${address}`));
+const limitedLogs = new WeakMap<Env, LimitedLog>();
+
+/** The limited log refusals are written to: Upstash when configured, else this instance's memory. */
+function limitedLog(current: Env): LimitedLog {
+  const config = sharedStoreConfig(current);
+  if (!config) return localLimited;
+  const known = limitedLogs.get(current);
+  if (known) return known;
+  const clientId = deriveDataKeys(config.dataKey).clientId;
+  const made = redisLimitedLog(connectRedis(config.credentials, STATE_TIMEOUT_MS), config.prefix, (address) => keyedHash(clientId, `address:${address}`));
+  limitedLogs.set(current, made);
+  return made;
+}
+
+/**
+ * Every refused TRAVELLER check is written down as it happens (module 04). Best-effort: the limiter's
+ * verdict is returned unchanged whether or not the line was written.
+ */
+export function createRateLimiter(current: Env = env()): RecordingLimiter {
+  return recordingLimiter(store(current)?.limiter ?? new MemoryRateLimiter(), limitedLog(current));
+}
+
+/**
+ * The same log, for module 04 to read. Its reads throw when Upstash does not answer — the redis log
+ * has no fallback — so the page can say the counts are unavailable rather than draw a quiet day.
+ */
+export function limitedLogForReading(current: Env = env()): LimitedLog {
+  return limitedLog(current);
 }
 
 export function createPnrCache(current: Env = env()): Cache {

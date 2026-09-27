@@ -106,8 +106,9 @@ describe("createRateLimiter", () => {
     const memory = parseEnv({ NODE_ENV: "test", UPSTASH_REDIS_REST_URL: "https://x.upstash.io", UPSTASH_REDIS_REST_TOKEN: "t" });
     const shared = parseEnv({ NODE_ENV: "test", UPSTASH_REDIS_REST_URL: "https://x.upstash.io", UPSTASH_REDIS_REST_TOKEN: "t", DATA_KEY });
     if (!memory.ok || !shared.ok) throw new Error("expected valid env");
-    expect(createRateLimiter(memory.env)).toBeInstanceOf(MemoryRateLimiter);
-    expect(createRateLimiter(shared.env)).toBeInstanceOf(SharedRateLimiter);
+    // Wrapped since module 04 so refusals are written down; the limiter underneath is what this is about.
+    expect(createRateLimiter(memory.env).limiter).toBeInstanceOf(MemoryRateLimiter);
+    expect(createRateLimiter(shared.env).limiter).toBeInstanceOf(SharedRateLimiter);
   });
 });
 

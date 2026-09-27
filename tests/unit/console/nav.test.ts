@@ -60,6 +60,8 @@ describe("railFor against today's real CONSOLE_MODULES", () => {
   // page SUPPORT has — until now a Support member signed in to nothing.
   const OVERVIEW = CONSOLE_MODULES.find((m) => m.num === "01");
   const SOURCES = CONSOLE_MODULES.find((m) => m.num === "02");
+  // 04 Abuse & limits flipped with its read-only half (2026-09-28): Owner and Admin, as the sheet's map gives it.
+  const ABUSE = CONSOLE_MODULES.find((m) => m.num === "04");
   const SWITCHES = CONSOLE_MODULES.find((m) => m.num === "11");
   const TEAM = CONSOLE_MODULES.find((m) => m.num === "13");
   const AUDIT = CONSOLE_MODULES.find((m) => m.num === "14");
@@ -71,7 +73,7 @@ describe("railFor against today's real CONSOLE_MODULES", () => {
     expect(TEAM).toBeDefined();
     expect(AUDIT).toBeDefined();
     expect(railFor("owner")).toEqual([
-      { group: "operate", modules: [OVERVIEW, SOURCES] },
+      { group: "operate", modules: [OVERVIEW, SOURCES, ABUSE] },
       { group: "configure", modules: [SWITCHES, TEAM] },
       { group: "record", modules: [AUDIT] },
     ]);
@@ -80,9 +82,9 @@ describe("railFor against today's real CONSOLE_MODULES", () => {
   // Main.dc.html:293-298's own access.Admin list has no '13' -- Team is Owner-only, whatever the
   // plan's table said (task-4-addendum.md §5, re-checked for task-8 in task-7-addendum.md §6) --
   // but it does have '14'.
-  it("gives an Admin Overview, Sources, Switches and the Audit log, but not Team", () => {
+  it("gives an Admin Overview, Sources, Abuse, Switches and the Audit log, but not Team", () => {
     expect(railFor("admin")).toEqual([
-      { group: "operate", modules: [OVERVIEW, SOURCES] },
+      { group: "operate", modules: [OVERVIEW, SOURCES, ABUSE] },
       { group: "configure", modules: [SWITCHES] },
       { group: "record", modules: [AUDIT] },
     ]);
@@ -137,8 +139,8 @@ describe("CONSOLE_MODULES", () => {
   // 11 Switches or 01 Overview arrives, this test names what changed instead of counting one more.
   // A tripwire, and it is meant to fire: a module flips only in the PR that adds its page, so an
   // unexplained change here is a rail link to a route that does not exist.
-  it("builds 01 Overview, 02 Sources, 11 Switches, 13 Team and 14 Audit log, and nothing else yet", () => {
-    expect(CONSOLE_MODULES.filter((m) => m.built).map((m) => m.num)).toEqual(["01", "02", "11", "13", "14"]);
+  it("builds 01 Overview, 02 Sources, 04 Abuse, 11 Switches, 13 Team and 14 Audit log, and nothing else yet", () => {
+    expect(CONSOLE_MODULES.filter((m) => m.built).map((m) => m.num)).toEqual(["01", "02", "04", "11", "13", "14"]);
   });
 
   it("gives every module a distinct, non-empty label and a console href", () => {

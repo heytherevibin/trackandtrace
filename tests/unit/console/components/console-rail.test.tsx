@@ -210,8 +210,9 @@ describe("today's reality: the rail and its phone trigger render for an Owner an
     expect(within(rail).queryByRole("link", { name: /Team/ })).not.toBeInTheDocument();
     expect(within(rail).getByRole("link", { name: /Overview/ })).toHaveAttribute("href", "/");
     expect(within(rail).getByRole("link", { name: /Sources/ })).toHaveAttribute("href", "/sources");
+    expect(within(rail).getByRole("link", { name: /Abuse/ })).toHaveAttribute("href", "/abuse");
     expect(within(rail).getByRole("link", { name: /Switches/ })).toHaveAttribute("href", "/settings");
-    expect(within(rail).getAllByRole("link")).toHaveLength(4);
+    expect(within(rail).getAllByRole("link")).toHaveLength(5);
   });
 });
 
