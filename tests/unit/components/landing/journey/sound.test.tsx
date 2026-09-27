@@ -77,8 +77,10 @@ describe("the rail clack's audio context", () => {
 describe("the departure horn (J5-18)", () => {
   const real = window.AudioContext;
   const tones: number[] = [];
+  let failHorn = false;
   class HornContext extends FakeContext {
     readonly createOscillator = () => {
+      if (failHorn) throw new Error("no oscillator this time");
       const o = { ...node(), frequency: { value: 0 }, type: "", start: () => tones.push(o.frequency.value) };
       return o;
     };
@@ -87,10 +89,12 @@ describe("the departure horn (J5-18)", () => {
     window.AudioContext = HornContext as unknown as typeof AudioContext;
     window.sessionStorage.clear();
     tones.length = 0;
+    failHorn = false;
   });
   afterEach(() => {
     window.AudioContext = real;
     made.length = 0;
+    failHorn = false;
     chooseSound(false);
   });
 
@@ -114,6 +118,44 @@ describe("the departure horn (J5-18)", () => {
     expect(tones).toEqual([]);
     expect(window.sessionStorage.getItem(HORN_KEY)).toBeNull();
     window.localStorage.removeItem("tt.sound");
+    stop();
+  });
+
+  it("stays silent while the audio context is not running, though Sound is on", () => {
+    const stop = startSound();
+    chooseSound(true); // the reader's gesture wakes the context: it starts running
+    const ctx = made[made.length - 1]!;
+    ctx.state = "suspended"; // e.g. suspended again between the wake and this departure
+    window.dispatchEvent(new Event(DEPART_EVENT));
+    expect(tones).toEqual([]);
+    expect(window.sessionStorage.getItem(HORN_KEY)).toBeNull();
+    stop();
+  });
+
+  it("stays silent with Sound off, even when the context is still running", () => {
+    const stop = startSound();
+    chooseSound(true); // wakes the context
+    const ctx = made[made.length - 1]!;
+    chooseSound(false); // Sound off (the switch also suspends the context in production)
+    ctx.state = "running"; // isolate the Sound guard from the context-state guard
+    window.dispatchEvent(new Event(DEPART_EVENT));
+    expect(tones).toEqual([]);
+    expect(window.sessionStorage.getItem(HORN_KEY)).toBeNull();
+    stop();
+  });
+
+  it("does not mark the horn as sounded when it fails to play, and the failure never escapes the listener", () => {
+    const stop = startSound();
+    chooseSound(true); // wakes the context, Sound on
+    failHorn = true; // the horn itself throws when it tries to play
+    expect(() => window.dispatchEvent(new Event(DEPART_EVENT))).not.toThrow();
+    expect(tones).toEqual([]);
+    expect(window.sessionStorage.getItem(HORN_KEY)).toBeNull();
+    failHorn = false;
+    // A later departure this visit may still try again, since nothing was marked.
+    window.dispatchEvent(new Event(DEPART_EVENT));
+    expect(tones).toEqual([311, 392]);
+    expect(window.sessionStorage.getItem(HORN_KEY)).toBe("1");
     stop();
   });
 });

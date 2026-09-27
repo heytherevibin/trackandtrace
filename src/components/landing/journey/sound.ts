@@ -91,7 +91,12 @@ export function startSound(): Teardown {
   const onDepart = () => {
     // Only a context the reader's own gesture made and woke; never one made here (spec §3.G).
     if (!audio || audio.ctx.state !== "running" || !soundOn() || hornedThisVisit()) return;
-    horn(audio);
+    try {
+      horn(audio);
+    } catch {
+      // A failed play is skipped, not marked: it may sound again on the next departure this visit.
+      return;
+    }
     try {
       window.sessionStorage.setItem(HORN_KEY, "1");
     } catch {
