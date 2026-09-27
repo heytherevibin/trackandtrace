@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { chooseSound } from "@/components/shell/use-sound";
-import { startSound } from "@/components/landing/journey/sound";
+import { DEPART_EVENT } from "@/components/landing/journey/journey-events";
+import { HORN_KEY, startSound } from "@/components/landing/journey/sound";
 
 // The rail clack's audio context follows the Sound switch: off suspends it, so nothing keeps the audio device
 // awake; on (or the next gesture) resumes it.
@@ -70,5 +71,49 @@ describe("the rail clack's audio context", () => {
     expect(made).toHaveLength(1);
     stop();
     expect(ctx.close).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("the departure horn (J5-18)", () => {
+  const real = window.AudioContext;
+  const tones: number[] = [];
+  class HornContext extends FakeContext {
+    readonly createOscillator = () => {
+      const o = { ...node(), frequency: { value: 0 }, type: "", start: () => tones.push(o.frequency.value) };
+      return o;
+    };
+  }
+  beforeEach(() => {
+    window.AudioContext = HornContext as unknown as typeof AudioContext;
+    window.sessionStorage.clear();
+    tones.length = 0;
+  });
+  afterEach(() => {
+    window.AudioContext = real;
+    made.length = 0;
+    chooseSound(false);
+  });
+
+  it("sounds its two tones once per visit as the train departs, while Sound is on", () => {
+    const stop = startSound();
+    chooseSound(true); // the switch is the reader's own gesture: the audio wakes
+    window.dispatchEvent(new Event(DEPART_EVENT));
+    expect(tones).toEqual([311, 392]);
+    expect(window.sessionStorage.getItem(HORN_KEY)).toBe("1");
+    window.dispatchEvent(new Event(DEPART_EVENT));
+    expect(tones).toEqual([311, 392]);
+    stop();
+  });
+
+  it("stays silent with Sound off, and before any gesture has woken the audio, and remembers nothing then", () => {
+    const stop = startSound();
+    window.dispatchEvent(new Event(DEPART_EVENT));
+    expect(tones).toEqual([]);
+    window.localStorage.setItem("tt.sound", "on"); // a remembered "on", but no gesture yet this visit
+    window.dispatchEvent(new Event(DEPART_EVENT));
+    expect(tones).toEqual([]);
+    expect(window.sessionStorage.getItem(HORN_KEY)).toBeNull();
+    window.localStorage.removeItem("tt.sound");
+    stop();
   });
 });
