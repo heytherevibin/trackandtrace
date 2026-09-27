@@ -49,3 +49,19 @@ export async function stubSaveData(page: Page): Promise<void> {
     }
   });
 }
+
+/** Waits for the page to draw `n` more frames: whatever a scroll, a wheel or a layout event set going has had its turn.
+ * A state wait, never a fixed time (J5 pre-flight #16). */
+export async function frames(page: Page, n = 2): Promise<void> {
+  await page.evaluate(
+    (count) =>
+      new Promise<void>((done) => {
+        const tick = (left: number): void => {
+          if (left <= 0) done();
+          else requestAnimationFrame(() => tick(left - 1));
+        };
+        tick(count);
+      }),
+    n,
+  );
+}

@@ -8,7 +8,7 @@ describe("parsePlace", () => {
     expect(parsePlace(JSON.stringify({ entry: "k1", id: "record", offset: 136 }))).toEqual({ entry: "k1", id: "record", offset: 136 });
   });
   it("refuses anything else: nothing stored, bad JSON, an unknown section, a missing or non-finite number", () => {
-    for (const raw of [null, "", "{", "[]", "null", '{"entry":"k1","id":"nowhere","offset":0}', '{"entry":"k1","id":"record"}', '{"entry":1,"id":"record","offset":0}', '{"entry":"k1","id":"record","offset":"9"}']) {
+    for (const raw of [null, "", "{", "[]", "null", '{"entry":"k1","id":"nowhere","offset":0}', '{"entry":"k1","id":"record"}', '{"entry":1,"id":"record","offset":0}', '{"entry":"","id":"record","offset":0}', '{"entry":"k1","id":"record","offset":"9"}']) {
       expect(parsePlace(raw), String(raw)).toBeNull();
     }
     expect(parsePlace(JSON.stringify({ entry: "k1", id: "record", offset: Number.POSITIVE_INFINITY }))).toBeNull();
@@ -37,7 +37,7 @@ describe("pickPlace", () => {
 type Rects = Record<string, number>;
 
 describe("startPlaceMemory", () => {
-  const nav = { currentEntry: { key: "k1" } as { key: string } | null };
+  const nav = Object.assign(new EventTarget(), { currentEntry: { key: "k1" } as { key: string } | null });
   let scrollY = 0;
   const scrolls: number[] = [];
   let rects: Rects = {};
@@ -113,10 +113,10 @@ describe("startPlaceMemory", () => {
     expect(parsePlace(window.sessionStorage.getItem(PLACE_KEY))).toEqual({ entry: "k1", id: "record", offset: -24 });
   });
 
-  it("samples at a click, before a link's navigation, and keeps that place once the page's sections are gone", () => {
+  it("samples as a navigation starts, and keeps that place once the page's sections are gone", () => {
     const memory = startPlaceMemory();
     scrollY = 2000 - 40;
-    document.body.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    nav.dispatchEvent(Object.assign(new Event("navigate"), { navigationType: "push" }));
     document.body.replaceChildren(); // the new page has replaced this one's markup
     scrollY = 0;
     window.dispatchEvent(new Event("scroll"));
@@ -125,12 +125,46 @@ describe("startPlaceMemory", () => {
     expect(parsePlace(window.sessionStorage.getItem(PLACE_KEY))).toEqual({ entry: "k1", id: "how", offset: -24 });
   });
 
+  it("never samples on a click alone, nor on a reload", () => {
+    const memory = startPlaceMemory();
+    scrollY = 2000 - 40;
+    document.body.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    nav.dispatchEvent(Object.assign(new Event("navigate"), { navigationType: "reload" }));
+    document.body.replaceChildren();
+    memory.stop();
+    expect(parsePlace(window.sessionStorage.getItem(PLACE_KEY))?.id).toBe("anatomy"); // the first sample, at the top
+  });
+
+  it("a replace after a traverse never changes the stored key or place", () => {
+    // Forward: the traverse is sampled on this entry; then the router's own same-URL replace lands with the
+    // destination already current while this page's sections still stand. A replace overwrites its own entry, so
+    // Back can never return to it: it must not re-key the place.
+    const memory = startPlaceMemory();
+    scrollY = 3000 - 40;
+    nav.dispatchEvent(Object.assign(new Event("navigate"), { navigationType: "traverse" }));
+    nav.currentEntry = { key: "k2" };
+    scrollY = 2000 - 40;
+    nav.dispatchEvent(Object.assign(new Event("navigate"), { navigationType: "replace" }));
+    document.body.replaceChildren();
+    memory.stop();
+    expect(parsePlace(window.sessionStorage.getItem(PLACE_KEY))).toEqual({ entry: "k1", id: "record", offset: -24 });
+  });
+
+  it("restores nothing once the reader has scrolled by their own hand", () => {
+    store({ entry: "k1", id: "record", offset: 136 });
+    const memory = startPlaceMemory();
+    window.dispatchEvent(new WheelEvent("wheel", { deltaY: 40 }));
+    memory.restore();
+    expect(scrolls).toEqual([]);
+    memory.stop();
+  });
+
   it("stops listening when stopped", () => {
     const removeWindow = vi.spyOn(window, "removeEventListener");
-    const removeDocument = vi.spyOn(document, "removeEventListener");
+    const removeNav = vi.spyOn(nav, "removeEventListener");
     startPlaceMemory().stop();
     expect(removeWindow.mock.calls.map((c) => c[0])).toContain("scroll");
-    expect(removeDocument.mock.calls.map((c) => c[0])).toContain("click");
+    expect(removeNav.mock.calls.map((c) => c[0])).toContain("navigate");
   });
 
   it("survives storage that throws", () => {
