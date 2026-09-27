@@ -44,7 +44,10 @@ const EVERY_ROLE = ["owner", "admin", "support", "viewer"] as const;
  */
 export const CONSOLE_MODULES: readonly ConsoleModule[] = [
   { num: "01", label: "Overview", group: "operate", roles: EVERY_ROLE, href: consoleHref("/"), built: false },
-  { num: "02", label: "Sources & usage", group: "operate", roles: OWNER_ADMIN_VIEWER, href: consoleHref("/sources"), built: false },
+  // 2026-09-28: src/app/console/sources/page.tsx exists, so this flips — and it is the first module
+  // a VIEWER can open, so it is the first time that role gets a rail at all. Everything on it is a
+  // read of something already recorded; the sheet's own note says there are no actions on it.
+  { num: "02", label: "Sources & usage", group: "operate", roles: OWNER_ADMIN_VIEWER, href: consoleHref("/sources"), built: true },
   { num: "03", label: "Status & incidents", group: "operate", roles: OWNER_ADMIN_VIEWER, href: consoleHref("/status"), built: false },
   { num: "04", label: "Abuse & limits", group: "operate", roles: OWNER_ADMIN, href: consoleHref("/abuse"), built: false },
   { num: "05", label: "Alerts", group: "operate", roles: OWNER_ADMIN, href: consoleHref("/alerts"), built: false },
