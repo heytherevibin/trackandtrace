@@ -288,14 +288,18 @@ export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2)
       window.removeEventListener("resize", onResize);
       window.clearTimeout(quiet);
       const pinned = section?.classList.contains(PINNED) ?? false;
-      keepPlace(section, stopLive);
+      // The unpin and the still's return (data-drawing-why gone, the load window's rule lets go of it) are one change
+      // to the reader below the chapter, kept in place together: the next build's report sees nothing left to keep.
+      keepPlace(section, () => {
+        stopLive();
+        // A client navigation away leaves this markup for the next mount to find: it must read exactly what a fresh
+        // boot script would choose for the motion this module was built with, never this lifetime's own reason.
+        const motionState: MotionState = motion ? "on" : "off";
+        const saverState: SaverState = html.dataset.saver === "on" ? "on" : "off";
+        html.dataset.drawing = resolveDrawing(motionState, saverState, storedQuality());
+        delete html.dataset.drawingWhy;
+      });
       if (pinned) emit(LAYOUT_EVENT);
-      // A client navigation away leaves this markup for the next mount to find: it must read exactly what a fresh
-      // boot script would choose for the motion this module was built with, never this lifetime's own reason.
-      const motionState: MotionState = motion ? "on" : "off";
-      const saverState: SaverState = html.dataset.saver === "on" ? "on" : "off";
-      html.dataset.drawing = resolveDrawing(motionState, saverState, storedQuality());
-      delete html.dataset.drawingWhy;
     };
   };
 }

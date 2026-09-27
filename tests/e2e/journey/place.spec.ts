@@ -1,10 +1,11 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "../fixtures";
-import { frames, scrollToId, waitForJourney } from "./journey-helpers";
+import { REBUILD_EVENT } from "@/components/landing/journey/journey-events";
+import { frames, scrollToId, waitForJourney, waitForLive } from "./journey-helpers";
 
 // The places the journey keeps (J5-17, J5-19): a change of height above 02 (the live drawing pinning, J5) must never
 // throw a reader inside 02 when Motion then goes off; and Back, Forward, Back finds the reader's place each time.
-// And a reader who arrives below the drawn train stays put while the journey takes the page over.
+// And a reader below the drawn train stays put while the journey takes the page over, and through a rebuild.
 
 interface Sample {
   readonly top: number;
@@ -15,13 +16,20 @@ interface Sample {
   readonly columns: boolean;
 }
 
-/** From before the page's first script: scroll anchoring off (a browser without it would move the reader with any
- * change of height above them), and #id's top every frame. */
-async function watchTop(page: Page, id: string): Promise<void> {
-  await page.addInitScript((target) => {
+/** From before the page's first script: scroll anchoring off, as a browser without it would be, moving the reader with
+ * any change of height above them that nothing compensates. */
+async function noAnchoring(page: Page): Promise<void> {
+  await page.addInitScript(() => {
     const sheet = new CSSStyleSheet();
     sheet.replaceSync("html { overflow-anchor: none; }");
     document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+  });
+}
+
+/** Scroll anchoring off (above), and #id's top every frame from before the page's first script. */
+async function watchTop(page: Page, id: string): Promise<void> {
+  await noAnchoring(page);
+  await page.addInitScript((target) => {
     const samples: Sample[] = [];
     Reflect.set(window, "__ttTops", samples);
     const tick = () => {
@@ -112,5 +120,46 @@ test.describe("the reader's place", () => {
       const moved = judged.map((s) => s.top).filter((top) => Math.abs(top - at) > 4);
       expect(moved, `#${id} landed at ${at} px`).toEqual([]);
     });
+  }
+
+  // A rebuild tears the live drawing down and builds the drawing again: to a reader below the chapter, the unpin and
+  // the still's return are one change, kept in place together (J5-3), whether the browser anchors scroll or not. For the
+  // fit rebuild the reader has the chapter's foot out of the window: with it still in view, still.ts's first columns
+  // settle after a live drawing moves the reader 77 px, as it did before this rule (see the load case above).
+  const principlesTop = (page: Page) => page.locator("#principles").evaluate((el) => el.getBoundingClientRect().top);
+  const rebuilds = [
+    {
+      change: "Motion goes off",
+      offset: 120,
+      act: async (page: Page) => {
+        // through the DOM: Playwright's click would scroll the footer's switch into view first
+        await page.getByRole("contentinfo").getByRole("switch", { name: "Motion" }).evaluate((el) => (el as HTMLElement).click());
+        await expect(page.locator("html")).toHaveAttribute("data-motion", "off");
+      },
+    },
+    {
+      change: "a fit change rebuilds the journey",
+      offset: 0,
+      act: (page: Page) => page.evaluate((type) => window.dispatchEvent(new Event(type)), REBUILD_EVENT),
+    },
+  ] as const;
+  for (const anchoring of ["on", "off"] as const) {
+    for (const { change, offset, act } of rebuilds) {
+      test(`a reader below the live drawing stays put when ${change} (scroll anchoring ${anchoring})`, async ({ page }) => {
+        await page.setViewportSize({ width: 1440, height: 900 });
+        if (anchoring === "off") await noAnchoring(page);
+        await page.goto("/");
+        await waitForLive(page);
+        await scrollToId(page, "principles", offset);
+        await frames(page, 3); // the scroll has been heard: the live drawing's place, 02's guard
+        const before = await principlesTop(page);
+        await act(page);
+        await expect(page.locator("html")).toHaveAttribute("data-drawing", "still");
+        await expect(page.locator("#anatomy")).not.toHaveClass(/is-live/);
+        await frames(page, 6); // the new build's first layout pass and the still's settle
+        const after = await principlesTop(page);
+        expect(Math.abs(after - before), `#principles ${before} -> ${after}`).toBeLessThanOrEqual(4);
+      });
+    }
   }
 });
