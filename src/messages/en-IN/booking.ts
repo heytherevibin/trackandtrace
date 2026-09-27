@@ -51,7 +51,20 @@ export const booking = {
     title: "Availability",
     retrieved: (time: string) => `Retrieved ${time} IST from Trakline.`,
     window: "Four dates come back at a time.",
-    columns: { date: "Date", availability: "Availability", fare: "Fare" },
+    /**
+     * `estimate` names whose estimate it is, and that is the whole of the attribution: a column
+     * says it once, where repeating "the reservation service estimates" on every row of every train
+     * would say it a dozen times and still not fit — measured on production at 375px, the status
+     * line has 51px spare and that phrase needs 165.
+     *
+     * The provider is never named here, as nowhere on a traveller surface names one. "Reservation
+     * service" is the term this site already uses when it cannot answer.
+     */
+    columns: { date: "Date", availability: "Availability", estimate: "Reservation service estimate", fare: "Fare" },
+    /** Shown as a percentage because that is the form the estimate arrives in. */
+    estimate: (pct: number) => `${pct}%`,
+    /** No estimate is a dash, never a zero: `No More Booking` carries 0, and 0% would read as a forecast. */
+    noEstimate: "—",
     /**
      * What has already happened to the queue, which is the one figure on the row a traveller can act
      * on — and it is in the answer itself, not in any stored history. `GNWL65/WL26` means the next

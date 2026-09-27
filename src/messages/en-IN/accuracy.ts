@@ -7,7 +7,7 @@ export const accuracy = {
   lead: "No accuracy figure is published until verified responses and confirmed outcomes exist and can be audited.",
   status: {
     title: "Accuracy reporting is not available yet",
-    detail: "There are no verified predictions and no confirmed outcomes to compare, so nothing is estimated.",
+    detail: "Trakline makes no predictions of its own, and there are not yet enough confirmed outcomes to score the reservation service’s. Nothing is claimed about either.",
     facts: [
       { label: "Verified records", value: "0" },
       { label: "Confirmed outcomes", value: "0" },

@@ -19,6 +19,8 @@ describe("ProvenancePanel", () => {
   it("names the live source and closes on the data-policy note", () => {
     render(<ProvenancePanel pnr="2345678901" source="live" checkedAt="2026-09-17T06:30:00.000Z" latencyMs={240} />);
     expect(screen.getByText("Trakline · 240 ms")).toBeInTheDocument();
-    expect(screen.getByText("Only fields returned by the source are shown. Prediction fields are never displayed.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Only fields returned by the source are shown. A confirmation estimate is the reservation service’s own, labelled as theirs; this page calculates none."),
+    ).toBeInTheDocument();
   });
 });

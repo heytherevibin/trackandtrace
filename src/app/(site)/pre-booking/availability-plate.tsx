@@ -2,6 +2,7 @@ import { Corners } from "@/components/ui/corners";
 import { PLATE_TITLE_STACK, plateCellClass } from "@/components/ui/plate";
 import { stackedTable, STACKED_ROLES as R } from "@/components/ui/stacked-table";
 import { queueMovement } from "@/components/ui/queue-movement";
+import { serviceEstimate } from "@/components/ui/service-estimate";
 import { statusTone } from "@/components/ui/status-tone";
 import { messages } from "@/messages";
 import type { AvailabilityAnswer, AvailabilityDay } from "@/services/availability-source";
@@ -37,6 +38,18 @@ function format(iso: string): string {
   const weekday = at.toLocaleDateString("en-IN", { weekday: "short", timeZone: "UTC" });
   const month = at.toLocaleDateString("en-IN", { month: "short", timeZone: "UTC" });
   return `${weekday}, ${d} ${month} ${y}`;
+}
+
+/**
+ * The reservation service's estimate for a day, or a dash.
+ *
+ * A dash and not a zero: `No More Booking` carries a percentage of 0, and drawn as "0%" it reads as
+ * a forecast of no chance when it is the closed counter said a second time. `serviceEstimate` is
+ * what decides which of the service's four forms is an estimate at all.
+ */
+function estimateOf(day: { readonly prediction?: string | null; readonly predictionPercentage?: number | null }): string {
+  const pct = serviceEstimate({ prediction: day.prediction ?? null, predictionPercentage: day.predictionPercentage ?? null });
+  return pct === null ? m.noEstimate : m.estimate(pct);
 }
 
 /**
@@ -139,13 +152,16 @@ export function AvailabilityPlate({
                 {m.columns.availability}
               </th>
               <th role={R.columnheader} scope="col" className={HEAD}>
+                {m.columns.estimate}
+              </th>
+              <th role={R.columnheader} scope="col" className={HEAD}>
                 {m.columns.fare}
               </th>
             </tr>
           </thead>
           <tbody role={R.rowgroup} className={S.body}>
             {answer.days.map((day) => (
-              <tr key={day.date} role={R.row} className={cn(S.row, "max-sm:grid-cols-3")}>
+              <tr key={day.date} role={R.row} className={cn(S.row, "max-sm:grid-cols-2")}>
                 {/* Set in caps like every other label on the sheet. `uppercase` is CSS, so the
                     date a screen reader announces is still "Wed, 30 Sep 2026". */}
                 <td role={R.cell} className={cn(CELL, S.wide, "font-data whitespace-nowrap uppercase tracking-caps max-sm:font-semibold")}>
@@ -153,6 +169,9 @@ export function AvailabilityPlate({
                 </td>
                 <td role={R.cell} data-label={m.columns.availability} className={cn(CELL, S.wide)}>
                   <Day day={day} />
+                </td>
+                <td role={R.cell} data-label={m.columns.estimate} className={cn(CELL, "font-data whitespace-nowrap")}>
+                  {estimateOf(day)}
                 </td>
                 <td role={R.cell} data-label={m.columns.fare} className={cn(CELL, "font-data whitespace-nowrap")}>
                   {fare}

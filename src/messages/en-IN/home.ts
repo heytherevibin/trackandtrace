@@ -21,7 +21,7 @@ export const home = {
     label: "Operating principles",
     rows: [
       { num: "01", prop: "Fields shown beyond the source response", val: "0", rem: "If the source did not send a field, the record says “not returned” — never a guess." },
-      { num: "02", prop: "Confirmation odds invented", val: "0", rem: "Prediction fields exist in the type layer and are never rendered." },
+      { num: "02", prop: "Confirmation odds invented", val: "0", rem: "Estimates shown are the reservation service’s, never ours. Trakline calculates none." },
       { num: "03", prop: "Account required to check", val: "None", rem: "Sign in only for a watchlist that follows you between devices. It stays optional." },
       { num: "04", prop: "PNRs and names written to logs", val: "0", rem: "Recent checks stay on your device, and you can clear them any time." },
     ],
@@ -57,7 +57,7 @@ export const home = {
     facts: [
       { legend: "Live at check", title: "Asked the moment you press Run", detail: "Each check asks for the current record. A repeat within a minute is marked as the last minute's read." },
       { legend: "Time-stamped", title: "Every result shows when it was retrieved", detail: "The retrieval time sits beside the status, in IST, so an old answer never passes for a new one." },
-      { legend: "Never estimated", title: "A missing field reads “Not returned”", detail: "Nothing is predicted, filled in or rounded up. Confirmation odds are never shown." },
+      { legend: "Never estimated", title: "A missing field reads “Not returned”", detail: "Nothing is predicted, filled in or rounded up. Where the reservation service publishes its own estimate it is shown as theirs, labelled, beside what it estimates." },
     ],
     policy: "Read the data policy",
   },

@@ -81,7 +81,7 @@ export const result = {
   journey: { legend: "Journey" },
   provenance: {
     legend: "How this result was assembled",
-    note: "Only fields returned by the source are shown. Prediction fields are never displayed.",
+    note: "Only fields returned by the source are shown. A confirmation estimate is the reservation service’s own, labelled as theirs; this page calculates none.",
     steps: { input: "Input received", validate: "Request validated", source: "Source answered", result: "Result presented" },
     details: {
       input: (formatted: string) => `PNR ${formatted}`,
