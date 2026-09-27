@@ -12,17 +12,13 @@ html[data-journey="on"] .blueprint.is-plotting { border-color: transparent; }
 .intro-outline rect { fill: none; stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
 html[data-journey="on"] #hero-title span span { display: inline-block; }
 
-/* ---- The strip: the train runs, the odometer counts, and the current station reads (from 64rem, where the
-   rail keeps room for every stop). Phones: a hairline rail in the masthead's foot, with the train alone. */
-html[data-journey="on"] .strip-row { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: 16px; }
-html[data-journey="on"] :is(.strip-odo, .route-strip .strip-train) { display: block; }
-@media (min-width: 64rem) {
-  html[data-journey="on"] .strip-row { grid-template-columns: auto minmax(0, 1fr) auto; }
-  html[data-journey="on"] .strip-now { display: block; }
-}
-@media (max-width: 47.99rem) {
+/* ---- The route rail: the train runs down it and the odometer at its foot counts. Phones: a hairline rail in the
+   masthead's foot, with the train alone. */
+html[data-journey="on"] .route-strip :is(.strip-odo, .strip-train) { display: block; }
+/* A finger in a window too short for the column's eleven 44px stops (journey.css) gets this rail too. */
+@media (max-width: 47.99rem), (pointer: coarse) and (max-height: 36.62rem) {
   /* overflow: hidden keeps the train's centred glyph, half its width past 0% or 100%, from ever widening the
-     page: desktop's strip-track has the page-frame gutter for that same room, but the rail runs edge to edge. */
+     page: the rail's own train is held inside its track by strip.ts, but this rail runs edge to edge. */
   html[data-journey="on"] .phone-rail { display: block; position: absolute; left: 0; right: 0; bottom: -1px; height: 12px; overflow: hidden; pointer-events: none; }
   html[data-journey="on"] .phone-rail::before { content: ""; position: absolute; left: 0; right: 0; top: 5px; height: 1px; background: var(--line); }
   html[data-journey="on"] .phone-rail .strip-train { display: block; top: 1px; width: 22px; height: 9px; }

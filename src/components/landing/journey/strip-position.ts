@@ -26,13 +26,22 @@ export function stripFraction({ i, f }: StripPlace, count: number): number {
   return (i + f) / (count - 1);
 }
 
-/** The train's `left` percentage within one track, clamped so the glyph (centred by CSS `translateX(-50%)`)
+/** The phone rail's train, as its `left` percentage within one track, clamped so the glyph (centred by CSS `translateX(-50%)`)
  * never hangs past either edge at DEP or END — the phone rail runs edge to edge, with nothing past it to
  * absorb the overhang. `trackWidth <= 0` (not yet measured) skips the clamp rather than dividing by zero. */
 export function trainLeft(fraction: number, glyphWidth: number, trackWidth: number): number {
   if (trackWidth <= 0) return fraction * 100;
   const halfPercent = (glyphWidth / 2 / trackWidth) * 100;
   return Math.min(Math.max(fraction * 100, halfPercent), 100 - halfPercent);
+}
+
+/** The rail's train, as its glyph's top in px down one track: centred on the stop it has reached, where each
+ * stop's box stands (`trackHeight - stopHeight`) × fraction down (stations.ts `stopTop`), and clamped so the glyph
+ * never hangs past either end. `trackHeight <= 0` (not yet measured, or the rail not shown) stands it at the top. */
+export function trainTop(fraction: number, glyphHeight: number, trackHeight: number, stopHeight: number): number {
+  if (trackHeight <= 0) return 0;
+  const centre = stopHeight / 2 + (trackHeight - stopHeight) * fraction;
+  return Math.min(Math.max(centre - glyphHeight / 2, 0), Math.max(0, trackHeight - glyphHeight));
 }
 
 export function odometer({ i, f }: StripPlace, kms: readonly number[]): number {

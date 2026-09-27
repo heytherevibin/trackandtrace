@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { leanStep, odometer, stationTops, stripFraction, stripPlace, trainLeft } from "@/components/landing/journey/strip-position";
+import { leanStep, odometer, stationTops, stripFraction, stripPlace, trainLeft, trainTop } from "@/components/landing/journey/strip-position";
 
 describe("the strip's position", () => {
   it("starts at 0, sets each station a third of a window early, and always rises", () => {
@@ -42,5 +42,23 @@ describe("the strip's position", () => {
   it("skips the clamp when the track has not been measured yet (trackWidth <= 0)", () => {
     expect(trainLeft(0.3, 22, 0)).toBe(30);
     expect(trainLeft(0.3, 22, -5)).toBe(30);
+  });
+
+  it("stands the rail's train on the stop it has reached: its centre on the stop's centre, down the rail", () => {
+    // A 495px track, 45px stops: DEP's centre at 22.5, END's at 472.5, the fifth of ten gaps at 247.5.
+    expect(trainTop(0, 30, 495, 45)).toBe(7.5);
+    expect(trainTop(0.5, 30, 495, 45)).toBe(232.5);
+    expect(trainTop(1, 30, 495, 45)).toBe(457.5);
+  });
+
+  it("holds the rail's train inside its track at both ends, however short the stops", () => {
+    // 10px stops on a 200px track: DEP's centre at 5 would hang a 30px glyph 10px above the track.
+    expect(trainTop(0, 30, 200, 10)).toBe(0);
+    expect(trainTop(1, 30, 200, 10)).toBe(170);
+  });
+
+  it("stands the rail's train at the top when the track has not been measured yet (trackHeight <= 0)", () => {
+    expect(trainTop(0.4, 30, 0, 44)).toBe(0);
+    expect(trainTop(0.4, 30, -5, 44)).toBe(0);
   });
 });
