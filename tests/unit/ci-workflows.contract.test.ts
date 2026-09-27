@@ -69,9 +69,22 @@ describe("ci.yml", () => {
     expect(ci).toMatch(/^ {2}console:$/m);
     const gate = ci.slice(ci.search(/^ {2}e2e:$/m));
     expect(gate).toContain("needs: [e2e-shard, console]");
-    // a failed or timed-out shard still reaches the gate; a run superseded by a newer push does not report
-    expect(gate).toContain("if: ${{ !cancelled() }}");
     expect(gate).toContain("npx playwright merge-reports --reporter html ./all-blob-reports");
+  });
+
+  it("always reports the e2e check, and fails it unless every shard and the console suite succeeded", () => {
+    const gate = ci.slice(ci.search(/^ {2}e2e:$/m));
+    // A skipped required check counts as passing: the gate must run even when a job it needs was cancelled or skipped.
+    expect(gate).toMatch(/^ {4}if: \$\{\{ always\(\) \}\}$/m);
+    expect(gate).not.toMatch(/^ {4}if: \$\{\{ !cancelled\(\) \}\}$/m);
+    // …and it passes only on `success`: cancelled, skipped and failure all fail it.
+    expect(gate).toContain("SHARDS: ${{ needs.e2e-shard.result }}");
+    expect(gate).toContain("CONSOLE: ${{ needs.console.result }}");
+    expect(gate).toContain('run: test "$SHARDS" = success && test "$CONSOLE" = success');
+    // The report steps run after a real failure, never for a cancelled run.
+    const conditions = [...gate.matchAll(/^ {6}(?:- | {2})if: (.+)$/gm)].map((m) => m[1]);
+    expect(conditions).toHaveLength(6);
+    for (const condition of conditions) expect(condition).toBe("${{ failure() && !cancelled() }}");
   });
 
   it("runs the database tests and the console suite against a local Supabase stack, in their own job", () => {
@@ -81,7 +94,15 @@ describe("ci.yml", () => {
   });
 
   it("gives every job a time limit", () => {
-    expect((ci.match(/timeout-minutes:/g) ?? []).length).toBe((ci.match(/runs-on:/g) ?? []).length);
+    expect((ci.match(/^ {4}timeout-minutes:/gm) ?? []).length).toBe((ci.match(/^ {4}runs-on:/gm) ?? []).length);
+  });
+
+  it("stops a slow shard's tests inside its job's limit, so the step fails and its blob report is still kept", () => {
+    const shard = ci.slice(ci.search(/^ {2}e2e-shard:$/m), ci.search(/^ {2}console:$/m));
+    const job = Number(/^ {4}timeout-minutes: (\d+)$/m.exec(shard)?.[1]);
+    const step = /^ {6}- run: npx playwright test --shard=\$\{\{ matrix\.shard \}\}\/4\n {8}timeout-minutes: (\d+)$/m.exec(shard);
+    expect(step?.[1]).toBe("17");
+    expect(Number(step?.[1])).toBeLessThan(job);
   });
 
   it("holds the journey's chunk budgets on every pull request, after the production build", () => {
