@@ -1,5 +1,6 @@
 import { QUALITY_STORAGE_KEY, resolveDrawing, type MotionState, type SaverState } from "@/components/motion/motion-boot";
-import { modeOf, placeAfter, startingReasons, wantsScene, whyOf, withReason, type DrawingMode, type DrawingReason, type Reasons } from "./drawing-mode";
+import { modeOf, placeAfter, readerPlace, startingReasons, wantsScene, whyOf, withReason, type DrawingMode, type DrawingReason, type Reasons } from "./drawing-mode";
+import { keepPlace, mastheadBottom } from "./keep-place";
 import { DRAWING_EVENT, LAYOUT_EVENT, WEBGL_EVENT, emit, type DrawingDetail, type WebglDetail } from "./journey-events";
 import type { JourneyContext, JourneyModule, Teardown } from "./start-journey";
 import { webgl2 } from "./webgl-probe";
@@ -48,30 +49,13 @@ function storeFloor(): void {
   }
 }
 
-function mastheadBottom(): number {
-  return Math.round(document.querySelector("header")?.getBoundingClientRect().bottom ?? 0);
-}
-
-/** Runs a change to the chapter, then puts the reader where placeAfter says (J5-3). A chapter already gone from the
- * document (a client navigation away) just changes. */
-function keepPlace(section: HTMLElement | null, change: () => void): void {
-  if (!section?.isConnected) {
-    change();
-    return;
-  }
-  const before = section.getBoundingClientRect();
-  const scrollY = window.scrollY;
-  change();
-  const to = placeAfter(before, section.getBoundingClientRect(), { scrollY, viewport: window.innerHeight, masthead: mastheadBottom() });
-  if (to !== null) window.scrollTo({ top: to, behavior: "instant" });
-}
-
 export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2): JourneyModule {
   return (ctx: JourneyContext): Teardown => {
     const { motion } = ctx;
     const html = document.documentElement;
     const section = document.getElementById("anatomy");
-    const below = () => (section?.getBoundingClientRect().top ?? 0) < 0;
+    // below the chapter by the same rule that moves the reader (readerPlace; the old 0 against placeAfter's −8 was J5's minor)
+    const below = () => section !== null && readerPlace(section.getBoundingClientRect(), window.innerHeight) !== "above";
     let reasons: Reasons = startingReasons({ motion, saver: html.dataset.saver === "on", quality: storedQuality(), place: below() });
     // Probed only when nothing else keeps the drawing still, so a page without WebGL never fetches the scene.
     if (wantsScene(reasons) && !probe()) reasons = withReason(reasons, "webgl", true);

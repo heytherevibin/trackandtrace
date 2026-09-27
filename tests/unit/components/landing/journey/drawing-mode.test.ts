@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { modeOf, placeAfter, startingReasons, wantsScene, whyOf, withReason, type Reasons } from "@/components/landing/journey/drawing-mode";
+import { modeOf, pastShift, placeAfter, readerPlace, startingReasons, wantsScene, whyOf, withReason, type Reasons } from "@/components/landing/journey/drawing-mode";
 
 const none: Reasons = new Set();
 
@@ -48,5 +48,25 @@ describe("the drawing's mode (spec §3.C)", () => {
     expect(placeAfter({ top: -5000, bottom: -840, height: 4160 }, { top: -5000, height: 900 }, at)).toBe(5000 - 3260);
     // no change, no move
     expect(placeAfter({ top: -2000, bottom: 2160, height: 4160 }, { top: -2000, height: 4160.5 }, at)).toBeNull();
+  });
+
+  it("judges the reader against a piece of the page by one rule (J5-3, shared by J6-4)", () => {
+    // its top visible, or within 8px above: above it, and a change lands below them
+    expect(readerPlace({ top: 0, bottom: 4000 }, 900)).toBe("above");
+    expect(readerPlace({ top: -8, bottom: 4000 }, 900)).toBe("above");
+    // over half the window still in it: inside
+    expect(readerPlace({ top: -9, bottom: 4000 }, 900)).toBe("inside");
+    expect(readerPlace({ top: -3000, bottom: 451 }, 900)).toBe("inside");
+    // its foot within the window's top half: past it, reading what follows
+    expect(readerPlace({ top: -3000, bottom: 450 }, 900)).toBe("past");
+    expect(readerPlace({ top: -3000, bottom: 120 }, 900)).toBe("past");
+    expect(readerPlace({ top: -3000, bottom: -500 }, 900)).toBe("past");
+  });
+
+  it("moves a reader past a piece by exactly its change, and nobody else", () => {
+    expect(pastShift({ top: -900, bottom: 16 }, -77, 900)).toBe(-77); // #principles at 80 px, the pin's foot at 16 px
+    expect(pastShift({ top: -900, bottom: 16 }, 0.5, 900)).toBe(0); // no change worth a move
+    expect(pastShift({ top: -900, bottom: 600 }, -77, 900)).toBe(0); // inside: the piece's own business
+    expect(pastShift({ top: 40, bottom: 900 }, -77, 900)).toBe(0); // above: the change lands below
   });
 });

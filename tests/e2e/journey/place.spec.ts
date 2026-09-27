@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "../fixtures";
 import { REBUILD_EVENT } from "@/components/landing/journey/journey-events";
-import { frames, scrollToId, waitForJourney, waitForLive } from "./journey-helpers";
+import { drawStill, frames, noAnchoring, scrollToId, waitForJourney, waitForLive } from "./journey-helpers";
 
 // The places the journey keeps (J5-17, J5-19): a change of height above 02 (the live drawing pinning, J5) must never
 // throw a reader inside 02 when Motion then goes off; and Back, Forward, Back finds the reader's place each time.
@@ -16,19 +16,8 @@ interface Sample {
   readonly columns: boolean;
 }
 
-/** From before the page's first script: scroll anchoring off, as a browser without it would be, moving the reader with
- * any change of height above them that nothing compensates. */
-async function noAnchoring(page: Page): Promise<void> {
-  await page.addInitScript(() => {
-    const sheet = new CSSStyleSheet();
-    sheet.replaceSync("html { overflow-anchor: none; }");
-    document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
-  });
-}
-
-/** Scroll anchoring off (above), and #id's top every frame from before the page's first script. */
+/** #id's top every frame from before the page's first script. */
 async function watchTop(page: Page, id: string): Promise<void> {
-  await noAnchoring(page);
   await page.addInitScript((target) => {
     const samples: Sample[] = [];
     Reflect.set(window, "__ttTops", samples);
@@ -95,37 +84,35 @@ test.describe("the reader's place", () => {
   });
 
   // The journey marks the page as its own (data-journey="on") before drawing.ts, eleventh of the modules it starts a
-  // turn at a time, has decided which drawing it shows; nothing in between may hide the still and collapse the chapter
-  // under a reader who arrived below it (an in-page link, a reload, Back). #principles is judged up to that decision:
-  // still.ts's first columns settle, next, moves a reader whose window still overlaps the chapter's foot (77 px here),
-  // as it did before J5. #record, further down, is judged through the whole start and settle.
-  for (const { id, through } of [
-    { id: "principles", through: "drawing.ts's decision" },
-    { id: "record", through: "the still's settle" },
-  ] as const) {
-    test(`a reader who arrives at #${id}, below the drawn train, stays put through ${through}`, async ({ page }) => {
-      await page.setViewportSize({ width: 1440, height: 900 });
-      await watchTop(page, id);
-      await page.goto(`/#${id}`);
-      await waitForJourney(page);
-      await expect(page.locator("html")).toHaveAttribute("data-drawing-why", "place");
-      await frames(page, 4); // anything the settle set going has had its turn
-      const samples = await page.evaluate(() => (Reflect.get(window, "__ttTops") ?? []) as Sample[]);
-      const landed = samples.findIndex((s) => s.y > 0); // the browser's jump to the fragment
-      expect(landed, "the page never scrolled to the fragment").toBeGreaterThanOrEqual(0);
-      const settled = samples.findIndex((s) => s.columns);
-      const judged = samples.slice(landed, id === "principles" && settled >= 0 ? settled : samples.length);
-      expect(judged.some((s) => s.decided), "the samples stop before drawing.ts decided").toBe(true);
-      const at = judged[0]!.top;
-      const moved = judged.map((s) => s.top).filter((top) => Math.abs(top - at) > 4);
-      expect(moved, `#${id} landed at ${at} px`).toEqual([]);
-    });
+  // turn at a time, has decided which drawing it shows, and still.ts then settles the still's columns. None of it may
+  // move a reader who arrived below the chapter (an in-page link, a reload, Back), scroll anchoring or not: the still's
+  // first settle judges them past the pin by readerPlace (J6-4), where it once moved #principles by 77 px.
+  for (const anchoring of ["on", "off"] as const) {
+    for (const id of ["principles", "record"] as const) {
+      test(`a reader who arrives at #${id}, below the drawn train, stays put through the journey's start and the still's settle (scroll anchoring ${anchoring})`, async ({ page }) => {
+        await page.setViewportSize({ width: 1440, height: 900 });
+        if (anchoring === "off") await noAnchoring(page);
+        await watchTop(page, id);
+        await page.goto(`/#${id}`);
+        await waitForJourney(page);
+        await expect(page.locator("html")).toHaveAttribute("data-drawing-why", "place");
+        await frames(page, 4); // anything the settle set going has had its turn
+        const samples = await page.evaluate(() => (Reflect.get(window, "__ttTops") ?? []) as Sample[]);
+        const landed = samples.findIndex((s) => s.y > 0); // the browser's jump to the fragment
+        expect(landed, "the page never scrolled to the fragment").toBeGreaterThanOrEqual(0);
+        const judged = samples.slice(landed);
+        expect(judged.some((s) => s.decided), "the samples stop before drawing.ts decided").toBe(true);
+        expect(judged.some((s) => s.columns), "the samples stop before the still settled its columns").toBe(true);
+        const at = judged[0]!.top;
+        const moved = judged.map((s) => s.top).filter((top) => Math.abs(top - at) > 4);
+        expect(moved, `#${id} landed at ${at} px`).toEqual([]);
+      });
+    }
   }
 
   // A rebuild tears the live drawing down and builds the drawing again: to a reader below the chapter, the unpin and
-  // the still's return are one change, kept in place together (J5-3), whether the browser anchors scroll or not. For the
-  // fit rebuild the reader has the chapter's foot out of the window: with it still in view, still.ts's first columns
-  // settle after a live drawing moves the reader 77 px, as it did before this rule (see the load case above).
+  // the still's return are one change, kept in place together (J5-3), whether the browser anchors scroll or not; the
+  // still's first columns settle then keeps them too (J6-4).
   const principlesTop = (page: Page) => page.locator("#principles").evaluate((el) => el.getBoundingClientRect().top);
   const rebuilds = [
     {
@@ -139,7 +126,7 @@ test.describe("the reader's place", () => {
     },
     {
       change: "a fit change rebuilds the journey",
-      offset: 0,
+      offset: 120,
       act: (page: Page) => page.evaluate((type) => window.dispatchEvent(new Event(type)), REBUILD_EVENT),
     },
   ] as const;
@@ -159,6 +146,40 @@ test.describe("the reader's place", () => {
         await frames(page, 6); // the new build's first layout pass and the still's settle
         const after = await principlesTop(page);
         expect(Math.abs(after - before), `#principles ${before} -> ${after}`).toBeLessThanOrEqual(4);
+      });
+    }
+  }
+
+  // 02's last lines (J6-4): a reader whose window still shows 02's foot, #record's heading below it, is past 02 by
+  // readerPlace, and stays on #record through a change of 02's height, where the window's top edge alone sent them back
+  // 2,300–3,000 px to 02's start (J5 final re-review 2).
+  const recordTop = (page: Page) => page.locator("#record").evaluate((el) => el.getBoundingClientRect().top);
+  const changes = [
+    {
+      change: "Motion goes off",
+      act: async (page: Page) => {
+        await page.getByRole("contentinfo").getByRole("switch", { name: "Motion" }).evaluate((el) => (el as HTMLElement).click());
+        await expect(page.locator("#how")).not.toHaveClass(/is-pinned/);
+      },
+    },
+    { change: "the window gets shorter", act: (page: Page) => page.setViewportSize({ width: 1440, height: 700 }) },
+  ] as const;
+  for (const anchoring of ["on", "off"] as const) {
+    for (const { change, act } of changes) {
+      test(`a reader in 02's last lines stays on #record when ${change} (scroll anchoring ${anchoring})`, async ({ page }) => {
+        await page.setViewportSize({ width: 1440, height: 900 });
+        await drawStill(page);
+        if (anchoring === "off") await noAnchoring(page);
+        await page.goto("/");
+        await waitForJourney(page);
+        await expect(page.locator("#how")).toHaveClass(/is-pinned/);
+        await scrollToId(page, "record", 120); // 02's foot 120px down the window
+        await frames(page, 3); // the guard has learned the reader's place
+        const before = await recordTop(page);
+        await act(page);
+        await frames(page, 6); // the collapse, its padding a frame later, the guard's and the still's settles
+        const after = await recordTop(page);
+        expect(Math.abs(after - before), `#record ${before} -> ${after}`).toBeLessThanOrEqual(4);
       });
     }
   }

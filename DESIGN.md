@@ -149,6 +149,10 @@ these rules.
   `<h1>` before and after; the split exists only while the letters move.
 - **Scroll-driven pieces follow the scroll both ways:** the strip, the board's status, the chapters, the berths
   and the route. Pinned pieces pin only while their content fits the window.
+- **Nothing moves under the reader.** A piece that grows or shrinks (the drawing's pin, 02's dial, the still's
+  columns, the run) judges the reader by one rule (`readerPlace`). Above it, its top in view, the change lands below
+  them. Inside it, with over half the window in it, they go to its start. Past it, its foot within the window's top
+  half, they move by exactly the change, so what follows it stays where they were reading.
 - **Motion off means still.** True readings keep updating (the strip's place, the board's status, the dial's
   segments and chart face), with no movement.
 - **The registration-mark cursor**, page-wide on fine pointers with Motion on: a hairline steel cross follows

@@ -62,8 +62,29 @@ function navigationTarget(): EventTarget | null {
   return nav instanceof EventTarget ? nav : null;
 }
 
-/** The reader's own hand: any of these before the restore means they have moved on, and nothing is restored under them. */
-const HAND = ["wheel", "touchstart", "keydown"] as const;
+/** The events that can carry the reader's own scroll; ownScroll says which of them do. */
+const HAND = ["wheel", "touchmove", "keydown"] as const;
+/** The keys that scroll the page: the arrows up and down, Page Up and Page Down, Home, End and Space (Shift+Space up). */
+const SCROLL_KEYS: ReadonlySet<string> = new Set(["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "]);
+/** Where a key types or picks rather than scrolls. */
+const TEXT_FIELD = "input, textarea, select, [contenteditable]:not([contenteditable='false'])";
+
+/**
+ * The reader's own scroll (J5-17, amended by the owner on 2026-09-28; J6-9): before the restore, it means they have
+ * moved on, and nothing is restored under them. Only a scroll counts:
+ * - a wheel that is mostly vertical and not a pinch-zoom (ctrl+wheel). A sideways wheel is a trackpad's swipe back, or
+ *   its momentum as the page returns;
+ * - a finger dragging (touchmove). A tap (touchstart alone) is not a scroll;
+ * - a scroll key, with focus outside a text field and no Alt, Ctrl or Meta: Alt+← and Cmd+[ are Back and Forward.
+ * A swipe back, a tap and every other key leave the restore pending.
+ */
+function ownScroll(event: Event): boolean {
+  if (event.type === "touchmove") return true;
+  if (event instanceof WheelEvent) return !event.ctrlKey && Math.abs(event.deltaY) > Math.abs(event.deltaX);
+  if (!(event instanceof KeyboardEvent) || !SCROLL_KEYS.has(event.key)) return false;
+  if (event.altKey || event.ctrlKey || event.metaKey) return false;
+  return !(event.target instanceof Element && event.target.closest(TEXT_FIELD));
+}
 
 function mastheadFoot(): number {
   return document.querySelector("header")?.getBoundingClientRect().bottom ?? 0;
@@ -152,7 +173,8 @@ export function startPlaceMemory(): PlaceMemory {
   const stopHand = () => {
     for (const type of HAND) window.removeEventListener(type, onHand, true);
   };
-  const onHand = () => {
+  const onHand = (event: Event) => {
+    if (!ownScroll(event)) return;
     pending = null;
     stopHand();
   };

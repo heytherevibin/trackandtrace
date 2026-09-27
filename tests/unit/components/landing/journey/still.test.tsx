@@ -12,8 +12,10 @@ beforeEach(() => {
   html.dataset.drawing = "still";
 });
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  Reflect.deleteProperty(document, "fonts");
   delete html.dataset.drawing;
   document.body.replaceChildren();
 });
@@ -59,7 +61,43 @@ describe("the still's labels when the drawing goes live (J5-5)", () => {
     emit(LAYOUT_EVENT);
     vi.advanceTimersToNextFrame();
     expect(label.classList.contains("is-hot")).toBe(true);
-    vi.useRealTimers();
+    stop();
+  });
+});
+
+describe("the still's columns keep a reader past them in place (J5, J6-4)", () => {
+  // The pin's columns take their height from the window, so a resize changes it before still.ts gets a turn: the
+  // change to answer is the one on record, unless someone already answered it by moving the reader (02's guard, whose
+  // move covers everything above #how's foot; scroll anchoring; a clamp). Answering it again moved them twice.
+  const resized = (ctx: ReturnType<typeof testContext>) => {
+    vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
+    ctx.still.set({ columns: true, height: 840 }); // the columns at 900px tall, as the reader last saw them
+    const pin = document.querySelector<HTMLElement>(".anatomy-pin")!;
+    pin.getBoundingClientRect = () => ({ top: -3341, bottom: -2701, height: 640, width: 1440, left: 0, right: 1440 }) as DOMRect; // at 700px
+  };
+
+  it("moves a reader past them by a resize's change that nobody has answered", () => {
+    const ctx = testContext();
+    resized(ctx);
+    vi.spyOn(window, "scrollY", "get").mockReturnValue(5355);
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+    const stop = startStill(ctx);
+    vi.advanceTimersToNextFrame();
+    expect(scrollTo).toHaveBeenCalledWith({ top: 5355 - 200, behavior: "instant" });
+    stop();
+  });
+
+  it("never answers a resize again once the reader was moved for it (02's guard, anchoring)", () => {
+    const ctx = testContext();
+    resized(ctx);
+    let y = 5355;
+    vi.spyOn(window, "scrollY", "get").mockImplementation(() => y);
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+    const stop = startStill(ctx);
+    y = 4499; // 02's guard moved them by #how's foot, the pin's change included
+    window.dispatchEvent(new Event("scroll"));
+    vi.advanceTimersToNextFrame();
+    expect(scrollTo).not.toHaveBeenCalled();
     stop();
   });
 });

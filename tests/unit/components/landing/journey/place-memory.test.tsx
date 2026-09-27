@@ -197,6 +197,79 @@ describe("startPlaceMemory", () => {
     memory.stop();
   });
 
+  // Only the reader's own scroll cancels the restore (J6-9; the owner, 2026-09-28, amending J5-17's "any key"): a
+  // mostly vertical wheel that is not a pinch-zoom, a finger dragging, and a scroll key outside a text field with no
+  // Alt, Ctrl or Meta. A swipe back, Back and Forward's own keys, a tap and every other key leave it pending.
+  type Act = [name: string, act: () => void];
+  const wheel =
+    (init: WheelEventInit) =>
+    (): void => {
+      window.dispatchEvent(new WheelEvent("wheel", init));
+    };
+  const key =
+    (k: string, init: KeyboardEventInit = {}) =>
+    (): void => {
+      document.body.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, ...init }));
+    };
+  const inField =
+    (tag: "input" | "textarea" | "div", k: string) =>
+    (): void => {
+      const field = document.createElement(tag);
+      if (tag === "div") field.setAttribute("contenteditable", "");
+      document.body.append(field);
+      field.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true }));
+    };
+  const cancels: Act[] = [
+    ["a mostly vertical wheel", wheel({ deltaX: 12, deltaY: 40 })],
+    ["a finger dragging (touchmove)", () => window.dispatchEvent(new Event("touchmove"))],
+    ["ArrowUp", key("ArrowUp")],
+    ["ArrowDown", key("ArrowDown")],
+    ["PageUp", key("PageUp")],
+    ["PageDown", key("PageDown")],
+    ["Home", key("Home")],
+    ["End", key("End")],
+    ["Space", key(" ")],
+    ["Shift+Space", key(" ", { shiftKey: true })],
+  ];
+  const keeps: Act[] = [
+    ["a trackpad's swipe back (a sideways wheel)", wheel({ deltaX: -60 })],
+    ["a wheel as much sideways as down", wheel({ deltaX: 30, deltaY: 30 })],
+    ["a pinch-zoom (ctrl+wheel)", wheel({ deltaY: 40, ctrlKey: true })],
+    ["a tap (touchstart alone)", () => window.dispatchEvent(new Event("touchstart"))],
+    ["the a key", key("a")],
+    ["Tab", key("Tab")],
+    ["Shift", key("Shift")],
+    ["Escape", key("Escape")],
+    ["ArrowLeft", key("ArrowLeft")],
+    ["ArrowRight", key("ArrowRight")],
+    ["Alt+ArrowLeft (Back)", key("ArrowLeft", { altKey: true })],
+    ["Meta+[ (Back)", key("[", { metaKey: true })],
+    ["Alt+ArrowDown", key("ArrowDown", { altKey: true })],
+    ["Ctrl+End", key("End", { ctrlKey: true })],
+    ["Meta+ArrowUp", key("ArrowUp", { metaKey: true })],
+    ["ArrowDown in a text input", inField("input", "ArrowDown")],
+    ["Space in a textarea", inField("textarea", " ")],
+    ["End in an editable region", inField("div", "End")],
+  ];
+
+  it.each(cancels)("restores nothing once the reader scrolls by their own hand: %s", (_, act) => {
+    store({ entry: "k1", id: "record", offset: 136 });
+    const memory = startPlaceMemory();
+    act();
+    memory.restore();
+    expect(scrolls).toEqual([]);
+    memory.stop();
+  });
+
+  it.each(keeps)("still restores after what is not the reader's own scroll: %s", (_, act) => {
+    store({ entry: "k1", id: "record", offset: 136 });
+    const memory = startPlaceMemory();
+    act();
+    memory.restore();
+    expect(scrolls).toEqual([3000 - 64 - 136]);
+    memory.stop();
+  });
+
   it("stops listening when stopped", () => {
     const removeWindow = vi.spyOn(window, "removeEventListener");
     const removeNav = vi.spyOn(nav, "removeEventListener");

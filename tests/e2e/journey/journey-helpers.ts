@@ -60,6 +60,16 @@ export async function scrollIntoChapter(page: Page, p: number): Promise<void> {
 /** Aborts the scene chunk (three.js and the live drawing). */
 export const blockSceneChunk = (page: Page): Promise<void> => blockChunk(page, SCENE_CHUNK_MARK);
 
+/** From before the page's first script: scroll anchoring off, as a browser without it would be (Safari, every iOS
+ * browser), moving the reader with any change of height above them that nothing compensates. */
+export async function noAnchoring(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const sheet = new CSSStyleSheet();
+    sheet.replaceSync("html { overflow-anchor: none; }");
+    document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+  });
+}
+
 /** Scrolls instantly so a section's top sits `offset` px below the window's top. */
 export async function scrollToId(page: Page, id: string, offset = 0): Promise<void> {
   await page.evaluate(

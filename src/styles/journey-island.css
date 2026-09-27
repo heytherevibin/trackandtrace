@@ -141,6 +141,9 @@ html[data-journey="on"] :is(.is-columns, [data-live="columns"]) .tb-cell b { col
 html[data-journey="on"][data-drawing="live"][data-drawing-why] #anatomy:not(.is-live) .anatomy-still { display: none; }
 html[data-journey="on"] #journey-canvas:not([hidden]) { display: block; position: fixed; inset: 0 0 auto 0; width: 100%; height: 100lvh; z-index: 1; pointer-events: none; }
 html[data-journey="on"] #anatomy.is-live { height: 520vh; padding-top: 0; padding-bottom: 0; }
+/* The pin and the unpin land whole in the task that makes them, so keepPlace (J5-3) measures all of the change: under
+   Motion off's 0.01ms transitions (motion.css) the paddings would land a frame later, under a reader nobody moves. */
+html[data-journey="on"] :is(#anatomy, #anatomy .anatomy-copy) { transition-property: none; }
 html[data-journey="on"] #anatomy.is-live .anatomy-pin { position: sticky; z-index: 2; top: var(--header-height); height: calc(100svh - var(--header-height)); min-height: 520px; }
 html[data-journey="on"] #anatomy.is-live .anatomy-stage { display: block; position: absolute; inset: 0; }
 html[data-journey="on"] #anatomy.is-live .anatomy-still { display: none; }
