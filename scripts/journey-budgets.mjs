@@ -96,7 +96,7 @@ export function measure(chunks, { requireLoader = false } = {}) {
 }
 
 /** @param {string} dir @returns {Chunk[]} */
-function chunksIn(dir) {
+export function chunksIn(dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const path = join(dir, entry.name);
     if (entry.isDirectory()) return chunksIn(path);
