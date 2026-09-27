@@ -8,6 +8,14 @@ export function mastheadBottom(): number {
   return Math.round(document.querySelector("header")?.getBoundingClientRect().bottom ?? 0);
 }
 
+/** An instant scroll to `top`, unless the reader already stands within a pixel of it. Any instant scroll, even to where
+ * they are, cancels a smooth one in flight: the glide that brings a Tab stop into the window stopped short, focus
+ * off-screen (WCAG 2.4.11), when the drawing above fell to the still and scroll anchoring had already answered it. */
+export function jumpTo(top: number): void {
+  if (Math.abs(top - window.scrollY) < 1) return;
+  window.scrollTo({ top, behavior: "instant" });
+}
+
 /** Runs a change to the piece, then puts the reader where placeAfter says. A piece already gone from the document (a
  * client navigation away) just changes. */
 export function keepPlace(section: HTMLElement | null, change: () => void): void {
@@ -23,5 +31,5 @@ export function keepPlace(section: HTMLElement | null, change: () => void): void
   // scroll, and put back against the one before, so a reader inside it still lands on its start.
   const drift = window.scrollY - scrollY;
   const to = placeAfter(before, { top: after.top + drift, height: after.height }, { scrollY, viewport: window.innerHeight, masthead: mastheadBottom() });
-  if (to !== null) window.scrollTo({ top: to, behavior: "instant" });
+  if (to !== null) jumpTo(to);
 }

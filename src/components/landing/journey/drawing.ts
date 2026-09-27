@@ -1,6 +1,6 @@
 import { QUALITY_STORAGE_KEY, resolveDrawing, type MotionState, type SaverState } from "@/components/motion/motion-boot";
 import { modeOf, placeAfter, readerPlace, startingReasons, wantsScene, whyOf, withReason, type DrawingMode, type DrawingReason, type Reasons } from "./drawing-mode";
-import { keepPlace, mastheadBottom } from "./keep-place";
+import { jumpTo, keepPlace, mastheadBottom } from "./keep-place";
 import { DRAWING_EVENT, LAYOUT_EVENT, WEBGL_EVENT, emit, type DrawingDetail, type WebglDetail } from "./journey-events";
 import { createLiveLabels } from "./live-labels";
 import type { JourneyContext, JourneyModule, Teardown } from "./start-journey";
@@ -250,7 +250,7 @@ export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2,
       const before = { top: was.top - was.y, bottom: was.bottom - was.y, height: was.bottom - was.top };
       const after = { top: r.top + window.scrollY - was.y, height: r.height };
       const to = placeAfter(before, after, { scrollY: was.y, viewport: was.vh, masthead: mastheadBottom() });
-      if (to !== null) window.scrollTo({ top: to, behavior: "instant" });
+      if (to !== null) jumpTo(to);
       learn();
     };
     window.addEventListener("scroll", learn, { passive: true });

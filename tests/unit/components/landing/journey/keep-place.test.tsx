@@ -53,4 +53,17 @@ describe("keepPlace", () => {
     });
     expect(scrollTo).toHaveBeenCalledWith({ top: 8200 - 2540, behavior: "instant" });
   });
+
+  // Any instant scroll, even to where the reader already stands, cancels a smooth one in flight: the glide that brings
+  // a Tab stop into the window (WCAG 2.4.11) stopped short, focus off-screen, when a drawing above fell to the still.
+  it("issues no scroll when the reader already stands within a pixel of their place: scroll anchoring moved them", () => {
+    const { piece, doc, scroll } = page();
+    scroll.y = 8200;
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+    keepPlace(piece, () => {
+      doc.height = 860;
+      scroll.y = 8200 - 2540 + 0.5; // the browser's anchoring answered the change as it laid out
+    });
+    expect(scrollTo).not.toHaveBeenCalled();
+  });
 });

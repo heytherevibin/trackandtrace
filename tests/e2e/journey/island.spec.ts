@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "../fixtures";
 import { PNR } from "../helpers";
-import { blockJourneyChunk, waitForJourney } from "./journey-helpers";
+import { blockJourneyChunk, frames, noAnchoring, scrollToId, waitForJourney, waitForLive } from "./journey-helpers";
 
 /** Frames the wait below gives a focus that never comes wholly into the window before checking it as it stands
  * (it then counts as hidden: the check samples the window's edge). The longest glide in the run, Tab wrapping from
@@ -172,3 +172,34 @@ test("the check still catches a real cover: an in-flow link scrolled in under th
   });
   expect(await page.evaluate(coveredFocusLabel)).not.toBeNull();
 });
+
+// The browser's own glide to a Tab stop, cut short (Task 6 review): the drawing above falls to the still mid-glide, and
+// the instant scrolls that keep the reader's place (keepPlace, the still's settle) cancel the smooth one, stranding focus
+// off-screen at rest. The glide must be taken up again. The drawing is live here: its fall to the still is the trigger.
+for (const anchoring of ["on", "off"] as const) {
+  test(`a Tab stop's glide reaches the window though the drawing above falls to the still mid-glide (scroll anchoring ${anchoring})`, async ({ page, isMobile }) => {
+    test.skip(isMobile, "keyboard");
+    await page.setViewportSize({ width: 1440, height: 900 });
+    if (anchoring === "off") await noAnchoring(page);
+    await page.goto("/");
+    await waitForLive(page);
+    await scrollToId(page, "record", 100); // past the drawn train; 04's link below the window
+    await frames(page, 3);
+    await page.evaluate(() => {
+      const link = [...document.querySelectorAll<HTMLAnchorElement>("#reliability a")].find((a) => a.textContent?.includes("Read the data policy"));
+      if (!link) throw new Error("no data policy link");
+      link.focus(); // the browser glides it into the window
+      requestAnimationFrame(() => requestAnimationFrame(() => window.dispatchEvent(new CustomEvent("tt:webgl", { detail: "lost" }))));
+    });
+    await expect(page.locator("html")).toHaveAttribute("data-drawing", "still");
+    await waitForFocusSettled(page);
+    await frames(page, 10); // at rest
+    const seen = await page.evaluate(() => {
+      const r = document.activeElement?.getBoundingClientRect();
+      const foot = document.querySelector("header")?.getBoundingClientRect().bottom ?? 0;
+      return r !== undefined && r.top >= foot && r.bottom <= window.innerHeight;
+    });
+    expect(seen, "the focused link is wholly in the window, below the masthead").toBe(true);
+    expect(await page.evaluate(coveredFocusLabel)).toBeNull();
+  });
+}

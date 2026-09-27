@@ -1,5 +1,6 @@
 import { pastShift } from "./drawing-mode";
 import { DRAWING_EVENT, LAYOUT_EVENT, emit, type DrawingDetail } from "./journey-events";
+import { jumpTo } from "./keep-place";
 import { columnsFit, columnsZone, distribute, leaderFrom, letterbox } from "./labels-layout";
 import type { JourneyContext, Teardown } from "./start-journey";
 import { STILL_MANIFEST } from "./still-manifest";
@@ -185,7 +186,7 @@ export function startStill({ still }: JourneyContext): Teardown {
       // Past the pin by the rule every piece uses (J6-4): its foot within the window's top half. The window's top edge
       // alone missed a reader at #principles, the pin's foot a few px under the masthead, and moved them 77 px.
       const shift = pastShift({ top: beforeRect.top, bottom: beforeRect.top + from }, afterHeight - from, window.innerHeight);
-      if (shift !== 0) window.scrollTo({ top: beforeScrollY + shift, behavior: "instant" });
+      if (shift !== 0) jumpTo(beforeScrollY + shift);
     }
     still.set({ columns: isColumns, height: afterHeight });
     seenY = window.scrollY;

@@ -118,4 +118,25 @@ describe("the still's columns keep a reader past them in place (J5, J6-4)", () =
     expect(scrollTo).toHaveBeenCalledWith({ top: 5400 - 200, behavior: "instant" });
     stop();
   });
+
+  it("issues no scroll when the reader already stands where the change puts them: an instant scroll cancels a Tab stop's glide", () => {
+    const ctx = testContext();
+    resized(ctx);
+    let y = 5355;
+    vi.spyOn(window, "scrollY", "get").mockImplementation(() => y);
+    const pin = document.querySelector<HTMLElement>(".anatomy-pin")!;
+    const rect = pin.getBoundingClientRect();
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+    const stop = startStill(ctx);
+    // scroll anchoring answers the change as the pass lays it out, before the pass reads the pin's new height
+    let reads = 0;
+    pin.getBoundingClientRect = () => {
+      reads += 1;
+      if (reads === 2) y = 5355 - 200;
+      return rect;
+    };
+    vi.advanceTimersToNextFrame();
+    expect(scrollTo).not.toHaveBeenCalled();
+    stop();
+  });
 });

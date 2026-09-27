@@ -117,4 +117,24 @@ describe("a resize under the pinned chapter is judged by the window the reader s
     expect(scrollTo).toHaveBeenCalledWith({ top: -1780 + window.scrollY, behavior: "instant" });
     stop();
   });
+
+  it("issues no scroll for a reader past it whom scroll anchoring already moved: an instant scroll cancels a Tab stop's glide", async () => {
+    vi.spyOn(window, "innerHeight", "get").mockImplementation(() => 400);
+    const scroll = { y: 0 };
+    vi.spyOn(window, "scrollY", "get").mockImplementation(() => scroll.y);
+    document.body.innerHTML = `<header></header><section id="anatomy"></section>`;
+    const section = document.getElementById("anatomy")!;
+    const doc = { top: 200, height: 2080 };
+    section.getBoundingClientRect = () => ({ top: doc.top - scroll.y, bottom: doc.top - scroll.y + doc.height, height: doc.height }) as DOMRect;
+    const stop = drawingModule(() => Promise.resolve(() => () => undefined), () => true, () => true)(testContext());
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+    scroll.y = 2100; // its foot 180px down the window: past it
+    window.dispatchEvent(new Event("scroll"));
+    doc.height = 1800; // a resize shrinks it by 280px, and the browser's anchoring moves the reader with it
+    scroll.y = 2100 - 280;
+    window.dispatchEvent(new Event("resize"));
+    expect(scrollTo).not.toHaveBeenCalled();
+    stop();
+  });
 });

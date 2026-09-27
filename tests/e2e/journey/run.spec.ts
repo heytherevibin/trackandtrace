@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "../fixtures";
 import { LANDING_INSTRUMENTS, collisionsInView } from "./collisions";
-import { drawStill, frames, motionOff, noAnchoring, scrollIntoRun, scrollToId, waitForJourney } from "./journey-helpers";
+import { drawStill, frames, motionOff, noAnchoring, scrollIntoRun, scrollToId, waitForJourney, waitForLive } from "./journey-helpers";
 
 // 06–07, the window-seat run (spec §3.A, §3.G; J6-7, J6-8). The drawing above is held to the still (drawStill): these
 // specs are about the run, and the live drawing would only make the software GPU slower.
@@ -202,6 +202,61 @@ test.describe("the window-seat run (spec §3.A)", () => {
       await frames(page, 6); // the unpin, 02's collapse and the still's settle
       const [top, foot] = await page.evaluate(() => [document.getElementById("features")?.getBoundingClientRect().top ?? 0, document.querySelector("header")?.getBoundingClientRect().bottom ?? 0]);
       expect(Math.abs(top! - foot!)).toBeLessThanOrEqual(4);
+    });
+  }
+});
+
+// A Tab stop's glide to the window, cut short (Task 6 review): the drawing above fell to the still mid-glide, and the
+// instant scroll its keepPlace made (a no-op under scroll anchoring, a real move without it) cancelled the smooth one,
+// stranding focus off-screen at rest (WCAG 2.4.11). The drawing is live here: its fall to the still is the trigger.
+test.describe("a Tab stop's glide into the run (spec §3.G; WCAG 2.4.11)", () => {
+  for (const anchoring of ["on", "off"] as const) {
+    test(`reaches the window though the drawing above falls to the still mid-glide (scroll anchoring ${anchoring})`, async ({ page, isMobile }) => {
+      test.skip(isMobile, "the keyboard: one project is enough");
+      await page.setViewportSize({ width: 1440, height: 900 });
+      if (anchoring === "off") await noAnchoring(page);
+      await page.goto("/");
+      await waitForLive(page);
+      await running(page);
+      await scrollToId(page, "record"); // past the drawn train; the run below the window
+      await frames(page, 3);
+      await page.evaluate(() => {
+        const link = [...document.querySelectorAll<HTMLAnchorElement>("#run a")].find((a) => a.textContent?.includes("Open Watchlist"));
+        if (!link) throw new Error("no Watchlist link");
+        link.focus(); // run.ts glides its station to the window
+        // two frames into the glide the GPU drops its context, and the drawing falls to the still
+        requestAnimationFrame(() => requestAnimationFrame(() => window.dispatchEvent(new CustomEvent("tt:webgl", { detail: "lost" }))));
+      });
+      await expect(page.locator("html")).toHaveAttribute("data-drawing", "still");
+      // at rest: the scroll has held for ten frames
+      await page.evaluate(
+        () =>
+          new Promise<void>((done) => {
+            let last = window.scrollY;
+            let held = 0;
+            const tick = () => {
+              held = window.scrollY === last ? held + 1 : 0;
+              last = window.scrollY;
+              if (held >= 10) done();
+              else requestAnimationFrame(tick);
+            };
+            requestAnimationFrame(tick);
+          }),
+      );
+      const link = page.getByRole("link", { name: "Open Watchlist →" });
+      await expect(link).toBeFocused();
+      // the track trails the scroll a little (its sync), so the card may still be sliding in: poll, at rest
+      await expect
+        .poll(() =>
+          link.evaluate((a) => {
+            const r = a.getBoundingClientRect();
+            const foot = document.querySelector("header")?.getBoundingClientRect().bottom ?? 0;
+            const whole = r.top >= foot && r.bottom <= window.innerHeight && r.left >= 0 && r.right <= window.innerWidth;
+            const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+            return whole && hit !== null && a.contains(hit);
+          }),
+        )
+        .toBe(true);
     });
   }
 });

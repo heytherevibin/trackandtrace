@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { LAYOUT_EVENT } from "@/components/landing/journey/journey-events";
 import { startRun } from "@/components/landing/journey/run";
 import { MODULES } from "@/components/landing/journey/start-journey";
 import { testContext } from "./journey-context";
@@ -100,6 +101,67 @@ describe("the window-seat run (J6-7, J6-8)", () => {
 
   it("is started last, so a rebuild tears it down first: its unpin is measured on the page the reader sees, before the still's and the drawing's teardowns change the layout above it for a moment", () => {
     expect(MODULES.at(-1)).toBe(startRun);
+  });
+
+  // A Tab stop's glide to the window can be cut short: a piece above moves the page (keepPlace, the drawing falling to
+  // the still under load) and its instant scroll cancels the smooth one, leaving focus off-screen (WCAG 2.4.11).
+  describe("a focused station, after a relayout", () => {
+    const focusWatchlist = () => {
+      const link = document.createElement("a");
+      link.href = "/watchlist";
+      document.querySelector("#features article")!.append(link);
+      link.focus(); // its station (the second: centre 650) stands at the window at 200 + 500
+      return link;
+    };
+    const relayout = () => {
+      window.dispatchEvent(new Event(LAYOUT_EVENT));
+      vi.advanceTimersToNextFrame();
+    };
+
+    it("comes back to the window", () => {
+      vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
+      lay(200);
+      const stop = startRun(testContext());
+      focusWatchlist();
+      expect(window.scrollTo).toHaveBeenLastCalledWith({ top: 700 });
+      vi.mocked(window.scrollTo).mockClear();
+      relayout();
+      expect(window.scrollTo).toHaveBeenCalledWith({ top: 700 });
+      stop();
+    });
+
+    it("stays where the reader's own scroll took them, and where focus has left it", () => {
+      vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
+      lay(200);
+      const stop = startRun(testContext());
+      focusWatchlist();
+      window.dispatchEvent(new WheelEvent("wheel", { deltaY: 120 }));
+      vi.mocked(window.scrollTo).mockClear();
+      relayout();
+      expect(window.scrollTo).not.toHaveBeenCalled();
+      const link = focusWatchlist();
+      link.blur();
+      vi.mocked(window.scrollTo).mockClear();
+      relayout();
+      expect(window.scrollTo).not.toHaveBeenCalled();
+      stop();
+    });
+
+    it("lets go once the glide has landed", () => {
+      vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
+      lay(200);
+      const y = vi.spyOn(window, "scrollY", "get").mockReturnValue(0);
+      const stop = startRun(testContext());
+      focusWatchlist();
+      y.mockReturnValue(700); // the glide lands: its station at the window
+      lay(-500);
+      window.dispatchEvent(new Event("scrollend"));
+      lay(-600); // then the page moves under the reader (not by a glide): nothing brings them back
+      vi.mocked(window.scrollTo).mockClear();
+      relayout();
+      expect(window.scrollTo).not.toHaveBeenCalledWith({ top: expect.any(Number) as number });
+      stop();
+    });
   });
 
   it("puts everything back on teardown", () => {
