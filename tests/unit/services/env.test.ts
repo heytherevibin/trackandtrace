@@ -208,16 +208,19 @@ describe("RailKit source configuration", () => {
     expect(accepted).toEqual(["none"]);
   });
 
-  // The one exception, and the reason it exists: `env()` THROWS in production, `railkit` + `rapidapi`
-  // was a perfectly valid pair for the six days between one provider replacing the other and the
-  // other being deleted, and nothing made anyone change it. Without this the deploy that removed the
-  // source would have taken every traveller PNR check down over a setting whose only correct reading
-  // is `none`.
-  it("reads the retired fallback as `none` rather than refusing to boot over it", () => {
+  // The shim that read a retired `PNR_FALLBACK` as `none` is gone, and its refusal is pinned here
+  // in its place. It existed because `env()` THROWS in production and `railkit` + `rapidapi` was a
+  // perfectly valid pair for the six days between one provider replacing the other and the other
+  // being deleted — so the deploy that removed the source would otherwise have taken every
+  // traveller PNR check down over a setting whose only correct reading was `none`.
+  //
+  // Production's was set to `none` on 2026-09-27, the last one carrying the retired name anywhere.
+  // A tolerance kept past its migration is how a deployment goes on quietly running a configuration
+  // nobody would write today, so now it says so.
+  it("refuses a retired fallback now that no environment carries one", () => {
     const parsed = parseEnv({ NODE_ENV: "production", PNR_SOURCE: "railkit", RAILKIT_API_KEY: KEY, PNR_FALLBACK: "rapidapi" });
 
-    expect(parsed.ok).toBe(true);
-    if (parsed.ok) expect(parsed.env.PNR_FALLBACK).toBe("none");
+    expect(parsed.ok).toBe(false);
   });
 
   // Found by a failing preview deploy, not by reading: Preview held its OWN `PNR_SOURCE=rapidapi`
@@ -334,13 +337,17 @@ describe("the daily live-request budget", () => {
 });
 
 // ---------------------------------------------------------------------------
-// The retired fallback's one-time notice
+// The retired fallback, after its migration
 // ---------------------------------------------------------------------------
-// The coercion keeps a stale `PNR_FALLBACK=rapidapi` from throwing at boot. The notice is what keeps
-// it from being coerced silently for ever — an accommodation nobody is told about is how the line it
-// lives on outlives the variable it was written for.
+// A coercion used to keep a stale `PNR_FALLBACK=rapidapi` from throwing at boot, and a one-time
+// notice kept it from being coerced silently for ever. Both are gone: Production's was set to
+// `none` on 2026-09-27, the last one carrying the retired name anywhere, and an accommodation kept
+// past its migration is how the line it lives on outlives the variable it was written for.
+//
+// What remains is the ordinary refusal — the value is not in the enum, and nothing special is done
+// about it any more.
 
-describe("the retired fallback's boot notice", () => {
+describe("the retired fallback, now that no environment carries one", () => {
   const before = { ...process.env };
 
   afterEach(() => {
@@ -349,21 +356,15 @@ describe("the retired fallback's boot notice", () => {
     vi.restoreAllMocks();
   });
 
-  it("says so once, and says which variable to delete", () => {
+  it("is refused like any other name outside the enum, and says nothing extra about it", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    process.env = { ...before, NODE_ENV: "development", PNR_SOURCE: "railkit", RAILKIT_API_KEY: FAKE_KEY, PNR_FALLBACK: "rapidapi" };
-    resetEnvCache();
+    const parsed = parseEnv({ NODE_ENV: "production", PNR_SOURCE: "railkit", RAILKIT_API_KEY: FAKE_KEY, PNR_FALLBACK: "rapidapi" });
 
-    expect(env().PNR_FALLBACK).toBe("none");
-    expect(warn).toHaveBeenCalledTimes(1);
-    expect(String(warn.mock.calls[0]?.[0])).toMatch(/PNR_FALLBACK[\s\S]*removed[\s\S]*Delete the variable/);
-
-    // Cached after the first read, so a busy process is not told on every call.
-    env();
-    expect(warn).toHaveBeenCalledTimes(1);
+    expect(parsed.ok).toBe(false);
+    expect(warn).not.toHaveBeenCalled();
   });
 
-  it("stays quiet when the variable is absent, which is the state this is steering towards", () => {
+  it("leaves an absent variable reading as `none`, which is the state this steered towards", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     process.env = { ...before, NODE_ENV: "development", PNR_SOURCE: "railkit", RAILKIT_API_KEY: FAKE_KEY };
     delete process.env.PNR_FALLBACK;
