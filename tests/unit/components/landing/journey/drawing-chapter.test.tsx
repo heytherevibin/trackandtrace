@@ -33,6 +33,17 @@ describe("the drawing chapter (GA)", () => {
     }
   });
 
+  it("gives the live drawing a stage, its two dimension figures and its caption; the stage and figures are decoration", () => {
+    const { container } = render(<DrawingChapter />);
+    expect(container.querySelector(".anatomy-stage")?.getAttribute("aria-hidden")).toBe("true");
+    const dims = [...container.querySelectorAll<HTMLElement>(".dim-label")];
+    expect(dims.map((d) => [d.dataset.dim, d.textContent, d.getAttribute("aria-hidden")])).toEqual([
+      ["length", "≈ 20 560 mm", "true"],
+      ["height", "≈ 4 255 mm", "true"],
+    ]);
+    expect(container.querySelector(".anatomy-caption")).toHaveTextContent("Scroll · the drawing turns, comes apart, couples up and departs");
+  });
+
   it("sends a page with JavaScript no still file, and a page without it only the wide drawing (§3.H's budget)", () => {
     const html = renderToString(<DrawingChapter />);
     const [page, noscript = ""] = html.split("<noscript>");

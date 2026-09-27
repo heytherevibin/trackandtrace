@@ -20,6 +20,9 @@ export const home = {
     title: "Every part answers to the source",
     lead: "Take a check apart and each piece does one job: ask the source once, show exactly what came back, and say when. Nothing in it guesses.",
     listLabel: "What each part does",
+    caption: "Scroll · the drawing turns, comes apart, couples up and departs",
+    dims: { length: "≈ 20 560 mm", height: "≈ 4 255 mm" },
+    nameboard: { platform: "PLATFORM 3", departures: "DEPARTURES" },
     parts: [
       { id: "pantoFront", title: "Leading pantograph", promise: "One live request", detail: "asked the moment you press Run" },
       { id: "shell", title: "Body shell", promise: "The record", detail: "only the fields the source returned" },

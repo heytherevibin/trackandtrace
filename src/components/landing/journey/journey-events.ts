@@ -21,6 +21,11 @@ export const RESULT_EVENT = "tt:result";
  * live module, which is torn down while the context is gone (v3's gotcha). */
 export const WEBGL_EVENT = "tt:webgl";
 export type WebglDetail = "lost" | "restored";
+/** The drawn train pulls away (progress 0.88, scrolling down): the horn's cue. */
+export const DEPART_EVENT = "tt:depart";
+/** Redraw the live drawing in the current theme now: the live drawing re-reads its tokens and draws at once. Night
+ * falls (J6) sends it inside its view transition, as journey.redrawNow() (J5-9). */
+export const THEME_EVENT = "tt:theme";
 
 export interface StationDetail {
   readonly index: number;
