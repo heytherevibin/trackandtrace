@@ -3,16 +3,54 @@ import { expect, test } from "../fixtures";
 import { PNR } from "../helpers";
 import { blockJourneyChunk, waitForJourney } from "./journey-helpers";
 
+/** Frames the wait below gives a focus that never comes wholly into the window before checking it as it stands
+ * (it then counts as hidden: the check samples the window's edge). The longest glide in the run, Tab wrapping from
+ * the footer back to the hero's field, took 184 frames locally; a slower runner draws fewer frames, not more. */
+const FOCUS_SETTLE_FRAME_CAP = 600;
+
 /** `<html data-scroll-behavior="smooth">` (base.css) animates every focus-driven scroll; without this, reading
- * the focused element's geometry mid-animation reports positions no reader ever actually sees it at. */
-async function waitForScrollSettled(page: Page): Promise<void> {
-  let last = -1;
-  for (let tries = 0; tries < 40; tries += 1) {
-    const y = await page.evaluate(() => window.scrollY);
-    if (y === last) return;
-    last = y;
-    await page.waitForTimeout(50);
-  }
+ * the focused element's geometry mid-animation reports positions no reader ever actually sees it at. Waits, in
+ * frames, until the focused element lies wholly inside the window, no scroll is under way (a `scroll` since the
+ * last `scrollend`), and scrollY has held for two frames. "scrollY stopped changing" alone is not enough: it is
+ * just as true before a smooth scroll's first frame, and a CI runner can take longer than two samples to draw
+ * that frame (2026-09-27: the check then read the board's "On the roadmap" link below the fold, under its own
+ * table cell). A focused control the browser leaves under the masthead is already wholly in the window, so it
+ * is still checked, and still caught. */
+async function waitForFocusSettled(page: Page): Promise<void> {
+  await page.evaluate(
+    (cap) =>
+      new Promise<void>((resolve) => {
+        let scrolling = false;
+        const onScroll = () => {
+          scrolling = true;
+        };
+        const onScrollEnd = () => {
+          scrolling = false;
+        };
+        window.addEventListener("scroll", onScroll);
+        window.addEventListener("scrollend", onScrollEnd);
+        let frames = 0;
+        let held = 0;
+        let lastY = window.scrollY;
+        const tick = () => {
+          frames += 1;
+          held = window.scrollY === lastY ? held + 1 : 0;
+          lastY = window.scrollY;
+          const el = document.activeElement;
+          const r = el && el !== document.body ? el.getBoundingClientRect() : null;
+          const inWindow = !r || (r.top >= 0 && r.left >= 0 && r.bottom <= window.innerHeight && r.right <= window.innerWidth);
+          if ((inWindow && !scrolling && held >= 2) || frames >= cap) {
+            window.removeEventListener("scroll", onScroll);
+            window.removeEventListener("scrollend", onScrollEnd);
+            resolve();
+          } else {
+            requestAnimationFrame(tick);
+          }
+        };
+        requestAnimationFrame(tick);
+      }),
+    FOCUS_SETTLE_FRAME_CAP,
+  );
 }
 
 /** Whether the focused element is actually hidden: something else paints over its centre. A fixed overlay
@@ -81,9 +119,32 @@ test("Tab never leaves focus under the masthead or behind a pinned piece", async
   await waitForJourney(page);
   for (let i = 0; i < 80; i += 1) {
     await page.keyboard.press("Tab");
-    await waitForScrollSettled(page);
+    await waitForFocusSettled(page);
     expect(await page.evaluate(coveredFocusLabel)).toBeNull();
   }
+});
+
+test("the wait before each check holds for a focus scroll that starts late, as on a slow runner", async ({ page, isMobile }) => {
+  test.skip(isMobile, "keyboard");
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  await waitForJourney(page);
+  // At the top of the page the board's "On the roadmap" link rests just below a 900px window's fold, so focusing
+  // it takes the browser's smooth scroll. Focus moves here with no scroll, and the browser's own focus scroll only
+  // starts 250 ms later: a runner that draws no frame for that long after the Tab. Until then the link is below
+  // the window, and the check, sampling the window's last row, would find its own table cell over it.
+  const below = await page.evaluate(() => {
+    const link = document.querySelector<HTMLElement>('#departures a[href="#roadmap"]')!;
+    link.focus({ preventScroll: true });
+    setTimeout(() => {
+      link.blur();
+      link.focus();
+    }, 250);
+    return link.getBoundingClientRect().bottom > window.innerHeight;
+  });
+  expect(below).toBe(true);
+  await waitForFocusSettled(page);
+  expect(await page.evaluate(coveredFocusLabel)).toBeNull();
 });
 
 test("the check still catches a real cover: an in-flow link scrolled in under the sticky masthead", async ({ page, isMobile }) => {
