@@ -6,7 +6,7 @@
 
 **Architecture:**
 - **Two chunks, one door.** The journey chunk (Anime.js and the journey modules, no three.js) reaches the live drawing only through `import("./scene/live")` in `drawing.ts`. Everything that imports `three` sits behind that door: the engine, palette, fit, scan, line side, glow, beam, and the live chapter with its labels.
-- **Prepare, then begin.** `drawing.ts` prepares the live drawing (the chunk, then the engine, built a part at a time) as soon as nothing but the reader's place holds it back. It begins it (the pin, the views, the labels) inside `keepPlace`, the one owner of the chapter's height changes.
+- **Prepare, then begin.** `drawing.ts` prepares the live drawing (the chunk, then the engine, built a part at a time) as soon as nothing but the reader's place holds it back. It begins it (the pin, the views, the labels) inside `keepPlace`, the one owner of the live pin's height changes.
 - **One engine per journey.** The engine lives on `JourneyContext` (`scene`, a `Kept`) for one `startJourney`. Rebuilds and WebGL restores reuse it; `atEnd` disposes it when the journey ends. Its canvas sits in `#app-root`, hidden whenever the drawing is not live.
 - **The labels have their own writers while live.** The pin's `data-live`, a transform and a clip wipe per label, and their own leader `<svg>`. `still.ts` stands aside the moment it hears the drawing go live.
 
@@ -38,10 +38,9 @@ No new dependency.
 
 ## Before Task 1: the rail is gone
 
-The owner is removing the route rail (the left column, its train glyph and odometer, and the phone rail; #77) in a separate PR that lands before J5. This plan is written as if the rail does not exist.
-- Once that PR has merged: `git fetch origin && git rebase origin/main`, then `npm ci` and `npm run check`. Expected: green.
-- No task touches `route-strip.tsx`, `strip.ts`, `strip-position.ts`, `train-glyph.tsx`, the rail's CSS, or anything the removal PR owns.
-- If the rail is still on `main` when you start, stop and ask the owner.
+The owner removed the route rail (the left column, its train glyph and odometer, and the phone rail; #77) in #80 (e7ae65e), which merged before J5 began; this branch is on `main` after it. This plan is written for a page with no rail.
+- Before Task 1: `npm ci` and `npm run check`. Expected: green.
+- No task touches what the removal left behind: `train-glyph.tsx` survives #80 (the how-it-works and route-map figures use it) and stays as it is; `station-progress.ts` is `STATION_EVENT`'s source now (Task 4 only rewords that event's comment).
 
 ## Rulings made while planning J5
 
@@ -49,7 +48,7 @@ Each ruling has an id (J5-n) and says what it costs if wrong. Task 10 writes rul
 
 1. **No hand-off to the strip.** The rail is gone (owner, 2026-09-27), so "the strip glyph takes over" (spec §3.A; J3-8, J4-5) is void. The departure ends as the train leaves the frame with the camera letting it go. `tt:depart` (at progress 0.88) and the horn stay. *Cost if wrong: whatever replaces the rail adds its own hand-off.*
 2. **A seventh reason, `place`.** It holds while the reader is below the chapter's top when the live drawing would begin, and clears when they come back above it. This is J3's rule for #how: pinning never grows a section under the reader. While `place` is the only reason, the scene still loads and builds in the background, so the switch is immediate when it clears. *Cost if wrong: a reader landing mid-page (a hash link, a Back return) sees the still until they scroll back up to GA.*
-3. **One owner of #anatomy's height changes.** That owner is `keepPlace` in `drawing.ts`, with a pure rule, `placeAfter`:
+3. **One owner of the live pin's height changes.** That owner is `keepPlace` in `drawing.ts`, with a pure rule, `placeAfter` (`still.ts` keeps compensating its own still-mode columns while the drawing is still, as J4 did; J5-5):
    - the chapter's top is visible, or below: nothing moves;
    - the reader is inside the chapter (its top gone above, over half the window still in it): they go to its start, as J4 did;
    - the reader is past it (its bottom within the window's top half): they move by exactly the change.
@@ -91,17 +90,46 @@ Each ruling has an id (J5-n) and says what it costs if wrong. Task 10 writes rul
 20. **The glow sprites are built by the live engine only** (`scene/glow.ts`: a canvas texture needs a document). They hang on `rig.cabFront` and the new `rig.pantoHead`. The bake never sees them. *Cost if wrong: none.*
 21. **Forced colours.** The live drawing then reads the system's own colours (Canvas, CanvasText, Highlight, LinkText) through a probe element, as the still's `currentColor` does, and follows the setting's change (spec §3.G, "forced colours read in both system themes"). *Cost if wrong: a forced-colours reader sees author colours on a system ground.*
 
+### Pre-flight amendments (2026-09-27)
+
+The controller's pre-flight scan raised 25 findings; each ruling below is already carried into the tasks, the constraints and Task 10's spec edits.
+1. The rail went with #80 before J5 began: "Before Task 1" says so, and Task 10 has no rail precondition.
+2. `still.test.tsx` stubs no `ResizeObserver`: `tests/setup.ts` defines it (Task 6).
+3. Task 10's context restore narrows the extension by its method through `Reflect`, not `instanceof WEBGL_lose_context` (an interface, not a constructor).
+4. The probe's test is `webgl-probe.test.tsx`, for jsdom (Task 6).
+5. Task 10 replaces §3.A's struck strip clause with "and leaves the frame (J5-1)".
+6. J5-2 stands: the three.js constraint below, and spec §3.B item 3 and §3.C (Task 10), allow the scene to prepare while `place` is the only reason.
+7. The governor waits 45 frames after every change, up or down, as spec §3.C says (Task 2's code and test).
+8. The frame meter stays on previews and in development (J5-10); Task 10 amends spec §2 and §7 to match.
+9. Task 10 rewrites spec §3.B's live gate to name `#anatomy.is-live` (with `data-drawing="live"` alongside) instead of adding a second clause.
+10. `still.ts` gates `leave` as it gates `enter`; `live-labels.clear()` leaves `.is-hot` to `scene/live.ts` (Tasks 6, 7).
+11. `scene/live.ts` owns `#journey-canvas`'s creation, `hidden` and removal; the engine exposes `canvas` read-only and owns its buffer and context (Tasks 4, 7; the one-writer list).
+12. Task 7 states `drawing-modes.spec.ts`'s full import list and adds `drawStill` to `drawing.spec.ts` and `collisions.spec.ts` with the specs that use it; Task 10 adds only `blockSceneChunk` and `drawStill` to `drawing-modes.spec.ts`.
+13. Task 6 migrates each context to `testContext({ motion, intro, result })`, keeping hero.test's shared `kept` and strokes.test's `intro: true`.
+14. The 20 s limit is proved with fake timers and an import that never settles (`sceneLoader`, Task 7); the frame meter's text is asserted in its unit test and its corner in its e2e (Task 9).
+15. One `storedQuality` (exported by `drawing.ts`), one `blockChunk(page, mark)` under `blockJourneyChunk`/`blockSceneChunk`, and one `radialTexture` under `glowTexture`/`poolTexture` (Tasks 3, 6, 7).
+16. E2E waits are `frames(page, n)` (Task 5's helper) or `expect.poll` on state; only Task 10's three 1.5 s "nothing downloads" windows stay, each saying why.
+17. `placeBox` and `lastScrollY` move into `startPlaceGuard`'s closure, and `settlePlace` takes and returns them (Task 5).
+18. The Gating constraint allows the page's no-JavaScript default, ungated, in `journey.css`.
+19. The import constraint allows `./` and one-level `../` inside `src/components/landing/journey/`; `@/` across directories; never two levels.
+20. Task 1 passes three's version to all four `sourceHash` calls, and its re-bake accepts either renamed SVGs or only a changed manifest.
+21. J5-3 names one owner of the live pin's height changes; `still.ts` still compensates its own still-mode columns.
+22. The frame meter's clipboard guard is in its code (Task 9).
+23. `playwright.config.ts` is in Task 7's file list and `git add`, for the SwiftShader flag if CI needs it.
+24. `tt.q`'s two writers (the floor in `drawing.ts`, the level in the governor) are named in the one-writer list.
+25. Task 4 rewords `STATION_EVENT`'s comment to name `station-progress.ts` as its source.
+
 ## Global Constraints
 
 - **Next.js.** It is Next.js 16.3.4: read `AGENTS.md` and the relevant guide in `node_modules/next/dist/docs/` before writing Next-specific code (the loader, the page prop, the dynamic import).
 - **Code rules.**
   - TypeScript strict, with no `any`; use `unknown` and narrowing.
-  - Use `@/` aliases in `src` and `tests`; tests of `scripts/*.mjs` import them relatively (`../../../scripts/…`), as the existing script tests do.
+  - Imports: `@/` across directories. Inside `src/components/landing/journey/` (the existing code's style), `./` and one-level `../` are allowed (`scene/*.ts` importing `../pose`, say); never two levels (`../../`). Tests import `src` by `@/`, and tests of `scripts/*.mjs` import them relatively (`../../../scripts/…`), as the existing script tests do. Task 1's `../train-parts` → `@/` conversion in `rig.ts` stays (the bake's esbuild resolves `@/`).
   - Prefer `const`; use `let` only in loops and closures that need it.
   - Every file stays under 500 lines, `scripts/**/*.mjs` included.
 - **TDD.** Write the failing test first, and watch it fail for the right reason before implementing.
 - **Pins.** `three` stays `0.186.0` and `animejs` stays `4.5.0`. Add no dependency.
-- **three.js only in the scene chunk.** Only `src/components/landing/journey/scene/*.ts` and `scripts/bake/page.ts` import `"three"`. The journey chunk reaches the scene only through the dynamic `import("./scene/live")` in `drawing.ts`. Type-only imports (`import type`) are allowed anywhere. A still page never downloads three.js.
+- **three.js only in the scene chunk.** Only `src/components/landing/journey/scene/*.ts` and `scripts/bake/page.ts` import `"three"`. The journey chunk reaches the scene only through the dynamic `import("./scene/live")` in `drawing.ts`. Type-only imports (`import type`) are allowed anywhere. A still page never downloads three.js, except while `place` is the only reason, when the scene prepares in the background (J5-2).
 - **Budgets, verbatim from spec §3.H:**
   - Journey chunk ≤ 70 KB compressed;
   - Scene chunk ≤ 240 KB compressed, live only;
@@ -120,14 +148,16 @@ Each ruling has an id (J5-n) and says what it costs if wrong. Task 10 writes rul
   - `drawing.ts` owns `#anatomy.is-live`, `data-drawing` and `data-drawing-why`;
   - `still.ts` owns `.is-columns`, `.is-compact`, the labels' `style.top`, the still holder's box and `svg.callout-lines`;
   - `live-labels.ts` owns `data-live`, `data-compact`, `--anatomy-copy-h`, the labels' `transform` and `clip-path`, and `svg.live-lines`;
-  - `.is-hot` is written by whichever of `still.ts` and `scene/live.ts` matches the current drawing;
+  - `.is-hot` is written by whichever of `still.ts` and `scene/live.ts` matches the current drawing: `still.ts`'s pointer handlers act only while `data-drawing="still"` (its one `light(null)` as it stands aside hands the labels over clean), and `live-labels.ts` never writes it;
   - `scene/live.ts` owns the dimension figures' `transform` and `clip-path`;
-  - the engine owns `#journey-canvas`.
-- **Gating.** Every journey-only CSS rule starts with `html[data-journey="on"]` and lives in `src/styles/journey-island.css`. A failed journey writes only `data-journey="failed"` (J3-1).
+  - `scene/live.ts` owns the `#journey-canvas` element: its creation, its `hidden` and its removal. The engine owns its drawing buffer and WebGL context, and reads the element only;
+  - `tt.q` (sessionStorage) has two writers, in turn: `drawing.ts` stores the floor (`"still"`), and the governor (in `scene/live.ts`) stores its level. `drawing.ts` and `scene/live.ts` read it through the one `storedQuality()` in `drawing.ts`; the frame meter reads it for display only.
+- **Gating.** Journey-only CSS rules are gated: each starts with `html[data-journey="on"]` and lives in `src/styles/journey-island.css`. A rule that is the page's no-JavaScript default layout lives ungated in `src/styles/journey.css` (Task 7's `.anatomy-stage, .anatomy-caption, .dim-label { display: none; }`, as J4's `.callout-lines, .title-block` rule is). A failed journey writes only `data-journey="failed"` (J3-1).
 - **Copy** is verbatim from v3. Travellers never see provider names.
 - **Tests.**
   - E2E specs import `{ test, expect }` from `tests/e2e/fixtures`.
   - Any e2e that waits on `terminal-result` asserts `data-kind`.
+  - E2E code in this plan waits on state (`frames(page, n)`, `expect.poll`, an attribute), never a fixed time, except a window that is itself the assertion ("nothing downloads"), which says so in a comment.
   - Run Playwright only in this worktree, on port 4210 (check `lsof -nP -iTCP:4210 -sTCP:LISTEN` first), in fixture mode.
   - Never send a sample PNR to a live site. Never touch port 3100 or the primary checkout `/Users/heytherevibin/Downloads/Code/Dev/trackandtrace`.
 - **The bake.** Editing any file in `BAKE_SOURCES` means re-baking (`npm run bake:stills`, on this Mac's GPU) and committing its outputs in the same commit; the `sourceHash` test enforces it. Only Task 1 edits bake sources.
@@ -145,8 +175,8 @@ Each ruling has an id (J5-n) and says what it costs if wrong. Task 10 writes rul
 | `src/components/landing/journey/governor.ts` | adaptive quality (pure) | 2 |
 | `src/components/landing/journey/scene/fit.ts` | the camera fit, `projectTo` | 2 |
 | `src/components/landing/journey/scene/{scan,departure,glow,beam}.ts` | the scan gate, the line side and nameboard, the Night glow, the headlight beam | 3 |
-| `src/components/landing/journey/scene/engine.ts`, `journey-events.ts` (`tt:webgl`) | the renderer, views, quality, palette, context loss, warm-up, picking | 4 |
-| `src/components/landing/journey/chapters.ts`, `place-memory.ts` | the guard's layout refresh; the parked place minors | 5 |
+| `src/components/landing/journey/scene/engine.ts`, `journey-events.ts` (`tt:webgl`; `tt:station`'s comment) | the renderer, views, quality, palette, context loss, warm-up, picking | 4 |
+| `src/components/landing/journey/chapters.ts`, `place-memory.ts`, `tests/e2e/journey/journey-helpers.ts` (`frames`) | the guard's layout refresh, its state in its closure; the parked place minors; the e2e frame wait | 5 |
 | `src/components/landing/journey/{drawing,drawing-mode,start-journey,still}.ts`, `webgl-probe.ts` | prepare/begin, `place`, WebGL, `placeAfter`, the engine's lifetime, still.ts standing aside | 6 |
 | `src/components/landing/journey/scene/{scene-mark,live}.ts`, `live-labels.ts`, `journey-events.ts` (`tt:depart`, `tt:theme`) | the live chapter and terminus; the labels while live | 7 |
 | `src/components/landing/journey/drawing-chapter.tsx`, `src/messages/en-IN/home.ts`, `src/styles/journey{,-island}.css` | the stage, figures, caption and nameboard words; the live layout | 7 |
@@ -232,7 +262,7 @@ In `tests/unit/components/landing/journey/scene/world.test.ts`, import `buildWor
 ```
 In `tests/unit/scripts/bake-emit.test.ts`:
 - Add `mkdirSync` to the `node:fs` import, and `BAKE_SOURCES` to the emit import.
-- Pass `"0.186.0"` as a third argument to all five existing `sourceHash(root, [...])` calls, since the temporary root has no `node_modules/three`.
+- Pass `"0.186.0"` as a third argument to all four existing `sourceHash(root, [...])` calls (its lines 40, 43, 45 and 47), since the temporary root has no `node_modules/three`.
 - Add:
 ```ts
   it("hashes three's version too, and counts the bake's own driver among its sources", () => {
@@ -447,7 +477,7 @@ Expected: the new tests PASS. `bake-stills.test.ts`'s "were baked from today's s
 Run: `npm run bake:stills`
 Expected: four lines, each with its edge and stretch counts and gzip size (each under 34 KB). The rig's geometry did not change, so each shape's size should be within a few bytes of J4's.
 
-Then run `git status --short public/journey src/components/landing/journey/still-manifest.ts`. Expected: four new files, four removed, and the manifest changed. If any shape's gzip size moved by more than 1 KB, stop and report: only comments, names and checks changed, so the drawing should not have.
+Then run `git status --short public/journey src/components/landing/journey/still-manifest.ts`. Expected: the manifest changed (its `sourceHash` is new). Either outcome for `public/journey` is right: no change, because the edits (comments, names, key checks, `new Color`) leave every SVG's bytes and so its hashed name the same; or four new files and four removed, if the SVG bytes moved at all. If any shape's gzip size moved by more than 1 KB, stop and report: only comments, names and checks changed, so the drawing should not have.
 
 - [ ] **Step 6: The whole gate, then commit**
 
@@ -608,7 +638,7 @@ describe("the governor (spec §3.C; v3's governor.js)", () => {
     const { sets, feed } = run(4, 3);
     feed(211, 16);
     expect(sets).toEqual([2]);
-    feed(60 + 181, 16);
+    feed(45 + 181, 16); // 45 frames' cool-down after the step up, then 181 good judgements
     expect(sets).toEqual([2, 1]);
     feed(1000, 16);
     expect(sets).toEqual([2, 1]);
@@ -800,8 +830,9 @@ export function cssRgb({ r, g, b }: Rgb): string {
 // Adaptive quality (spec §3.C; prototype v3's governor.js). It watches the gaps between frames the drawing actually
 // drew, only within one scroll gesture: a gap over 120 ms is a new gesture, and idle() says a frame went by with
 // nothing to draw. The p90 of the last 30–40 gaps over 26 ms steps quality down; over 40 ms at the lowest step asks
-// for the still drawing; under 18.5 ms for 180 judgements steps back up, at most twice. Each change waits (45
-// frames down, 60 up) before judging again. Pure: the live chapter feeds it frames and acts on its answers.
+// for the still drawing; under 18.5 ms for 180 judgements steps back up, at most twice. Each change waits 45 frames
+// before judging again (spec §3.C; v3 waited 60 after a step up). Pure: the live chapter feeds it frames and acts on
+// its answers.
 
 export const LONG_MS = 26;
 export const SLOW_MS = 40;
@@ -859,7 +890,7 @@ export function createGovernor({ levels, start = 0, set, floor }: GovernorOption
           set(level);
           ups += 1;
           good = 0;
-          cool = 60;
+          cool = 45;
           win.length = 0;
         }
       } else good = 0;
@@ -1065,8 +1096,8 @@ The four things the live drawing adds to J4's world. Each is built in node, with
 - Produces:
   - `scan.ts`: `interface Scan { readonly group: Group; set(t: number): void; setColors(dark: Color, light: Color, gate: Color, night: boolean): void }`; `createScan(rig: Rig, style: LineStyle): Scan`. `t` = 0 all solid, 1 all drawn.
   - `departure.ts`: `interface BoardFace { readonly texture: Texture; paint(ink: Rgb): void }`; `boardFace(words: { readonly platform: string; readonly departures: string }, family: string): BoardFace` (needs a document); `interface Departure { readonly group: Group; setInk(ink: Rgb): void }`; `buildDeparture(style: LineStyle, face: BoardFace): Departure`.
-  - `glow.ts`: `glowTexture(): Texture` (needs a document); `interface Glow { set(on: boolean, headUp: boolean): void; setColor(c: Color): void }`; `createGlow(rig: Rig, texture: Texture): Glow`.
-  - `beam.ts`: `poolTexture(): Texture` (needs a document); `interface Beam { readonly group: Group; set(on: boolean, lit: number): void; setColor(c: Color): void }`; `createBeam(rig: Rig, pool: Texture): Beam`.
+  - `glow.ts`: `radialTexture(stops: readonly (readonly [number, number])[]): Texture` (a white radial fade, `[offset, alpha]` stops; needs a document; the one texture helper both sprites and the pool use, J5 pre-flight #15); `glowTexture(): Texture` (needs a document); `interface Glow { set(on: boolean, headUp: boolean): void; setColor(c: Color): void }`; `createGlow(rig: Rig, texture: Texture): Glow`.
+  - `beam.ts`: `poolTexture(): Texture` (glow.ts's `radialTexture` with its own stops; needs a document); `interface Beam { readonly group: Group; set(on: boolean, lit: number): void; setColor(c: Color): void }`; `createBeam(rig: Rig, pool: Texture): Beam`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1441,20 +1472,27 @@ import type { Rig } from "./rig";
 // raised pantograph's head meets the wire. Additive, and only at Night at full quality (J5-20). The live engine makes
 // these; the bake never sees them.
 
-/** A soft white disc; the material's colour tints it. */
-export function glowTexture(): Texture {
+/** A white radial fade: each stop is [offset, alpha]. An alpha mask only; the material's colour (a token's) tints it. */
+export function radialTexture(stops: readonly (readonly [number, number])[]): Texture {
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = 128;
   const ctx = canvas.getContext("2d");
   if (ctx) {
     const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
-    g.addColorStop(0, "rgba(255,255,255,1)");
-    g.addColorStop(0.18, "rgba(255,255,255,0.55)");
-    g.addColorStop(1, "rgba(255,255,255,0)");
+    for (const [offset, alpha] of stops) g.addColorStop(offset, `rgba(255,255,255,${alpha})`);
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, 128, 128);
   }
   return new CanvasTexture(canvas);
+}
+
+/** A soft white disc; the material's colour tints it. */
+export function glowTexture(): Texture {
+  return radialTexture([
+    [0, 1],
+    [0.18, 0.55],
+    [1, 0],
+  ]);
 }
 
 export interface Glow {
@@ -1489,7 +1527,8 @@ In the test, `sprites[0]!.material` is typed `SpriteMaterial`, so `.opacity` nee
 
 `src/components/landing/journey/scene/beam.ts`, from `V3/scene/beam.js`. The shaders and every number are verbatim; the colour is passed in, and the uniforms are kept by reference (`UniformsUtils.merge` clones, which would lose them):
 ```ts
-import { AdditiveBlending, CanvasTexture, Color, ConeGeometry, DoubleSide, Group, Mesh, MeshBasicMaterial, PlaneGeometry, ShaderMaterial, UniformsLib, UniformsUtils, type Texture } from "three";
+import { AdditiveBlending, Color, ConeGeometry, DoubleSide, Group, Mesh, MeshBasicMaterial, PlaneGeometry, ShaderMaterial, UniformsLib, UniformsUtils, type Texture } from "three";
+import { radialTexture } from "./glow";
 import type { Rig } from "./rig";
 
 // Night (spec §3.A): the locomotive's headlight throws a soft steel beam along the track ahead, and lights a pool on
@@ -1529,20 +1568,13 @@ const fragment = /* glsl */ `
   }
 `;
 
-/** A soft white pool for the ballast; the material's colour tints it. */
+/** A soft white pool for the ballast (glow.ts's radial fade, its own stops); the material's colour tints it. */
 export function poolTexture(): Texture {
-  const canvas = document.createElement("canvas");
-  canvas.width = canvas.height = 128;
-  const ctx = canvas.getContext("2d");
-  if (ctx) {
-    const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
-    g.addColorStop(0, "rgba(255,255,255,0.9)");
-    g.addColorStop(0.45, "rgba(255,255,255,0.28)");
-    g.addColorStop(1, "rgba(255,255,255,0)");
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, 128, 128);
-  }
-  return new CanvasTexture(canvas);
+  return radialTexture([
+    [0, 0.9],
+    [0.45, 0.28],
+    [1, 0],
+  ]);
 }
 
 export interface Beam {
@@ -1624,6 +1656,7 @@ One fixed canvas draws each visible stage into its own scissored rectangle (spec
 
 **Files:**
 - Create: `src/components/landing/journey/scene/engine.ts`
+- Modify: `src/components/landing/journey/journey-events.ts` (`WEBGL_EVENT`; `STATION_EVENT`'s comment)
 - Test: `tests/unit/components/landing/journey/scene/engine.test.ts`
 
 **Interfaces:**
@@ -1635,9 +1668,9 @@ One fixed canvas draws each visible stage into its own scissored rectangle (spec
   - `interface LiveParts { world; scan; departure; glow; beam }`; `applyLive(parts: LiveParts, camera: PerspectiveCamera, pose: Pose, quality: Quality, night: boolean): void`.
   - `pickables(rig: Rig): Mesh[]`; `toLinePalette(p: ScenePalette): Palette`; `weightsFor(night: boolean): LineOpacity`.
   - `interface EngineOptions { palette: ScenePalette; coaches: number; words: { platform: string; departures: string }; family: string }`.
-  - `interface Engine { world; fit; show(on); addView(id, view); removeView(id); frame(); live(pose, quality, night); setPalette(p); night(); setQuality(level); quality(); project(point, rect); pick(clientX, clientY, rect, camera); inked(el); dispose() }`.
+  - `interface Engine { world; fit; canvas; addView(id, view); removeView(id); frame(); live(pose, quality, night); setPalette(p); night(); setQuality(level); quality(); project(point, rect); pick(clientX, clientY, rect, camera); inked(el); dispose() }`. `canvas` is read-only here: `scene/live.ts` made the element and owns its `hidden` and its removal; the engine owns its drawing buffer and WebGL context (J5 pre-flight #11).
   - `createEngine(canvas: HTMLCanvasElement, options: EngineOptions, pause: Pause): Promise<Engine>`.
-  - `journey-events.ts`: `WEBGL_EVENT = "tt:webgl"`, `type WebglDetail = "lost" | "restored"`.
+  - `journey-events.ts`: `WEBGL_EVENT = "tt:webgl"`, `type WebglDetail = "lost" | "restored"`; `STATION_EVENT`'s comment names `station-progress.ts` as its source (no code change).
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1719,7 +1752,11 @@ Expected: FAIL. The module does not exist.
 
 - [ ] **Step 3: Add the event, and implement the engine**
 
-In `src/components/landing/journey/journey-events.ts`, after `RESULT_EVENT`, add:
+In `src/components/landing/journey/journey-events.ts`, first reword `STATION_EVENT`'s stale comment (the strip is gone; J5 pre-flight #25). Replace `/** The strip reached another station. */` with:
+```ts
+/** The scroll reached another station (station-progress.ts announces it; the departure board follows). */
+```
+Then, after `RESULT_EVENT`, add:
 ```ts
 /** The live drawing's GPU context: "lost" (draw still) or "restored" (live again). Heard by drawing.ts, never by the
  * live module, which is torn down while the context is gone (v3's gotcha). */
@@ -1843,8 +1880,9 @@ export interface EngineOptions {
 export interface Engine {
   readonly world: World;
   readonly fit: Fit;
-  /** The canvas shows only while the drawing is live. */
-  show(on: boolean): void;
+  /** The canvas it draws on. scene/live.ts made it and owns the element (its `hidden`, its removal); the engine owns
+   * only its drawing buffer and WebGL context. */
+  readonly canvas: HTMLCanvasElement;
   addView(id: string, view: View): void;
   removeView(id: string): void;
   /** Draws every visible stage now (or clears the canvas when none shows). */
@@ -1971,9 +2009,7 @@ export async function createEngine(canvas: HTMLCanvasElement, options: EngineOpt
   return {
     world,
     fit,
-    show: (on) => {
-      canvas.hidden = !on;
-    },
+    canvas,
     addView: (id, view) => {
       views.set(id, view);
     },
@@ -2019,8 +2055,7 @@ export async function createEngine(canvas: HTMLCanvasElement, options: EngineOpt
       canvas.removeEventListener("webglcontextrestored", onRestored);
       views.clear();
       renderer.dispose();
-      renderer.forceContextLoss();
-      canvas.remove();
+      renderer.forceContextLoss(); // the element itself is scene/live.ts's to remove
     },
   };
 }
@@ -2045,19 +2080,39 @@ git commit -m "feat(journey): the live drawing's engine: scissored views, qualit
 The live drawing grows and shrinks #anatomy above #how, so the places the journey already keeps must survive that. The chapters guard refreshes its box on layout (J5-19). This task also closes the four `place-memory.ts` minors J4 parked (J5-17). Both are proved before the drawing goes live, with a stand-in that grows the page above #how.
 
 **Files:**
-- Modify: `src/components/landing/journey/chapters.ts` (`startPlaceGuard`), `src/components/landing/journey/place-memory.ts`
-- Test: `tests/unit/components/landing/journey/place-memory.test.tsx`; create `tests/e2e/journey/place.spec.ts`
+- Modify: `src/components/landing/journey/chapters.ts` (`startPlaceGuard`, `settlePlace`), `src/components/landing/journey/place-memory.ts`
+- Test: `tests/unit/components/landing/journey/place-memory.test.tsx`; create `tests/e2e/journey/place.spec.ts`; modify `tests/e2e/journey/journey-helpers.ts` (`frames`)
 
 **Interfaces:**
 - Consumes: `LAYOUT_EVENT` (J3); `waitForJourney`, `scrollToId` (`journey-helpers.ts`).
-- Produces: no new exports. `startPlaceMemory()` keeps its signature and now samples on `navigate` instead of `click`. `parsePlace("…entry: \"\"…")` is `null`.
+- Produces: no new exports from `src`. `startPlaceMemory()` keeps its signature and now samples on `navigate` instead of `click`. `parsePlace("…entry: \"\"…")` is `null`. `chapters.ts`'s `placeBox` and `lastScrollY` leave module level for `startPlaceGuard`'s closure (J5 pre-flight #17).
+  - E2E helper `frames(page, n = 2)`: waits for the page to draw `n` more frames. Tasks 7 and 10 wait on it (or on `expect.poll`) instead of a fixed time.
 
 - [ ] **Step 1: Write the failing tests**
+
+`tests/e2e/journey/journey-helpers.ts`, add:
+```ts
+/** Waits for the page to draw `n` more frames: whatever a scroll, a wheel or a layout event set going has had its turn.
+ * A state wait, never a fixed time (J5 pre-flight #16). */
+export async function frames(page: Page, n = 2): Promise<void> {
+  await page.evaluate(
+    (count) =>
+      new Promise<void>((done) => {
+        const tick = (left: number): void => {
+          if (left <= 0) done();
+          else requestAnimationFrame(() => tick(left - 1));
+        };
+        tick(count);
+      }),
+    n,
+  );
+}
+```
 
 `tests/e2e/journey/place.spec.ts`:
 ```ts
 import { expect, test } from "../fixtures";
-import { scrollToId, waitForJourney } from "./journey-helpers";
+import { frames, scrollToId, waitForJourney } from "./journey-helpers";
 
 // The places the journey keeps (J5-17, J5-19): a change of height above 02 (the live drawing pinning, J5) must never
 // throw a reader inside 02 when Motion then goes off; and Back, Forward, Back finds the reader's place each time.
@@ -2076,13 +2131,14 @@ test.describe("the reader's place", () => {
       document.getElementById("principles")?.after(spacer);
       window.dispatchEvent(new Event("tt:layout"));
     });
-    await page.waitForTimeout(300);
+    await frames(page); // the grown page has laid out (tt:layout's listeners ran inside dispatchEvent)
     const vh = page.viewportSize()?.height ?? 800;
     await scrollToId(page, "how", -Math.round(vh * 2.5)); // well inside 02, past where its stale box would end
-    await page.waitForTimeout(300);
+    await frames(page); // the scroll event has reached the guard, which learns the reader's place from it
     await page.getByRole("contentinfo").getByRole("switch", { name: "Motion" }).click();
     await expect(page.locator("html")).toHaveAttribute("data-motion", "off");
-    await page.waitForTimeout(500);
+    await expect(page.locator("#how")).not.toHaveClass(/is-pinned/); // the collapse has happened
+    await frames(page, 3); // its height, then its padding a frame later, then the guard's settle
     const [top, foot] = await page.evaluate(() => [document.getElementById("how")?.getBoundingClientRect().top ?? 0, document.querySelector("header")?.getBoundingClientRect().bottom ?? 0]);
     expect(Math.abs(top - foot)).toBeLessThanOrEqual(24); // at 02's own start (its scroll margin), not thrown past it
   });
@@ -2092,21 +2148,20 @@ test.describe("the reader's place", () => {
     await page.goto("/");
     await waitForJourney(page);
     await scrollToId(page, "record", 120);
-    await page.waitForTimeout(300);
+    await frames(page); // the scroll has been sampled
     const before = await page.locator("#record").evaluate((el) => el.getBoundingClientRect().top);
+    const drift = async () => Math.abs((await page.locator("#record").evaluate((el) => el.getBoundingClientRect().top)) - before);
     const away = page.getByLabel("Primary").getByRole("link", { name: "Watchlist" });
     await away.click();
     await expect(page).toHaveURL(/\/watchlist/);
     await page.goBack();
     await waitForJourney(page);
-    await page.waitForTimeout(400);
-    expect(Math.abs((await page.locator("#record").evaluate((el) => el.getBoundingClientRect().top)) - before)).toBeLessThanOrEqual(4);
+    await expect.poll(drift).toBeLessThanOrEqual(4); // the restore has landed
     await page.goForward();
     await expect(page).toHaveURL(/\/watchlist/);
     await page.goBack();
     await waitForJourney(page);
-    await page.waitForTimeout(400);
-    expect(Math.abs((await page.locator("#record").evaluate((el) => el.getBoundingClientRect().top)) - before)).toBeLessThanOrEqual(4);
+    await expect.poll(drift).toBeLessThanOrEqual(4);
   });
 });
 ```
@@ -2161,18 +2216,76 @@ Expected: the first test FAILS, with 02's top far from the masthead's foot: the 
 
 - [ ] **Step 3: Implement**
 
-In `chapters.ts`'s `startPlaceGuard`, after the `learn` listeners, add:
+In `chapters.ts`, this task adds a writer of the guard's box, so the box and the reader's place leave module level for `startPlaceGuard`'s closure first (Global Constraints: journey state lives per `startJourney`; J5 pre-flight #17). `settlePlace` takes them and returns the new pair. Delete the two module-level lines `let placeBox: Span = { top: 0, bottom: 0 };` and `let lastScrollY = 0;` (keep the long comment above them: it now introduces `settlePlace`), and replace `settlePlace` with:
 ```ts
+/** Where the reader was, and #how's document box then: the guard's state, kept in its closure. */
+interface Place {
+  readonly box: Span;
+  readonly y: number;
+}
+
+/** Above 02's old start: nothing. Inside it: 02's new start, at its landing under the masthead. At or past its
+ * old end: the same distance past its new end (the height's change, plus its top's when the width moved it).
+ * Returns the place to judge the next change from. */
+function settlePlace(section: HTMLElement, was: Place): Place {
+  const now = docBox(section);
+  const { y } = was;
+  if (y >= was.box.bottom) window.scrollTo({ top: y + now.bottom - was.box.bottom, behavior: "instant" });
+  else if (y > was.box.top) window.scrollTo({ top: now.top - Number.parseFloat(getComputedStyle(section).scrollMarginTop), behavior: "instant" });
+  return { box: now, y: window.scrollY };
+}
+```
+Then replace `startPlaceGuard` with the following. The only behaviour it adds is `refresh` on `LAYOUT_EVENT` (J5-19); the rest is the same code reading its closure's `place` instead of the module's two lets. `LAYOUT_EVENT` is already imported there.
+```ts
+/** Started once, for the journey's whole lifetime (start-journey.ts calls this: it must already be watching
+ * when a Motion toggle collapses #how, and survive the rebuild that follows), and stopped only with it. */
+export function startPlaceGuard(): Teardown {
+  const section = document.getElementById("how");
+  if (!section) return () => {};
+  let place: Place = { box: docBox(section), y: window.scrollY };
+  let lastSize = sizeOf(section);
+  const unchanged = () => {
+    const size = sizeOf(section);
+    return size.width === lastSize.width && size.height === lastSize.height;
+  };
+  // The reader's place, only while #how is still the size this guard last settled.
+  const learn = () => {
+    if (unchanged()) place = { ...place, y: window.scrollY };
+  };
+  window.addEventListener("scroll", learn, { passive: true });
+  window.addEventListener(MOTION_BEFORE_EVENT, learn);
   // The drawing above 02 (GA, J5) pins and unpins, which moves #how's document box without resizing it. While #how
   // is the size this guard last settled, every layout change refreshes the box it judges against; a change that did
   // resize #how is the observer's, below, and must be judged against the box from before it.
   const refresh = () => {
-    const size = sizeOf(section);
-    if (size.width === lastSize.width && size.height === lastSize.height) placeBox = docBox(section);
+    if (unchanged()) place = { ...place, box: docBox(section) };
   };
   window.addEventListener(LAYOUT_EVENT, refresh);
+  // A freshly observed target always delivers one initial notification, even when nothing has actually
+  // changed (the spec guarantees it) — this observer never fires on its own just because something above
+  // #how changed size and moved it; only #how's own border-box actually changing size does that, or this
+  // guaranteed-but-empty first delivery. Treating that first delivery as a real resize (the previous bug
+  // here) reads whatever #how's box happens to be at that moment — including a document position already
+  // shifted by content above it, before #how itself ever resized — as #how's own change, and relocates a
+  // reader who never left where they were reading. The box this guard compares against still refreshes every
+  // time (so a later, real resize is judged from here, never a stale one) — only the relocation itself waits
+  // for #how's own box to actually change size.
+  const observer = new ResizeObserver(() => {
+    const resized = !unchanged();
+    lastSize = sizeOf(section);
+    if (resized) place = settlePlace(section, place);
+    else place = { ...place, box: docBox(section) };
+  });
+  observer.observe(section, { box: "border-box" });
+  return () => {
+    window.removeEventListener("scroll", learn);
+    window.removeEventListener(MOTION_BEFORE_EVENT, learn);
+    window.removeEventListener(LAYOUT_EVENT, refresh);
+    observer.disconnect();
+  };
+}
 ```
-Then add `window.removeEventListener(LAYOUT_EVENT, refresh);` to its teardown. `LAYOUT_EVENT` is already imported there.
+`place` and `lastSize` are closure state (`let` in a closure that needs it). Nothing else in the codebase reads `placeBox`, `lastScrollY` or `settlePlace` (`still.ts:149-150` names `settlePlace` only in a comment, which stays true).
 
 In `place-memory.ts`:
 - `parsePlace` refuses an empty entry: `if (typeof entry !== "string" || entry === "" || typeof id !== "string" || !IDS.includes(id)) return null;`
@@ -2222,7 +2335,7 @@ If "Back, Forward, then Back again" is still red, stop here and report the three
 
 ```bash
 npm run check
-git add src/components/landing/journey/chapters.ts src/components/landing/journey/place-memory.ts tests/unit/components/landing/journey/place-memory.test.tsx tests/e2e/journey/place.spec.ts
+git add src/components/landing/journey/chapters.ts src/components/landing/journey/place-memory.ts tests/unit/components/landing/journey/place-memory.test.tsx tests/e2e/journey/place.spec.ts tests/e2e/journey/journey-helpers.ts
 git commit -m "fix(journey): keep the reader's place when the page above 02 changes, and on Back, Forward, Back"
 ```
 
@@ -2244,13 +2357,13 @@ git commit -m "fix(journey): keep the reader's place when the page above 02 chan
 **Files:**
 - Modify: `src/components/landing/journey/drawing-mode.ts`, `drawing.ts`, `start-journey.ts`, `still.ts`
 - Create: `src/components/landing/journey/webgl-probe.ts`, `tests/unit/components/landing/journey/journey-context.ts` (a test helper)
-- Test: `tests/unit/components/landing/journey/{drawing-mode.test.ts,drawing.test.tsx,start-journey.test.tsx,webgl-probe.test.ts,still.test.tsx}`, and every other unit test that builds a `JourneyContext`
+- Test: `tests/unit/components/landing/journey/{drawing-mode.test.ts,drawing.test.tsx,start-journey.test.tsx,webgl-probe.test.tsx,still.test.tsx}`, and every other unit test that builds a `JourneyContext`
 
 **Interfaces:**
 - Consumes: `WEBGL_EVENT`, `WebglDetail` (Task 4); `Engine` (Task 4, as a type only).
 - Produces:
   - `drawing-mode.ts`: `DRAWING_REASONS` gains `"place"` (last); `wantsScene(reasons: Reasons): boolean`; `startingReasons({ motion, saver, quality, place })`; `placeAfter(before: { top; bottom; height }, after: { top; height }, at: { scrollY; viewport; masthead }): number | null`. `keepsPlace` is removed.
-  - `drawing.ts`: `type Begin = () => Teardown`; `type LoadLive = (ask: Ask, ctx: JourneyContext) => Promise<Begin>`; `drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2): JourneyModule`; `noLiveDrawing`; `startDrawing` (still `drawingModule(noLiveDrawing)` until Task 7).
+  - `drawing.ts`: `type Begin = () => Teardown`; `type LoadLive = (ask: Ask, ctx: JourneyContext) => Promise<Begin>`; `drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2): JourneyModule`; `noLiveDrawing`; `storedQuality(): string | null` (exported; Task 7's `scene/live.ts` imports it rather than repeating it); `startDrawing` (still `drawingModule(noLiveDrawing)` until Task 7).
   - `webgl-probe.ts`: `webgl2(): boolean`.
   - `start-journey.ts`: `JourneyContext` gains `readonly scene: Kept<Promise<Engine> | null>` and `readonly atEnd: (stop: Teardown) => void`; `interface Lifetime { atEnd(stop: Teardown): void; end(): void }`; `lifetime(): Lifetime`.
   - Test helper `testContext(overrides?: Partial<JourneyContext>): JourneyContext`.
@@ -2276,7 +2389,14 @@ export function testContext(overrides: Partial<JourneyContext> = {}): JourneyCon
   };
 }
 ```
-Run `grep -rln "still: keep" tests/unit` and, in every file it lists, replace the file's own context builder with `testContext({ motion })` (or `testContext()`), importing it from `./journey-context`. The rail's `strip.test.tsx` should already be gone with the rail.
+Run `grep -rn "still: keep" tests/unit` and, at every call it lists, replace the literal context with `testContext({ motion, intro, result })`, passing only the fields that differ from the helper's defaults (Motion on, no intro, a fresh `result`), so each file keeps its own overrides. Import `testContext` from `./journey-context`, and drop any import (`keep`, `ResultDetail`, `JourneyContext`) the file no longer uses. On the branch today that is:
+- `board.test.tsx:18`: `testContext()`;
+- `drawing.test.tsx:7`: `const ctx = (motion: boolean): JourneyContext => testContext({ motion });`;
+- `hero.test.tsx:28` and `:44`: `testContext({ result: kept })`, and `:35`: `testContext({ motion: false, result: kept })`. The three share the one `kept` result: that shared result is what the test proves (the face survives a rebuild);
+- `hero.test.tsx:55`: `testContext()`;
+- `strokes.test.tsx:69`: `testContext({ intro: true })` (the intro's rings are what it tears down); `:78` and `:91`: `testContext()`.
+
+The rail's `strip.test.tsx` went with the rail (#80).
 
 `tests/unit/components/landing/journey/drawing-mode.test.ts`:
 - Import `placeAfter` and `wantsScene` instead of `keepsPlace`.
@@ -2306,7 +2426,7 @@ Run `grep -rln "still: keep" tests/unit` and, in every file it lists, replace th
     expect(placeAfter({ top: -2000, bottom: 2160, height: 4160 }, { top: -2000, height: 4160.5 }, at)).toBeNull();
   });
 ```
-`tests/unit/components/landing/journey/webgl-probe.test.ts` (jsdom; name it `.test.tsx` if the jsdom environment is picked by extension, as this repo does):
+`tests/unit/components/landing/journey/webgl-probe.test.tsx` (`.test.tsx`: this repo's vitest config gives jsdom only to `.test.tsx`, and the probe needs a document):
 ```ts
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { webgl2 } from "@/components/landing/journey/webgl-probe";
@@ -2340,11 +2460,6 @@ const html = document.documentElement;
 beforeEach(() => {
   document.body.innerHTML = `<section id="anatomy"><div class="anatomy-pin is-columns"><div class="anatomy-copy"></div><div class="anatomy-still"></div><svg class="callout-lines"></svg><ol class="callouts"><li class="callout" data-part="shell" data-side="right" style="top: 40px"></li></ol><div class="title-block"></div></div></section>`;
   vi.stubGlobal("matchMedia", () => ({ matches: true, addEventListener: () => undefined, removeEventListener: () => undefined }));
-  vi.stubGlobal("ResizeObserver", class {
-    observe(): void {}
-    unobserve(): void {}
-    disconnect(): void {}
-  });
   Object.defineProperty(document, "fonts", { configurable: true, value: { ready: Promise.resolve() } });
   html.dataset.drawing = "still";
 });
@@ -2370,16 +2485,20 @@ describe("the still's labels when the drawing goes live (J5-5)", () => {
     stop();
   });
 
-  it("never lights a label while the drawing is live", () => {
+  it("never lights or dims a label while the drawing is live: .is-hot is the live drawing's then", () => {
     const stop = startStill(testContext());
     html.dataset.drawing = "live";
-    document.querySelector(".callout")?.dispatchEvent(new PointerEvent("pointerenter"));
-    expect(document.querySelector(".callout")?.classList.contains("is-hot")).toBe(false);
+    const label = document.querySelector(".callout")!;
+    label.dispatchEvent(new PointerEvent("pointerenter"));
+    expect(label.classList.contains("is-hot")).toBe(false);
+    label.classList.add("is-hot"); // lit by the live drawing (scene/live.ts)
+    label.dispatchEvent(new PointerEvent("pointerleave"));
+    expect(label.classList.contains("is-hot")).toBe(true);
     stop();
   });
 });
 ```
-If jsdom lacks `PointerEvent`, use `new Event("pointerenter")`.
+If jsdom lacks `PointerEvent`, use `new Event("pointerenter")` and `new Event("pointerleave")`. `tests/setup.ts` already defines `ResizeObserver` (non-configurable, so a `vi.stubGlobal` of it would throw); the test stubs only `matchMedia`.
 
 `tests/unit/components/landing/journey/start-journey.test.tsx`: import `lifetime`, and add:
 ```ts
@@ -2646,7 +2765,9 @@ export const noLiveDrawing: LoadLive = () => Promise.reject(new Error("no live d
 const PINNED = "is-live";
 const PLACE_EVENTS = ["scroll", "resize", LAYOUT_EVENT] as const;
 
-function storedQuality(): string | null {
+/** This session's tt.q: a quality step, "still" (the floor), or nothing. The live chapter imports this one reader
+ * for the governor's starting step rather than repeating it (J5 pre-flight #15). */
+export function storedQuality(): string | null {
   try {
     return window.sessionStorage.getItem(QUALITY_STORAGE_KEY);
   } catch {
@@ -2866,7 +2987,16 @@ export const startDrawing = drawingModule(noLiveDrawing);
 ```
 - Listen with `onDrawing` for `DRAWING_EVENT` in place of `schedule` (and remove it on teardown).
 - At the top of `layout()`, after `frame = 0;`, add `if (document.documentElement.dataset.drawing !== "still") return standAside();`.
-- In the labels' `enter` handler, light only while the still draws: `if (fine.matches && document.documentElement.dataset.drawing === "still") light(label.dataset.part ?? null);`.
+- In the labels' `enter` and `leave` handlers, light and dim only while the still draws, so `.is-hot` has one writer at a time (the live drawing's `setHot` while live):
+```ts
+    const enter = () => {
+      if (fine.matches && document.documentElement.dataset.drawing === "still") light(label.dataset.part ?? null);
+    };
+    const leave = () => {
+      if (document.documentElement.dataset.drawing === "still") light(null);
+    };
+```
+  `standAside`'s one `light(null)` at the switch to live stays: it hands the labels over clean.
 - Update the header comment: "…the live drawing (J5) takes the labels over, and this module stands aside."
 
 - [ ] **Step 4: Run them to see them pass**
@@ -2904,18 +3034,19 @@ J4's still specs are pinned to the still (J5-12).
 **Files:**
 - Create: `src/components/landing/journey/scene/scene-mark.ts`, `scene/live.ts`, `src/components/landing/journey/live-labels.ts`
 - Modify: `src/components/landing/journey/drawing.ts` (the real loader), `journey-events.ts` (`DEPART_EVENT`, `THEME_EVENT`), `drawing-chapter.tsx`, `src/messages/en-IN/home.ts`, `src/styles/journey.css`, `src/styles/journey-island.css`
+- Modify, only if CI's Chromium reports no WebGL (Step 1): `playwright.config.ts` (the SwiftShader flag)
 - Test: `tests/unit/components/landing/journey/{live-labels.test.tsx,drawing-chapter.test.tsx,drawing.test.tsx}`; create `tests/e2e/journey/live-drawing.spec.ts`; modify `tests/e2e/journey/{journey-helpers.ts,drawing-checks.ts,drawing.spec.ts,collisions.spec.ts,drawing-modes.spec.ts,teardown.spec.ts}`
 
 **Interfaces:**
-- Consumes: everything from Tasks 2–4 and 6; `Box`, `distribute`, `columnsZone`, `columnsFit`, `leaderFrom` (`labels-layout.ts`); `anatomyPose`, `terminusPose` (J4); `track` (`observers.ts`); `SMOOTH` (`motion-tokens.ts`).
+- Consumes: everything from Tasks 2–4 and 6, including `storedQuality` (`drawing.ts`, Task 6); `frames` (`journey-helpers.ts`, Task 5); `Box`, `distribute`, `columnsZone`, `columnsFit`, `leaderFrom` (`labels-layout.ts`); `anatomyPose`, `terminusPose` (J4); `track` (`observers.ts`); `SMOOTH` (`motion-tokens.ts`).
 - Produces:
   - `scene-mark.ts`: `SCENE_CHUNK_MARK = "tt-scene-chunk"`.
   - `scene/live.ts`: `prepareLive(ask: Ask, ctx: JourneyContext): Promise<Begin>`; it re-exports `SCENE_CHUNK_MARK`, and declares the dev-only `window.__ttJourney?: JourneyProbe` with `anatomy(): number`, `terminus(): number`, `quality(): number`, `night(): boolean`, `box(): Box | null` and `inked(selector: string): number`.
   - `live-labels.ts`: `revealOf(i: number, callouts: number): number`; `wipe(t: number): string`; `interface LiveLabels { pin; labels; layout(): Box | null; listMode(): boolean; beside(): boolean; draw(anchorOf, reveal): void; clear(): void }`; `createLiveLabels(section: HTMLElement): LiveLabels | null`.
-  - `drawing.ts`: `LOAD_LIMIT_MS = 20_000`; `loadScene: LoadLive`; `startDrawing = drawingModule(loadScene)`.
+  - `drawing.ts`: `LOAD_LIMIT_MS = 20_000`; `sceneLoader(importScene?: () => Promise<{ prepareLive: LoadLive }>): LoadLive` (the import defaults to `import("./scene/live")`); `loadScene: LoadLive = sceneLoader()`; `startDrawing = drawingModule(loadScene)`.
   - `journey-events.ts`: `DEPART_EVENT = "tt:depart"`, `THEME_EVENT = "tt:theme"`.
   - `messages.home.drawing`: `caption`, `dims: { length, height }`, `nameboard: { platform, departures }`.
-  - E2E helpers: `waitForLive(page)`, `drawStill(page)`, `scrollIntoChapter(page, p)`, `blockSceneChunk(page)`.
+  - E2E helpers: `waitForLive(page)`, `drawStill(page)`, `scrollIntoChapter(page, p)`; `blockChunk(page, mark)`, with `blockJourneyChunk(page)` (J4's, now a one-line wrapper) and `blockSceneChunk(page)` wrapping it.
 
 - [ ] **Step 1: Prove WebGL where the tests run, then write the failing tests**
 
@@ -2925,7 +3056,7 @@ node -e 'import("@playwright/test").then(async ({ chromium }) => { const b = awa
 ```
 Expected: `true`.
 
-CI's Linux runner is checked by this task's e2e on the PR. If CI reports `data-drawing-why` of `webgl`, add `launchOptions: { args: ["--enable-unsafe-swiftshader"] }` to the `desktop` and `mobile` projects in `playwright.config.ts`, and say so in the PR.
+CI's Linux runner is checked by this task's e2e on the PR. If CI reports `data-drawing-why` of `webgl`, add `launchOptions: { args: ["--enable-unsafe-swiftshader"] }` to the `desktop` and `mobile` projects in `playwright.config.ts`, commit it with this task (Step 8's `git add` names it), and say so in the PR.
 
 `tests/unit/components/landing/journey/live-labels.test.tsx`:
 ```ts
@@ -2987,13 +3118,43 @@ In `tests/unit/components/landing/journey/drawing-chapter.test.tsx`, add:
     expect(container.querySelector(".anatomy-caption")).toHaveTextContent("Scroll · the drawing turns, comes apart, couples up and departs");
   });
 ```
-In `tests/unit/components/landing/journey/drawing.test.tsx`, add:
+In `tests/unit/components/landing/journey/drawing.test.tsx`, add `LOAD_LIMIT_MS` and `sceneLoader` to the drawing import, and add:
 ```ts
-  it("gives up on a scene that has not arrived in 20 s (spec §3.C, load)", () => {
-    expect(LOAD_LIMIT_MS).toBe(20_000);
+describe("the scene's 20 s limit (spec §3.C, load; J5-11)", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("gives up on a scene chunk that never arrives at 20 s, and draws still for load", async () => {
+    vi.useFakeTimers();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    // an import that never settles: only the limit can end the wait
+    const stop = drawingModule(sceneLoader(() => new Promise(() => undefined)), () => true)(testContext());
+    await vi.advanceTimersByTimeAsync(LOAD_LIMIT_MS - 1);
+    expect(html.dataset.drawingWhy).toBe("");
+    expect(warn).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(html.dataset.drawingWhy).toBe("load");
+    expect(warn).toHaveBeenCalledWith(expect.any(String), new Error("the live drawing took over 20 s to arrive"));
+    stop();
+    warn.mockRestore();
   });
+});
 ```
-`tests/e2e/journey/journey-helpers.ts`: import `SCENE_CHUNK_MARK` from `@/components/landing/journey/scene/scene-mark`, and add:
+`tests/e2e/journey/journey-helpers.ts`: import `SCENE_CHUNK_MARK` from `@/components/landing/journey/scene/scene-mark`. Replace `blockJourneyChunk` with one helper for any chunk and a one-line wrapper (J5 pre-flight #15):
+```ts
+/** Aborts the one script chunk that carries `mark`, found by its content, so its hashed name never matters. */
+export async function blockChunk(page: Page, mark: string): Promise<void> {
+  await page.route("**/_next/static/**/*.js", async (route) => {
+    const response = await route.fetch();
+    const body = await response.text();
+    if (body.includes(mark)) return route.abort();
+    return route.fulfill({ response, body });
+  });
+}
+
+/** Aborts the journey chunk. */
+export const blockJourneyChunk = (page: Page): Promise<void> => blockChunk(page, JOURNEY_CHUNK_MARK);
+```
+Then add:
 ```ts
 /** The drawing is live and pinned: the scene loaded, the engine built, the chapter began. */
 export async function waitForLive(page: Page): Promise<void> {
@@ -3022,15 +3183,8 @@ export async function scrollIntoChapter(page: Page, p: number): Promise<void> {
   await expect.poll(() => page.evaluate(() => window.__ttJourney?.anatomy() ?? -1), { timeout: 5_000 }).toBeCloseTo(p, 1);
 }
 
-/** Aborts the scene chunk (three.js and the live drawing), found by its content. */
-export async function blockSceneChunk(page: Page): Promise<void> {
-  await page.route("**/_next/static/**/*.js", async (route) => {
-    const response = await route.fetch();
-    const body = await response.text();
-    if (body.includes(SCENE_CHUNK_MARK)) return route.abort();
-    return route.fulfill({ response, body });
-  });
-}
+/** Aborts the scene chunk (three.js and the live drawing). */
+export const blockSceneChunk = (page: Page): Promise<void> => blockChunk(page, SCENE_CHUNK_MARK);
 ```
 In `tests/e2e/journey/drawing-checks.ts`, let `drawingCollisions` read the live drawing too. Replace the start of the function's `page.evaluate` body, up to the `const pr = pin.getBoundingClientRect();` line, with:
 ```ts
@@ -3068,7 +3222,7 @@ Then change the leaders' selector from `".callout-lines line"` to `live ? ".live
 import { expect, test } from "../fixtures";
 import { collisionsInView } from "./collisions";
 import { drawingCollisions } from "./drawing-checks";
-import { scrollIntoChapter, scrollToId, waitForLive } from "./journey-helpers";
+import { frames, scrollIntoChapter, scrollToId, waitForLive } from "./journey-helpers";
 
 test.describe("the train, drawn live (spec §3.A, §3.C)", () => {
   test("loads its scene, pins the chapter and draws into its stage", async ({ page }) => {
@@ -3087,7 +3241,7 @@ test.describe("the train, drawn live (spec §3.A, §3.C)", () => {
     const seen: number[] = [];
     for (let i = 0; i < 40; i += 1) {
       await page.mouse.wheel(0, 180);
-      await page.waitForTimeout(60);
+      await frames(page, 3); // the wheel's scroll has landed and the drawing has followed it a step
       seen.push(await page.evaluate(() => window.__ttJourney?.anatomy() ?? 0));
     }
     const back = seen.filter((p, i) => i > 0 && p < seen[i - 1]! - 1e-6);
@@ -3171,7 +3325,7 @@ test.describe("nothing collides through the live chapter (spec §5)", () => {
       const found: string[] = [];
       for (let k = 0; k <= 20; k += 1) {
         await scrollIntoChapter(page, k / 20);
-        await page.waitForTimeout(80);
+        await frames(page); // the labels, leaders and figures have been placed for this progress
         for (const f of [...(await collisionsInView(page)), ...(await drawingCollisions(page))]) found.push(`${k / 20}: ${f}`);
       }
       expect(found).toEqual([]);
@@ -3180,7 +3334,7 @@ test.describe("nothing collides through the live chapter (spec §5)", () => {
 });
 ```
 Pin J4's still specs to the still (J5-12):
-- In `drawing.spec.ts` and in the `collisions.spec.ts` describe "the drawn train at #anatomy: nothing collides in columns", add `test.beforeEach(async ({ page }) => drawStill(page));`.
+- In `drawing.spec.ts` and in the `collisions.spec.ts` describe "the drawn train at #anatomy: nothing collides in columns", add `test.beforeEach(async ({ page }) => drawStill(page));`, and add `drawStill` to each file's `./journey-helpers` import: `drawing.spec.ts` imports `{ drawStill, scrollToId, waitForJourney }`, `collisions.spec.ts` imports `{ drawStill, waitForJourney }`.
 - In `drawing.spec.ts`'s first test, the expected `data-drawing-why` becomes `quality`.
 - In `drawing-modes.spec.ts`, replace "a live page fetches no still file until the page draws still" with:
 ```ts
@@ -3193,16 +3347,23 @@ Pin J4's still specs to the still (J5-12):
     await waitForLive(page);
     await scrollIntoChapter(page, 0.5);
     await scrollToId(page, "terminus");
-    await page.waitForTimeout(500);
+    // the terminus has drawn live: every stage this page shows has been drawn, and none asked for a still
+    await expect.poll(() => page.evaluate(() => window.__ttJourney?.inked(".terminus-stage") ?? 0)).toBeGreaterThan(0.002);
     expect(fetched).toEqual([]);
   });
+```
+  That test replaces the only use of `JOURNEY_CHUNK_MARK` in `drawing-modes.spec.ts`, so its imports become exactly:
+```ts
+import { expect, test } from "../fixtures";
+import { STILL_MANIFEST } from "@/components/landing/journey/still-manifest";
+import { blockJourneyChunk, motionOff, scrollIntoChapter, scrollToId, stubSaveData, waitForJourney, waitForLive } from "./journey-helpers";
 ```
 - In `teardown.spec.ts`, add `"clip-path"` to `STYLE`, so a label or figure left clipped after a live run shows as a difference.
 
 - [ ] **Step 2: Run them to see them fail**
 
 Run: `npx vitest run tests/unit/components/landing/journey/live-labels.test.tsx tests/unit/components/landing/journey/drawing-chapter.test.tsx tests/unit/components/landing/journey/drawing.test.tsx`
-Expected: FAIL. `live-labels.ts`, the new markup and `LOAD_LIMIT_MS` do not exist.
+Expected: FAIL. `live-labels.ts`, the new markup, `LOAD_LIMIT_MS` and `sceneLoader` do not exist.
 
 Then `npx playwright test tests/e2e/journey/live-drawing.spec.ts --project=desktop`.
 Expected: FAIL at `waitForLive`. `#anatomy` never gets `is-live`, because `startDrawing` still uses `noLiveDrawing`.
@@ -3412,8 +3573,7 @@ export function createLiveLabels(section: HTMLElement): LiveLabels | null {
       delete pin.dataset.live;
       pin.removeAttribute("data-compact");
       pin.style.removeProperty("--anatomy-copy-h");
-      resetLabels();
-      for (const l of labels) l.classList.remove("is-hot");
+      resetLabels(); // .is-hot is scene/live.ts's: its teardown's setHot(null) clears it
     },
   };
 }
@@ -3427,7 +3587,7 @@ import { animate, onScroll } from "animejs";
 import { Vector3, type PerspectiveCamera } from "three";
 import { QUALITY_STORAGE_KEY } from "@/components/motion/motion-boot";
 import { messages } from "@/messages";
-import type { Ask, Begin } from "../drawing";
+import { storedQuality, type Ask, type Begin } from "../drawing";
 import { createGovernor, startLevel } from "../governor";
 import { DEPART_EVENT, LAYOUT_EVENT, THEME_EVENT, emit } from "../journey-events";
 import type { Box } from "../labels-layout";
@@ -3492,14 +3652,6 @@ function pause(): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, 0));
 }
 
-function storedQuality(): string | null {
-  try {
-    return window.sessionStorage.getItem(QUALITY_STORAGE_KEY);
-  } catch {
-    return null;
-  }
-}
-
 /** The engine for this journey: built once, a part at a time, and disposed when the journey ends (J5-4). */
 function engineFor(ctx: JourneyContext): Promise<Engine> {
   const held = ctx.scene.get();
@@ -3516,7 +3668,10 @@ function engineFor(ctx: JourneyContext): Promise<Engine> {
   ctx.scene.set(made);
   ctx.atEnd(() => {
     void made.then(
-      (engine) => engine.dispose(),
+      (engine) => {
+        engine.dispose();
+        canvas.remove();
+      },
       () => canvas.remove(),
     );
   });
@@ -3552,7 +3707,7 @@ function startLive(engine: Engine, ask: Ask): Teardown {
   let alive = true;
   let drawnKey = "";
   engine.setPalette(palette()); // the theme may have changed while nothing live listened
-  engine.show(true);
+  engine.canvas.hidden = false; // this module owns the canvas element: it shows only while the drawing is live
 
   // ---- pointing: a label lights its part, a part lights its label (fine pointers only)
   let hot: RigPartId | null = null;
@@ -3766,7 +3921,7 @@ function startLive(engine: Engine, ask: Ask): Teardown {
     engine.removeView("anatomy");
     engine.removeView("terminus");
     engine.frame(); // nothing left on screen: clears the canvas
-    engine.show(false);
+    engine.canvas.hidden = true;
     if (process.env.NODE_ENV !== "production") delete window.__ttJourney;
   };
 }
@@ -3778,21 +3933,31 @@ If the file passes 500 lines once formatted, move `engineFor` and `pause` into `
 /** The scene chunk may take this long to arrive before the page gives up and draws still (spec §3.C, load; J5-11). */
 export const LOAD_LIMIT_MS = 20_000;
 
-/** The live drawing's only door: the scene chunk (three.js), imported on demand, then its engine prepared. */
-export const loadScene: LoadLive = (ask, ctx) =>
-  new Promise<Begin>((resolve, reject) => {
-    const timer = window.setTimeout(() => reject(new Error("the live drawing took over 20 s to arrive")), LOAD_LIMIT_MS);
-    import("./scene/live").then(
-      (scene) => {
-        window.clearTimeout(timer);
-        resolve(scene.prepareLive(ask, ctx));
-      },
-      (error: unknown) => {
-        window.clearTimeout(timer);
-        reject(error);
-      },
-    );
-  });
+/** The scene chunk's one export this module calls. */
+interface SceneChunk {
+  readonly prepareLive: LoadLive;
+}
+
+/** The live drawing's only door: the scene chunk (three.js), imported on demand, then its engine prepared. A unit test
+ * passes an import that never settles, to prove the limit (J5 pre-flight #14). */
+export function sceneLoader(importScene: () => Promise<SceneChunk> = () => import("./scene/live")): LoadLive {
+  return (ask, ctx) =>
+    new Promise<Begin>((resolve, reject) => {
+      const timer = window.setTimeout(() => reject(new Error("the live drawing took over 20 s to arrive")), LOAD_LIMIT_MS);
+      importScene().then(
+        (scene) => {
+          window.clearTimeout(timer);
+          resolve(scene.prepareLive(ask, ctx));
+        },
+        (error: unknown) => {
+          window.clearTimeout(timer);
+          reject(error);
+        },
+      );
+    });
+}
+
+export const loadScene: LoadLive = sceneLoader();
 
 export const startDrawing = drawingModule(loadScene);
 ```
@@ -3877,7 +4042,7 @@ Expected: PASS, including every existing journey spec. If `teardown.spec.ts` sho
 
 ```bash
 npm run check
-git add src/components/landing/journey src/messages/en-IN/home.ts src/styles/journey.css src/styles/journey-island.css tests/unit/components/landing/journey tests/e2e/journey
+git add src/components/landing/journey src/messages/en-IN/home.ts src/styles/journey.css src/styles/journey-island.css playwright.config.ts tests/unit/components/landing/journey tests/e2e/journey
 git commit -m "feat(journey): the train, drawn live: the scene on demand, the pinned chapter, its labels and the terminus"
 ```
 
@@ -4059,12 +4224,16 @@ describe("the frame meter (J5-10)", () => {
     expect(frameStats([], [], 0)).toEqual({ fps: 0, p95: 0, slow: 0, longs: 0, longMax: 0 });
   });
 
-  it("stands in the page's corner, says which drawing is shown and why, and closes", () => {
+  it("says which drawing is shown and why, in the review's own words, and closes", () => {
     document.documentElement.dataset.drawing = "still";
     document.documentElement.dataset.drawingWhy = "saver";
     const stop = startHud();
     const hud = document.querySelector(".journey-hud");
     expect(hud).not.toBeNull();
+    const text = hud?.querySelector("pre")?.textContent ?? "";
+    expect(text).toContain("drawing still (data saver)");
+    expect(text).not.toContain("quality"); // the quality step is a live drawing's
+    expect(text).toMatch(/^fps \d+ {3}p95 [\d.]+ ms {3}slow [\d.]+%$/m);
     hud?.querySelector<HTMLButtonElement>('button[aria-label="Close the frame meter"]')?.click();
     expect(document.querySelector(".journey-hud")).toBeNull();
     stop();
@@ -4073,7 +4242,7 @@ describe("the frame meter (J5-10)", () => {
   });
 });
 ```
-The meter's text is checked in the e2e. In `journey-loader.test.tsx`, add:
+Its corner is CSS (`journey-island.css`), which jsdom does not load, so the e2e below checks it. In `journey-loader.test.tsx`, add:
 ```ts
   it("tells the journey whether the frame meter is allowed", async () => {
     const startJourney = vi.fn(() => () => {});
@@ -4096,6 +4265,11 @@ test("the frame meter shows only when asked for, says which drawing is shown, an
   const hud = page.locator(".journey-hud");
   await expect(hud).toBeVisible();
   await expect(hud).toContainText(/drawing (live|still)/);
+  await expect(hud).toContainText(/fps \d+ {3}p95/);
+  // the page's bottom-right corner, 12px in (journey-island.css)
+  const box = await hud.boundingBox();
+  const size = page.viewportSize();
+  expect(box && size ? [Math.round(size.width - box.x - box.width), Math.round(size.height - box.y - box.height)] : null).toEqual([12, 12]);
   await hud.getByRole("button", { name: "Close the frame meter" }).click();
   await expect(hud).toHaveCount(0);
 });
@@ -4238,7 +4412,10 @@ export function startHud(): Teardown {
   };
   copy.addEventListener("click", () => {
     const report = `Trakline journey · ${new Date().toISOString()}\n${text()}`;
-    navigator.clipboard.writeText(report).then(
+    // An insecure page has no clipboard: navigator.clipboard is undefined there, whatever lib.dom's type says.
+    const clipboard: Clipboard | undefined = navigator.clipboard;
+    const written = clipboard ? clipboard.writeText(report) : Promise.reject(new Error("no clipboard"));
+    written.then(
       () => {
         copy.textContent = "Copied";
       },
@@ -4258,7 +4435,6 @@ export function startHud(): Teardown {
   return stop;
 }
 ```
-`navigator.clipboard` can be undefined on an insecure page; guard it with `navigator.clipboard?.writeText(report) ?? Promise.reject(new Error("no clipboard"))`.
 
 In `start-journey.ts`:
 ```ts
@@ -4359,7 +4535,11 @@ describe("the journey's chunk budgets (spec §3.H; J5-15)", () => {
   });
 });
 ```
-In `tests/e2e/journey/drawing-modes.spec.ts`, import `blockSceneChunk`, `drawStill`, `waitForLive` and `scrollToId`, and add:
+In `tests/e2e/journey/drawing-modes.spec.ts`, add `blockSceneChunk` and `drawStill` to its `./journey-helpers` import (Task 7 already brought in `waitForLive`, `scrollIntoChapter` and `scrollToId`), so it reads:
+```ts
+import { blockJourneyChunk, blockSceneChunk, drawStill, motionOff, scrollIntoChapter, scrollToId, stubSaveData, waitForJourney, waitForLive } from "./journey-helpers";
+```
+Then add:
 ```ts
 /** Every script response carrying three.js; its renderer's own message text survives minification. */
 function watchThree(page: import("@playwright/test").Page): () => readonly string[] {
@@ -4382,6 +4562,8 @@ test.describe("J5: every reason not to draw live (spec §3.C, §4)", () => {
     await page.goto("/");
     await waitForJourney(page);
     await expect(page.locator("html")).toHaveAttribute("data-drawing-why", "motion");
+    // A window is the assertion: nothing is asked for, so there is no state to wait on; 1.5 s is longer than a
+    // prepare would take to start the scene's import.
     await page.waitForTimeout(1_500);
     expect(three()).toEqual([]);
   });
@@ -4398,6 +4580,7 @@ test.describe("J5: every reason not to draw live (spec §3.C, §4)", () => {
     await waitForJourney(page);
     await expect(page.locator("html")).toHaveAttribute("data-drawing-why", "webgl");
     await expect(drawn(page).first()).toBeAttached();
+    // A window is the assertion: a download that never starts has no state to wait on.
     await page.waitForTimeout(1_500);
     expect(three()).toEqual([]);
   });
@@ -4415,8 +4598,11 @@ test.describe("J5: every reason not to draw live (spec §3.C, §4)", () => {
     await expect(page.locator("#anatomy")).not.toHaveClass(/is-live/);
     await expect(drawn(page).first()).toBeAttached();
     await page.evaluate(() => {
+      // WEBGL_lose_context is an interface in lib.dom, not a constructor, so the extension is narrowed by its method.
       const lose: unknown = Reflect.get(window, "__lose");
-      if (lose instanceof WEBGL_lose_context) lose.restoreContext();
+      const restore: unknown = typeof lose === "object" && lose !== null ? Reflect.get(lose, "restoreContext") : undefined;
+      if (typeof restore !== "function") throw new Error("no restoreContext");
+      Reflect.apply(restore, lose, []);
     });
     await waitForLive(page);
   });
@@ -4437,6 +4623,7 @@ test.describe("J5: every reason not to draw live (spec §3.C, §4)", () => {
     await page.goto("/");
     await waitForJourney(page);
     await expect(page.locator("html")).toHaveAttribute("data-drawing-why", "quality");
+    // A window is the assertion: a download that never starts has no state to wait on.
     await page.waitForTimeout(1_500);
     expect(three()).toEqual([]);
   });
@@ -4451,15 +4638,21 @@ test.describe("J5: every reason not to draw live (spec §3.C, §4)", () => {
   });
 });
 ```
-If `WEBGL_lose_context` is not a global constructor in this Chromium, narrow with `typeof Reflect.get(lose, "restoreContext") === "function"` and call it through `Reflect.apply`.
 
-In `tests/e2e/journey/journey-axe.spec.ts`, import `scrollIntoChapter` and `waitForLive`, and add:
+In `tests/e2e/journey/journey-axe.spec.ts`, its imports become:
+```ts
+import { expect, test } from "../fixtures";
+import { expectAxeClean } from "../helpers";
+import { motionOff, scrollIntoChapter, scrollToId, stubSaveData, waitForJourney, waitForLive } from "./journey-helpers";
+```
+and add, inside `test.describe("axe, while the journey runs", …)`:
 ```ts
   test("clean at the drawing, live, with its labels out", async ({ page }) => {
     await page.goto("/");
     await waitForLive(page);
     await scrollIntoChapter(page, 0.4);
-    await page.waitForTimeout(600);
+    // out: every label has wiped in whole
+    await expect.poll(() => page.locator("#anatomy .callout").evaluateAll((els) => els.every((el) => getComputedStyle(el).clipPath === "none"))).toBe(true);
     await expectAxeClean(page);
   });
 
@@ -4468,7 +4661,7 @@ In `tests/e2e/journey/journey-axe.spec.ts`, import `scrollIntoChapter` and `wait
     await page.goto("/");
     await waitForLive(page);
     await scrollIntoChapter(page, 0.4);
-    await page.waitForTimeout(600);
+    await expect.poll(() => page.locator("#anatomy .callout").evaluateAll((els) => els.every((el) => getComputedStyle(el).clipPath === "none"))).toBe(true);
     await expectAxeClean(page);
   });
 ```
@@ -4562,23 +4755,27 @@ else. They rise and wipe in; they never fade.
 
 - [ ] **Step 5: The spec** (`docs/superpowers/specs/2026-09-24-landing-journey-design.md`)
 
-Precondition: the rail-removal PR owns the Masthead row and the rail's wording. If §3.A's Masthead row still describes the rail, stop and ask the owner. J5 edits only the following.
-- **§3.A, the drawn-train row.** Replace "…past masts, a signal gantry and Platform 3's nameboard; the strip glyph takes over." with "…past masts, a signal gantry and Platform 3's nameboard, and leaves the frame (J5-1)."
-- **§3.B, State.** After "CSS pins sections only under `html[data-motion="on"]`", add: "; the drawing chapter pins only under `#anatomy.is-live`, which the journey writes while the live drawing runs (J5-3)".
+The rail was removed by #80 (e7ae65e) before J5 began, and §3.A's Masthead row already records its removal; J5 leaves that row alone and edits only the following. Each edit replaces the quoted text exactly.
+- **§2, the J5 scope (its lines 53–54).** Replace "the frame meter (a review tool: preview deployments only, §3.J)" with "the frame meter (a review tool: preview deployments and development only, §3.J; J5-10)".
+- **§3.A, the drawn-train row.** Replace "; ~~the strip glyph takes over~~ (moot: the strip was removed by the owner, 2026-09-27)." with ", and leaves the frame (J5-1)." The row then reads "…past masts, a signal gantry and Platform 3's nameboard, and leaves the frame (J5-1). Night: …".
+- **§3.B, item 3, Live drawing.** Replace "When the drawing is live, the journey dynamically imports the scene chunk" with "When the drawing is live, or held still only by `place` (then the scene prepares in the background, J5-2), the journey dynamically imports the scene chunk".
+- **§3.B, State.** Rewrite the gate's clause rather than adding a second one. Replace "CSS pins sections only under `html[data-motion="on"]` and draws live only under `html[data-drawing="live"]`, so the no-JS default is static." with "CSS pins sections only under `html[data-motion="on"]`, and pins and draws the drawing chapter live only under `#anatomy.is-live`, which the journey writes while the live drawing runs, alongside `html[data-drawing="live"]` (J5-3), so the no-JS default is static."
 - **§3.B, the module map.**
   - In the Scene row, `scene/journey.ts` becomes `scene/live.ts`; add `scene/glow.ts` and `scene/scene-mark.ts`.
   - In the Client island row, add `live-labels.ts`, `webgl-probe.ts`, `hud.ts` and `hud-gate.ts`.
 - **§3.C, the reasons table.** Add the row:
   `| \`place\` | the reader is below the chapter's top when the live drawing would begin | they come back above it |`
   Under the table, add: "While `place` is the only reason, the scene still loads and builds, so the switch is immediate (J5-2)."
+- **§3.C, Still.** Replace "A still page never downloads three.js." with "A still page never downloads three.js, except while `place` is the only reason, when the scene prepares in the background (J5-2)."
 - **§3.E.** The token list becomes "(`--surface-0`, `--ink-1`, `--accent`, `--accent-text`; J5-8)".
 - **§3.J.** Add "and in development" after "preview deployments".
+- **§7, the owner's check (its lines 322–323).** Replace "frame meter on preview deployments only)" with "frame meter on preview deployments and in development only; J5-10)".
 - **§6, after "Decided while planning J4":**
 ```md
 Decided while planning J5 (2026-09-27):
 - the rail is gone, so the departure hands over to nothing: the train leaves the frame (J5-1);
 - a seventh reason, `place`, keeps a reader below the chapter on the still until they come back above it (J5-2);
-- one owner, `drawing.ts`, for the chapter's height changes and the reader's place (J5-3);
+- one owner, `drawing.ts`, for the live pin's height changes and the reader's place around them (J5-3);
 - the engine lives for the journey and is reused across rebuilds and restores (J5-4);
 - labels while live wipe in and rise, never fade, with their own writers (J5-5);
 - the palette reads four tokens (J5-8);
