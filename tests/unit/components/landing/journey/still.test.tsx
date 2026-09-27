@@ -100,4 +100,22 @@ describe("the still's columns keep a reader past them in place (J5, J6-4)", () =
     expect(scrollTo).not.toHaveBeenCalled();
     stop();
   });
+
+  it("learns the reader's own scroll while the pin is the height on record, and answers a resize that follows", () => {
+    const ctx = testContext();
+    resized(ctx);
+    const pin = document.querySelector<HTMLElement>(".anatomy-pin")!;
+    let height = 840; // still the columns the reader last saw
+    pin.getBoundingClientRect = () => ({ top: -3341, bottom: -3341 + height, height, width: 1440, left: 0, right: 1440 }) as DOMRect;
+    let y = 5355;
+    vi.spyOn(window, "scrollY", "get").mockImplementation(() => y);
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+    const stop = startStill(ctx);
+    y = 5400; // the reader scrolls by hand, a little further below the pin
+    window.dispatchEvent(new Event("scroll"));
+    height = 640; // then the window gets shorter, and nobody answers it (scroll anchoring off)
+    vi.advanceTimersToNextFrame();
+    expect(scrollTo).toHaveBeenCalledWith({ top: 5400 - 200, behavior: "instant" });
+    stop();
+  });
 });
