@@ -71,6 +71,57 @@ export async function scrollIntoRun(page: Page, p: number): Promise<void> {
   await frames(page, 2);
 }
 
+/** What happens two frames after a Tab stop takes focus, mid-glide: the drawing above falls to the still (the GPU drops
+ * its context), or the reader leaves by a drag, an instant scroll to 01's top 100px down the window, which sends no
+ * wheel, touch or key. */
+export type MidGlide = "lost" | "away";
+
+/** Readies a keyboard move onto the link named `name` inside `within`: its preceding Tab stop takes focus without
+ * scrolling, so the next Tab lands on the link as a reader's would; `then` happens two frames after it does. */
+export async function readyTab(page: Page, within: string, name: string, then?: MidGlide): Promise<void> {
+  await page.evaluate(
+    ([scope, text, mid]) => {
+      const stops = [...document.querySelectorAll<HTMLElement>("a[href], button:not([disabled]), input:not([disabled]):not([type='hidden']), select, textarea, [tabindex]")].filter(
+        (el) => el.tabIndex >= 0 && el.checkVisibility(),
+      );
+      const target = [...document.querySelectorAll<HTMLElement>(`${scope} a`)].find((a) => a.textContent?.includes(text));
+      const before = target ? stops[stops.indexOf(target) - 1] : undefined;
+      if (!target || !before) throw new Error(`no Tab stop before "${text}" in ${scope}`);
+      before.focus({ preventScroll: true });
+      if (!mid) return;
+      const act = () => {
+        if (mid === "lost") window.dispatchEvent(new CustomEvent("tt:webgl", { detail: "lost" }));
+        else {
+          const principles = document.getElementById("principles");
+          if (!principles) throw new Error("#principles is missing");
+          window.scrollTo({ top: principles.getBoundingClientRect().top + window.scrollY - 100, behavior: "instant" });
+        }
+      };
+      target.addEventListener("focus", () => requestAnimationFrame(() => requestAnimationFrame(act)), { once: true });
+    },
+    [within, name, then ?? null] as const,
+  );
+}
+
+/** The page has held its scroll for `n` frames: at rest. */
+export async function atRest(page: Page, n = 10): Promise<void> {
+  await page.evaluate(
+    (count) =>
+      new Promise<void>((done) => {
+        let last = window.scrollY;
+        let held = 0;
+        const tick = () => {
+          held = window.scrollY === last ? held + 1 : 0;
+          last = window.scrollY;
+          if (held >= count) done();
+          else requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      }),
+    n,
+  );
+}
+
 /** Aborts the scene chunk (three.js and the live drawing). */
 export const blockSceneChunk = (page: Page): Promise<void> => blockChunk(page, SCENE_CHUNK_MARK);
 

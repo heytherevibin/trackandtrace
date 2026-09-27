@@ -1,7 +1,7 @@
 import { animate, onScroll, type JSAnimation, type ScrollObserver } from "animejs";
 import { messages } from "@/messages";
 import { readerPlace } from "./drawing-mode";
-import { OWN_SCROLL, ownScroll } from "./focus-glide";
+import { keyboardFocus, watchGlide } from "./focus-glide";
 import { anchorOf, band, fitsRun, hereAt, layers, leanStep, offsets, runLayout, trainAt, type RunLayout } from "./geometry/run";
 import { LAYOUT_EVENT, emit } from "./journey-events";
 import { keepPlace, mastheadBottom } from "./keep-place";
@@ -24,6 +24,8 @@ const NS = "http://www.w3.org/2000/svg";
 const PHONE = "(max-width: 47.99rem)";
 const COARSE = "(pointer: coarse)";
 const PLACE_EVENTS = ["scroll", "resize", LAYOUT_EVENT] as const;
+/** How soon after a Tab press a focus counts as that Tab's: the same task, allowing for a slow device. */
+const TAB_FOCUS_MS = 250;
 const kmOf = (id: string): number => STATIONS.find((s) => s.id === id)?.km ?? 0;
 const KM = { from: kmOf("features"), to: kmOf("use") };
 
@@ -57,7 +59,8 @@ export function startRun({ motion }: JourneyContext): Teardown {
   let waiting = false;
   let placeFrame = 0;
   let layoutFrame = 0;
-  let aimed = -1; // the station a Tab stop's glide is bringing to the window, until it lands
+  let aimed = -1; // the station a Tab stop's glide is bringing to the window, while watch is armed for it
+  let tabAt = Number.NEGATIVE_INFINITY; // when Tab (or Shift+Tab) was last pressed
 
   /** The scroll at which station i stands at the window: the run's start (its top under the masthead) plus its anchor. */
   const stationY = (i: number, layout: RunLayout): number =>
@@ -155,6 +158,7 @@ export function startRun({ motion }: JourneyContext): Teardown {
     lean = 0;
     lastP = 0;
     aimed = -1;
+    watch.disarm();
   };
 
   const paint = () => {
@@ -257,40 +261,39 @@ export function startRun({ motion }: JourneyContext): Teardown {
     }
     driver?.observer.refresh();
     paint();
-    if (aimed >= 0) reaim(at);
     if (run.offsetHeight !== before) emit(LAYOUT_EVENT);
   };
   const soon = () => {
     if (!layoutFrame) layoutFrame = requestAnimationFrame(relayout);
   };
 
-  // Tab onto a link in a card: bring its station to the window (the page's own scroll-behavior glides it).
+  // Tab onto a link in a card: bring its station to the window (the page's own scroll-behavior glides it). Only the
+  // keyboard's focus (a Tab just pressed, and :focus-visible): a mouse's needs no glide, and focus returning to the window
+  // must not pull a reader who scrolled away back to it (Task 6 review, round 2).
+  const onKey = (event: KeyboardEvent) => {
+    if (event.key === "Tab") tabAt = event.timeStamp;
+  };
   const onFocus = (event: FocusEvent) => {
     const layout = at;
-    const station = event.target instanceof Element ? event.target.closest<HTMLElement>("[data-station]") : null;
+    const el = event.target instanceof Element ? event.target : null;
+    const station = el?.closest<HTMLElement>("[data-station]") ?? null;
     const i = station ? stations.indexOf(station) : -1;
-    if (!layout || i < 0) return;
+    if (!layout || !el || i < 0 || event.timeStamp - tabAt > TAB_FOCUS_MS || !keyboardFocus(el)) return;
+    const top = stationY(i, layout);
+    if (Math.abs(top - window.scrollY) < 1) return; // at the window already: no glide to watch
     aimed = i;
-    window.scrollTo({ top: stationY(i, layout) });
+    window.scrollTo({ top });
+    watch.arm();
   };
-  /** The glide can be cut short: a piece above moves the page (keepPlace; the drawing falling to the still under load),
-   * and an instant scroll cancels a smooth one, leaving focus off-screen (WCAG 2.4.11). After a relayout its station
-   * comes back to the window, while focus is still in it and the glide has neither landed nor met the reader's own
-   * scroll. */
-  function reaim(layout: RunLayout): void {
+  /** The glide cut short by a place-keeping jump (the drawing falling to the still under load; WCAG 2.4.11): its station
+   * back to the window, once, while focus is still in it (focus-glide.ts's watch says when). */
+  const watch = watchGlide(() => {
+    const layout = at;
     const station = stations[aimed];
-    if (!station?.contains(document.activeElement)) {
-      aimed = -1;
-      return;
-    }
-    window.scrollTo({ top: stationY(aimed, layout) });
-  }
-  const onScrollEnd = () => {
-    if (aimed >= 0 && at && Math.abs(window.scrollY - stationY(aimed, at)) < 2) aimed = -1;
-  };
-  const onOwnScroll = (event: Event) => {
-    if (ownScroll(event)) aimed = -1;
-  };
+    const i = aimed;
+    aimed = -1;
+    if (layout && station?.contains(document.activeElement)) window.scrollTo({ top: stationY(i, layout) });
+  });
   // A link to 06 or 07 (the departure board's): its first station to the window, the address, and focus in place (J6-8).
   const onClick = (event: MouseEvent) => {
     const layout = at;
@@ -310,8 +313,7 @@ export function startRun({ motion }: JourneyContext): Teardown {
   window.addEventListener("resize", soon);
   trackEl.addEventListener("focusin", onFocus);
   document.addEventListener("click", onClick);
-  window.addEventListener("scrollend", onScrollEnd);
-  for (const type of OWN_SCROLL) window.addEventListener(type, onOwnScroll, { passive: true });
+  window.addEventListener("keydown", onKey, { capture: true, passive: true });
   return () => {
     cancelAnimationFrame(placeFrame);
     cancelAnimationFrame(layoutFrame);
@@ -320,8 +322,8 @@ export function startRun({ motion }: JourneyContext): Teardown {
     window.removeEventListener("resize", soon);
     trackEl.removeEventListener("focusin", onFocus);
     document.removeEventListener("click", onClick);
-    window.removeEventListener("scrollend", onScrollEnd);
-    for (const type of OWN_SCROLL) window.removeEventListener(type, onOwnScroll);
+    window.removeEventListener("keydown", onKey, true);
+    watch.stop();
     if (!at) return;
     unpin();
     emit(LAYOUT_EVENT);

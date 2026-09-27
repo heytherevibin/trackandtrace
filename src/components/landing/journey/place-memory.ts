@@ -62,8 +62,8 @@ function navigationTarget(): EventTarget | null {
   return nav instanceof EventTarget ? nav : null;
 }
 
-/** The events that can carry the reader's own scroll; ownScroll says which of them do. */
-const HAND = ["wheel", "touchmove", "keydown"] as const;
+/** The events that can carry the reader's own scroll; ownScroll says which of them do. Shared by focus-glide.ts. */
+export const HAND = ["wheel", "touchmove", "keydown"] as const;
 /** The keys that scroll the page: the arrows up and down, Page Up and Page Down, Home, End and Space (Shift+Space up). */
 const SCROLL_KEYS: ReadonlySet<string> = new Set(["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "]);
 /** Where a key types or picks rather than scrolls. */
@@ -78,7 +78,7 @@ const TEXT_FIELD = "input, textarea, select, [contenteditable]:not([contentedita
  * - a scroll key, with focus outside a text field and no Alt, Ctrl or Meta: Alt+← and Cmd+[ are Back and Forward.
  * A swipe back, a tap and every other key leave the restore pending.
  */
-function ownScroll(event: Event): boolean {
+export function ownScroll(event: Event): boolean {
   if (event.type === "touchmove") return true;
   if (event instanceof WheelEvent) return !event.ctrlKey && Math.abs(event.deltaY) > Math.abs(event.deltaX);
   if (!(event instanceof KeyboardEvent) || !SCROLL_KEYS.has(event.key)) return false;

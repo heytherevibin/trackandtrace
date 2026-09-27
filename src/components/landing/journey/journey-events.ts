@@ -11,6 +11,9 @@ export const DRAWING_EVENT = "tt:drawing";
 export const STATION_EVENT = "tt:station";
 /** A piece's fit changed (chapters pinned ⇄ static): the whole journey rebuilds around it. */
 export const REBUILD_EVENT = "tt:rebuild";
+/** An instant scroll that keeps the reader's place (keep-place.ts's jumpTo) moved the page. Any instant scroll cancels a
+ * smooth one in flight: a Tab stop's glide cut short, which focus-glide.ts and run.ts take up again. */
+export const JUMP_EVENT = "tt:jump";
 /** A check plate repainted: how many digits it holds, and whether it is running. */
 export const PLATE_EVENT = "tt:plate";
 /** A check plate started a request. */

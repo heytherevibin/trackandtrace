@@ -1,19 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { startFocusGlide } from "@/components/landing/journey/focus-glide";
-import { LAYOUT_EVENT } from "@/components/landing/journey/journey-events";
+import { JUMP_EVENT, LAYOUT_EVENT } from "@/components/landing/journey/journey-events";
 import { testContext } from "./journey-context";
 
-// The browser glides a Tab stop into the window, and an instant scroll that keeps the reader's place (keepPlace, the
-// still's settle: the drawing falling to the still under load) cancels that glide, stranding focus off-screen at rest
-// (WCAG 2.4.11). After a layout change the glide is taken up again, while focus is still there and the reader has not
-// scrolled by their own hand.
+// The browser glides a Tab stop into the window, and an instant scroll that keeps the reader's place (jumpTo: keepPlace,
+// the still's settle, the drawing falling to the still under load) cancels that glide, stranding focus off-screen at rest
+// (WCAG 2.4.11). The glide is taken up again once, and only that: armed by keyboard focus that starts a glide, it never
+// pulls a reader who left by their own hand (a scrollbar drag sends no wheel, touch or key), and it lets go once the page
+// holds still (Task 6 review, round 2).
 
 const reveal = vi.fn();
 let box = { top: 1400, bottom: 1432 }; // below a 900px window
+let y = 0;
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
   vi.spyOn(window, "innerHeight", "get").mockReturnValue(900);
+  y = 0;
+  vi.spyOn(window, "scrollY", "get").mockImplementation(() => y);
   document.body.innerHTML = `<header></header><section id="reliability"><a href="/accuracy">Read the data policy</a></section><div id="run" class="run is-running"><section id="features"><article data-station=""><a href="/watchlist">Open Watchlist</a></article></section></div>`;
   document.querySelector("header")!.getBoundingClientRect = () => ({ bottom: 64 }) as DOMRect;
   box = { top: 1400, bottom: 1432 };
@@ -30,89 +34,167 @@ afterEach(() => {
 });
 
 const policy = () => document.querySelector<HTMLAnchorElement>("#reliability a")!;
-const refocus = () => {
-  policy().blur();
-  policy().focus();
+const frames = (n: number) => {
+  for (let k = 0; k < n; k += 1) vi.advanceTimersToNextFrame();
 };
-const layout = () => {
+/** The browser's glide: a scroll step, each frame. */
+const glide = (by = 40) => {
+  y += by;
+  window.dispatchEvent(new Event("scroll"));
+};
+/** Focus as the keyboard gives it (:focus-visible), or as a mouse does: said outright, since jsdom's own modality guess
+ * carries from test to test. */
+const modality = (el: HTMLElement, keyboard: boolean) => {
+  const own = Element.prototype.matches.bind(el);
+  vi.spyOn(el, "matches").mockImplementation((selector: string) => (selector === ":focus-visible" ? keyboard : own(selector)));
+};
+/** Focus that starts the browser's glide: the keyboard's, unless said otherwise. */
+const tabOnto = (el: HTMLElement, keyboard = true) => {
+  modality(el, keyboard);
+  el.focus();
+  glide();
+  frames(1);
+};
+/** A place-keeping jump, as the drawing falls to the still: it cuts the glide, and the page's layout changes. */
+const jump = () => {
+  window.dispatchEvent(new Event(JUMP_EVENT));
   window.dispatchEvent(new Event(LAYOUT_EVENT));
-  vi.advanceTimersToNextFrame();
 };
 
-describe("a Tab stop's glide, cut short", () => {
-  it("is taken up again after a layout change, centred so the masthead never covers it", () => {
+describe("arming: keyboard focus that starts a glide", () => {
+  it("takes a glide a jump cut short up again, once, centred so the masthead never covers it", () => {
     const stop = startFocusGlide(testContext());
-    policy().focus();
-    layout();
+    tabOnto(policy());
+    jump();
+    frames(3);
+    expect(reveal).toHaveBeenCalledTimes(1);
     expect(reveal).toHaveBeenCalledWith({ block: "center", inline: "nearest" });
-    stop();
-  });
-
-  it("is left alone once the focused element stands in the window", () => {
-    const stop = startFocusGlide(testContext());
-    policy().focus();
-    box = { top: 400, bottom: 432 };
-    layout();
-    expect(reveal).not.toHaveBeenCalled();
-    stop();
-  });
-
-  it("is let go once the glide has landed, the reader scrolls by their own hand, or focus moves on", () => {
-    const stop = startFocusGlide(testContext());
-    policy().focus();
-    box = { top: 400, bottom: 432 };
-    window.dispatchEvent(new Event("scrollend")); // landed
-    box = { top: 1400, bottom: 1432 }; // then the page moves under the reader, not by a glide
-    layout();
-    refocus();
-    window.dispatchEvent(new WheelEvent("wheel", { deltaY: 120 }));
-    layout();
-    refocus();
-    window.dispatchEvent(new KeyboardEvent("keydown", { key: "PageDown" }));
-    layout();
-    refocus();
-    policy().blur();
-    layout();
-    expect(reveal).not.toHaveBeenCalled();
-    stop();
-  });
-
-  it("is not taken up by the next key that is not a scroll (Tab itself)", () => {
-    const stop = startFocusGlide(testContext());
-    policy().focus();
-    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Shift" }));
-    layout();
+    jump(); // once: a second cut is not taken up
+    frames(3);
     expect(reveal).toHaveBeenCalledTimes(1);
     stop();
   });
 
-  it("takes up only a glide the browser began: a Tab stop already in the viewport is not scrolled for", () => {
+  it("waits for the jumps to settle: a second jump in the next frame (the still's settle) is taken up after it", () => {
     const stop = startFocusGlide(testContext());
-    box = { top: 40, bottom: 72 }; // in the viewport, if under the masthead: the browser does not scroll for it
-    policy().focus();
-    layout();
+    tabOnto(policy());
+    jump();
+    frames(1);
+    jump();
+    expect(reveal).not.toHaveBeenCalled();
+    frames(3);
+    expect(reveal).toHaveBeenCalledTimes(1);
+    stop();
+  });
+
+  it("is not armed by mouse focus, which starts no glide", () => {
+    const stop = startFocusGlide(testContext());
+    tabOnto(policy(), false);
+    jump();
+    frames(3);
     expect(reveal).not.toHaveBeenCalled();
     stop();
   });
 
-  it("leaves a station of the running window-seat run to run.ts, which brings it to the window sideways", () => {
+  it("is not armed when no scroll follows the focus within a few frames (focus returning to the window)", () => {
     const stop = startFocusGlide(testContext());
-    document.querySelector<HTMLAnchorElement>("#run a")!.focus();
-    layout();
+    modality(policy(), true);
+    policy().focus();
+    frames(4);
+    glide();
+    jump();
+    frames(3);
+    expect(reveal).not.toHaveBeenCalled();
+    stop();
+  });
+
+  it("is not armed for a Tab stop already in the viewport, nor for a station of the running run (run.ts's)", () => {
+    const stop = startFocusGlide(testContext());
+    box = { top: 40, bottom: 72 }; // in the viewport, if under the masthead: the browser does not scroll for it
+    tabOnto(policy());
+    jump();
+    frames(3);
+    box = { top: 1400, bottom: 1432 };
+    tabOnto(document.querySelector<HTMLAnchorElement>("#run a")!);
+    jump();
+    frames(3);
+    expect(reveal).not.toHaveBeenCalled();
+    stop();
+  });
+});
+
+describe("never against the reader", () => {
+  it("does not pull back a reader who left mid-glide by a drag (no wheel, touch or key): only a jump cuts a glide", () => {
+    const stop = startFocusGlide(testContext());
+    tabOnto(policy());
+    y = 1410; // a scrollbar drag, away
+    window.dispatchEvent(new Event("scroll"));
+    window.dispatchEvent(new Event(LAYOUT_EVENT));
+    window.dispatchEvent(new Event("resize"));
+    frames(3);
+    expect(reveal).not.toHaveBeenCalled();
+    stop();
+  });
+
+  it("lets go once the page has held still for ten frames: a jump after that takes nothing up", () => {
+    const stop = startFocusGlide(testContext());
+    tabOnto(policy());
+    frames(10);
+    jump();
+    frames(3);
+    expect(reveal).not.toHaveBeenCalled();
+    stop();
+  });
+
+  it("does not let go on the first scrollend: the jump that cuts the glide sends one before the glide is taken up", () => {
+    const stop = startFocusGlide(testContext());
+    tabOnto(policy());
+    jump();
+    window.dispatchEvent(new Event("scrollend"));
+    frames(3);
+    expect(reveal).toHaveBeenCalledTimes(1);
+    stop();
+  });
+
+  for (const [name, event] of [
+    ["a press of the pointer", new PointerEvent("pointerdown")],
+    ["a wheel", new WheelEvent("wheel", { deltaY: 120 })],
+    ["a finger dragging", new Event("touchmove")],
+    ["a key that scrolls", new KeyboardEvent("keydown", { key: "PageDown" })],
+  ] as const) {
+    it(`lets go on the reader's own scroll: ${name}`, () => {
+      const stop = startFocusGlide(testContext());
+      tabOnto(policy());
+      window.dispatchEvent(event);
+      jump();
+      frames(3);
+      expect(reveal).not.toHaveBeenCalled();
+      stop();
+    });
+  }
+
+  it("lets go when focus has moved on", () => {
+    const stop = startFocusGlide(testContext());
+    tabOnto(policy());
+    policy().blur();
+    jump();
+    frames(3);
     expect(reveal).not.toHaveBeenCalled();
     stop();
   });
 
   it("does nothing with Motion off, where nothing glides, and stops listening on teardown", () => {
     const off = startFocusGlide(testContext({ motion: false }));
-    policy().focus();
-    layout();
+    tabOnto(policy());
+    jump();
+    frames(3);
     off();
     policy().blur();
     const stop = startFocusGlide(testContext());
     stop();
-    policy().focus();
-    layout();
+    tabOnto(policy());
+    jump();
+    frames(3);
     expect(reveal).not.toHaveBeenCalled();
   });
 });

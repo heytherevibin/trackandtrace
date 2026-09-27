@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { LAYOUT_EVENT } from "@/components/landing/journey/journey-events";
+import { JUMP_EVENT, LAYOUT_EVENT } from "@/components/landing/journey/journey-events";
 import { startRun } from "@/components/landing/journey/run";
 import { MODULES } from "@/components/landing/journey/start-journey";
 import { testContext } from "./journey-context";
@@ -103,63 +103,105 @@ describe("the window-seat run (J6-7, J6-8)", () => {
     expect(MODULES.at(-1)).toBe(startRun);
   });
 
-  // A Tab stop's glide to the window can be cut short: a piece above moves the page (keepPlace, the drawing falling to
-  // the still under load) and its instant scroll cancels the smooth one, leaving focus off-screen (WCAG 2.4.11).
-  describe("a focused station, after a relayout", () => {
-    const focusWatchlist = () => {
+  // A Tab stop's glide to the window can be cut short: a piece above moves the page by a place-keeping jump (jumpTo; the
+  // drawing falling to the still under load), and an instant scroll cancels the smooth one, leaving focus off-screen
+  // (WCAG 2.4.11). Its station is brought back once, and never against the reader (Task 6 review, round 2).
+  describe("a Tab stop's glide to its station", () => {
+    const watchlist = () => {
       const link = document.createElement("a");
       link.href = "/watchlist";
       document.querySelector("#features article")!.append(link);
-      link.focus(); // its station (the second: centre 650) stands at the window at 200 + 500
-      return link;
+      return link; // its station (the second: centre 650) stands at the window at 200 + 500
     };
-    const relayout = () => {
+    /** Focus as the keyboard gives it (:focus-visible), said outright: jsdom's own modality guess carries between tests. */
+    const keyboard = (el: HTMLElement) => {
+      const own = Element.prototype.matches.bind(el);
+      vi.spyOn(el, "matches").mockImplementation((selector: string) => selector === ":focus-visible" || own(selector));
+      return el;
+    };
+    /** Tab onto it: a Tab keydown, then the focus it moves. */
+    const tab = (el: HTMLElement) => {
+      keyboard(el);
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab" }));
+      el.focus();
+    };
+    const frames = (n: number) => {
+      for (let k = 0; k < n; k += 1) vi.advanceTimersToNextFrame();
+    };
+    const jump = () => {
+      window.dispatchEvent(new Event(JUMP_EVENT));
       window.dispatchEvent(new Event(LAYOUT_EVENT));
-      vi.advanceTimersToNextFrame();
     };
 
-    it("comes back to the window", () => {
+    it("glides for keyboard focus, and is taken up once after a jump cuts it short", () => {
       vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
       lay(200);
       const stop = startRun(testContext());
-      focusWatchlist();
+      tab(watchlist());
       expect(window.scrollTo).toHaveBeenLastCalledWith({ top: 700 });
       vi.mocked(window.scrollTo).mockClear();
-      relayout();
+      jump();
+      frames(3);
       expect(window.scrollTo).toHaveBeenCalledWith({ top: 700 });
+      vi.mocked(window.scrollTo).mockClear();
+      jump(); // once
+      frames(3);
+      expect(window.scrollTo).not.toHaveBeenCalledWith({ top: 700 });
       stop();
     });
 
-    it("stays where the reader's own scroll took them, and where focus has left it", () => {
+    it("does not glide for focus that is not the keyboard's: a mouse, or the window regaining focus", () => {
       vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
       lay(200);
       const stop = startRun(testContext());
-      focusWatchlist();
-      window.dispatchEvent(new WheelEvent("wheel", { deltaY: 120 }));
-      vi.mocked(window.scrollTo).mockClear();
-      relayout();
-      expect(window.scrollTo).not.toHaveBeenCalled();
-      const link = focusWatchlist();
-      link.blur();
-      vi.mocked(window.scrollTo).mockClear();
-      relayout();
-      expect(window.scrollTo).not.toHaveBeenCalled();
+      keyboard(watchlist()).focus(); // :focus-visible, but no Tab moved it: focus returning to the window
+      jump();
+      frames(3);
+      expect(window.scrollTo).not.toHaveBeenCalledWith({ top: 700 });
       stop();
     });
 
-    it("lets go once the glide has landed", () => {
+    it("does not pull back a reader who dragged away, however long after, whatever the layout does", () => {
       vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
       lay(200);
-      const y = vi.spyOn(window, "scrollY", "get").mockReturnValue(0);
       const stop = startRun(testContext());
-      focusWatchlist();
-      y.mockReturnValue(700); // the glide lands: its station at the window
-      lay(-500);
-      window.dispatchEvent(new Event("scrollend"));
-      lay(-600); // then the page moves under the reader (not by a glide): nothing brings them back
+      tab(watchlist());
       vi.mocked(window.scrollTo).mockClear();
-      relayout();
-      expect(window.scrollTo).not.toHaveBeenCalledWith({ top: expect.any(Number) as number });
+      frames(60);
+      window.dispatchEvent(new Event(LAYOUT_EVENT));
+      window.dispatchEvent(new Event("resize"));
+      frames(3);
+      jump(); // even a jump, once the page has held still
+      frames(3);
+      expect(window.scrollTo).not.toHaveBeenCalledWith({ top: 700 });
+      stop();
+    });
+
+    it("arms nothing for a station already at the window: no glide starts", () => {
+      vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
+      lay(200);
+      const stop = startRun(testContext());
+      expect(document.getElementById("run")?.classList.contains("is-running")).toBe(true);
+      lay(-500); // the reader has scrolled on: its station stands at the window
+      vi.spyOn(window, "scrollY", "get").mockReturnValue(700);
+      tab(watchlist());
+      expect(window.scrollTo).not.toHaveBeenCalledWith({ top: 700 });
+      jump();
+      frames(3);
+      expect(window.scrollTo).not.toHaveBeenCalledWith({ top: 700 });
+      stop();
+    });
+
+    it("lets go on the reader's own scroll: a press of the pointer", () => {
+      vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
+      lay(200);
+      const stop = startRun(testContext());
+      tab(watchlist());
+      vi.mocked(window.scrollTo).mockClear();
+      window.dispatchEvent(new PointerEvent("pointerdown"));
+      jump();
+      frames(3);
+      expect(window.scrollTo).not.toHaveBeenCalledWith({ top: 700 });
       stop();
     });
   });

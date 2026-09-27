@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "../fixtures";
 import { LANDING_INSTRUMENTS, collisionsInView } from "./collisions";
-import { drawStill, frames, motionOff, noAnchoring, scrollIntoRun, scrollToId, waitForJourney, waitForLive } from "./journey-helpers";
+import { atRest, drawStill, frames, motionOff, noAnchoring, readyTab, scrollIntoRun, scrollToId, waitForJourney, waitForLive } from "./journey-helpers";
 
 // 06–07, the window-seat run (spec §3.A, §3.G; J6-7, J6-8). The drawing above is held to the still (drawStill): these
 // specs are about the run, and the live drawing would only make the software GPU slower.
@@ -109,9 +109,11 @@ test.describe("the window-seat run (spec §3.A)", () => {
     await page.goto("/");
     await waitForJourney(page);
     await running(page);
-    await page.getByRole("link", { name: "Open Watchlist →" }).focus();
-    for (const [n, name] of ["Open Watchlist →", "Open Pre-booking →", "Open Accuracy →"].entries()) {
-      if (n > 0) await page.keyboard.press("Tab");
+    // by the keyboard from the first: only the keyboard's focus glides a station to the window (focus given in code, by a
+    // mouse or by the window regaining focus does not)
+    await readyTab(page, "#run", "Open Watchlist");
+    for (const name of ["Open Watchlist →", "Open Pre-booking →", "Open Accuracy →"]) {
+      await page.keyboard.press("Tab");
       const link = page.getByRole("link", { name });
       await expect(link).toBeFocused();
       const i = await link.evaluate((a) => [...document.querySelectorAll("#run [data-station]")].findIndex((s) => s.contains(a)));
@@ -208,8 +210,18 @@ test.describe("the window-seat run (spec §3.A)", () => {
 
 // A Tab stop's glide to the window, cut short (Task 6 review): the drawing above fell to the still mid-glide, and the
 // instant scroll its keepPlace made (a no-op under scroll anchoring, a real move without it) cancelled the smooth one,
-// stranding focus off-screen at rest (WCAG 2.4.11). The drawing is live here: its fall to the still is the trigger.
+// stranding focus off-screen at rest (WCAG 2.4.11). The glide is taken up once, and never against the reader (round 2).
 test.describe("a Tab stop's glide into the run (spec §3.G; WCAG 2.4.11)", () => {
+  const inWindow = (page: Page, name: string) =>
+    page.getByRole("link", { name }).evaluate((a) => {
+      const r = a.getBoundingClientRect();
+      const foot = document.querySelector("header")?.getBoundingClientRect().bottom ?? 0;
+      const whole = r.top >= foot && r.bottom <= window.innerHeight && r.left >= 0 && r.right <= window.innerWidth;
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return whole && hit !== null && a.contains(hit);
+    });
+  const principlesTop = (page: Page) => page.locator("#principles").evaluate((el) => el.getBoundingClientRect().top);
+
   for (const anchoring of ["on", "off"] as const) {
     test(`reaches the window though the drawing above falls to the still mid-glide (scroll anchoring ${anchoring})`, async ({ page, isMobile }) => {
       test.skip(isMobile, "the keyboard: one project is enough");
@@ -220,43 +232,35 @@ test.describe("a Tab stop's glide into the run (spec §3.G; WCAG 2.4.11)", () =>
       await running(page);
       await scrollToId(page, "record"); // past the drawn train; the run below the window
       await frames(page, 3);
-      await page.evaluate(() => {
-        const link = [...document.querySelectorAll<HTMLAnchorElement>("#run a")].find((a) => a.textContent?.includes("Open Watchlist"));
-        if (!link) throw new Error("no Watchlist link");
-        link.focus(); // run.ts glides its station to the window
-        // two frames into the glide the GPU drops its context, and the drawing falls to the still
-        requestAnimationFrame(() => requestAnimationFrame(() => window.dispatchEvent(new CustomEvent("tt:webgl", { detail: "lost" }))));
-      });
+      await readyTab(page, "#run", "Open Watchlist", "lost");
+      await page.keyboard.press("Tab");
+      await expect(page.getByRole("link", { name: "Open Watchlist →" })).toBeFocused();
       await expect(page.locator("html")).toHaveAttribute("data-drawing", "still");
-      // at rest: the scroll has held for ten frames
-      await page.evaluate(
-        () =>
-          new Promise<void>((done) => {
-            let last = window.scrollY;
-            let held = 0;
-            const tick = () => {
-              held = window.scrollY === last ? held + 1 : 0;
-              last = window.scrollY;
-              if (held >= 10) done();
-              else requestAnimationFrame(tick);
-            };
-            requestAnimationFrame(tick);
-          }),
-      );
-      const link = page.getByRole("link", { name: "Open Watchlist →" });
-      await expect(link).toBeFocused();
+      await atRest(page);
       // the track trails the scroll a little (its sync), so the card may still be sliding in: poll, at rest
-      await expect
-        .poll(() =>
-          link.evaluate((a) => {
-            const r = a.getBoundingClientRect();
-            const foot = document.querySelector("header")?.getBoundingClientRect().bottom ?? 0;
-            const whole = r.top >= foot && r.bottom <= window.innerHeight && r.left >= 0 && r.right <= window.innerWidth;
-            const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-            return whole && hit !== null && a.contains(hit);
-          }),
-        )
-        .toBe(true);
+      await expect.poll(() => inWindow(page, "Open Watchlist →")).toBe(true);
+    });
+
+    test(`never pulls back a reader who dragged away mid-glide, however long after (scroll anchoring ${anchoring})`, async ({ page, isMobile }) => {
+      test.skip(isMobile, "the keyboard: one project is enough");
+      await drawStill(page);
+      await page.setViewportSize({ width: 1440, height: 900 });
+      if (anchoring === "off") await noAnchoring(page);
+      await page.goto("/");
+      await waitForJourney(page);
+      await running(page);
+      await scrollToId(page, "record");
+      await frames(page, 3);
+      await readyTab(page, "#run", "Open Watchlist", "away");
+      await page.keyboard.press("Tab");
+      await expect(page.getByRole("link", { name: "Open Watchlist →" })).toBeFocused();
+      await atRest(page);
+      const before = await principlesTop(page);
+      expect(before, "the drag left the reader at 01").toBeCloseTo(100, -1);
+      await frames(page, 60);
+      await page.evaluate(() => window.dispatchEvent(new Event("tt:layout")));
+      await frames(page, 15);
+      expect(Math.abs((await principlesTop(page)) - before)).toBeLessThanOrEqual(4);
     });
   }
 });
