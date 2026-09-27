@@ -101,9 +101,27 @@ describe("the shipped route list", () => {
     expect(routes.map((r) => r.trainNo)).not.toContain("12951");
   });
 
-  it("costs 28 calls a run at worst: its two Tatkal combos make the pinned ask only", () => {
-    // Six combos × 2 asks + two Tatkal combos × 1 ask = 14 asks, each allowed the guard's one retry.
-    expect(plannedCalls({ routes })).toBe(28);
+  // Same rejection, same phrase, a different train. 12203 was a Garib Rath candidate: the provider's
+  // own search knows it as `GARIB RATH EXP` and `/trains/12203/info` gives its 25 stops SHC → ASR, so
+  // neither the number nor the leg was the problem — and it still answered `Unable to process your
+  // request` for 3A, 3E and CC, end to end and on a shorter leg, with a control combo answering 200
+  // in the same breath. **The Garib Rath axis is filled by 12187 instead**, which proves the product
+  // is covered and this entry is not: a bad entry wearing a failure's clothes, exactly as 12951 was.
+  it("does not carry 12203, which refused generically while another Garib Rath answered", () => {
+    expect(routes.map((r) => r.trainNo)).not.toContain("12203");
+  });
+
+  // 12113 is different and worth keeping straight: it ANSWERS. Its first dated entry came back
+  // `rawStatus: TRAIN CANCELLED`, `canBook: false`, on 2026-09-27. A cancelled train's window is not
+  // a clearance curve, and a list entry that samples one would teach a model that cancellation looks
+  // like demand. Re-probe before adding it; a cancellation is a date's property, not a train's.
+  it("does not carry 12113, whose window opened on a cancelled date", () => {
+    expect(routes.map((r) => r.trainNo)).not.toContain("12113");
+  });
+
+  it("costs 44 calls a run at worst: its two Tatkal combos make the pinned ask only", () => {
+    // Ten combos × 2 asks + two Tatkal combos × 1 ask = 22 asks, each allowed the guard's one retry.
+    expect(plannedCalls({ routes })).toBe(44);
     expect(routes.filter((r) => rollingAskIsPointless(r) !== null)).toHaveLength(2);
   });
 

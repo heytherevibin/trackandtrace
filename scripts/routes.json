@@ -3,8 +3,10 @@
     "THIS LIST IS THE MODEL'S BIAS. Read that before adding to it.",
     "A confirmation model learns the trains it was shown. Three Rajdhanis give a model that predicts Rajdhanis and is confidently wrong about a branch passenger train, because premium AC stock, sleeper Mail/Express and short-haul seating clear their waitlists on completely different curves. Every entry below was chosen to widen the spread, not to be interesting.",
     "The spread this list aims at, and why each axis matters: train kind (Rajdhani, Superfast Mail/Express, ordinary Express), class (AC berth, sleeper berth, and a seating class, which is not a berth at all), quota (GN opens 60 days out and drains slowly; TQ opens one day out and drains in minutes, so it is a different process, not a busier version of the same one), leg length, and region (northern, southern and western zones fill differently).",
-    "HOW EACH ENTRY IS SAMPLED, because it is not the same for all of them. A GN combo gets two asks a run: the rolling four-day window that walks the sixty-day horizon, and one pinned at today for the days_out = 0 outcome row. A TQ combo gets the PINNED ASK ONLY. Measured 2026-09-23 and 2026-09-24 on 12301 HWH-NDLS 2A/TQ: the pinned ask answered 2 rows both days while the rolling ask refused at 4 and at 7 days out, because Tatkal is not on sale that far ahead. So a TQ entry here is a sample of the last few days before departure and nothing else — which is the whole of what that quota has to say, and is what makes the GN/TQ pair below a contrast rather than two copies. See QUOTAS_OPENING_NEAR_DEPARTURE in scripts/crawl-routes.mjs.",
-    "What is missing, stated so it is not mistaken for a complete sample: no Vande Bharat, no Garib Rath, no festival-season special, and STILL no genuinely short BRANCH LINE. 12123 CSMT-PUNE closes the short-leg gap and the chair-car gap, but Mumbai-Pune is a dense trunk corridor, not a branch — a branch line is a different demand shape again and is still owed. The second intermediate-station leg is now here (12621 BPL-NDLS). Add the rest before anyone fits a model to this.",
+    "HOW EACH ENTRY IS SAMPLED, because it is not the same for all of them. A GN combo gets two asks a run: the rolling four-day window that walks the sixty-day horizon, and one pinned at today for the days_out = 1 outcome row (the reading one day before the journey; see migration 20260927080000). A TQ combo gets the PINNED ASK ONLY. Measured 2026-09-23 and 2026-09-24 on 12301 HWH-NDLS 2A/TQ: the pinned ask answered 2 rows both days while the rolling ask refused at 4 and at 7 days out, because Tatkal is not on sale that far ahead. So a TQ entry here is a sample of the last few days before departure and nothing else — which is the whole of what that quota has to say, and is what makes the GN/TQ pair below a contrast rather than two copies. See QUOTAS_OPENING_NEAR_DEPARTURE in scripts/crawl-routes.mjs.",
+    "What is missing, stated so it is not mistaken for a complete sample: a FESTIVAL-SEASON SPECIAL, and nothing else from the original four. Vande Bharat (20707), Garib Rath (12187) and a genuine branch line (16792 QLN-SCT, about 94 km of single-line ghat section) were added 2026-09-27. A festival special is deliberately still absent: it only says anything near a festival, so adding one in an ordinary week samples an ordinary week and calls it a special. Add it when one is running. 12123 CSMT-PUNE closed the short-leg gap; the second intermediate-station leg is here (12621 BPL-NDLS).",
+    "REJECTED, and why each one, so nobody re-adds it. 12951: `Unable to process your request` for every class and date tried, 2026-09-23. 12203 GARIB RATH EXP: the same generic phrase for 3A, 3E and CC, end to end SHC-ASR and on a shorter leg, on 2026-09-27 — and the number and route are both real, confirmed by the provider's own search and by 25 stops from /trains/12203/info, with a control combo answering 200 in the same breath. 12113: it ANSWERS, but its first dated entry was `TRAIN CANCELLED` with canBook false. That is not a refusal and not a clearance curve either; a cancellation is a date's property rather than a train's, so re-probe before adding it.",
+    "A REFUSAL'S WORDING IS EVIDENCE, and the 2026-09-27 round is what proved it. `Unable to process your request` is generic and means the entry is dead. `Class does not exist in this train for this Train route` is specific: the train and the leg are fine and only the class is wrong, which is how 3E was ruled out on both Garib Raths and 2S on 16792 without discarding either train. Read what a refusal SAYS before concluding what it means.",
     "HOW AN ENTRY GETS HERE, since the first six arrived unverified and one guess had already gone wrong. Ask the provider for the exact combo before adding it — `/api/v1/seats/:train/:from/:to/:date/:class/:quota` is the same question the crawler asks, and the only one that settles whether the train, the leg, the class and the quota all exist together. `/api/v1/trains/:no` returns a name and nothing else, so it confirms a train number but cannot confirm a leg. AND ASK A KNOWN-GOOD COMBO IN THE SAME BREATH: on 2026-09-24 every candidate refused with a 400, which reads exactly like four bad entries, until 12137 CSMT-NDLS — on this list and answering for two days — refused identically. The upstream was down. Without that control four good candidates would have been thrown away as dead.",
     "The first six entries were UNVERIFIED against the provider when they were added. The preflight only checks their shape; the first real run is what checks whether the provider knows them. 12951 is deliberately absent: it answered `Unable to process your request` for every class and date tried on 2026-09-23, which is a bad list entry wearing a failure's clothes. A combo the crawler reports as always-refusing belongs here too — deleted, not retried daily forever.",
     "Only the `Refused N runs in a row` list means that. A combo whose pinned ask ANSWERS is one the provider knows, whatever its rolling ask did, and the run no longer counts a strike against it — which is what stopped both TQ entries below from being deleted after two runs for being Tatkal. And a combo that makes the pinned ask only can never appear on that list at all: watch the run's pinned-failure section for one that fails there every single day."
@@ -65,7 +67,7 @@
       "to": "PUNE",
       "travelClass": "CC",
       "quota": "GN",
-      "note": "Deccan Queen — a SHORT leg, about 192 km and three and a half hours, against a list otherwise made of overnight hauls of ten hours and up. A commuter-weighted corridor fills within days rather than over weeks, which is a clearance curve nothing else here has. Also the list's only reserved chair car: 2S on 12051 is seating too, but unreserved-grade seating fills differently from CC. Validated against the provider 2026-09-24: 4 dated entries, first AVAILABLE."
+      "note": "Deccan Queen — a SHORT leg, about 192 km and three and a half hours, against a list otherwise made of overnight hauls of ten hours and up. A commuter-weighted corridor fills within days rather than over weeks, which is a clearance curve nothing else here has. Also a reserved chair car, where 2S on 12051 is seating of an unreserved grade and fills differently. It was the only CC here until 20707 was added on 2026-09-27, and the two now pair: same class, one a commuter trunk corridor and one a Vande Bharat. Validated against the provider 2026-09-24: 4 dated entries, first AVAILABLE."
     },
     {
       "trainNo": "12621",
@@ -74,6 +76,38 @@
       "travelClass": "SL",
       "quota": "GN",
       "note": "Tamil Nadu Express again, same class and quota — but boarding at Bhopal, an INTERMEDIATE station, rather than at Chennai where it starts. That is the whole point of the entry: it is identical to the 12621 MAS-NDLS row in every axis except leg position, so the pair isolates what a mid-route leg does to a waitlist from everything else that might explain it. Intermediate legs hold a smaller quota and clear on their own schedule. Validated against the provider 2026-09-24: 4 dated entries, first WAITLIST."
+    },
+    {
+      "trainNo": "20707",
+      "from": "SC",
+      "to": "VSKP",
+      "travelClass": "CC",
+      "quota": "GN",
+      "note": "Vande Bharat — the gap this list named and did not fill. A fully-reserved chair-car day train with no berth at all and a very large inventory: validated 2026-09-27 at first AVAILABLE-0664. Six hundred free seats is a different process from a Rajdhani's 3A, not a bigger version of it — nothing clears because nothing has to queue, until the day it does. Pairs against 12123 CC to separate 'chair car' from 'premium day train', the same way 12137 pairs against 12301 to separate 'AC' from 'Rajdhani'."
+    },
+    {
+      "trainNo": "12187",
+      "from": "JBP",
+      "to": "CSMT",
+      "travelClass": "3A",
+      "quota": "GN",
+      "note": "Garib Rath — AC three-tier at roughly half the fare, which is a different demand population in the same physical class. Validated 2026-09-27: 16 stops JBP → CSMT from /trains/:no/info, first AVAILABLE-0082. **The class is 3A, not 3E.** 3E was tried first on the reasoning that Garib Rath stock is three-tier economy, and the provider answered `Class does not exist in this train for this Train route` for it on both Garib Raths tried — a specific refusal, which is what told us the class was wrong rather than the train. This entry replaces 12203, which is rejected: see _bias."
+    },
+    {
+      "trainNo": "16792",
+      "from": "QLN",
+      "to": "SCT",
+      "travelClass": "SL",
+      "quota": "GN",
+      "note": "PALARUVI EXP, Kollam–Sengottai — the BRANCH LINE this list has owed since it was written. About 94 km of single-line ghat section with 7 halts, daily, found by asking /trains/between/QLN/SCT rather than guessing a number. Validated 2026-09-27: first AVAILABLE-0001. One free berth is the entry's whole point — a branch quota is small enough to be down to its last berth while a trunk sleeper is 160 deep in waitlist, and neither behaves like the other. Every other entry here is a trunk corridor."
+    },
+    {
+      "trainNo": "16792",
+      "from": "QLN",
+      "to": "SCT",
+      "travelClass": "3A",
+      "quota": "GN",
+      "note": "The same branch train in an AC class, validated 2026-09-27 at first GNWL20/WL9. Identical to the row above in every axis except class, so the pair isolates what class does on a branch from what the branch does — the same design as the 12621 MAS/BPL pair for leg position. WL20/WL9 against 12301's GNWL164/WL63 is the contrast the list is for. Its 2S was tried and refused `Class does not exist in this train for this Train route`, so this train carries no seating class."
     }
   ]
 }

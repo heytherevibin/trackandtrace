@@ -95,5 +95,11 @@ jobs:
         continue-on-error: true
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          # Paired, exactly as the Crawl step above pairs them, and for the same reason: the env
+          # schema refuses one without the other. It was missing here, so `source:report` failed
+          # validation on every run — and `continue-on-error` meant the step reported success while
+          # printing nothing. The crawler's own banner names this script as "the check that fails on
+          # the store", and it had never once run. A silenced check is worse than no check.
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
         run: npm run source:report
