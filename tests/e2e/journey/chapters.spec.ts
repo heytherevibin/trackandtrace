@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type ElementHandle, type Page } from "@playwright/test";
 import { JOURNEY_CHUNK_MARK } from "@/components/landing/journey/journey-mark";
 import { collisionsInView } from "./collisions";
 import { motionOff, scrollToId, waitForJourney } from "./journey-helpers";
@@ -26,6 +26,29 @@ async function intoHow(page: Page, by: number): Promise<void> {
     window.scrollTo({ top: how.getBoundingClientRect().top + window.scrollY + px, behavior: "instant" });
   }, by);
   await page.waitForTimeout(300);
+}
+
+/** Waits for `count` of the page's own frames: a wait counted in rendering updates, never in wall time. */
+async function frames(page: Page, count: number): Promise<void> {
+  await page.evaluate(
+    (n) =>
+      new Promise<void>((resolve) => {
+        const step = (left: number) => (left === 0 ? resolve() : requestAnimationFrame(() => step(left - 1)));
+        step(n);
+      }),
+    count,
+  );
+}
+
+/** The footer's own Motion switch. These tests click it through the DOM (element.click()), never with
+ * Playwright's click, which scrolls it into view first and would move the very reader they place. */
+async function motionSwitch(page: Page): Promise<ElementHandle<HTMLElement | SVGElement>> {
+  return (await page.getByRole("switch", { name: "Motion" }).elementHandle())!;
+}
+
+/** Flips Motion the way a reader does, through chooseMotion (use-motion.ts), without scrolling the page. */
+async function clickMotionSwitch(page: Page): Promise<void> {
+  await (await motionSwitch(page)).evaluate((el) => (el as HTMLElement).click());
 }
 
 /** How far #how's top is from its scroll-margin landing under the masthead. */
@@ -93,35 +116,53 @@ test.describe("02 · the chapters, pinned", () => {
     const headerBottom = await page.locator("header").evaluate((h) => Math.round(h.getBoundingClientRect().bottom));
     const target = headerBottom + 100;
     await scrollToId(page, "features", target);
-    // Lets chapters.ts's place guard (startPlaceGuard) catch up: it learns the reader's position off
-    // the window's own "scroll" event, which this environment delivers as a throttled task rather than on
-    // this frame, so the toggle below must wait for it to land before it can rely on that position.
-    await page.waitForTimeout(200);
-
-    // Drives Motion the way chooseMotion (use-motion.ts) does, without the footer switch: that control sits at
-    // the very foot of the page, and Playwright's click auto-scrolls it into view first, which would confound
-    // the very position this test is checking.
-    await page.evaluate(() => {
-      window.localStorage.setItem("tt.motion", "off");
-      document.documentElement.setAttribute("data-motion", "off");
-      window.dispatchEvent(new Event("tt:motion"));
-    });
-    await page.waitForTimeout(300);
+    // No wait for the scroll's own "scroll" event: the place guard reads the reader's place as Motion changes,
+    // whether or not a frame has delivered that event yet (the next test holds it to exactly that).
+    await clickMotionSwitch(page);
     await expect(page.locator("#how")).not.toHaveClass(/is-pinned/);
+    // The collapse lands over two frames (the height, then the padding); a few more let any late move show.
+    await frames(page, 6);
     let top = await page.locator("#features").evaluate((el) => el.getBoundingClientRect().top);
     expect(Math.abs(top - target)).toBeLessThanOrEqual(4);
 
-    await page.evaluate(() => {
-      window.localStorage.removeItem("tt.motion");
-      document.documentElement.setAttribute("data-motion", "on");
-      window.dispatchEvent(new Event("tt:motion"));
-    });
-    await page.waitForTimeout(300);
+    await clickMotionSwitch(page);
+    await expect(page.locator("html")).toHaveAttribute("data-motion", "on");
+    await frames(page, 6);
     // Motion re-enabling does not, by itself, re-pin #how here: the reader is still below its start (at
     // #features), and pinning is deferred until they scroll back above it (spec §3.A) — the point of that
     // deferral is exactly that this toggle must not grow #how under them, so nothing moves either way.
     await expect(page.locator("#how")).not.toHaveClass(/is-pinned/);
     top = await page.locator("#features").evaluate((el) => el.getBoundingClientRect().top);
+    expect(Math.abs(top - target)).toBeLessThanOrEqual(4);
+  });
+
+  test("a scroll and a Motion switch with no frame between them keep the reader where the scroll put them", async ({ page }) => {
+    // What a slow device (or a loaded CI runner) does: the reader's last scroll has not yet reached a frame, so
+    // its "scroll" event is still pending, when Motion collapses #how. That event then lands after the browser
+    // has already moved scrollY for the collapse, so it reports the browser's move, never the reader's place.
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/");
+    await waitForJourney(page);
+    await expect(page.locator("#how")).toHaveClass(/is-pinned/);
+    // The reader first settles well below 02, so the guard has a place below it on record.
+    await scrollToId(page, "faq");
+    await frames(page, 3);
+    const headerBottom = await page.locator("header").evaluate((h) => Math.round(h.getBoundingClientRect().bottom));
+    const target = headerBottom + 100;
+    const toggle = await motionSwitch(page);
+    await page.evaluate(
+      ([by, sw]) => {
+        const el = document.getElementById("features")!;
+        window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - by, behavior: "instant" });
+        (sw as HTMLElement).click();
+      },
+      [target, toggle] as const,
+    );
+    await expect(page.locator("html")).toHaveAttribute("data-motion", "off");
+    await expect(page.locator("#how")).not.toHaveClass(/is-pinned/);
+    // The collapse lands over two frames (the height, then the padding); a few more let any late move show.
+    await frames(page, 6);
+    const top = await page.locator("#features").evaluate((el) => el.getBoundingClientRect().top);
     expect(Math.abs(top - target)).toBeLessThanOrEqual(4);
   });
 

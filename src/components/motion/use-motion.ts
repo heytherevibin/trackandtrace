@@ -5,6 +5,9 @@ import { MOTION_STORAGE_KEY, REDUCED_MOTION_QUERY, resolveMotion, type MotionSta
 
 /** Dispatched on window after every rewrite of <html data-motion>; the journey (J3) rebuilds on it. */
 export const MOTION_EVENT = "tt:motion";
+/** Dispatched on window just before every rewrite of <html data-motion>, while the page still has the old
+ * layout: the journey's place guard reads the reader's place here, since the rewrite can collapse 02 at once. */
+export const MOTION_BEFORE_EVENT = "tt:motion-before";
 
 function storedChoice(): string | null {
   try {
@@ -21,6 +24,7 @@ function deviceReducesMotion(): boolean {
 /** Re-resolves Motion from the choice (else the stored one) and the device, writes it, and tells listeners. */
 export function applyMotion(choice: string | null = storedChoice()): MotionState {
   const motion = resolveMotion(choice, deviceReducesMotion());
+  window.dispatchEvent(new Event(MOTION_BEFORE_EVENT));
   document.documentElement.setAttribute("data-motion", motion);
   window.dispatchEvent(new Event(MOTION_EVENT));
   return motion;

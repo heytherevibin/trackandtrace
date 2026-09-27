@@ -1,4 +1,5 @@
 import { animate, onScroll, stagger, utils, type JSAnimation } from "animejs";
+import { MOTION_BEFORE_EVENT } from "@/components/motion/use-motion";
 import { messages } from "@/messages";
 import { formatPnr } from "@/utils/pnr";
 import { barWidth, chapterAt, stepLit, typedCount } from "./chapters-progress";
@@ -34,8 +35,11 @@ function span(el: Element | null): Span | null {
 // teardown gets a turn, and a resize or a turned phone refits it. The collapse lands in two frames: the height
 // at once, then the padding one frame later (Motion off's 0.01ms transitions, motion.css), which only the
 // border box shows. #how is measured afresh each time, against the box this guard last saw (its document top
-// moves with the window's width). By then the browser has already moved window.scrollY for the same reflow,
-// so the reader's position is kept one step behind, off "scroll" events.
+// moves with the window's width). By then the browser has already moved window.scrollY for the same reflow
+// (scroll anchoring, or clamping to the shorter page), so the reader's position is kept one step behind: off
+// "scroll" events while #how is the size this guard last settled, and read afresh just before Motion rewrites
+// the page. A "scroll" event can land after #how changed size and before the observer settles it (the reader's
+// last scroll had not reached a frame yet: a slow device); it reports the browser's move, never the reader's.
 let placeBox: Span = { top: 0, bottom: 0 };
 let lastScrollY = 0;
 
@@ -57,6 +61,13 @@ function settlePlace(section: HTMLElement): void {
   lastScrollY = window.scrollY;
 }
 
+/** #how's own border-box size, at the same precision a ResizeObserver entry reports (never offsetWidth/
+ * offsetHeight's rounded integers, or a genuine sub-pixel resize would misread as unchanged). */
+function sizeOf(section: HTMLElement): { readonly width: number; readonly height: number } {
+  const r = section.getBoundingClientRect();
+  return { width: r.width, height: r.height };
+}
+
 /** Started once, for the journey's whole lifetime (start-journey.ts calls this: it must already be watching
  * when a Motion toggle collapses #how, and survive the rebuild that follows), and stopped only with it. */
 export function startPlaceGuard(): Teardown {
@@ -64,12 +75,22 @@ export function startPlaceGuard(): Teardown {
   if (!section) return () => {};
   placeBox = docBox(section);
   lastScrollY = window.scrollY;
-  const onScroll = () => (lastScrollY = window.scrollY);
-  window.addEventListener("scroll", onScroll, { passive: true });
-  const observer = new ResizeObserver(() => settlePlace(section));
+  let lastSize = sizeOf(section);
+  // The reader's place, only while #how is still the size this guard last settled.
+  const learn = () => {
+    const size = sizeOf(section);
+    if (size.width === lastSize.width && size.height === lastSize.height) lastScrollY = window.scrollY;
+  };
+  window.addEventListener("scroll", learn, { passive: true });
+  window.addEventListener(MOTION_BEFORE_EVENT, learn);
+  const observer = new ResizeObserver(() => {
+    lastSize = sizeOf(section);
+    settlePlace(section);
+  });
   observer.observe(section, { box: "border-box" });
   return () => {
-    window.removeEventListener("scroll", onScroll);
+    window.removeEventListener("scroll", learn);
+    window.removeEventListener(MOTION_BEFORE_EVENT, learn);
     observer.disconnect();
   };
 }

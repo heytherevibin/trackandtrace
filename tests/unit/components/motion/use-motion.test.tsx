@@ -1,7 +1,7 @@
 import { act, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SiteMotion } from "@/components/motion/site-motion";
-import { MOTION_EVENT, applyMotion, chooseMotion, useMotion } from "@/components/motion/use-motion";
+import { MOTION_BEFORE_EVENT, MOTION_EVENT, applyMotion, chooseMotion, useMotion } from "@/components/motion/use-motion";
 
 function Probe() {
   const { motion, deviceReduced } = useMotion();
@@ -50,6 +50,18 @@ describe("the reader's Motion choice", () => {
     expect(window.localStorage.getItem("tt.motion")).toBe("off");
     expect(html()).toHaveAttribute("data-motion", "off");
     expect(heard).toHaveBeenCalledTimes(1);
+  });
+
+  it("announced first while <html> still shows the old Motion, so a reader's place can be read before the page changes", () => {
+    const seen: string[] = [];
+    const before = () => seen.push(`before:${html().getAttribute("data-motion")}`);
+    const after = () => seen.push(`after:${html().getAttribute("data-motion")}`);
+    window.addEventListener(MOTION_BEFORE_EVENT, before);
+    window.addEventListener(MOTION_EVENT, after);
+    chooseMotion(false);
+    window.removeEventListener(MOTION_BEFORE_EVENT, before);
+    window.removeEventListener(MOTION_EVENT, after);
+    expect(seen).toEqual(["before:on", "after:off"]);
   });
 
   it("switched back on: forgotten, since on is the default", () => {
