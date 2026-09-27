@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { frameStats, startHud } from "@/components/landing/journey/hud";
 import { hudAllowed } from "@/components/landing/journey/hud-gate";
@@ -5,12 +7,18 @@ import { hudAllowed } from "@/components/landing/journey/hud-gate";
 describe("the frame meter (J5-10)", () => {
   afterEach(() => document.body.replaceChildren());
 
-  it("is allowed on preview deployments and in development, never in production — reading process.env directly, whole", () => {
+  it("is allowed on preview deployments and in development, never in production", () => {
     expect(hudAllowed({ VERCEL_ENV: "preview", NODE_ENV: "production" })).toBe(true); // a preview build always allows it
     expect(hudAllowed({ VERCEL_ENV: undefined, NODE_ENV: "development" })).toBe(true); // a plain `next dev`, nothing set by Vercel
     expect(hudAllowed({ VERCEL_ENV: "production", NODE_ENV: "production" })).toBe(false); // a Vercel production build
     expect(hudAllowed({ VERCEL_ENV: undefined, NODE_ENV: "production" })).toBe(false); // a self-hosted production build: no VERCEL_ENV at all
     expect(hudAllowed({ VERCEL_ENV: undefined, NODE_ENV: "test" })).toBe(false); // the unit/e2e runner's own NODE_ENV: not development, so not allowed either
+  });
+
+  it("is decided from the environment the page already parsed, never from process.env read directly (services/env.ts)", () => {
+    const page = readFileSync(join(process.cwd(), "src/app/(site)/page.tsx"), "utf8");
+    expect(page).not.toMatch(/process\.env/);
+    expect(page).toMatch(/hudAllowed\(current\)/);
   });
 
   it("reads frame rate, p95, slow frames and the last ten seconds' long tasks", () => {

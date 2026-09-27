@@ -48,7 +48,7 @@ export default async function HomePage() {
       <PhotoSplit />
       <Faq />
       <ClosingCta sampleMode={sampleMode} connected={connected} />
-      <JourneyLoader hud={hudAllowed(process.env)} />
+      <JourneyLoader hud={hudAllowed(current)} />
     </div>
   );
 }
