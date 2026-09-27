@@ -5,11 +5,12 @@ import { hudAllowed } from "@/components/landing/journey/hud-gate";
 describe("the frame meter (J5-10)", () => {
   afterEach(() => document.body.replaceChildren());
 
-  it("is allowed on preview deployments and in development, never in production", () => {
-    expect(hudAllowed("preview", "production")).toBe(true);
-    expect(hudAllowed(undefined, "development")).toBe(true);
-    expect(hudAllowed("production", "production")).toBe(false);
-    expect(hudAllowed(undefined, "production")).toBe(false);
+  it("is allowed on preview deployments and in development, never in production — reading process.env directly, whole", () => {
+    expect(hudAllowed({ VERCEL_ENV: "preview", NODE_ENV: "production" })).toBe(true); // a preview build always allows it
+    expect(hudAllowed({ VERCEL_ENV: undefined, NODE_ENV: "development" })).toBe(true); // a plain `next dev`, nothing set by Vercel
+    expect(hudAllowed({ VERCEL_ENV: "production", NODE_ENV: "production" })).toBe(false); // a Vercel production build
+    expect(hudAllowed({ VERCEL_ENV: undefined, NODE_ENV: "production" })).toBe(false); // a self-hosted production build: no VERCEL_ENV at all
+    expect(hudAllowed({ VERCEL_ENV: undefined, NODE_ENV: "test" })).toBe(false); // the unit/e2e runner's own NODE_ENV: not development, so not allowed either
   });
 
   it("reads frame rate, p95, slow frames and the last ten seconds' long tasks", () => {
