@@ -147,3 +147,50 @@ describe("queue movement on the day row", () => {
     expect(screen.queryByText(/nobody has cleared/)).not.toBeInTheDocument();
   });
 });
+
+// ---------------------------------------------------------------------------
+// The reservation service's own estimate, shown as ITS estimate.
+//
+// It has its own COLUMN rather than sitting on the status line, and that is a
+// measurement and not a preference. Measured on production at 375px on
+// 2026-09-27: the availability line is 293px wide and the movement sentence
+// already uses 242 of them, leaving 51 — while "service estimates 89%" needs
+// 165. Inline, every waitlisted row would have taken a second line, against a
+// standing requirement that these rows stay on one.
+//
+// A column also attributes the number once, in its name, instead of repeating
+// "service estimates" on every row of every train.
+// ---------------------------------------------------------------------------
+
+describe("the reservation service's estimate", () => {
+  it("gives the estimate its own named column, so the number is attributed by where it sits", () => {
+    draw([day({ status: "WL", canBook: true, rawStatus: "GNWL65/WL26", wlBooking: 65, wlCurrent: 26, prediction: "89% Chance", predictionPercentage: 89 })]);
+    expect(screen.getByRole("columnheader", { name: "Reservation service estimate" })).toBeInTheDocument();
+    expect(screen.getByText("89%")).toBeInTheDocument();
+  });
+
+  it("keeps the movement sentence and the estimate on separate lines, which is why the column exists", () => {
+    draw([day({ status: "WL", canBook: true, rawStatus: "GNWL65/WL26", wlBooking: 65, wlCurrent: 26, prediction: "89% Chance", predictionPercentage: 89 })]);
+    const movement = screen.getByText("39 of 65 ahead have cleared");
+    const estimate = screen.getByText("89%");
+    // Different cells: neither can push the other onto a second line.
+    expect(movement.closest("td")).not.toBe(estimate.closest("td"));
+  });
+
+  it("shows an estimate given in words at the figure behind it", () => {
+    draw([day({ status: "WL", canBook: true, rawStatus: "PQWL308/WL180", wlBooking: 308, wlCurrent: 180, prediction: "Low Chance", predictionPercentage: 26 })]);
+    expect(screen.getByText("26%")).toBeInTheDocument();
+  });
+
+  it("draws a dash where the service made no estimate, never a zero", () => {
+    // `No More Booking` carries pct 0. Drawn as "0%" it reads as a forecast of
+    // no chance, when it is the closed counter said a second time.
+    draw([day({ status: "WL", canBook: false, rawStatus: "NOT AVAILABLE", prediction: "No More Booking", predictionPercentage: 0 })]);
+    expect(screen.queryByText("0%")).not.toBeInTheDocument();
+  });
+
+  it("does not echo an available day back as a hundred per cent", () => {
+    draw([day({ status: "AVAILABLE", canBook: true, rawStatus: "AVAILABLE-0037", prediction: "Available", predictionPercentage: 100 })]);
+    expect(screen.queryByText("100%")).not.toBeInTheDocument();
+  });
+});

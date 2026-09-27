@@ -15,7 +15,11 @@ describe("AccuracyPage", () => {
     const plate = heading.closest("[role=status]") as HTMLElement;
     expect(plate).not.toBeNull();
     expect(plate).toHaveClass("blueprint");
-    expect(within(plate).getByText("There are no verified predictions and no confirmed outcomes to compare, so nothing is estimated.")).toBeInTheDocument();
+    expect(
+      within(plate).getByText(
+        "Trakline makes no predictions of its own, and there are not yet enough confirmed outcomes to score the reservation service’s. Nothing is claimed about either.",
+      ),
+    ).toBeInTheDocument();
     const facts = [...plate.querySelectorAll("dt")].map((dt) => [dt.textContent, dt.nextElementSibling?.textContent]);
     expect(facts).toEqual([
       ["Verified records", "0"],

@@ -52,10 +52,19 @@ export interface AvailabilityDay {
  * yet, and `availabilityText` already carries the source's own words.
  *
  * `prediction` / `predictionPercentage` are the *source's* own guess. They are
- * recorded privately as the baseline a Trakline model has to beat (spec D4/§6)
- * and are never shown: the live site promises confirmation odds are never
- * displayed, and showing someone else's as ours would be untrue twice over.
- * Do not "helpfully" surface them.
+ * recorded as the baseline a Trakline model has to beat (spec D4/§6) and, since
+ * 2026-09-27, they are also SHOWN — in a column that names whose estimate it is,
+ * and only where the source itself called it a chance.
+ *
+ * The rule that changed is "never displayed". The rule that did not is the one
+ * that mattered: **Trakline still calculates nothing.** Showing someone else's
+ * estimate as ours would be untrue twice over, and that is what the attribution
+ * is for; the copy on the home, legal, result and accuracy pages was rewritten
+ * in the same change rather than left contradicting the page.
+ *
+ * `serviceEstimate` decides which of the source's four forms is an estimate at
+ * all — "Available" at 100 and "No More Booking" at 0 are the status restated,
+ * not forecasts, and drawing them would turn an echo into a prediction.
  */
 export interface AvailabilityDayRecord extends AvailabilityDay {
   readonly wlBooking: number | null;

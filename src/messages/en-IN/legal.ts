@@ -20,7 +20,7 @@ export const legal = {
     lead: "Plain terms for using this tool.",
     sections: [
       { id: "what", title: "What this is", body: "An independent tool that shows the reservation fields a railway data source returns for a PNR. It is not affiliated with IRCTC or Indian Railways." },
-      { id: "status", title: "Status and availability", body: "Results reflect the source's answer at the retrieval time shown. The reservation chart is final; this tool never estimates or predicts an outcome." },
+      { id: "status", title: "Status and availability", body: "Results reflect the source's answer at the retrieval time shown. The reservation chart is final. Where the reservation service publishes its own confirmation estimate, it is shown as theirs and labelled as an estimate. Trakline does not calculate one." },
       { id: "data", title: "Your data", body: "The privacy page describes what is stored and how to remove it." },
       { id: "guarantees", title: "No guarantees", body: "The service is provided as is. Sources may be unavailable, and when they are the tool says so rather than filling the gap." },
     ],
