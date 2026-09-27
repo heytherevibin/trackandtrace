@@ -11,6 +11,7 @@ import { introWanted, startIntro } from "./intro";
 import { LAYOUT_EVENT, REBUILD_EVENT, type ResultDetail } from "./journey-events";
 import { JOURNEY_CHUNK_MARK } from "./journey-mark";
 import { refreshAll, untrackAll } from "./observers";
+import { startPlaceMemory } from "./place-memory";
 import { startRoute } from "./route";
 import { startSound } from "./sound";
 import { startStill } from "./still";
@@ -109,6 +110,10 @@ export function startJourney(): Teardown {
   // teardown or the next build's modules get a turn — this guard must already be watching when that
   // happens, and must survive the rebuild it is reacting to, not be one of the things stopAll() tears down.
   const stopPlaceGuard = startPlaceGuard();
+  // Back to "/": the reader's section, restored once this first build and its layout have settled (the pin, and
+  // the drawing's columns, a frame after build's own LAYOUT_EVENT), never the raw scrollY a pinned 02 left behind.
+  const memory = startPlaceMemory();
+  let settleFrame = 0;
 
   html.setAttribute("data-journey", "on");
   try {
@@ -118,8 +123,15 @@ export function startJourney(): Teardown {
     // the guard would otherwise keep moving a reader inside #how on a page marked "failed".
     window.clearTimeout(resizeTimer);
     stopPlaceGuard();
+    memory.stop();
     throw error;
   }
+  settleFrame = requestAnimationFrame(() => {
+    settleFrame = requestAnimationFrame(() => {
+      settleFrame = 0;
+      memory.restore();
+    });
+  });
   window.addEventListener(MOTION_EVENT, rebuild);
   window.addEventListener(REBUILD_EVENT, rebuild);
   window.addEventListener("resize", onResize);
@@ -130,6 +142,8 @@ export function startJourney(): Teardown {
     window.removeEventListener("resize", onResize);
     window.removeEventListener(LAYOUT_EVENT, refreshAll);
     window.clearTimeout(resizeTimer);
+    cancelAnimationFrame(settleFrame);
+    memory.stop();
     stopAll();
     stopPlaceGuard();
     if (html.getAttribute("data-journey") === "on") html.removeAttribute("data-journey");

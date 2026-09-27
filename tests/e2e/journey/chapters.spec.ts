@@ -227,6 +227,76 @@ test.describe("02 · the chapters, pinned", () => {
     expect(await offLanding()).toBeLessThanOrEqual(4);
   });
 
+  test.describe("coming back to the page", () => {
+    test.skip(({ isMobile }) => isMobile, "the masthead's links, and a pinned 02 at 1440×900: wide screens");
+
+    /** Settles once #how's pin, the drawing's columns and every compensating scroll have landed. */
+    async function settled(page: Page): Promise<void> {
+      await waitForJourney(page);
+      await page.waitForTimeout(600);
+      await waitForScrollSettled(page);
+    }
+    const topOf = (page: Page, id: string) => page.locator(`#${id}`).evaluate((el) => el.getBoundingClientRect().top);
+
+    test("Back returns the reader to the section they left, though the pin no longer stands above it", async ({ page }) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.goto("/");
+      await waitForJourney(page);
+      await expect(page.locator("#how")).toHaveClass(/is-pinned/);
+      await scrollToId(page, "record", 200);
+      await page.waitForTimeout(300);
+      const before = await topOf(page, "record");
+
+      // A real Next <Link> in the masthead: a client navigation, so "/" unmounts and the journey tears down.
+      await page.getByLabel("Primary").getByRole("link", { name: "Watchlist" }).click();
+      await expect(page).toHaveURL(/\/watchlist/);
+      await page.goBack();
+      await expect(page).toHaveURL(/\/$/);
+      await settled(page);
+      expect(Math.abs((await topOf(page, "record")) - before)).toBeLessThanOrEqual(4);
+    });
+
+    test("a reload at a scroll position is left where the browser put it", async ({ page }) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      // Records #record's top on every frame until the journey takes the page over: where the browser's own
+      // restoration left the reader, before anything of the journey's could move them.
+      await page.addInitScript(() => {
+        const w = window as unknown as { __pre: number | null };
+        w.__pre = null;
+        const tick = () => {
+          if (document.documentElement.getAttribute("data-journey") === "on") return;
+          const el = document.getElementById("record");
+          if (el) w.__pre = el.getBoundingClientRect().top;
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      });
+      await page.goto("/");
+      await waitForJourney(page);
+      await scrollToId(page, "record", 200);
+      await page.waitForTimeout(300);
+      await page.reload();
+      await settled(page);
+      const pre = await page.evaluate(() => (window as unknown as { __pre: number | null }).__pre);
+      expect(pre).not.toBeNull();
+      expect(Math.abs((await topOf(page, "record")) - (pre ?? 0))).toBeLessThanOrEqual(4);
+    });
+
+    test("a new visit through a link starts at the top, whatever place the last visit left", async ({ page }) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.goto("/");
+      await waitForJourney(page);
+      await scrollToId(page, "record", 200);
+      await page.waitForTimeout(300);
+      await page.getByLabel("Primary").getByRole("link", { name: "Watchlist" }).click();
+      await expect(page).toHaveURL(/\/watchlist/);
+      await page.getByRole("link", { name: "Trakline" }).first().click();
+      await expect(page).toHaveURL(/\/$/);
+      await settled(page);
+      expect(await page.evaluate(() => window.scrollY)).toBeLessThanOrEqual(4);
+    });
+  });
+
   test("an anchor clicked on the board lands its section, and 02 stays pinned", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/");
