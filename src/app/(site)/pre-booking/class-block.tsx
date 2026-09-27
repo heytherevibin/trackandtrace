@@ -1,3 +1,4 @@
+import { queueMovement } from "@/components/ui/queue-movement";
 import { statusTone } from "@/components/ui/status-tone";
 import { messages } from "@/messages";
 import type { AvailabilityDayRecord } from "@/services/availability-source";
@@ -28,6 +29,7 @@ const m = messages.booking.availability;
 
 function Body({ cls, day, fareTotal, notCarried }: { readonly cls: string; readonly day: AvailabilityDayRecord | null; readonly fareTotal: number | null; readonly notCarried: boolean }) {
   const colour = day ? statusTone(day) : null;
+  const move = day ? queueMovement(day.rawStatus) : null;
   const fare = fareTotal === null ? "—" : m.fare(fareTotal);
   return (
     <>
@@ -38,11 +40,19 @@ function Body({ cls, day, fareTotal, notCarried }: { readonly cls: string; reado
           <>
             <span className={cn(TAG, colour.chip)}>{day.status}</span>
             {/* The queue as now against where it opened. Both ends or neither: "44" alone says
-                nothing about whether 44 is near the front, and the pair is what the source gives. */}
-            {day.wlCurrent !== null && day.wlBooking !== null ? (
+                nothing about whether 44 is near the front, and the pair is what the source gives.
+
+                Read through `queueMovement` rather than off `wlCurrent`/`wlBooking`, because those
+                are the pair with its prefixes stripped. On `GNWL5/RAC48` — issued at waitlist 5, now
+                standing at RAC 48 — this drew "48/5", a pair that reads as a queue grown tenfold when
+                the position had in fact improved out of the waitlist. There the second figure is
+                dropped: 48 is where it stands, and 5 is not a number it can be compared with. */}
+            {move?.kind === "drained" ? (
               <span className={cn("font-data text-base leading-none", colour.figure)}>
-                {day.wlCurrent}/{day.wlBooking}
+                {move.now}/{move.opened}
               </span>
+            ) : move?.kind === "improved" ? (
+              <span className={cn("font-data text-base leading-none", colour.figure)}>{move.now}</span>
             ) : day.seats !== null ? (
               // The berth count the railway published. Not a forecast — the one number on this card
               // that says how much room is actually left.

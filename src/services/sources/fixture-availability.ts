@@ -63,7 +63,11 @@ function janShatabdi(now: Date): AvailabilityAnswer {
     days: [
       // The state the crawler found on its first real run: a queue you cannot join.
       day(istDay(0, now), "WAITLIST", "GNWL12", "GNWL136/WL12", false, { wlBooking: 136, wlCurrent: 12 }),
-      day(istDay(1, now), "AVAILABLE", "AVAILABLE", "AVAILABLE", true),
+      // A position that has left the waitlist for RAC. Measured live on 2026-09-27 — four rows in
+      // 433 carry this form — and it is here because reading the pair as one scale drew "48 · of 5
+      // when booking opened", a queue apparently grown tenfold when it had in fact improved. A
+      // fixture with only same-queue pairs agrees with a reader that gets this wrong.
+      day(istDay(1, now), "WAITLIST", "RAC 48", "GNWL5/RAC48", true, { wlBooking: 5, wlCurrent: 48 }),
       day(istDay(2, now), "WAITLIST", "GNWL55", "GNWL136/WL55", true, { wlBooking: 136, wlCurrent: 55 }),
       day(istDay(3, now), "WAITLIST", "GNWL84", "GNWL244/WL84", true, { wlBooking: 244, wlCurrent: 84 }),
     ],
