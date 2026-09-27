@@ -70,9 +70,11 @@ describe("startJourney's first build, a module at a time (spec §3.H)", () => {
     await release();
     await frames();
     expect(layouts).not.toHaveBeenCalled(); // the layout pass waits for the last module
+    expect(window.__ttJourneyStarted).toBe(false); // what the e2e specs wait on (outside production only)
     const turns = 1 + (await releaseAll());
     expect(turns).toBe(MODULES.length - 1);
     expect(last).toHaveBeenCalledTimes(1);
+    expect(window.__ttJourneyStarted).toBe(true);
     await frames();
     expect(layouts).toHaveBeenCalled();
   });
@@ -85,6 +87,7 @@ describe("startJourney's first build, a module at a time (spec §3.H)", () => {
     await releaseAll();
     expect(last).not.toHaveBeenCalled();
     expect(document.documentElement.hasAttribute("data-journey")).toBe(false);
+    expect(window.__ttJourneyStarted).toBeUndefined();
   });
 
   it("rebuilds whole at once on a Motion change mid-start, and the start in flight stops", async () => {

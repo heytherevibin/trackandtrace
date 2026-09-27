@@ -27,6 +27,15 @@ import { startStill } from "./still";
 
 export { JOURNEY_CHUNK_MARK };
 
+declare global {
+  interface Window {
+    /** Outside production builds only: false while the first build is still starting its modules a turn at a time,
+     * true once every module has started (what the e2e specs wait on before they act). */
+    __ttJourneyStarted?: boolean;
+  }
+}
+const probed = process.env.NODE_ENV !== "production";
+
 /** A value startJourney holds for its whole lifetime, across every rebuild. */
 export interface Kept<T> {
   get(): T;
@@ -176,9 +185,11 @@ export function startJourney(options: JourneyOptions = {}): Teardown {
     scene.set(null);
     stopPlaceGuard();
     if (html.getAttribute("data-journey") === "on") html.removeAttribute("data-journey");
+    if (probed) delete window.__ttJourneyStarted;
   };
 
   html.setAttribute("data-journey", "on");
+  if (probed) window.__ttJourneyStarted = false;
   window.addEventListener(MOTION_EVENT, rebuild);
   window.addEventListener(REBUILD_EVENT, rebuild);
   window.addEventListener("resize", onResize);
@@ -186,6 +197,7 @@ export function startJourney(options: JourneyOptions = {}): Teardown {
   build(pause).then(
     () => {
       if (ended) return;
+      if (probed) window.__ttJourneyStarted = true;
       // The frame meter (J5-10): its own chunk, fetched only when allowed and asked for; it ends with the journey.
       if (options.hud && new URLSearchParams(window.location.search).has("journey-hud")) {
         void import("./hud").then(({ startHud }) => life.atEnd(startHud()), () => undefined);
