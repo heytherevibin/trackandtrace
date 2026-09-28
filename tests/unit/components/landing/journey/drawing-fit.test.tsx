@@ -21,6 +21,7 @@ afterEach(() => {
   delete html.dataset.saver;
   window.sessionStorage.clear();
   document.body.innerHTML = "";
+  Reflect.deleteProperty(document, "fonts"); // jsdom has none: a test's stand-in
 });
 
 describe("fit, judged before the scene is fetched (J6-5)", () => {
@@ -40,6 +41,59 @@ describe("fit, judged before the scene is fetched (J6-5)", () => {
     expect(scrollTo).not.toHaveBeenCalled(); // the reader never moved, so nothing was put back
   });
 
+  it("undoes every write the trial made: the pin's data-live, data-compact and --anatomy-copy-h, the labels' transform and clip-path, .live-lines and .is-live", () => {
+    vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener: () => undefined, removeEventListener: () => undefined }));
+    document.body.innerHTML = markup;
+    const section = document.getElementById("anatomy")!;
+    const pin = section.querySelector<HTMLElement>(".anatomy-pin")!;
+    const label = section.querySelector<HTMLElement>(".callout")!;
+    const written = new Set<string>();
+    const seen = new MutationObserver((records) => {
+      for (const r of records) written.add(r.type === "childList" ? "children" : `${(r.target as Element).className || (r.target as Element).id}:${r.attributeName}`);
+    });
+    seen.observe(section, { attributes: true, childList: true, subtree: true });
+    liveFits(section);
+    const records = seen.takeRecords();
+    seen.disconnect();
+    for (const r of records) written.add(r.type === "childList" ? "children" : `${(r.target as Element).className || (r.target as Element).id}:${r.attributeName}`);
+    // the trial wrote them (columns tried, compact and not, then the list), so undoing them is proven, not assumed
+    expect([...written]).toEqual(expect.arrayContaining(["anatomy:class", "anatomy-pin:data-live", "anatomy-pin:data-compact", "anatomy-pin:style", "children"]));
+    expect(section.classList.contains("is-live")).toBe(false);
+    expect(pin.dataset.live).toBeUndefined();
+    expect(pin.hasAttribute("data-compact")).toBe(false);
+    expect(pin.style.getPropertyValue("--anatomy-copy-h")).toBe("");
+    expect(label.style.transform).toBe("");
+    expect(label.style.clipPath).toBe("");
+    expect(section.querySelector(".live-lines")).toBeNull();
+  });
+
+  it("puts back a reader the trial moved through jumpTo: announced, and never a sub-pixel no-op that would cancel a glide", () => {
+    vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener: () => undefined, removeEventListener: () => undefined }));
+    document.body.innerHTML = markup;
+    const section = document.getElementById("anatomy")!;
+    const pin = section.querySelector<HTMLElement>(".anatomy-pin")!;
+    const scroll = { y: 3000, during: 3000 };
+    vi.spyOn(window, "scrollY", "get").mockImplementation(() => scroll.y);
+    // scroll anchoring moving a reader below the chapter while it stands pinned for the trial
+    const box = pin.getBoundingClientRect.bind(pin);
+    pin.getBoundingClientRect = () => {
+      scroll.y = scroll.during;
+      return box();
+    };
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+    const jumps = vi.fn();
+    window.addEventListener("tt:jump", jumps);
+    scroll.during = 3000.4; // under a pixel: nothing to put back
+    liveFits(section);
+    expect(scrollTo).not.toHaveBeenCalled();
+    scroll.y = 3000;
+    scroll.during = 3480;
+    liveFits(section);
+    expect(scrollTo).toHaveBeenCalledWith({ top: 3000, behavior: "instant" });
+    expect(jumps).toHaveBeenCalledTimes(1);
+    window.removeEventListener("tt:jump", jumps);
+  });
+
   it("has nothing to judge without the chapter's markup: the scene's own check decides", () => {
     expect(liveFits(null)).toBe(true);
     document.body.innerHTML = `<section id="anatomy"></section>`;
@@ -53,6 +107,57 @@ describe("fit, judged before the scene is fetched (J6-5)", () => {
     expect(html.dataset.drawingWhy).toBe("fit");
     expect(load).not.toHaveBeenCalled();
     stop();
+  });
+
+  // Judged in the fallback font, a first visit's chapter can read as too tall, and holds the still for the whole build
+  // (Task 4 review): the first judgement waits for the page's own type.
+  it("waits for the web fonts before judging fit, then judges once and asks for the scene", async () => {
+    const loaded: { now: () => void } = { now: () => undefined };
+    const ready = new Promise<void>((resolve) => {
+      loaded.now = resolve;
+    });
+    const fonts = { status: "loading", ready };
+    Object.defineProperty(document, "fonts", { configurable: true, value: fonts });
+    const fits = vi.fn(() => true);
+    const load = vi.fn<LoadLive>(() => new Promise<Begin>(() => undefined));
+    const stop = drawingModule(load, () => true, fits)(testContext());
+    expect(fits).not.toHaveBeenCalled();
+    expect(load).not.toHaveBeenCalled();
+    fonts.status = "loaded";
+    loaded.now();
+    await ready;
+    await Promise.resolve();
+    expect(fits).toHaveBeenCalledTimes(1);
+    expect(load).toHaveBeenCalledTimes(1);
+    stop();
+  });
+
+  it("judges fit at once when the web fonts have already loaded", () => {
+    Object.defineProperty(document, "fonts", { configurable: true, value: { status: "loaded", ready: Promise.resolve() } });
+    const fits = vi.fn(() => false);
+    const load = vi.fn<LoadLive>();
+    const stop = drawingModule(load, () => true, fits)(testContext());
+    expect(fits).toHaveBeenCalledTimes(1);
+    expect(html.dataset.drawingWhy).toBe("fit");
+    expect(load).not.toHaveBeenCalled();
+    stop();
+  });
+
+  it("judges nothing once its module has ended before the fonts load", async () => {
+    const loaded: { now: () => void } = { now: () => undefined };
+    const ready = new Promise<void>((resolve) => {
+      loaded.now = resolve;
+    });
+    Object.defineProperty(document, "fonts", { configurable: true, value: { status: "loading", ready } });
+    const fits = vi.fn(() => true);
+    const load = vi.fn<LoadLive>();
+    const stop = drawingModule(load, () => true, fits)(testContext());
+    stop();
+    loaded.now();
+    await ready;
+    await Promise.resolve();
+    expect(fits).not.toHaveBeenCalled();
+    expect(load).not.toHaveBeenCalled();
   });
 
   it("asks for the scene when it fits", () => {

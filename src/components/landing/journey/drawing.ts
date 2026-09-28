@@ -55,9 +55,10 @@ function storeFloor(): void {
  * Whether the live chapter's words fit its window (spec §3.C, fit), judged before the scene is fetched (J6-5): the pinned
  * layout, laid out for an instant and measured by the live labels' own layout() (a DOM measurement, no three.js), then
  * put back in the same task, so nothing paints. A reader below the chapter may have been moved by scroll anchoring
- * while it stood pinned: the scroll is put back too. The one write of the pin outside keepPlace, and still this
- * module's. The scene's own check, on every relayout while live, stands behind it. Without the chapter's markup (a
- * unit test) there is nothing to judge, and the scene decides.
+ * while it stood pinned: the scroll is put back too, through jumpTo, as every place-keeping move (a sub-pixel no-op
+ * would cancel a glide in flight, and a real move is announced). The one write of the pin outside keepPlace, and still
+ * this module's. The scene's own check, on every relayout while live, stands behind it. Without the chapter's markup
+ * (a unit test) there is nothing to judge, and the scene decides.
  */
 export function liveFits(section: HTMLElement | null): boolean {
   if (!section || section.classList.contains(PINNED)) return true;
@@ -67,8 +68,13 @@ export function liveFits(section: HTMLElement | null): boolean {
   const fits = labels === null || labels.layout() !== null;
   labels?.clear();
   section.classList.remove(PINNED);
-  if (window.scrollY !== y) window.scrollTo({ top: y, behavior: "instant" });
+  jumpTo(y);
   return fits;
+}
+
+/** The page's web fonts are still arriving: fit judged now would measure the fallback's lines. */
+function fontsLoading(): boolean {
+  return "fonts" in document && document.fonts.status === "loading";
 }
 
 export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2, fits: (section: HTMLElement | null) => boolean = liveFits): JourneyModule {
@@ -93,6 +99,9 @@ export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2,
     let moving = false;
     let quiet = 0;
     let waiting = false;
+    // Fit is judged in the page's own type: a first visit's chapter measured in the fallback font can read as too tall
+    // and hold the still for the whole build (Task 4 review). Until the fonts load, nothing is judged or fetched.
+    let typeset = !fontsLoading();
 
     const report = (now: DrawingMode) => {
       html.dataset.drawing = now;
@@ -260,8 +269,8 @@ export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2,
     function apply(): void {
       if (!alive) return;
       // judged once, just before the first fetch: a chapter that cannot fit its window never downloads the scene (J6-5)
-      if (wantsScene(reasons) && !prepared && !fits(section)) reasons = withReason(reasons, "fit", true);
-      if (wantsScene(reasons)) prepare();
+      if (typeset && wantsScene(reasons) && !prepared && !fits(section)) reasons = withReason(reasons, "fit", true);
+      if (typeset && wantsScene(reasons)) prepare();
       const want = modeOf(reasons);
       if (want !== mode) {
         keepPlace(section, () => {
@@ -285,6 +294,11 @@ export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2,
     window.addEventListener(WEBGL_EVENT, onWebgl);
 
     apply();
+    if (!typeset)
+      void document.fonts.ready.then(() => {
+        typeset = true;
+        apply();
+      });
     return () => {
       alive = false;
       ended.abort();
