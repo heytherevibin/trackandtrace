@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { frameStats, startHud } from "@/components/landing/journey/hud";
 import { hudAllowed } from "@/components/landing/journey/hud-gate";
+import { HUD_CHUNK_MARK } from "@/components/landing/journey/hud-mark";
 
 describe("the frame meter (J5-10)", () => {
   afterEach(() => document.body.replaceChildren());
@@ -42,5 +43,10 @@ describe("the frame meter (J5-10)", () => {
     stop();
     delete document.documentElement.dataset.drawing;
     delete document.documentElement.dataset.drawingWhy;
+  });
+  it("carries its chunk's mark on its own root, so the chunk budgets can tell its chunk apart (J6-15)", () => {
+    const stop = startHud();
+    expect(document.querySelector<HTMLElement>(".journey-hud")?.dataset.chunk).toBe(HUD_CHUNK_MARK);
+    stop();
   });
 });

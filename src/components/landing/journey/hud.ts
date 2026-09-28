@@ -1,4 +1,5 @@
 import { QUALITY_STORAGE_KEY } from "@/components/motion/motion-boot";
+import { HUD_CHUNK_MARK } from "./hud-mark";
 import type { Teardown } from "./start-journey";
 
 // The frame meter (spec §3.J, §7; prototype v3's hud.js; J5-10): for trying the landing on a real phone. It shows
@@ -56,6 +57,7 @@ function quality(): string {
 export function startHud(): Teardown {
   const el = document.createElement("div");
   el.className = "journey-hud";
+  el.dataset.chunk = HUD_CHUNK_MARK; // the chunk budgets find the meter's chunk by this (journey-budgets.mjs)
   const head = document.createElement("div");
   const title = document.createElement("span");
   title.textContent = "Frame meter";

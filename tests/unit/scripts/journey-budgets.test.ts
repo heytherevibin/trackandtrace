@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { JOURNEY_CHUNK_MARK } from "@/components/landing/journey/journey-mark";
+import { HUD_CHUNK_MARK } from "@/components/landing/journey/hud-mark";
 import { SCENE_CHUNK_MARK } from "@/components/landing/journey/scene/scene-mark";
 import { BUDGETS, MARKS, measure } from "../../../scripts/journey-budgets.mjs";
 
@@ -12,6 +13,7 @@ describe("the journey's chunk budgets (spec §3.H; J5-15)", () => {
   it("finds the chunks by the same marks the app carries", () => {
     expect(MARKS.journey).toBe(JOURNEY_CHUNK_MARK);
     expect(MARKS.scene).toBe(SCENE_CHUNK_MARK);
+    expect(MARKS.hud).toBe(HUD_CHUNK_MARK);
     expect(BUDGETS).toEqual({ journey: 70 * 1024, scene: 240 * 1024 });
   });
 
@@ -79,5 +81,15 @@ describe("the chunks each budget counts (Task 7's split: the journey loads as se
   it("with requireLoader, fails when no loader fetches the journey chunk: a split it cannot see would be under-counted", () => {
     expect(measure([journey, scene], { requireLoader: true }).failures.join(" ")).toMatch(/no loader fetches the journey chunk/);
     expect(measure([journey, scene]).failures).toEqual([]);
+  });
+  it("classes a loader group by the scene's mark before the meter's, and fails one that carries both", () => {
+    const both = { name: "static/chunks/both.js", text: `${MARKS.scene} ${MARKS.hud} ${noise(100)}` };
+    const r = measure([page, journey, anime, { ...loaders, text: `${loads("both.js")}` }, both, three], { requireLoader: true });
+    expect(r.failures.join(" ")).toMatch(/one loader fetches both the scene and the frame meter/);
+  });
+
+  it("with requireLoader, fails when no loader fetches the scene: what loads beside it would go uncounted", () => {
+    const r = measure([page, journey, anime, { ...loaders, text: loads("hud.js") }, scene, three, hud], { requireLoader: true });
+    expect(r.failures.join(" ")).toMatch(/no loader fetches the scene chunk/);
   });
 });

@@ -1,7 +1,15 @@
-// The journey's real-GPU budgets (spec §3.H), on this machine's GPU against a production build:
-//   npm run build && npx next start -p 4210    (another shell; `lsof -nP -iTCP:4210 -sTCP:LISTEN` first)
-//   node scripts/journey-perf.mjs               (run it twice: a fresh server's first answers are cold)
-// A headed Chromium on the real GPU (Metal on a Mac), a fresh one for each, loads "/" twice:
+// The journey's performance budgets (spec §3.H), against this checkout's production build, which the script serves
+// itself on this machine with sample data and nothing live (scripts/serve-local-production.mjs; J6-14):
+//   npm run build:local && node scripts/journey-perf.mjs              the real-GPU run, by hand, on the owner's Mac (run
+//                                                                      it twice: a fresh server's first answers are cold)
+//   npm run build:local && node scripts/journey-perf.mjs --software   the nightly's throttled run, on a runner with no GPU
+// Only a build made by `npm run build:local` is served (every live variable blanked, stamped beside BUILD_ID; J6-2). It
+// refuses port 4210 when another server answers there (`lsof -nP -iTCP:4210 -sTCP:LISTEN`), and, through the serve
+// script, a working tree holding any .env file but .env.example. JOURNEY_PERF_URL points it at a server already
+// running instead. Either run fails when the server's offline guard refused anything, or when the
+// page asked any host but this one. It never submits a PNR. Exits 1 on a missed budget.
+//
+// The real-GPU run: a headed Chromium on the real GPU (Metal on a Mac), a fresh one for each, loads "/" twice:
 // - a phone, 390×844 at 4× CPU: the longest journey task at load (≤ 120 ms) and the scene's longest step (≤ 61 ms),
 //   from the start to one frame after the drawing goes live. Each long task is named by the scripts that ran in it
 //   (Long Animation Frames), against the chunk lists journey-budgets.mjs reads from the build; the page's own longest
@@ -9,11 +17,14 @@
 //   through the drawing: median fps and frames over 33 ms;
 // - the reference desktop, 1280×800 at 1×: the same scroll's p95 and frames over 25 ms, recorded from two frames after
 //   the jump into #anatomy, with the progress through #anatomy of every frame over 25 ms.
-// Loading "/" must contact no live service: any request to a host but this server fails the run. It never submits a
-// PNR. JOURNEY_PERF_URL points it at another server (default http://localhost:4210/). Exits 1 on a missed budget.
+// The software run (J6-3): a headless Chromium drawing through SwiftShader, on the CPU: a phone at 4×, 6× and 10× CPU,
+// and the desktop at 1×. A software GPU measures the rasteriser, not the page, so frame times and long tasks are printed
+// only. It fails on what holds on any machine: another host asked, CLS over 0.05, a drawing that never decided, and at
+// 10× a governor that never answered (no quality step stored in tt.q, and no still for quality or load).
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chunksIn, measure } from "./journey-budgets.mjs";
+import { refusals, startLocalProduction } from "./serve-local-production.mjs";
 
 export const BUDGETS = { journeyTask: 120, sceneStep: 61, cls: 0.05, desktopP95: 12, desktopOver25: 0, phoneFps: 55, phoneOver33: 2 };
 
@@ -63,6 +74,26 @@ export function frameStats(frames) {
   const over = (ms) => Math.round((frames.filter((f) => f > ms).length / frames.length) * 1000) / 10;
   return { count: frames.length, p95: quantile(frames, 0.95), medianFps: Math.round(1000 / quantile(frames, 0.5)), over25: over(25), over33: over(33.4) };
 }
+
+/**
+ * What a software GPU's run can fail on (J6-3): another host asked, CLS over budget, a drawing that never decided, and
+ * at the heaviest rate a governor that never answered. Frame times and long tasks are never its business.
+ * @param {{ rate: number, foreign: readonly string[], cls: number, why: string | null, q: string | null, heaviest: boolean }} run
+ * @returns {string[]}
+ */
+export function softwareFailures(run) {
+  /** @type {string[]} */
+  const out = [];
+  if (run.foreign.length) out.push(`asked ${run.foreign.join(", ")}`);
+  if (run.cls > BUDGETS.cls) out.push(`CLS ${run.cls.toFixed(3)} over ${BUDGETS.cls}`);
+  if (run.why === null) out.push("the drawing never decided");
+  const answered = run.q !== null || /\b(quality|load)\b/.test(run.why ?? "");
+  if (run.heaviest && !answered) out.push("the governor never answered: no quality step stored, and no still for quality or load");
+  return out;
+}
+
+/** @param {number} n */
+const ms = (n) => `${n.toFixed(0)} ms`;
 
 // ---- the browser half
 
@@ -125,13 +156,10 @@ async function scrollThrough(page, { width, height }) {
 }
 
 /**
- * One viewport in its own browser, so no run inherits another's compiled shaders or caches.
- * @param {string} base @param {Owners} owners @param {{ width: number, height: number, cpu: number }} run
+ * Every origin but the page's own that the page asks, as it asks.
+ * @param {import("@playwright/test").Page} page @param {string} base
  */
-async function measureRun(base, owners, { width, height, cpu }) {
-  const { chromium } = await import("@playwright/test");
-  const browser = await chromium.launch({ headless: false, args: ["--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist"] });
-  const page = await browser.newPage({ viewport: { width, height } });
+function watchForeign(page, base) {
   /** @type {Set<string>} */
   const foreign = new Set();
   const origin = new URL(base).origin;
@@ -139,6 +167,18 @@ async function measureRun(base, owners, { width, height, cpu }) {
     const u = new URL(r.url());
     if (u.origin !== origin && u.protocol !== "data:" && u.protocol !== "blob:") foreign.add(u.origin);
   });
+  return foreign;
+}
+
+/**
+ * One viewport in its own browser, so no run inherits another's compiled shaders or caches.
+ * @param {string} base @param {Owners} owners @param {{ width: number, height: number, cpu: number }} run
+ */
+async function measureRun(base, owners, { width, height, cpu }) {
+  const { chromium } = await import("@playwright/test");
+  const browser = await chromium.launch({ headless: false, args: ["--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist"] });
+  const page = await browser.newPage({ viewport: { width, height } });
+  const foreign = watchForeign(page, base);
   const cdp = await page.context().newCDPSession(page);
   if (cpu > 1) await cdp.send("Emulation.setCPUThrottlingRate", { rate: cpu });
   await page.addInitScript(observe);
@@ -153,17 +193,42 @@ async function measureRun(base, owners, { width, height, cpu }) {
   return { tasks: longest(tasks), all: tasks, cls: perf.cls, ...scroll, foreign: [...foreign] };
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const root = join(fileURLToPath(new URL(".", import.meta.url)), "..");
-  const built = measure(chunksIn(join(root, ".next/static/chunks")), { requireLoader: true });
-  if (built.failures.length) throw new Error(`the build's chunks cannot be placed: ${built.failures.join("; ")}`);
-  const owners = { journey: new Set(built.journey.map(chunkOf)), scene: new Set(built.scene.map(chunkOf)) };
-  const base = process.env.JOURNEY_PERF_URL ?? "http://localhost:4210/";
+/**
+ * One software-GPU run, in its own headless browser (SwiftShader): the page's decision, its quality step and its CLS;
+ * its long tasks and, when live, its scroll, printed only.
+ * @param {string} base @param {Owners} owners @param {{ width: number, height: number, cpu: number }} run
+ */
+async function softwareRun(base, owners, { width, height, cpu }) {
+  const { chromium } = await import("@playwright/test");
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width, height } });
+  const foreign = watchForeign(page, base);
+  const cdp = await page.context().newCDPSession(page);
+  if (cpu > 1) await cdp.send("Emulation.setCPUThrottlingRate", { rate: cpu });
+  await page.addInitScript(observe);
+  await page.goto(base);
+  const decided = await page.waitForSelector("html[data-drawing-why]", { state: "attached", timeout: 60_000 }).then(() => true, () => false);
+  const live = decided && (await page.waitForSelector("#anatomy.is-live", { state: "attached", timeout: 30_000 }).then(() => true, () => false));
+  const scroll = live ? await scrollThrough(page, { width, height }) : null;
+  /** @type {{ tasks: Task[], scripts: Script[], cls: number }} */
+  const perf = await page.evaluate(() => Reflect.get(window, "__perf"));
+  const state = await page.evaluate(() => ({ why: document.documentElement.getAttribute("data-drawing-why"), q: window.sessionStorage.getItem("tt.q") }));
+  await browser.close();
+  return { width, height, cpu, tasks: longest(attribute(perf.tasks, perf.scripts, owners)), cls: perf.cls, stats: scroll?.stats ?? null, foreign: [...foreign], ...state };
+}
+
+/**
+ * The real-GPU run's verdicts (spec §3.H).
+ * @param {string} base @param {Owners} owners @returns {Promise<Array<[string, boolean]>>}
+ */
+async function hardware(base, owners) {
   const phone = await measureRun(base, owners, { width: 390, height: 844, cpu: 4 });
   const desk = await measureRun(base, owners, { width: 1280, height: 800, cpu: 1 });
-
-  const ms = (/** @type {number} */ n) => `${n.toFixed(0)} ms`;
-  const lines = [
+  console.log(`phone long tasks: ${phone.all.map((t) => `${t.owner} ${ms(t.duration)}`).join(", ") || "none"}`);
+  console.log(`desktop long tasks: ${desk.all.map((t) => `${t.owner} ${ms(t.duration)}`).join(", ") || "none"}`);
+  if (phone.slow.length) console.log(`phone frames over 25 ms (progress through #anatomy): ${phone.slow.join(", ")}`);
+  if (desk.slow.length) console.log(`desktop frames over 25 ms (progress through #anatomy): ${desk.slow.join(", ")}`);
+  return [
     [`phone longest journey task at load ${ms(phone.tasks.journey)} (page's own longest ${ms(phone.tasks.page)})`, phone.tasks.journey <= BUDGETS.journeyTask],
     [`phone longest scene step ${ms(phone.tasks.scene)}`, phone.tasks.scene <= BUDGETS.sceneStep],
     [`phone scroll median ${phone.stats.medianFps} fps, ${phone.stats.over33}% > 33 ms (${phone.stats.count} frames)`, phone.stats.medianFps >= BUDGETS.phoneFps && phone.stats.over33 <= BUDGETS.phoneOver33],
@@ -171,10 +236,45 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     [`CLS at load: phone ${phone.cls.toFixed(3)}, desktop ${desk.cls.toFixed(3)}`, Math.max(phone.cls, desk.cls) <= BUDGETS.cls],
     [`other hosts asked: ${[...phone.foreign, ...desk.foreign].join(", ") || "none"}`, !phone.foreign.length && !desk.foreign.length],
   ];
-  console.log(`phone long tasks: ${phone.all.map((t) => `${t.owner} ${ms(t.duration)}`).join(", ") || "none"}`);
-  console.log(`desktop long tasks: ${desk.all.map((t) => `${t.owner} ${ms(t.duration)}`).join(", ") || "none"}`);
-  if (phone.slow.length) console.log(`phone frames over 25 ms (progress through #anatomy): ${phone.slow.join(", ")}`);
-  if (desk.slow.length) console.log(`desktop frames over 25 ms (progress through #anatomy): ${desk.slow.join(", ")}`);
+}
+
+/**
+ * The software run's verdicts (J6-3): each line prints its numbers, and judges only softwareFailures.
+ * @param {string} base @param {Owners} owners @returns {Promise<Array<[string, boolean]>>}
+ */
+async function software(base, owners) {
+  /** @type {Array<[string, boolean]>} */
+  const lines = [];
+  const runs = [
+    { width: 390, height: 844, cpu: 4 },
+    { width: 390, height: 844, cpu: 6 },
+    { width: 390, height: 844, cpu: 10 },
+    { width: 1280, height: 800, cpu: 1 },
+  ];
+  for (const run of runs) {
+    const r = await softwareRun(base, owners, run);
+    const scrolled = r.stats ? `scroll median ${r.stats.medianFps} fps, p95 ${r.stats.p95.toFixed(1)} ms, ${r.stats.over33}% > 33 ms` : "not live, so no scroll";
+    const drawing = r.why === null ? "undecided" : r.why === "" ? "live" : `still (${r.why})`;
+    console.log(`${r.width}×${r.height} at ${r.cpu}× (software GPU, printed only): longest journey task ${ms(r.tasks.journey)}, scene step ${ms(r.tasks.scene)}, page ${ms(r.tasks.page)}; ${scrolled}; drawing ${drawing}; quality step ${r.q ?? "none stored"}`);
+    const failures = softwareFailures({ rate: r.cpu, foreign: r.foreign, cls: r.cls, why: r.why, q: r.q, heaviest: r.cpu === 10 });
+    lines.push([`${r.width}×${r.height} at ${r.cpu}×: CLS ${r.cls.toFixed(3)}, other hosts ${r.foreign.join(", ") || "none"}, drawing ${drawing}${failures.length ? `: ${failures.join("; ")}` : ""}`, failures.length === 0]);
+  }
+  return lines;
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const root = join(fileURLToPath(new URL(".", import.meta.url)), "..");
+  const built = measure(chunksIn(join(root, ".next/static/chunks")), { requireLoader: true });
+  if (built.failures.length) throw new Error(`the build's chunks cannot be placed: ${built.failures.join("; ")}`);
+  const owners = { journey: new Set(built.journey.map(chunkOf)), scene: new Set(built.scene.map(chunkOf)) };
+  const own = process.env.JOURNEY_PERF_URL ? null : await startLocalProduction({ port: 4210 });
+  const base = process.env.JOURNEY_PERF_URL ?? own?.url ?? "";
+  const judge = process.argv.includes("--software") ? software : hardware;
+  const lines = await judge(base, owners).finally(() => own?.stop());
+  if (own) {
+    const refused = refusals();
+    lines.push([`the server's offline guard refused: ${refused.join(", ") || "nothing"}`, refused.length === 0]);
+  }
   for (const [text, ok] of lines) console.log(`${ok ? "✓" : "✗"} ${text}`);
   process.exit(lines.every(([, ok]) => ok) ? 0 : 1);
 }

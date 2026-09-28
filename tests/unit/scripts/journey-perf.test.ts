@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { attribute, frameStats, longest } from "../../../scripts/journey-perf.mjs";
+import { attribute, frameStats, longest, softwareFailures } from "../../../scripts/journey-perf.mjs";
 
 // The real-GPU budgets' arithmetic (spec §3.H), apart from the browser that feeds it: which long tasks are the
 // journey's (§3.H budgets the longest *journey* task at load, not the page's hydration), which are the scene's steps,
@@ -53,5 +53,27 @@ describe("frameStats", () => {
 
   it("is all zeros with no frames", () => {
     expect(frameStats([])).toEqual({ count: 0, p95: 0, medianFps: 0, over25: 0, over33: 0 });
+  });
+});
+
+describe("softwareFailures: what a software GPU's run can fail on (J6-3)", () => {
+  const clean = { rate: 4, foreign: [], cls: 0.002, why: "", q: null, heaviest: false } as const;
+
+  it("passes a run that asked no other host, held its layout and decided its drawing; frame times are not its business", () => {
+    expect(softwareFailures(clean)).toEqual([]);
+  });
+
+  it("fails another host asked, CLS over 0.05, or a drawing that never decided", () => {
+    expect(softwareFailures({ ...clean, foreign: ["https://example.invalid"] })).toEqual(["asked https://example.invalid"]);
+    expect(softwareFailures({ ...clean, cls: 0.06 })).toEqual(["CLS 0.060 over 0.05"]);
+    expect(softwareFailures({ ...clean, why: null })).toEqual(["the drawing never decided"]);
+  });
+
+  it("at the heaviest rate, asks the governor to have answered: a quality step stored, or the still for quality or load", () => {
+    expect(softwareFailures({ ...clean, heaviest: true })).toEqual(["the governor never answered: no quality step stored, and no still for quality or load"]);
+    expect(softwareFailures({ ...clean, heaviest: true, q: "1" })).toEqual([]);
+    expect(softwareFailures({ ...clean, heaviest: true, why: "quality" })).toEqual([]);
+    expect(softwareFailures({ ...clean, heaviest: true, why: "load" })).toEqual([]);
+    expect(softwareFailures({ ...clean, heaviest: true, why: "place" })).toHaveLength(1);
   });
 });
