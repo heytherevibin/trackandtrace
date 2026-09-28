@@ -71,10 +71,7 @@ export function startStill({ still }: JourneyContext): Teardown {
     for (const label of labels) label.style.top = "";
     for (const key of HOLDER) holder.style[key] = "";
     lines.removeAttribute("viewBox");
-    for (const { line, dot } of leaders) {
-      line.remove();
-      dot.remove();
-    }
+    lines.replaceChildren(); // every leader, a predecessor's included (the successor's hand-over, below)
     leaders = [];
   };
 
@@ -252,15 +249,12 @@ export function startStill({ still }: JourneyContext): Teardown {
   observer.observe(titleBlock);
   for (const label of labels) observer.observe(label);
   void document.fonts.ready.then(schedule);
-  // A rebuild's successor (Motion, a fit change): the predecessor's teardown cleared, in this same task, the columns
-  // the reader is looking at. Laid out only a frame later, the chapter stood collapsed for everything that measured the
-  // page meanwhile (the drawing's start tells tt:layout), and 02's place guard kept the reader the cleared height past
-  // where they were reading once 02's padding landed in that frame (WebKit under load). So they are laid out again
-  // here, against the place on record (nobody moves for a change never seen), and told.
-  const kept = still.get();
-  if (kept.columns && !pin.classList.contains("is-columns") && document.documentElement.dataset.drawing === "still") {
+  // A rebuild's successor (Motion, a fit change) finds the columns its predecessor left standing (the teardown, below)
+  // and takes them over in this same task: laid out afresh against the place on record (nothing the reader saw has
+  // changed, so nobody moves), or cleared at once when the drawing is now live. Its own leaders replace the predecessor's.
+  if (pin.classList.contains("is-columns")) {
+    lines.replaceChildren();
     layout();
-    if (still.get().columns) emit(LAYOUT_EVENT); // a flip is told by layout() itself
   } else schedule();
 
   return () => {
@@ -274,6 +268,17 @@ export function startStill({ still }: JourneyContext): Teardown {
     observer.disconnect();
     for (const stop of pointing) stop();
     if (!aside) light(null);
-    clear();
+    if (!pin.classList.contains("is-columns")) return clear();
+    // The columns the reader is looking at stand until the task ends, for a rebuild's successor to take over (a rebuild
+    // starts every module before it returns: start-journey.ts). Cleared here, the chapter stood 304 px shorter for every
+    // layout the other teardowns and starts force before the successor laid them out again, and Linux WebKit's scroll
+    // anchoring moved the reader for that collapse and never for the columns' return (the nightly, run 36406365173).
+    // No successor took them (the journey ended, or its rebuild failed): cleared then, and the place on record with them.
+    const handed = still.get();
+    queueMicrotask(() => {
+      if (still.get() !== handed) return;
+      clear();
+      still.set({ columns: false, height: null });
+    });
   };
 }

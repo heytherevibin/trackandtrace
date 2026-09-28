@@ -65,37 +65,64 @@ describe("the still's labels when the drawing goes live (J5-5)", () => {
   });
 });
 
-// Motion's rebuild tears the still down, its columns cleared, and starts its successor in the same task. Laid out again
-// only a frame later, the chapter stood 304px shorter for everything that measured the page meanwhile: the drawing's
-// start tells tt:layout, and 02's place guard took that half-built page for the reader's, then kept the reader 304px
-// past #record once 02's padding landed in the same frame (the nightly's WebKit, under load).
+// A rebuild (Motion, a fit change) tears the still down and starts its successor in the same task. A predecessor that
+// cleared its columns left the chapter 304 px shorter until the successor laid them out again, and every layout in
+// between (the drawing's teardown and start measure the page) saw it so: Linux WebKit's scroll anchoring answered that
+// collapse by moving the reader up 304 px and never answered the columns' return, so the reader landed 304 px past their
+// place (the nightly, run 36406365173). So the columns are handed over as they stand, never collapsed in between.
 describe("the still's successor in a rebuild", () => {
-  it("lays out again, in the same task, the columns its predecessor cleared, and says so", () => {
-    const ctx = testContext();
-    ctx.still.set({ columns: true, height: 944 }); // what the reader was looking at
+  /** The columns as a wide window lays them out: the pin 944 px tall with them, 640 px without. */
+  const laidOut = () => {
+    vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
     const pin = document.querySelector<HTMLElement>(".anatomy-pin")!;
-    pin.classList.remove("is-columns"); // the predecessor's teardown
-    let height = 640;
+    pin.classList.remove("is-columns"); // the server's markup
     const rect = (top: number, bottom: number, left = 0, right = 1440) => ({ top, bottom, height: bottom - top, left, right, width: right - left }) as DOMRect;
-    pin.getBoundingClientRect = () => rect(-3000, -3000 + height);
-    // the columns' own boxes, as a wide window lays them out: the words at the top, the title block at the foot
+    pin.getBoundingClientRect = () => rect(-3000, -3000 + (pin.classList.contains("is-columns") ? 944 : 640));
     document.querySelector(".anatomy-copy")!.getBoundingClientRect = () => rect(-3000, -2900, 0, 600);
     document.querySelector(".title-block")!.getBoundingClientRect = () => rect(-2200, -2100, 1000, 1440);
     document.querySelector(".callout")!.getBoundingClientRect = () => rect(-2960, -2920, 1180, 1440);
-    const observer = vi.spyOn(pin.classList, "add").mockImplementation(function (this: DOMTokenList, ...tokens: string[]) {
-      if (tokens.includes("is-columns")) height = 944;
-      return DOMTokenList.prototype.add.apply(this, tokens);
-    });
-    const told = vi.fn();
-    window.addEventListener(LAYOUT_EVENT, told);
-    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
-    const stop = startStill(ctx);
+    const ctx = testContext();
+    const first = startStill(ctx);
+    vi.advanceTimersToNextFrame(); // the first settle: columns
     expect(pin.classList.contains("is-columns")).toBe(true);
-    expect(told).toHaveBeenCalled();
-    expect(scrollTo).not.toHaveBeenCalled(); // the reader never saw it collapse: nobody is moved
-    window.removeEventListener(LAYOUT_EVENT, told);
-    observer.mockRestore();
-    stop();
+    expect(ctx.still.get()).toEqual({ columns: true, height: 944 });
+    return { ctx, pin, first, lines: document.querySelector("svg.callout-lines")!, label: document.querySelector<HTMLElement>(".callout")! };
+  };
+
+  it("leaves the columns standing for the successor, which lays them out in the same task: nothing in between sees them gone", async () => {
+    const { ctx, pin, first, lines } = laidOut();
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+    first();
+    expect(pin.classList.contains("is-columns")).toBe(true); // what the drawing's teardown and start measure
+    const second = startStill(ctx);
+    expect(pin.classList.contains("is-columns")).toBe(true);
+    expect(lines.children).toHaveLength(2); // one leader and its dot: the predecessor's are not left beside the successor's
+    await Promise.resolve();
+    expect(pin.classList.contains("is-columns")).toBe(true); // handed over: the predecessor clears nothing afterwards
+    expect(lines.children).toHaveLength(2);
+    expect(scrollTo).not.toHaveBeenCalled(); // the reader never saw anything change
+    second();
+  });
+
+  it("clears them once the task ends with no successor (the journey ended, or its rebuild failed)", async () => {
+    const { ctx, pin, first, lines, label } = laidOut();
+    first();
+    await Promise.resolve();
+    expect(pin.classList.contains("is-columns")).toBe(false);
+    expect(label.style.top).toBe("");
+    expect(lines.children).toHaveLength(0);
+    expect(ctx.still.get()).toEqual({ columns: false, height: null });
+  });
+
+  it("clears them at once for a successor that finds the drawing live: no frame of them under the pinned chapter", () => {
+    const { ctx, pin, first, lines } = laidOut();
+    first();
+    html.dataset.drawing = "live";
+    const second = startStill(ctx);
+    expect(pin.classList.contains("is-columns")).toBe(false);
+    expect(lines.children).toHaveLength(0);
+    expect(ctx.still.get()).toEqual({ columns: false, height: null });
+    second();
   });
 });
 
@@ -107,6 +134,9 @@ describe("the still's columns keep a reader past them in place (J5, J6-4)", () =
     vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
     ctx.still.set({ columns: true, height: 840 }); // the columns at 900px tall, as the reader last saw them
     const pin = document.querySelector<HTMLElement>(".anatomy-pin")!;
+    // born without the columns standing, so its first pass is a frame's (a successor finding them standing takes them
+    // over at once: above)
+    pin.classList.remove("is-columns");
     pin.getBoundingClientRect = () => ({ top: -3341, bottom: -2701, height: 640, width: 1440, left: 0, right: 1440 }) as DOMRect; // at 700px
   };
 

@@ -150,6 +150,31 @@ test.describe("the reader's place", () => {
     }
   }
 
+  // A rebuild tears the still down and starts its successor in one task. Columns cleared in between left the chapter
+  // 304 px shorter for every layout the teardowns and starts forced meanwhile, and Linux WebKit's scroll anchoring moved
+  // the reader for that collapse, never for the columns' return (the nightly, run 36406365173). Every class the pin
+  // carries through the rebuild is read back (a MutationObserver sees a class removed and added back in one task).
+  test("the still's columns stand through a Motion rebuild: no layout in between sees the chapter without them", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await drawStill(page);
+    await page.goto("/");
+    await waitForJourney(page);
+    await expect(page.locator("#anatomy .anatomy-pin")).toHaveClass(/is-columns/);
+    await page.evaluate(() => {
+      const pin = document.querySelector("#anatomy .anatomy-pin");
+      if (!pin) throw new Error("no .anatomy-pin");
+      const classes: string[] = [];
+      const watch = new MutationObserver((records) => classes.push(...records.map((r) => r.oldValue ?? "")));
+      watch.observe(pin, { attributes: true, attributeFilter: ["class"], attributeOldValue: true });
+      Reflect.set(window, "__ttPinClasses", () => [...classes, pin.className]);
+    });
+    await page.getByRole("contentinfo").getByRole("switch", { name: "Motion" }).evaluate((el) => (el as HTMLElement).click());
+    await expect(page.locator("html")).toHaveAttribute("data-motion", "off");
+    await frames(page, 3);
+    const classes = await page.evaluate(() => (Reflect.get(window, "__ttPinClasses") as () => string[])());
+    expect(classes.filter((c) => !c.split(/\s+/).includes("is-columns")), classes.join(" | ")).toEqual([]);
+  });
+
   // 02's last lines (J6-4): a reader whose window still shows 02's foot, #record's heading below it, is past 02 by
   // readerPlace, and stays on #record through a change of 02's height, where the window's top edge alone sent them back
   // 2,300–3,000 px to 02's start (J5 final re-review 2).
