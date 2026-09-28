@@ -164,3 +164,18 @@ describe("providerGuard", () => {
     warn.mockRestore();
   });
 });
+
+describe("this instance's memory, when no shared store is configured", () => {
+  // Next bundles route handlers and pages as separate module instances in one process: a module-level store
+  // is then two stores. The console's block route wrote to one and the /abuse page read the other, so a block
+  // showed its toast and then an empty Blocked table (CI, 2026-09-28). "This instance" means the process.
+  it("is one store per process, however many times the module is loaded", async () => {
+    const current = envOf({ NODE_ENV: "test" });
+    const first = await import("@/services/shared-store");
+    vi.resetModules();
+    const second = await import("@/services/shared-store");
+    expect(second.blocksForConsole(current).list).toBe(first.blocksForConsole(current).list);
+    expect(second.limitedLogForReading(current)).toBe(first.limitedLogForReading(current));
+    expect(second.addressMember(current, "192.0.2.9")).toBe(first.addressMember(current, "192.0.2.9"));
+  });
+});

@@ -70,12 +70,32 @@ function store(current: Env): SharedStore | null {
   return stores.get(current) ?? null;
 }
 
-/** Without a shared store there is no DATA_KEY to hash with, so this instance hashes with a key of its own that never leaves memory. */
-const randomKey = randomBytes(32);
-const localHash = (address: string): string => keyedHash(randomKey, `address:${address}`);
-const localLimited = memoryLimitedLog(localHash);
-const localBlocks = memoryBlocklist();
-const localBlocked = cachedBlocks(localBlocks);
+/**
+ * Without a shared store, the address hash, the limited log and the blocklist live in this instance's memory.
+ * "This instance" is the PROCESS, not the module: Next bundles route handlers and pages as separate module
+ * instances in one process, so a module-level store would be two stores — the block route wrote to one and the
+ * /abuse page read the other (a block showed its toast, then an empty Blocked table; CI, 2026-09-28). So they are
+ * kept on globalThis under a registered symbol, which every copy of this module finds.
+ *
+ * With no DATA_KEY to hash with, the hash key is this process's own and never leaves memory.
+ */
+interface LocalGuards {
+  readonly hash: (address: string) => string;
+  readonly log: LimitedLog;
+  readonly blocks: Blocklist;
+  readonly blocked: BlockedCheck;
+}
+const LOCAL_GUARDS = Symbol.for("trakline.shared-store.local-guards");
+function localGuards(): LocalGuards {
+  const holder = globalThis as { [LOCAL_GUARDS]?: LocalGuards };
+  if (!holder[LOCAL_GUARDS]) {
+    const key = randomBytes(32);
+    const hash = (address: string): string => keyedHash(key, `address:${address}`);
+    const blocks = memoryBlocklist();
+    holder[LOCAL_GUARDS] = { hash, log: memoryLimitedLog(hash), blocks, blocked: cachedBlocks(blocks) };
+  }
+  return holder[LOCAL_GUARDS];
+}
 
 interface Guards {
   readonly hash: (address: string) => string;
@@ -95,7 +115,7 @@ function travellerGuards(current: Env): Guards {
   const config = sharedStoreConfig(current);
   let made: Guards;
   if (!config) {
-    made = { hash: localHash, keyId: "local", log: localLimited, blocks: localBlocks, blocked: localBlocked };
+    made = { ...localGuards(), keyId: "local" };
   } else {
     const clientId = deriveDataKeys(config.dataKey).clientId;
     const hash = (address: string): string => keyedHash(clientId, `address:${address}`);
