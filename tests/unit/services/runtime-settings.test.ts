@@ -169,3 +169,51 @@ describe("createRuntimeSettings", () => {
     expect(await settings.liveChecksPerDay(300)).toBe(900);
   });
 });
+
+describe("siteNotice", () => {
+  // The traveller strip reads this. Off is the deployment's default; there is no env value for it.
+  const NOTICE = { site_notice_on: true, site_notice_text: "Planned maintenance on 21 Sep, 02:00–03:00 IST. Checks may be slow.", site_notice_version: 3 };
+
+  it("answers the text and its version when the notice is on", async () => {
+    const settings = createRuntimeSettings({ read: async () => NOTICE, now: clock().now });
+    expect(await settings.siteNotice()).toEqual({ text: NOTICE.site_notice_text, version: 3 });
+  });
+
+  it("answers nothing when it is off, or null, or has no text to show", async () => {
+    for (const row of [{ ...NOTICE, site_notice_on: false }, { ...NOTICE, site_notice_on: null }, { ...NOTICE, site_notice_text: null }, { ...NOTICE, site_notice_text: "   " }]) {
+      const settings = createRuntimeSettings({ read: async () => row, now: clock().now });
+      expect(await settings.siteNotice(), JSON.stringify(row)).toBeNull();
+    }
+  });
+
+  it("treats a missing version as the first, so a device can still close it", async () => {
+    const settings = createRuntimeSettings({ read: async () => ({ ...NOTICE, site_notice_version: null }), now: clock().now });
+    expect(await settings.siteNotice()).toEqual({ text: NOTICE.site_notice_text, version: 1 });
+  });
+
+  it("refuses a text longer than the console allows rather than draw whatever arrived", async () => {
+    const settings = createRuntimeSettings({ read: async () => ({ ...NOTICE, site_notice_text: "x".repeat(161) }), now: clock().now });
+    expect(await settings.siteNotice()).toBeNull();
+  });
+
+  it("keeps showing the last good notice while the store is down", async () => {
+    const time = clock();
+    let fail = false;
+    const settings = createRuntimeSettings({
+      read: async () => {
+        if (fail) throw new Error("down");
+        return NOTICE;
+      },
+      now: time.now,
+    });
+    await settings.siteNotice();
+    fail = true;
+    time.advance(COPY_FRESH_MS + 1);
+    expect(await settings.siteNotice()).toEqual({ text: NOTICE.site_notice_text, version: 3 });
+  });
+
+  it("does not let a bad notice column take the live-check limit down with it", async () => {
+    const settings = createRuntimeSettings({ read: async () => ({ ...NOTICE, site_notice_version: "three", live_checks_per_day: 900 }), now: clock().now });
+    expect(await settings.liveChecksPerDay(300)).toBe(900);
+  });
+});
