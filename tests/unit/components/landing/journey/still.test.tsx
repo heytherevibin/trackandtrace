@@ -65,6 +65,40 @@ describe("the still's labels when the drawing goes live (J5-5)", () => {
   });
 });
 
+// Motion's rebuild tears the still down, its columns cleared, and starts its successor in the same task. Laid out again
+// only a frame later, the chapter stood 304px shorter for everything that measured the page meanwhile: the drawing's
+// start tells tt:layout, and 02's place guard took that half-built page for the reader's, then kept the reader 304px
+// past #record once 02's padding landed in the same frame (the nightly's WebKit, under load).
+describe("the still's successor in a rebuild", () => {
+  it("lays out again, in the same task, the columns its predecessor cleared, and says so", () => {
+    const ctx = testContext();
+    ctx.still.set({ columns: true, height: 944 }); // what the reader was looking at
+    const pin = document.querySelector<HTMLElement>(".anatomy-pin")!;
+    pin.classList.remove("is-columns"); // the predecessor's teardown
+    let height = 640;
+    const rect = (top: number, bottom: number, left = 0, right = 1440) => ({ top, bottom, height: bottom - top, left, right, width: right - left }) as DOMRect;
+    pin.getBoundingClientRect = () => rect(-3000, -3000 + height);
+    // the columns' own boxes, as a wide window lays them out: the words at the top, the title block at the foot
+    document.querySelector(".anatomy-copy")!.getBoundingClientRect = () => rect(-3000, -2900, 0, 600);
+    document.querySelector(".title-block")!.getBoundingClientRect = () => rect(-2200, -2100, 1000, 1440);
+    document.querySelector(".callout")!.getBoundingClientRect = () => rect(-2960, -2920, 1180, 1440);
+    const observer = vi.spyOn(pin.classList, "add").mockImplementation(function (this: DOMTokenList, ...tokens: string[]) {
+      if (tokens.includes("is-columns")) height = 944;
+      return DOMTokenList.prototype.add.apply(this, tokens);
+    });
+    const told = vi.fn();
+    window.addEventListener(LAYOUT_EVENT, told);
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+    const stop = startStill(ctx);
+    expect(pin.classList.contains("is-columns")).toBe(true);
+    expect(told).toHaveBeenCalled();
+    expect(scrollTo).not.toHaveBeenCalled(); // the reader never saw it collapse: nobody is moved
+    window.removeEventListener(LAYOUT_EVENT, told);
+    observer.mockRestore();
+    stop();
+  });
+});
+
 describe("the still's columns keep a reader past them in place (J5, J6-4)", () => {
   // The pin's columns take their height from the window, so a resize changes it before still.ts gets a turn: the
   // change to answer is the one on record, unless someone already answered it by moving the reader (02's guard, whose

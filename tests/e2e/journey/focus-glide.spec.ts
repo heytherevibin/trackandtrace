@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "../fixtures";
-import { atRest, drawStill, frames, noAnchoring, readyTab, scrollToId, waitForJourney, waitForLive } from "./journey-helpers";
+import { atRest, drawStill, frames, noAnchoring, pressTab, readyTab, scrollToId, waitForJourney, waitForLive } from "./journey-helpers";
 
 // A Tab stop's glide, taken up again (focus-glide.ts; WCAG 2.4.11; Task 6 review). The browser glides a Tab stop into the
 // window, and an instant scroll that keeps the reader's place (the drawing falling to the still mid-glide) cancels it,
@@ -38,7 +38,7 @@ test.describe("a Tab stop's glide (spec §3.G; WCAG 2.4.11)", () => {
         await scrollToId(page, "record", 100); // past the drawn train; 04's link below the window
         await frames(page, 3);
         await readyTab(page, "#reliability", POLICY, "lost");
-        await page.keyboard.press("Tab");
+        await pressTab(page);
         await expect(policy(page)).toBeFocused();
         await expect(page.locator("html")).toHaveAttribute("data-drawing", "still");
         await atRest(page);
@@ -60,7 +60,7 @@ test.describe("a Tab stop's glide (spec §3.G; WCAG 2.4.11)", () => {
             await scrollToId(page, "record", 100);
             await frames(page, 3);
             await readyTab(page, "#reliability", POLICY);
-            await page.keyboard.press("Tab");
+            await pressTab(page);
             await expect(policy(page)).toBeFocused();
             await frames(page, at);
             await page.setViewportSize({ width: 1440, height: 860 });
@@ -78,7 +78,7 @@ test.describe("a Tab stop's glide (spec §3.G; WCAG 2.4.11)", () => {
         await scrollToId(page, "record", 100);
         await frames(page, 3);
         await readyTab(page, "#reliability", POLICY, "away");
-        await page.keyboard.press("Tab");
+        await pressTab(page);
         await expect(policy(page)).toBeFocused();
         await atRest(page);
         const before = await principlesTop(page);
@@ -102,7 +102,7 @@ test.describe("a Tab stop's glide (spec §3.G; WCAG 2.4.11)", () => {
           await scrollToId(page, "record", 100);
           await frames(page, 3);
           await readyTab(page, "#reliability", POLICY);
-          await page.keyboard.press("Tab");
+          await pressTab(page);
           await expect(policy(page)).toBeFocused();
           await atRest(page, 20);
           expect(await inWindow(page), "the Tab brought the link to the window").toBe(true);

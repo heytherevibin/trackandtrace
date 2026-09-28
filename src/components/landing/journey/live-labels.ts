@@ -99,7 +99,10 @@ export function createLiveLabels(section: HTMLElement): LiveLabels | null {
     return zone;
   };
 
-  const list = (): Box => {
+  /** The list's zone for the drawing, or null when the list itself runs past its own box (text made larger than the
+   * window holds, such as 200%): its parts would cover the chapter's words and the section below, so the drawing does
+   * not fit, and the chapter reads as the still, in the page's own flow (§3.C). */
+  const list = (): Box | null => {
     pin.dataset.live = "list";
     pin.removeAttribute("data-compact");
     tops = new Map();
@@ -109,6 +112,7 @@ export function createLiveLabels(section: HTMLElement): LiveLabels | null {
     const pr = pin.getBoundingClientRect();
     const t = rel(copy, pr).bottom + 16;
     const lr = legend.getBoundingClientRect();
+    if (legend.scrollHeight > legend.clientHeight + 1) return null;
     beside = lr.left > pr.left + pr.width * 0.45;
     if (beside) return { l: 8 - pr.left, r: lr.left - 12 - pr.left, t, b: pr.height - 12 };
     return { l: 8 - pr.left, r: window.innerWidth - 8 - pr.left, t, b: lr.top - pr.top - 12 };
@@ -121,7 +125,7 @@ export function createLiveLabels(section: HTMLElement): LiveLabels | null {
       beside = false;
       pin.style.removeProperty("--anatomy-copy-h");
       const zone = (!narrow.matches ? columns() : null) ?? list();
-      return zone.b - zone.t >= 150 && zone.r - zone.l >= 200 ? zone : null;
+      return zone && zone.b - zone.t >= 150 && zone.r - zone.l >= 200 ? zone : null;
     },
     listMode: () => pin.dataset.live !== "columns",
     beside: () => beside,

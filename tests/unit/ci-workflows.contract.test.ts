@@ -152,8 +152,8 @@ describe("journey-nightly.yml", () => {
   });
 
   it("measures what a GPU-less runner can: the chunk budgets, the production build, the throttled runs, the wide e2e", () => {
-    // read from `jobs:` on: the header comment names the build too, and must not stand in for the build step. The
-    // build is build:local, the only build the serve script accepts (a plain `npm run build` leaves it unstamped).
+    // read from `jobs:` on, so only the steps count, never a comment above them. The build is build:local, the only
+    // build the serve script accepts (a plain `npm run build` leaves it unstamped).
     const steps = nightly.slice(nightly.search(/^jobs:$/m));
     const order = ["npm run build:local", "node scripts/journey-budgets.mjs", "npx playwright test -c playwright.production.config.ts", "node scripts/journey-perf.mjs --software"].map((step) => steps.indexOf(step));
     expect(order.every((i) => i >= 0)).toBe(true);

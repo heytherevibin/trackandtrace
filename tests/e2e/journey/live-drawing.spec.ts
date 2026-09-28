@@ -3,7 +3,7 @@ import { expect, test } from "../fixtures";
 import { SCENE_CHUNK_MARK } from "@/components/landing/journey/scene/scene-mark";
 import { collisionsInView } from "./collisions";
 import { drawingCollisions } from "./drawing-checks";
-import { frames, scrollIntoChapter, scrollToId, skipWithoutWebgl2, waitForJourney, waitForLive } from "./journey-helpers";
+import { dismissInstall, frames, scrollIntoChapter, scrollToId, skipWithoutWebgl2, waitForJourney, waitForLive } from "./journey-helpers";
 
 // Every test here needs the live drawing: in a WebKit with no WebGL 2 (J6-12) each skips before it starts, saying so,
 // by the same check waitForLive makes.
@@ -20,14 +20,16 @@ test.describe("the train, drawn live (spec §3.A, §3.C)", () => {
   });
 
   test("its progress never steps back while scrolling down (§3.H)", async ({ page }) => {
-    test.setTimeout(120_000); // 40 wheel steps, each waiting on frames a software GPU under a parallel run draws slowly
+    test.setTimeout(120_000); // 40 steps, each waiting on frames a software GPU under a parallel run draws slowly
     await page.goto("/");
     await waitForLive(page);
     await scrollIntoChapter(page, 0);
     const seen: number[] = [];
     for (let i = 0; i < 40; i += 1) {
-      await page.mouse.wheel(0, 180);
-      await frames(page, 3); // the wheel's scroll has landed and the drawing has followed it a step
+      // 180px down, as a wheel's notch scrolls it: by the page's own scroll, which every browser and device takes
+      // (Playwright's wheel is not supported in mobile WebKit)
+      await page.evaluate(() => window.scrollBy({ top: 180, behavior: "instant" }));
+      await frames(page, 3); // the scroll has landed and the drawing has followed it a step
       seen.push(await page.evaluate(() => window.__ttJourney?.anatomy() ?? 0));
     }
     const back = seen.filter((p, i) => i > 0 && p < seen[i - 1]! - 1e-6);
@@ -86,7 +88,8 @@ test.describe("the train, drawn live (spec §3.A, §3.C)", () => {
     expect(await page.evaluate(() => window.__ttJourney?.night())).toBe(true);
   });
 
-  test("forced colours: it draws live in the system's own colours, and the labels keep theirs (J5-21)", async ({ page }) => {
+  test("forced colours: it draws live in the system's own colours, and the labels keep theirs (J5-21)", async ({ page, browserName }) => {
+    test.skip(browserName !== "chromium", "Playwright emulates forced colours only in Chromium");
     await page.emulateMedia({ forcedColors: "active" });
     await page.goto("/");
     await waitForLive(page);
@@ -180,6 +183,7 @@ test.describe("the live drawing at its edges", () => {
     const release = await holdSceneChunk(page);
     await page.goto("/");
     await waitForJourney(page);
+    await dismissInstall(page);
     await expect(page.locator("html")).toHaveAttribute("data-drawing", "live");
     await scrollToId(page, "anatomy", 80);
     await frames(page);

@@ -30,7 +30,9 @@ export function SpecimenRecord({ specimen }: { readonly specimen: Specimen | nul
           {specimen ? (
             <>
               <div className="flex flex-wrap items-center gap-2.5">
-                <SheetTag variant="accent">{specimen.leadTag}</SheetTag>
+                <SheetTag variant="accent" wrap>
+                  {specimen.leadTag}
+                </SheetTag>
                 <SampleTag />
               </div>
               <p className="font-display text-xl font-semibold uppercase leading-normal tracking-head tnum">{specimen.trainLine}</p>

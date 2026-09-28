@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "../fixtures";
 import { LANDING_INSTRUMENTS, collisionsInView } from "./collisions";
-import { atRest, drawStill, frames, motionOff, noAnchoring, readyTab, scrollIntoRun, scrollToId, waitForJourney, waitForLive } from "./journey-helpers";
+import { atRest, dismissInstall, drawStill, frames, motionOff, noAnchoring, pressTab, readyTab, scrollIntoRun, scrollToId, waitForJourney, waitForLive } from "./journey-helpers";
 
 // 06–07, the window-seat run (spec §3.A, §3.G; J6-7, J6-8). The drawing above is held to the still (drawStill): these
 // specs are about the run, and the live drawing would only make the software GPU slower.
@@ -113,7 +113,7 @@ test.describe("the window-seat run (spec §3.A)", () => {
     // mouse or by the window regaining focus does not)
     await readyTab(page, "#run", "Open Watchlist");
     for (const name of ["Open Watchlist →", "Open Pre-booking →", "Open Accuracy →"]) {
-      await page.keyboard.press("Tab");
+      await pressTab(page);
       const link = page.getByRole("link", { name });
       await expect(link).toBeFocused();
       const i = await link.evaluate((a) => [...document.querySelectorAll("#run [data-station]")].findIndex((s) => s.contains(a)));
@@ -234,7 +234,7 @@ test.describe("a Tab stop's glide into the run (spec §3.G; WCAG 2.4.11)", () =>
       await scrollToId(page, "record"); // past the drawn train; the run below the window
       await frames(page, 3);
       await readyTab(page, "#run", "Open Watchlist", "lost");
-      await page.keyboard.press("Tab");
+      await pressTab(page);
       await expect(page.getByRole("link", { name: "Open Watchlist →" })).toBeFocused();
       await expect(page.locator("html")).toHaveAttribute("data-drawing", "still");
       await atRest(page);
@@ -259,7 +259,7 @@ test.describe("a Tab stop's glide into the run (spec §3.G; WCAG 2.4.11)", () =>
           await scrollToId(page, "record", 100);
           await frames(page, 3);
           await readyTab(page, "#run", "Open Watchlist");
-          await page.keyboard.press("Tab");
+          await pressTab(page);
           await expect(page.getByRole("link", { name: "Open Watchlist →" })).toBeFocused();
           await frames(page, at);
           await page.setViewportSize({ width: 1440, height: 860 });
@@ -281,7 +281,7 @@ test.describe("a Tab stop's glide into the run (spec §3.G; WCAG 2.4.11)", () =>
       await scrollToId(page, "record");
       await frames(page, 3);
       await readyTab(page, "#run", "Open Watchlist", "away");
-      await page.keyboard.press("Tab");
+      await pressTab(page);
       await expect(page.getByRole("link", { name: "Open Watchlist →" })).toBeFocused();
       await atRest(page);
       const before = await principlesTop(page);
@@ -305,6 +305,7 @@ test.describe("nothing collides while the run carries 06–07 past the window (s
       await page.setViewportSize(size.viewport);
       await page.goto("/");
       await waitForJourney(page);
+      await dismissInstall(page);
       await running(page);
       const found: string[] = [];
       for (let k = 0; k <= 10; k += 1) {

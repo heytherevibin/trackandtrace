@@ -268,6 +268,7 @@ export function startRun({ motion }: JourneyContext): Teardown {
   // keyboard's focus (a Tab in this task, and :focus-visible): a mouse's needs no glide, and focus returning to the window
   // must not pull a reader who scrolled away back to it (Task 6 review, round 2).
   const tab = watchTab();
+  let again = 0;
   const onFocus = (event: FocusEvent) => {
     const layout = at;
     const el = event.target instanceof Element ? event.target : null;
@@ -279,6 +280,13 @@ export function startRun({ motion }: JourneyContext): Teardown {
     aimed = i;
     window.scrollTo({ top });
     watch.arm();
+    // Safari reveals the link with a glide of its own, begun after this listener, which replaces this one (Option-Tab
+    // brought the station to rest 160px short): aimed again in the next task, while focus is still in the station.
+    window.clearTimeout(again);
+    again = window.setTimeout(() => {
+      const now = at;
+      if (now && aimed === i && station?.contains(document.activeElement)) window.scrollTo({ top: stationY(i, now) });
+    }, 0);
   };
   /** The glide cut short by a place-keeping jump (the drawing falling to the still under load; WCAG 2.4.11): its station
    * back to the window while focus is still in it, after each cut, at most three times (focus-glide.ts's watch says
@@ -316,6 +324,7 @@ export function startRun({ motion }: JourneyContext): Teardown {
     window.removeEventListener("resize", soon);
     trackEl.removeEventListener("focusin", onFocus);
     document.removeEventListener("click", onClick);
+    window.clearTimeout(again);
     tab.stop();
     watch.stop();
     if (!at) return;

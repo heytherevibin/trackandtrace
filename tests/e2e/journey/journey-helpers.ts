@@ -48,6 +48,15 @@ export async function skipWithoutWebgl2(page: Page): Promise<void> {
   test.info().skip(!webgl2, "this WebKit has no WebGL 2: the live drawing is proven in Chromium and on the owner's devices");
 }
 
+/** The install prompt an iPhone gets (its user agent: the nightly's webkit-phone), a plate fixed over the page's foot:
+ * dismissed through its own control, as a reader would, before a spec reads the page under it. Nowhere else it shows. */
+export async function dismissInstall(page: Page): Promise<void> {
+  const prompt = page.getByTestId("install-prompt");
+  if (!(await prompt.isVisible())) return;
+  await prompt.getByTestId("install-dismiss").click();
+  await expect(prompt).toBeHidden();
+}
+
 /** Holds the page to the still drawing for its session, as the quality floor does (J5-12): for specs about the still. */
 export async function drawStill(page: Page): Promise<void> {
   await page.addInitScript(() => window.sessionStorage.setItem("tt.q", "still"));
@@ -113,6 +122,14 @@ export async function readyTab(page: Page, within: string, name: string, then?: 
     },
     [within, name, then ?? null] as const,
   );
+}
+
+/** Tab as the reader's browser takes it through links: Option-Tab (Alt+Tab) in WebKit on macOS, where a bare Tab skips
+ * links unless the system's keyboard navigation is on (Safari's own default, which Playwright's WebKit keeps there);
+ * Tab everywhere else. The page knows both for a Tab (focus-glide.ts's watchTab). */
+export async function pressTab(page: Page): Promise<void> {
+  const webkit = page.context().browser()?.browserType().name() === "webkit";
+  await page.keyboard.press(webkit && process.platform === "darwin" ? "Alt+Tab" : "Tab");
 }
 
 /** The page has held its scroll for `n` frames: at rest. */

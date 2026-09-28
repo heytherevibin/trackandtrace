@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "../fixtures";
 import { PNR } from "../helpers";
-import { blockJourneyChunk, waitForJourney } from "./journey-helpers";
+import { blockJourneyChunk, pressTab, waitForJourney } from "./journey-helpers";
 
 /** Frames the wait below gives a focus that never comes wholly into the window before checking it as it stands
  * (it then counts as hidden: the check samples the window's edge). The longest glide in the run, Tab wrapping from
@@ -124,7 +124,7 @@ test("Tab never leaves focus under the masthead or behind a pinned piece", async
   await page.goto("/");
   await waitForJourney(page);
   for (let i = 0; i < 80; i += 1) {
-    await page.keyboard.press("Tab");
+    await pressTab(page);
     await waitForFocusSettled(page);
     expect(await page.evaluate(coveredFocusLabel)).toBeNull();
   }

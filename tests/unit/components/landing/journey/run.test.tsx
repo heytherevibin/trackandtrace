@@ -223,6 +223,27 @@ describe("the window-seat run (J6-7, J6-8)", () => {
       stop();
     });
 
+    // Safari reveals the link a Tab moved focus to with a glide of its own, begun after focusin's listeners have run, which
+    // replaces this one: Option-Tab brought the second station to rest 160px short of the window (the nightly's WebKit).
+    it("aims again in the task after the focus, once the browser's own reveal of the link has begun, while focus stays", () => {
+      vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame", "setTimeout", "clearTimeout"] });
+      lay(200);
+      const stop = startRun(testContext());
+      const link = watchlist();
+      tab(link);
+      expect(window.scrollTo).toHaveBeenCalledTimes(1);
+      vi.advanceTimersByTime(0);
+      expect(window.scrollTo).toHaveBeenCalledTimes(2);
+      expect(window.scrollTo).toHaveBeenLastCalledWith({ top: 700 });
+      link.blur();
+      vi.mocked(window.scrollTo).mockClear();
+      tab(link); // and not once focus has left the station in between
+      link.blur();
+      vi.advanceTimersByTime(0);
+      expect(window.scrollTo).toHaveBeenCalledTimes(1);
+      stop();
+    });
+
     it("lets go on the reader's own scroll: a press of the pointer", () => {
       vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
       lay(200);

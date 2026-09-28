@@ -4,8 +4,9 @@
 
 /** "02 · How it works": 13px condensed capitals in readable steel. */
 export const KICKER = "block font-display text-label font-semibold uppercase leading-normal tracking-caps text-accent-text";
-/** Section heading: 32/36 condensed capitals, hung optically. */
-export const H2 = "optical-hang text-5xl tracking-head";
+/** Section heading: 32/36 condensed capitals, hung optically. A word wider than its column (text at 200% on a phone)
+ * breaks rather than running past the window; at the drawn sizes every word fits, and nothing breaks. */
+export const H2 = "optical-hang text-5xl tracking-head wrap-anywhere";
 /** Card and step heading: 22/24 condensed capitals. */
 export const H3 = "text-2xl leading-6 tracking-head";
 /** Body copy: 15/24 at 78%. */

@@ -28,7 +28,10 @@ export function TopNav() {
 
   return (
     <header className={cn("border-b border-line bg-surface-0", !minimal && "sticky top-0 z-nav")} style={{ viewTransitionName: "site-header" }}>
-      <div className="page-frame flex h-16 items-center gap-x-3 lg:gap-x-5">
+      {/* One row, 64px, at every width the design draws. Text made larger than the row allows (200%) reflows: the
+          nav's boxes wrap among themselves and the controls drop to a row of their own, each row as tall as the
+          first, so nothing is pushed past the window's edge. At the design's own sizes nothing wraps. */}
+      <div className="page-frame flex min-h-16 flex-wrap items-center gap-x-3 lg:gap-x-5">
         {minimal ? null : <NavMenu pathname={pathname} className="lg:hidden" />}
         {/* The mark alone is 24px wide on a phone. Its hit area grows rightward into the mr-auto gap
             (motion.css): centred, it would reach back over the menu button beside it. */}
@@ -37,7 +40,7 @@ export function TopNav() {
         </Link>
         {minimal ? null : (
           <>
-            <nav aria-label={messages.shell.nav.primaryLabel} className="hidden flex-1 items-center gap-2 lg:flex">
+            <nav aria-label={messages.shell.nav.primaryLabel} className="hidden flex-1 flex-wrap items-center gap-2 lg:flex">
               {PRIMARY_NAV.map(({ href, label, Icon }) => {
                 const active = isActive(pathname, href);
                 return (
@@ -48,7 +51,7 @@ export function TopNav() {
                 );
               })}
             </nav>
-            <div className="flex items-center gap-2">
+            <div className="ml-auto flex min-h-16 items-center gap-2">
               <ThemeToggle />
               <UserMenu />
             </div>

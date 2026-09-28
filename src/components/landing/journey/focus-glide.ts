@@ -36,7 +36,8 @@ function readersOwn(event: Event): boolean {
 }
 
 export interface TabKey {
-  /** A Tab (or Shift+Tab) keydown is being handled: the focus it moves comes in the same task. */
+  /** A Tab keydown is being handled (Shift+Tab, and Safari's Option-Tab, which moves to links there, as well): the
+   * focus it moves comes in the same task. */
   down(): boolean;
   stop(): void;
 }
@@ -47,7 +48,8 @@ export function watchTab(): TabKey {
   let down = false;
   let timer = 0;
   const onKey = (event: KeyboardEvent) => {
-    if (event.key !== "Tab") return;
+    // Ctrl+Tab and Cmd+Tab move between the browser's tabs or the system's apps, never through the page
+    if (event.key !== "Tab" || event.ctrlKey || event.metaKey) return;
     down = true;
     window.clearTimeout(timer);
     timer = window.setTimeout(() => {

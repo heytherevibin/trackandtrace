@@ -251,7 +251,16 @@ export function startStill({ still }: JourneyContext): Teardown {
   observer.observe(titleBlock);
   for (const label of labels) observer.observe(label);
   void document.fonts.ready.then(schedule);
-  schedule();
+  // A rebuild's successor (Motion, a fit change): the predecessor's teardown cleared, in this same task, the columns
+  // the reader is looking at. Laid out only a frame later, the chapter stood collapsed for everything that measured the
+  // page meanwhile (the drawing's start tells tt:layout), and 02's place guard kept the reader the cleared height past
+  // where they were reading once 02's padding landed in that frame (WebKit under load). So they are laid out again
+  // here, against the place on record (nobody moves for a change never seen), and told.
+  const kept = still.get();
+  if (kept.columns && !pin.classList.contains("is-columns") && document.documentElement.dataset.drawing === "still") {
+    layout();
+    if (still.get().columns) emit(LAYOUT_EVENT); // a flip is told by layout() itself
+  } else schedule();
 
   return () => {
     alive = false;

@@ -7,7 +7,8 @@ import { frames, scrollIntoChapter, scrollIntoRun, scrollToId, waitForLive } fro
 // for a person to look at. It asserts only that each place was reached and photographed; the pictures are the evidence.
 
 /** The run's track glides to its place over some sixty frames after a jump (run.ts eases it): a photograph taken
- * sooner shows it mid-glide. Waits, on state, until the track's transform has held for ten frames. */
+ * sooner shows it mid-glide. Waits, on state, until the track's transform has held for ten frames. Called at every
+ * place: away from the run the track stands still, so it returns in ten frames. */
 async function runAtRest(page: Page): Promise<void> {
   await page.waitForFunction(
     () =>

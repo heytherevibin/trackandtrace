@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { startFocusGlide } from "@/components/landing/journey/focus-glide";
+import { startFocusGlide, watchTab } from "@/components/landing/journey/focus-glide";
 import { JUMP_EVENT, LAYOUT_EVENT } from "@/components/landing/journey/journey-events";
 import { testContext } from "./journey-context";
 
@@ -268,5 +268,27 @@ describe("never against the reader", () => {
     jump();
     frames(3);
     expect(reveal).not.toHaveBeenCalled();
+  });
+});
+
+describe("the Tab it knows (watchTab)", () => {
+  const press = (init: KeyboardEventInit) => window.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", ...init }));
+
+  it("knows Tab and Shift+Tab, and Safari's Option-Tab (Alt+Tab, Alt+Shift+Tab), which moves to links there", () => {
+    for (const init of [{}, { shiftKey: true }, { altKey: true }, { altKey: true, shiftKey: true }]) {
+      const tab = watchTab();
+      press(init);
+      expect(tab.down(), JSON.stringify(init)).toBe(true);
+      tab.stop();
+    }
+  });
+
+  it("does not take Ctrl+Tab or Cmd+Tab (the browser's tabs, the system's apps) for a move through the page", () => {
+    for (const init of [{ ctrlKey: true }, { metaKey: true }, { ctrlKey: true, shiftKey: true }, { metaKey: true, altKey: true }]) {
+      const tab = watchTab();
+      press(init);
+      expect(tab.down(), JSON.stringify(init)).toBe(false);
+      tab.stop();
+    }
   });
 });

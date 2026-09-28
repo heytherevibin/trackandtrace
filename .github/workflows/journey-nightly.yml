@@ -23,6 +23,9 @@ on:
 permissions:
   contents: read
 
+# Always cancelled by a newer run, unlike ci.yml's (which keeps a push to main's run whole): every run here is a check,
+# never a record, so a newer one of the same ref (a push to the PR that changes this file, a hand dispatch over the
+# night's) supersedes it.
 concurrency:
   group: journey-nightly-${{ github.ref }}
   cancel-in-progress: true
