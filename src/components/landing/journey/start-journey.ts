@@ -204,6 +204,12 @@ export function startJourney(options: JourneyOptions = {}): Teardown {
   window.addEventListener(REBUILD_EVENT, rebuild);
   window.addEventListener("resize", onResize);
   window.addEventListener(LAYOUT_EVENT, refreshAll);
+  // Web fonts still arriving as the journey starts: every piece that measured itself in the fallback's lines (02's fit,
+  // on a small phone too tall to pin) measures again once they land. Already loaded: nothing to announce.
+  if ("fonts" in document && document.fonts.status === "loading")
+    void document.fonts.ready.then(() => {
+      if (!ended) window.dispatchEvent(new Event(LAYOUT_EVENT));
+    });
   build(pause).then(
     () => {
       if (ended) return;

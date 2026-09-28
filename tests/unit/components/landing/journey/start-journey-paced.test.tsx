@@ -103,3 +103,60 @@ describe("startJourney's first build, a module at a time (spec §3.H)", () => {
     expect(last).toHaveBeenCalledTimes(1);
   });
 });
+
+// A piece that measured itself while the page's web fonts were still arriving (02's fit, judged in the fallback's
+// lines) measures again once they land: the journey announces tt:layout then, once. Fonts already loaded at the
+// start: nothing to announce, and no extra relayout.
+describe("startJourney and the page's web fonts", () => {
+  let stop: (() => void) | undefined;
+  const layouts = vi.fn();
+  const fonts = (status: string, ready: Promise<unknown>) => Object.defineProperty(document, "fonts", { configurable: true, value: { status, ready } });
+  const settled = async () => {
+    for (let k = 0; k < 4; k += 1) await Promise.resolve();
+  };
+
+  beforeEach(() => {
+    document.body.innerHTML = "";
+    document.documentElement.removeAttribute("data-journey");
+    window.sessionStorage.setItem("tt.intro", "1");
+    gate.waits.length = 0;
+    layouts.mockClear();
+    window.addEventListener(LAYOUT_EVENT, layouts);
+  });
+  afterEach(() => {
+    stop?.();
+    stop = undefined;
+    window.removeEventListener(LAYOUT_EVENT, layouts);
+    window.sessionStorage.clear();
+    Reflect.deleteProperty(document, "fonts"); // jsdom has none: the tests' stand-in
+  });
+
+  it("announces tt:layout once the fonts still loading at the start have landed", async () => {
+    const land: { now: () => void } = { now: () => undefined };
+    fonts("loading", new Promise<void>((resolve) => (land.now = resolve)));
+    stop = startJourney();
+    await settled();
+    expect(layouts).not.toHaveBeenCalled(); // the build is held at its first pause: nothing else announces
+    land.now();
+    await settled();
+    expect(layouts).toHaveBeenCalledTimes(1);
+  });
+
+  it("announces nothing for fonts already loaded at the start", async () => {
+    fonts("loaded", Promise.resolve());
+    stop = startJourney();
+    await settled();
+    expect(layouts).not.toHaveBeenCalled();
+  });
+
+  it("announces nothing once the journey has ended", async () => {
+    const land: { now: () => void } = { now: () => undefined };
+    fonts("loading", new Promise<void>((resolve) => (land.now = resolve)));
+    stop = startJourney();
+    stop();
+    stop = undefined;
+    land.now();
+    await settled();
+    expect(layouts).not.toHaveBeenCalled();
+  });
+});

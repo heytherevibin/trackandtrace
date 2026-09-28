@@ -1,7 +1,7 @@
 import { expect, test, type ElementHandle, type Page } from "@playwright/test";
 import { JOURNEY_CHUNK_MARK } from "@/components/landing/journey/journey-mark";
 import { collisionsInView } from "./collisions";
-import { motionOff, scrollToId, waitForJourney } from "./journey-helpers";
+import { drawStill, motionOff, scrollToId, waitForJourney } from "./journey-helpers";
 
 // A window too short for every stop of 02 to fit pinned below the masthead. The masthead is one row since the
 // route strip became a left rail (2026-09-27), 32px shorter than with the strip's row, so 02 now fits pinned from
@@ -393,5 +393,42 @@ test.describe("02 · the chapters, pinned", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.waitForTimeout(600);
     expect(await howOffLanding(page)).toBeLessThanOrEqual(4);
+  });
+});
+
+// A reader whose web fonts land late: 02 judged whether it fits in the fallback's lines, which on a small phone are
+// too tall for its stops, and nothing judged it again once the page's own type arrived, so 02 stayed a plain section
+// though it fits. The journey announces tt:layout when the fonts land, and 02 measures again (final review, ruling).
+test.describe("02 and fonts that land after it has decided", () => {
+  test("pins once the page's own type arrives, though it could not in the fallback's", async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 568 });
+    // the still, as the quality floor draws it: the live drawing's own wait for the fonts, and its pin, would announce
+    // a layout of their own once the fonts land, and hide what this is about
+    await drawStill(page);
+    // how many frames since the page last announced tt:layout: the journey's own start has gone quiet
+    await page.addInitScript(() => {
+      let quiet = 0;
+      window.addEventListener("tt:layout", () => (quiet = 0));
+      const tick = () => {
+        quiet += 1;
+        Reflect.set(window, "__quiet", quiet);
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+    let land: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => (land = resolve));
+    await page.route("**/*.woff2", async (route) => {
+      await held;
+      await route.continue();
+    });
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await waitForJourney(page);
+    await expect.poll(() => page.evaluate(() => Number(Reflect.get(window, "__quiet")))).toBeGreaterThan(30);
+    expect(await page.evaluate(() => document.fonts.status)).toBe("loading");
+    await expect(page.locator("#how")).not.toHaveClass(/is-pinned/); // decided in the fallback's lines
+    land();
+    await page.evaluate(() => document.fonts.ready.then(() => undefined));
+    await expect(page.locator("#how")).toHaveClass(/is-pinned/);
   });
 });
