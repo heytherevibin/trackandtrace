@@ -6,7 +6,7 @@ import { anchorOf, band, fitsRun, hereAt, layers, leanStep, offsets, runLayout, 
 import { LAYOUT_EVENT, emit } from "./journey-events";
 import { keepPlace, mastheadBottom } from "./keep-place";
 import { SMOOTH } from "./motion-tokens";
-import { refreshObserver, track } from "./observers";
+import { keepUp, refreshObserver, track } from "./observers";
 import type { JourneyContext, Teardown } from "./start-journey";
 import { STATIONS, kmFigure } from "./stations";
 
@@ -55,7 +55,7 @@ export function startRun({ motion }: JourneyContext): Teardown {
   const state = { p: 0 };
   const marks: HTMLElement[] = [];
   let at: RunLayout | null = null;
-  let driver: { readonly observer: ScrollObserver; readonly drive: JSAnimation } | null = null;
+  let driver: { readonly observer: ScrollObserver; readonly drive: JSAnimation; readonly awake: () => void } | null = null;
   let current = -1;
   let lastP = 0;
   let lean = 0;
@@ -188,9 +188,11 @@ export function startRun({ motion }: JourneyContext): Teardown {
   const startDriver = () => {
     const observer = track(onScroll({ target: run, enter: () => `top+=${mastheadBottom()} top`, leave: "bottom bottom", sync: SMOOTH }));
     const drive = animate(state, { p: [0, 1], ease: "linear", duration: 1000, onUpdate: paint, autoplay: observer });
-    driver = { observer, drive };
+    // a jump's glide to a station, finished though a frame outlasts anime's wake (a slow device)
+    driver = { observer, drive, awake: keepUp(observer, () => state.p) };
   };
   const stopDriver = () => {
+    driver?.awake();
     driver?.drive.revert();
     driver?.observer.revert();
     driver = null;

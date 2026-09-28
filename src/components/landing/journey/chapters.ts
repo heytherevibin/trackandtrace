@@ -9,7 +9,7 @@ import { fitsWindow, type Span } from "./fit";
 import { LAYOUT_EVENT, REBUILD_EVENT } from "./journey-events";
 import { jumpTo } from "./keep-place";
 import { SMOOTH, STAGGER, T } from "./motion-tokens";
-import { track } from "./observers";
+import { keepUp, track } from "./observers";
 import type { JourneyContext, Teardown } from "./start-journey";
 
 // 02 pinned (spec §3.A): the section holds under the masthead while the scroll plays its three stops inside
@@ -276,9 +276,11 @@ function startDriver(section: HTMLElement, dial: SVGSVGElement): Teardown {
   const observer = track(onScroll({ target: section, enter: () => `top+=${headerOffset()} top`, leave: "bottom bottom", sync: SMOOTH }));
   const drive = animate(state, { p: [0, 1], ease: "linear", duration: 1000, onUpdate: render, autoplay: observer });
   const ring = dashed ? animate(dashed, { rotate: "-=360", duration: 90_000, loop: true, ease: "linear" }) : null;
+  const awake = keepUp(observer, () => state.p); // the stops catch the scroll up though a frame outlasts anime's wake
   render();
 
   return () => {
+    awake();
     drive.revert();
     observer.revert();
     ring?.revert();

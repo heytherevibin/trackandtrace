@@ -82,6 +82,31 @@ test.describe("the window-seat run (spec §3.A)", () => {
     await expect(page.locator('.board tr[data-stop="8"] td.board-status')).toHaveText(/At\s*platform/i);
   });
 
+  // Anime's smoothed scroll sync eases the run toward the scroll only while its wake timer runs, 500 ms after each scroll
+  // event; one frame longer than that ends it short (the nightly's WebKit runner: the train 6–35 px short of 07, both
+  // tries). A slow device's stall, two frames after the jump: the busy loop is the stall itself, not a wait.
+  test("a jump to 07 brings its first station to the window though a frame stalls past anime's wake (a slow device)", async ({ page, isMobile }) => {
+    test.skip(isMobile, "one project is enough");
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/");
+    await waitForJourney(page);
+    await running(page);
+    await frames(page, 10);
+    await page.evaluate(() => {
+      const use = document.getElementById("use");
+      const head = document.querySelector("header")?.getBoundingClientRect().bottom ?? 0;
+      window.scrollTo({ top: Number(use?.dataset.runAt) - head, behavior: "instant" });
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          const end = performance.now() + 700;
+          while (performance.now() < end);
+        }),
+      );
+    });
+    const first07 = await stationOf(page, "#use *");
+    await expect.poll(() => offTrain(page, first07)).toBeLessThanOrEqual(3);
+  });
+
   test("Back from 07, inside the run, returns the reader to 07, not 06 (J6-9)", async ({ page, isMobile }) => {
     test.skip(isMobile, "one project is enough");
     await page.setViewportSize({ width: 1440, height: 900 });

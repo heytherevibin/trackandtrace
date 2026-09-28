@@ -93,6 +93,39 @@ test.describe("02 · the chapters, pinned", () => {
     }
   });
 
+  // Anime's smoothed scroll sync eases 02 toward the scroll only while its wake timer runs, 500 ms after each scroll
+  // event; one frame longer than that ends it short (observers.ts keepUp). A slow device's stall, two frames after a
+  // jump deep into 02: the busy loop is the stall itself, not a wait. The rail's marker stands at 02's drawn progress.
+  test("a jump deep into 02 plays through to the scroll though a frame stalls past anime's wake (a slow device)", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/");
+    await waitForJourney(page);
+    await expect(page.locator("#how")).toHaveClass(/is-pinned/);
+    await frames(page, 10);
+    await page.evaluate(() => {
+      const how = document.getElementById("how")!;
+      window.scrollTo({ top: how.getBoundingClientRect().top + window.scrollY + (how.offsetHeight - window.innerHeight) * 0.9, behavior: "instant" });
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          const end = performance.now() + 700;
+          while (performance.now() < end);
+        }),
+      );
+    });
+    // 02's progress by the scroll, as its observer reads it: from its top under the masthead to its foot at the window's
+    const behind = () =>
+      page.evaluate(() => {
+        const how = document.getElementById("how")!;
+        const top = how.getBoundingClientRect().top + window.scrollY;
+        const start = top - Math.round(document.querySelector("header")!.getBoundingClientRect().height);
+        const end = top + how.offsetHeight - window.innerHeight;
+        const scrolled = Math.min(1, Math.max(0, (window.scrollY - start) / (end - start)));
+        const drawn = Number.parseFloat(how.querySelector<HTMLElement>(".rail-marker")!.style.left) / 100;
+        return Math.abs(scrolled - drawn);
+      });
+    await expect.poll(behind).toBeLessThanOrEqual(0.005);
+  });
+
   test("never collides while it plays: desktop, short desktop, phone, and a phone on its side", async ({ page }) => {
     for (const size of [{ width: 1440, height: 900 }, { width: 1440, height: 600 }, { width: 390, height: 844 }, { width: 844, height: 390 }]) {
       await page.setViewportSize(size);

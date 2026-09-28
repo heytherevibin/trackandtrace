@@ -15,6 +15,8 @@ vi.mock("animejs", () => ({
       target: null as Element | null,
       refreshes: 0,
       reverted: false,
+      progress: 0, // the scroll's, as far as the drawing (never moved here) is concerned: caught up
+      container: { handleScroll: () => undefined },
       refresh() {
         if (!this.target) throw new TypeError("Cannot read properties of null (reading 'getBoundingClientRect')");
         this.refreshes += 1;
