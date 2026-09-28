@@ -157,15 +157,16 @@ export function startStill({ still }: JourneyContext): Teardown {
   // to the ordinary, content-driven list height, which nothing here writes or is answerable for): #how keeps
   // its own reader in place independently in that case, via chapters.ts, and the two must never both react to
   // the same resize.
-  // Compared against what the reader last actually settled on (ctx.still, above) when there is one, never a
-  // value measured fresh in this same call: a rebuild's teardown already having run, or the columns formula
-  // answering a resize, is never caught mid-change by any callback, only after, so there is no "before" left
-  // to measure at that moment except what was already on record (prototype v3's placeBox pattern, chapters.ts's
-  // own settlePlace) — comparing a fresh instance's first pass against a live read instead would misread the
-  // rebuild itself (list, briefly, while nothing is watching, then columns again) as a flip the reader lived
-  // through. Only the very first settle this lifetime, with nothing on record yet, measures fresh: at that
-  // moment the pin still carries its untouched server-rendered height, which a live read is the right (and
-  // only) way to learn.
+  // The change is measured from the height on record (ctx.still, above) while the reader still stands where the last
+  // settle left them (seenY, learned only while the pin is that height): a rebuild's teardown already having run, or
+  // the columns formula answering a resize, is never caught mid-change by any callback, only after, so there is no
+  // "before" left to measure at that moment except what was already on record (prototype v3's placeBox pattern,
+  // chapters.ts's own settlePlace) — comparing a fresh instance's first pass against a live read instead would misread
+  // the rebuild itself (list, briefly, while nothing is watching, then columns again) as a flip the reader lived
+  // through. Once the reader has been moved since (02's guard, scroll anchoring or a clamp answered the change), it is
+  // measured fresh (`from = beforeRect.height`), so this pass answers only its own change, never one already answered
+  // (Task 3). With nothing on record yet (the first settle this lifetime) the pin carries its untouched
+  // server-rendered height, which a live read is the right (and only) way to learn.
   const layout = () => {
     frame = 0;
     if (document.documentElement.dataset.drawing !== "still") return standAside();

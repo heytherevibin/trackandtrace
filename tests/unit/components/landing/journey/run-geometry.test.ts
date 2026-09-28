@@ -96,6 +96,9 @@ describe("the window's three layers", () => {
     const rail = 836 - 46;
     expect(drawn.line.posts[0]).toEqual({ x: 64, y: rail + 24, km: kmAt(60, L.first, L.travel, KM) });
     expect(drawn.line.posts.every((p, i, all) => i === 0 || p.x - all[i - 1]!.x === 320)).toBe(true);
+    // every other tick of 160px from 60 short of the line's span, 2430: ticks at 60…2300, the posts at 64…2304
+    expect(drawn.line.posts).toHaveLength(8);
+    expect(drawn.line.posts.at(-1)?.x).toBe(2304);
   });
 
   it("strokes each layer with its own weight class", () => {

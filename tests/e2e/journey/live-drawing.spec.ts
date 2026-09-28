@@ -88,7 +88,7 @@ test.describe("the train, drawn live (spec §3.A, §3.C)", () => {
     expect(await page.evaluate(() => window.__ttJourney?.night())).toBe(true);
   });
 
-  test("forced colours: it draws live in the system's own colours, and the labels keep theirs (J5-21)", async ({ page, browserName }) => {
+  test("forced colours: it still draws live, and the labels take the system's text colour (J5-21)", async ({ page, browserName }) => {
     test.skip(browserName !== "chromium", "Playwright emulates forced colours only in Chromium");
     await page.emulateMedia({ forcedColors: "active" });
     await page.goto("/");

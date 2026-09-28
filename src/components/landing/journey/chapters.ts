@@ -101,7 +101,9 @@ export function startPlaceGuard(): Teardown {
   // settled, every layout change refreshes the box it judges against, and the reader's scroll with it: that move's
   // own "scroll" event lands a frame later, and a resize judged before it would read the reader's old place against
   // the new box. A change that did resize #how is the observer's, below, and must be judged against the box from
-  // before it.
+  // before it. A dependency every piece below 02 carries: one that moves the reader in a rebuild (the run's unpin,
+  // run.ts) must tell tt:layout after its move, so this refresh learns the scroll it left; else 02's own resize, a
+  // frame later, is judged from the scroll before that move, and undoes it.
   const refresh = () => {
     if (unchanged()) place = { box: docBox(section), y: window.scrollY, vh: window.innerHeight };
   };
@@ -126,7 +128,8 @@ export function startPlaceGuard(): Teardown {
   // Motion's rewrite collapses 02 at once, and the journey's rebuild then tears down the pieces below it: the run's
   // unpin moves the reader by its own change (keepPlace), from wherever they stand by then. Settled here, as Motion
   // changes and before the rebuild (this listener is added first), 02's move is made first and the run's lands on it;
-  // settled by the observer a frame later, from the place kept before both, it would undo the run's (J6-7).
+  // settled by the observer a frame later, from the place kept before both, it would undo the run's (J6-7). That
+  // holds only while the run tells tt:layout after its move (refresh, above).
   window.addEventListener(MOTION_EVENT, settle);
   return () => {
     window.removeEventListener("scroll", learn);

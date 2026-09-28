@@ -174,8 +174,10 @@ html[data-journey="on"] #anatomy.is-live [data-live="list"] .anatomy-legend { po
 html[data-journey="on"] #run.is-running { height: var(--run-h); }
 /* The pin and the unpin land whole in the task that makes them, so keepPlace (J5-3) measures all of the change, as
    #anatomy's do: under Motion off's 0.01ms transitions (motion.css) the run's height and its pieces' widths, paddings
-   and type (the kicker's too) would land a frame later, under a reader nobody moves. A lit plate's own transition,
-   below, outranks this; it moves no box. */
+   and type (the kicker's too) would land a frame later, under a reader nobody moves. Deliberately with Motion on too,
+   and unpinned: the run pins and unpins with Motion on, and any length that transitioned there would land after
+   keepPlace measured. A lit plate's own transition, below, outranks this; it moves no box. A hover or press transition
+   added inside 06–07 must outrank it the same way, and move no box. */
 html[data-journey="on"] :is(#run, #run *) { transition-property: none; }
 /* clip, not hidden: a clipped box is not a scroll container, so focusing a card cannot scroll it sideways */
 html[data-journey="on"] #run.is-running .run-pin { position: sticky; top: var(--header-height); z-index: 2; height: calc(100svh - var(--header-height)); overflow: clip; }

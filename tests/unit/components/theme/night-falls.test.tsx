@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { THEME_EVENT } from "@/components/landing/journey/journey-events";
-import { SWEEP_MS, nightFalls, sweepFrom, themeApplied } from "@/components/theme/night-falls";
+import { SWEEP_MS, nightFalls, resolvedChoice, sweepFrom, themeApplied } from "@/components/theme/night-falls";
 
 // Night falls (spec §3.F; J6-10). jsdom has no View Transitions and no Element#animate: the tests give it stand-ins.
 
@@ -34,6 +34,32 @@ function listen(): { readonly heard: () => number; readonly stop: () => void } {
 describe("the sweep's circle", () => {
   it("starts at the button's centre and reaches the window's farthest corner", () => {
     expect(sweepFrom({ left: 1380, top: 14, width: 36, height: 36 }, { width: 1440, height: 900 })).toEqual({ x: 1398, y: 32, reach: Math.ceil(Math.hypot(1398, 868)) });
+  });
+});
+
+describe("resolvedChoice: the theme the sweep waits for", () => {
+  const prefers = (dark: boolean) => vi.stubGlobal("matchMedia", (query: string) => ({ matches: dark && query === "(prefers-color-scheme: dark)" }));
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("is Day or Night itself", () => {
+    prefers(true);
+    expect(resolvedChoice("light")).toBe("light");
+    prefers(false);
+    expect(resolvedChoice("dark")).toBe("dark");
+  });
+
+  it("reads System from the system's preference", () => {
+    prefers(true);
+    expect(resolvedChoice("system")).toBe("dark");
+    prefers(false);
+    expect(resolvedChoice("system")).toBe("light");
+  });
+
+  it("reads System as Day where the browser cannot say", () => {
+    vi.stubGlobal("matchMedia", undefined);
+    expect(resolvedChoice("system")).toBe("light");
   });
 });
 

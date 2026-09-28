@@ -212,10 +212,10 @@ describe("startPlaceMemory", () => {
       document.body.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, ...init }));
     };
   const inField =
-    (tag: "input" | "textarea" | "div", k: string) =>
+    (tag: "input" | "textarea" | "select" | "div", k: string, editable = "") =>
     (): void => {
       const field = document.createElement(tag);
-      if (tag === "div") field.setAttribute("contenteditable", "");
+      if (tag === "div") field.setAttribute("contenteditable", editable);
       document.body.append(field);
       field.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true }));
     };
@@ -230,6 +230,7 @@ describe("startPlaceMemory", () => {
     ["End", key("End")],
     ["Space", key(" ")],
     ["Shift+Space", key(" ", { shiftKey: true })],
+    ["End inside a region made not editable (contenteditable=false)", inField("div", "End", "false")],
   ];
   const keeps: Act[] = [
     ["a trackpad's swipe back (a sideways wheel)", wheel({ deltaX: -60 })],
@@ -250,6 +251,7 @@ describe("startPlaceMemory", () => {
     ["ArrowDown in a text input", inField("input", "ArrowDown")],
     ["Space in a textarea", inField("textarea", " ")],
     ["End in an editable region", inField("div", "End")],
+    ["ArrowDown on a select (it picks an option)", inField("select", "ArrowDown")],
   ];
 
   it.each(cancels)("restores nothing once the reader scrolls by their own hand: %s", (_, act) => {
