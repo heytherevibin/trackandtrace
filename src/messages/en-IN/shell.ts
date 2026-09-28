@@ -46,4 +46,9 @@ export const shell = {
     action: "Install",
     iosHint: "On iPhone: Share, then Add to Home Screen.",
   },
+  /** Notices.dc.html, SITE NOTICE STRIP. The text itself is the console's. */
+  siteNotice: {
+    label: "Site notice",
+    close: "Close this notice",
+  },
 } as const satisfies MessageTree;

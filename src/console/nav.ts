@@ -37,16 +37,22 @@ const EVERY_ROLE = ["owner", "admin", "support", "viewer"] as const;
  * `built` was false for all fourteen in 2d-1: no module had a page, and a rail of links that all
  * lead nowhere is worse than no rail (task-4-brief.md's ruling). A module's flag flips to true in
  * the same PR that adds its page; 2d-2 task-8 flipped the first one -- 13 Team -- and 2d-2b task-2
- * flips the second, 14 Audit log. The rest are still to come:
- *   - 01 Overview: 2f
- *   - 11 Switches & settings: 2e
- * The other ten modules have no page planned yet.
+ * flips the second, 14 Audit log. 11 Switches, 02 Sources, 01 Overview and 04 Abuse followed; the rest have
+ * no page yet.
  */
 export const CONSOLE_MODULES: readonly ConsoleModule[] = [
-  { num: "01", label: "Overview", group: "operate", roles: EVERY_ROLE, href: consoleHref("/"), built: false },
-  { num: "02", label: "Sources & usage", group: "operate", roles: OWNER_ADMIN_VIEWER, href: consoleHref("/sources"), built: false },
+  // 2026-09-28: src/app/console/page.tsx is Overview now rather than a redirect to My keys, so this
+  // flips. Every role may open it, so it is the first page Support has — its own three modules are
+  // still unbuilt.
+  { num: "01", label: "Overview", group: "operate", roles: EVERY_ROLE, href: consoleHref("/"), built: true },
+  // 2026-09-28: src/app/console/sources/page.tsx exists, so this flips — and it is the first module
+  // a VIEWER can open, so it is the first time that role gets a rail at all. Everything on it is a
+  // read of something already recorded; the sheet's own note says there are no actions on it.
+  { num: "02", label: "Sources & usage", group: "operate", roles: OWNER_ADMIN_VIEWER, href: consoleHref("/sources"), built: true },
   { num: "03", label: "Status & incidents", group: "operate", roles: OWNER_ADMIN_VIEWER, href: consoleHref("/status"), built: false },
-  { num: "04", label: "Abuse & limits", group: "operate", roles: OWNER_ADMIN, href: consoleHref("/abuse"), built: false },
+  // 2026-09-28: src/app/console/abuse/page.tsx exists — its read-only half. Blocking follows in its
+  // own change, so the page draws Limits and Most limited today and no Block control yet.
+  { num: "04", label: "Abuse & limits", group: "operate", roles: OWNER_ADMIN, href: consoleHref("/abuse"), built: true },
   { num: "05", label: "Alerts", group: "operate", roles: OWNER_ADMIN, href: consoleHref("/alerts"), built: false },
   { num: "06", label: "Leads", group: "people", roles: OWNER_ADMIN_SUPPORT, href: consoleHref("/leads"), built: false },
   { num: "07", label: "Announcements", group: "people", roles: OWNER_ADMIN, href: consoleHref("/announcements"), built: false },

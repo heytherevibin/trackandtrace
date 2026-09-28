@@ -3,7 +3,8 @@ import { MemoryCache } from "@/services/cache";
 import { parseEnv } from "@/services/env";
 import { EncryptedRedisCache } from "@/services/redis-cache";
 import { UNLIMITED_BUDGET } from "@/services/live-budget";
-import { createPnrCache, liveBudget, providerGuard, resetLocalState } from "@/services/shared-store";
+import { addressMember, blocksForConsole, createPnrCache, createRateLimiter, limitedLogForReading, liveBudget, providerGuard, publicStore, publicStoreForReading, resetLocalState } from "@/services/shared-store";
+import { readUsageHistory } from "@/services/usage";
 import type { SourceOutcome } from "@/services/sources/outcome";
 
 const DATA_KEY = Buffer.alloc(32, 7).toString("base64");
@@ -27,6 +28,78 @@ describe("createPnrCache", () => {
   it("builds one store per environment, shared by the cache and the limiter", () => {
     const current = envOf({ NODE_ENV: "test", KV_REST_API_URL: "https://x.upstash.io", KV_REST_API_TOKEN: "t", DATA_KEY });
     expect(createPnrCache(current)).toBe(createPnrCache(current));
+  });
+});
+
+describe("publicStoreForReading", () => {
+  // A dashboard reading the shared store must be told when it cannot. `publicStore` falls back to
+  // this instance's memory on any error — right for a breaker deciding whether to call, wrong for a
+  // page reporting what every instance did: an unreachable Upstash then reads as an empty store, and
+  // the page says "Answering" and "0 requests" about a day it knows nothing of.
+  const UNREACHABLE = { NODE_ENV: "test", KV_REST_API_URL: "http://127.0.0.1:1", KV_REST_API_TOKEN: "t", DATA_KEY };
+
+  it("fails a read when the shared store cannot be reached, rather than answering from this instance", async () => {
+    await expect(publicStoreForReading(envOf(UNREACHABLE)).kv.get("anything")).rejects.toThrow();
+  });
+
+  it("so a day the store could not answer for reads as unknown, not as a quiet day", async () => {
+    const { kv, prefix } = publicStoreForReading(envOf(UNREACHABLE));
+    const [day] = await readUsageHistory(kv, prefix, "railkit", 1);
+    expect(day?.requests).toBeNull();
+  });
+
+  it("reads this instance's memory when no shared store is configured, because that is where the counts are", () => {
+    const current = envOf({ NODE_ENV: "test" });
+    expect(publicStoreForReading(current)).toEqual(publicStore(current));
+  });
+
+  it("keeps the prefix the writers use", () => {
+    const current = envOf(UNREACHABLE);
+    expect(publicStoreForReading(current).prefix).toBe(publicStore(current).prefix);
+  });
+});
+
+describe("createRateLimiter and limitedLogForReading", () => {
+  it("writes each refused traveller check where module 04 reads it, and never the address", async () => {
+    const current = envOf({ NODE_ENV: "test" });
+    const limiter = createRateLimiter(current);
+    const before = (await limitedLogForReading(current).today(10, Date.now())).total;
+    for (let i = 0; i < 3; i += 1) await limiter.check("pnr:198.51.100.7", 1, 60_000);
+
+    const today = await limitedLogForReading(current).today(10, Date.now());
+    expect(today.total - before).toBe(2);
+    expect(JSON.stringify(today)).not.toContain("198.51.100.7");
+  });
+
+  it("fails a read when the shared store cannot be reached", async () => {
+    const current = envOf({ NODE_ENV: "test", KV_REST_API_URL: "http://127.0.0.1:1", KV_REST_API_TOKEN: "t", DATA_KEY });
+    await expect(limitedLogForReading(current).today(10, Date.now())).rejects.toThrow();
+  });
+});
+
+describe("blocking, end to end over this instance's memory", () => {
+  it("refuses a blocked address's next traveller check, and lets it through once lifted", async () => {
+    const current = envOf({ NODE_ENV: "test" });
+    const limiter = createRateLimiter(current);
+    const blocks = blocksForConsole(current);
+    const member = addressMember(current, "192.0.2.44");
+    const now = Date.now();
+
+    await blocks.list.block(member, { note: "", by: "Asha Rao", since: now, until: null, keyId: blocks.keyId });
+    blocks.invalidate();
+    expect((await limiter.check("pnr:192.0.2.44", 20, 60_000)).ok).toBe(false);
+    expect((await limiter.check("pnr:192.0.2.45", 20, 60_000)).ok).toBe(true);
+
+    await blocks.list.unblock(member);
+    blocks.invalidate();
+    expect((await limiter.check("pnr:192.0.2.44", 20, 60_000)).ok).toBe(true);
+  });
+
+  it("hashes an address the way the limited log does, so a Most limited row blocks the same address", () => {
+    const current = envOf({ NODE_ENV: "test" });
+    expect(addressMember(current, "192.0.2.44")).toMatch(/^4\.[A-Za-z0-9_-]{43}$/);
+    expect(addressMember(current, "2001:db8:0:1::5")).toMatch(/^6\./);
+    expect(addressMember(current, "2001:db8:0:1::5")).toBe(addressMember(current, "2001:db8:0:1::9"));
   });
 });
 
@@ -89,5 +162,20 @@ describe("providerGuard", () => {
     await availability.breaker.record(keyRefused);
     await expect(pnr.breaker.admit()).resolves.toEqual({ open: true, retryAfterSeconds: 600 });
     warn.mockRestore();
+  });
+});
+
+describe("this instance's memory, when no shared store is configured", () => {
+  // Next bundles route handlers and pages as separate module instances in one process: a module-level store
+  // is then two stores. The console's block route wrote to one and the /abuse page read the other, so a block
+  // showed its toast and then an empty Blocked table (CI, 2026-09-28). "This instance" means the process.
+  it("is one store per process, however many times the module is loaded", async () => {
+    const current = envOf({ NODE_ENV: "test" });
+    const first = await import("@/services/shared-store");
+    vi.resetModules();
+    const second = await import("@/services/shared-store");
+    expect(second.blocksForConsole(current).list).toBe(first.blocksForConsole(current).list);
+    expect(second.limitedLogForReading(current)).toBe(first.limitedLogForReading(current));
+    expect(second.addressMember(current, "192.0.2.9")).toBe(first.addressMember(current, "192.0.2.9"));
   });
 });

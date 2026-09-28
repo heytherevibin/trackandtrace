@@ -54,7 +54,7 @@ function limits(over: Partial<Limits> = {}): Limits {
 type Save = (value: number, version: number, reason: string) => Promise<SaveResult>;
 
 function draw(over: Partial<Limits> = {}, save: Save = vi.fn(async () => ({ ok: true as const }))) {
-  render(<LimitsPlate limits={limits(over)} save={save} />);
+  render(<LimitsPlate limits={limits(over)} environment="production" save={save} />);
   return save;
 }
 
@@ -78,7 +78,7 @@ describe("the Limits plate", () => {
   it("names who changed it last, and admits when nobody has", () => {
     draw();
     expect(screen.getByText(/Asha Rao/)).toBeInTheDocument();
-    render(<LimitsPlate limits={limits({ changedBy: null, changedAt: null })} save={vi.fn()} />);
+    render(<LimitsPlate limits={limits({ changedBy: null, changedAt: null })} environment="production" save={vi.fn()} />);
     expect(screen.getAllByText(/Never changed from this console/).length).toBeGreaterThan(0);
   });
 
@@ -130,6 +130,20 @@ describe("the Limits plate", () => {
 
     expect(save).toHaveBeenCalledWith(900, 4, REASON);
     expect(await screen.findByText(/logged/i)).toBeInTheDocument();
+  });
+
+  // The regression. console_save_settings spends use_tap('settings.save', p_environment,
+  // p_changes::text, p_reason); a tap minted over anything else is refused — and until this, the
+  // plate minted ("Change the live-check limit", "Switches & settings", "900"), so every save failed.
+  it("mints the tap over exactly the four fields console_save_settings spends", async () => {
+    draw();
+    const field = screen.getByRole("spinbutton", { name: /live checks per day/i });
+    await userEvent.clear(field);
+    await userEvent.type(field, "900");
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+    await tap(userEvent.setup());
+
+    expect(runTap).toHaveBeenCalledWith({ action: "settings.save", target: "production", value: '{"live_checks_per_day": 900}', reason: REASON });
   });
 
   it("draws the sheet's own words when the save does not reach the store", async () => {

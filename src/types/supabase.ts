@@ -286,6 +286,15 @@ export type Database = {
         }
         Returns: string
       }
+      console_block_address: {
+        Args: {
+          p_environment: string
+          p_reason: string
+          p_target: string
+          p_value: string
+        }
+        Returns: undefined
+      }
       console_change_role: {
         Args: {
           p_environment: string
@@ -345,6 +354,15 @@ export type Database = {
         Returns: number
       }
       console_team: { Args: never; Returns: Json }
+      console_unblock_address: {
+        Args: {
+          p_environment: string
+          p_reason: string
+          p_target: string
+          p_value: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

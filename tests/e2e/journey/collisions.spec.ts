@@ -295,11 +295,28 @@ test.describe("the hero dial's chart readout", () => {
 // 02's chapters play across a pinned window as the page scrolls; a dense, small-step sweep catches anything
 // the coarser top-to-bottom sweep's 45% stride could step over while a stop is playing.
 test.describe("02 pinned, a dense sweep", () => {
+  // Held to the still drawing: this sweep is about #how's chapters, and the live drawing at #anatomy made it a
+  // race it could lose. The live chapter adds ~3,450px of pinned runway and a WebGL frame to every stop. On a CI
+  // runner's software GL a frame can take over 120 ms — past the governor's gesture window, so it never judges and
+  // never floors to the still — and ~97 stops, each waiting two such frames, ran past the 30 s budget
+  // ("page.evaluate: Test timeout", with the scene chunk's load cut off by the teardown). Whether it happened
+  // depended on when the scene finished loading and how fast the runner was. Measured locally: live and pinned
+  // at a 20× slower CPU, 76 stops in 30 s, reaching y=10,125 of 12,910. The drawing's own collisions are checked
+  // by the #anatomy specs and the top-to-bottom sweeps, which keep it live.
+  test.beforeEach(async ({ page }) => drawStill(page));
+  // ~65 stops of four page round-trips each, where the default 30 s is sized for one page's checks. Measured at a
+  // 20× slower CPU with four workers: 21–28 s with the still drawing — inside 30 s, but not by enough to call it
+  // settled. Three times the budget only raises the ceiling; a passing sweep takes as long as it did.
+  test.slow();
+
   for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }] as const) {
     test(`Motion on: nothing collides through the chapters at ${viewport.width}×${viewport.height}`, async ({ page }) => {
       await page.setViewportSize(viewport);
       await gotoReady(page, "/");
       await waitForJourney(page);
+      // The sweep only means something while #how is pinned: pinning grows it by up to 330vh, so a box at least twice
+      // the window tall says the chapters will play across the pinned window as the sweep scrolls through them.
+      await expect.poll(() => page.evaluate(() => (document.getElementById("how")?.offsetHeight ?? 0) / window.innerHeight)).toBeGreaterThan(2);
       expect(await collisionsTopToBottom(page, { ...LANDING_INSTRUMENTS, step: 0.15 })).toEqual([]);
     });
   }

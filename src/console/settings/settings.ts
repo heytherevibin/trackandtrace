@@ -16,6 +16,9 @@
 /** The columns this plate reads, shaped as `console_auth_read_settings` returns them. */
 export interface SettingsRow {
   readonly live_checks_per_day: number | null;
+  readonly site_notice_on?: boolean | null;
+  readonly site_notice_text?: string | null;
+  readonly site_notice_version?: number | null;
   readonly version: number;
   readonly changed_at: string | null;
   readonly changed_by_name: string | null;

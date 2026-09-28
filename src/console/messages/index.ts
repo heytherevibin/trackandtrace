@@ -1,3 +1,4 @@
+import { abuse } from "./en-IN/abuse";
 import { audit } from "./en-IN/audit";
 import { availability } from "./en-IN/availability";
 import { email } from "./en-IN/email";
@@ -5,12 +6,14 @@ import { frame } from "./en-IN/frame";
 import { frameSignedIn } from "./en-IN/frame-signed-in";
 import { keys } from "./en-IN/keys";
 import { myKeys } from "./en-IN/my-keys";
+import { overview } from "./en-IN/overview";
 import { session } from "./en-IN/session";
 import { settings } from "./en-IN/settings";
+import { sources } from "./en-IN/sources";
 import { setup } from "./en-IN/setup";
 import { signIn } from "./en-IN/sign-in";
 import { tap } from "./en-IN/tap";
 import { team } from "./en-IN/team";
 
 /** Console copy. It may name providers; traveller code never imports it (tests/unit/console/boundary.contract.test.ts). */
-export const consoleMessages = { frame, frameSignedIn, signIn, availability, session, email, keys, myKeys, setup, tap, team, audit, settings } as const;
+export const consoleMessages = { frame, frameSignedIn, signIn, availability, session, email, keys, myKeys, setup, tap, team, audit, settings, sources, overview, abuse } as const;

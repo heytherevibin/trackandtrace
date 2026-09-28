@@ -235,3 +235,72 @@ export function createBreaker(kv: Kv, scope: BreakerScope, options: { readonly o
     },
   };
 }
+
+/** What a dashboard may know about a fuse without taking part in its decision. */
+export interface BreakerState {
+  /** False when the store could not be read: every figure below is then a placeholder, not a reading. */
+  readonly known: boolean;
+  readonly open: boolean;
+  /** Seconds until it may be asked again, or null when it is not open. */
+  readonly retryAfterSeconds: number | null;
+  /**
+   * Which fuse is open, which is as close to WHY as this can honestly get: the provider-wide one
+   * opens only on a refused key or a spent plan, a caller's own only on failures. The reason itself
+   * is never stored — `openFor` emits it and writes a duration — so inventing the sentence the
+   * sheet draws would be inventing the fact behind it.
+   */
+  readonly openedBy: "provider" | "endpoint" | null;
+  /** The current window's figures, and the trips this caller has earned while the memory lasts. */
+  readonly failures: number;
+  readonly asks: number;
+  readonly trips: number;
+}
+
+function counted(raw: string | null): number {
+  return raw !== null && /^\d+$/.test(raw.trim()) ? Number(raw) : 0;
+}
+
+/**
+ * Reads a fuse without asking it anything.
+ *
+ * `admit()` is the gate's own question, and a page drawing a state must not be a caller taking part
+ * in the decision — on a probing fuse `admit()` is the very call that spends the probe. This reads
+ * the same keys and changes none of them.
+ *
+ * It never throws. A dashboard that 500s because its status widget could not load is worse than one
+ * that says it does not know, so an unreachable store comes back `known: false` with everything else
+ * at its resting value, and the page draws that as "cannot say" rather than as "answering".
+ */
+export async function readBreakerState(kv: Kv, scope: BreakerScope): Promise<BreakerState> {
+  const provider = sharedKeys(scope.provider);
+  const endpoint = countingKeys(scope.endpoint);
+  try {
+    const [providerOpen, endpointOpen, providerTtl, endpointTtl, fails, asks, trips] = await Promise.all([
+      kv.get(provider.open),
+      kv.get(endpoint.open),
+      kv.ttl(provider.open),
+      kv.ttl(endpoint.open),
+      kv.get(endpoint.fails),
+      kv.get(endpoint.asks),
+      kv.get(endpoint.trips),
+    ]);
+    // The provider fuse wins when both are open: it is the longer of the two by construction — a
+    // refused key rests far longer than a run of failures — so it is the one an operator is actually
+    // waiting on, and naming the shorter would understate the wait.
+    const openedBy = providerOpen !== null ? "provider" : endpointOpen !== null ? "endpoint" : null;
+    // `Kv.ttl` answers in MILLISECONDS. Rounded up, so a fuse with a part-second left still reads as
+    // open for a second rather than for none.
+    const ms = openedBy === "provider" ? providerTtl : openedBy === "endpoint" ? endpointTtl : 0;
+    return {
+      known: true,
+      open: openedBy !== null,
+      retryAfterSeconds: openedBy !== null && ms > 0 ? Math.ceil(ms / 1000) : null,
+      openedBy,
+      failures: counted(fails),
+      asks: counted(asks),
+      trips: counted(trips),
+    };
+  } catch {
+    return { known: false, open: false, retryAfterSeconds: null, openedBy: null, failures: 0, asks: 0, trips: 0 };
+  }
+}

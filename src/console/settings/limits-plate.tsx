@@ -6,6 +6,7 @@ import { ConfirmItsYou } from "@/console/components/confirm-its-you";
 import { consoleMessages } from "@/console/messages";
 import { saveLiveChecks } from "@/console/settings/settings-client";
 import type { Limits } from "@/console/settings/settings";
+import { settingsTap } from "@/console/settings/settings-tap";
 import { cn } from "@/utils/cn";
 
 // PLATE "Limits" (Console Switches.dc.html), and one row of the two it draws.
@@ -31,7 +32,7 @@ export type SaveResult = { readonly ok: true } | { readonly ok: false; readonly 
 type Stage = { readonly kind: "ready" } | { readonly kind: "confirming"; readonly next: number } | { readonly kind: "saving" } | { readonly kind: "saved"; readonly value: number } | { readonly kind: "failed"; readonly stale: boolean };
 
 /** `changed_at` as the console prints times: IST, to the minute. */
-function readWhen(iso: string | null): string | null {
+export function readWhen(iso: string | null): string | null {
   if (iso === null) return null;
   const at = new Date(iso);
   if (Number.isNaN(at.getTime())) return null;
@@ -46,9 +47,12 @@ function readWhen(iso: string | null): string | null {
  */
 export function LimitsPlate({
   limits,
+  environment,
   save = saveLiveChecks,
 }: {
   readonly limits: Limits;
+  /** The deployment the save writes to — the tap's target, as console_save_settings spends it. */
+  readonly environment: string;
   readonly save?: (value: number, version: number, reason: string) => Promise<SaveResult>;
 }) {
   const [typed, setTyped] = useState(String(limits.liveChecks.value));
@@ -147,9 +151,9 @@ export function LimitsPlate({
 
       <ConfirmItsYou
         open={stage.kind === "confirming"}
-        action={m.tap.action}
-        target={m.tap.target}
-        value={stage.kind === "confirming" ? String(stage.next) : ""}
+        // Exactly the four fields console_save_settings spends (settings-tap.ts). These once read
+        // m.tap.action / m.tap.target / String(next), and every save was refused.
+        {...settingsTap(environment, { live_checks_per_day: stage.kind === "confirming" ? stage.next : limits.liveChecks.value })}
         reason={reason}
         summary={m.tap.summary}
         change={{ label: m.tap.changeLabel, before: String(limits.liveChecks.value), after: stage.kind === "confirming" ? String(stage.next) : "" }}

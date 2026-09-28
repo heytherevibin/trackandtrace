@@ -19,8 +19,7 @@ test.beforeEach(() => resetConsole());
  * to sign-in.spec.ts and setup.spec.ts, under the same config rather than a third one
  * (task-10-addendum.md §4's own instruction).
  *
- * My keys, not Overview: it's what `/` lands on today (src/app/console/page.tsx), the only signed-in
- * page that exists yet, and the one task-10-addendum.md §2 asks this task to look at closely -- the
+ * My keys: `/` landed on it until 01 Overview was built (overview.spec.ts scans that page), and it is the one task-10-addendum.md §2 asks this task to look at closely -- the
  * table-stack path that already produced one real bug on this branch (2c3929c, fixed before this
  * task's own BASE). layoutBreaks runs in a real Chromium layout, not jsdom -- see console-rail.test.tsx
  * for the reverse case (task-10-addendum.md §3): jsdom has no layout at all, so this file, not a
@@ -31,7 +30,7 @@ test.describe("the signed-in frame at 390px", () => {
     const owner = await setUpFirstOwner(page, baseURL ?? BASE);
 
     await page.setViewportSize({ width: 390, height: 844 });
-    await gotoReady(page, "/");
+    await gotoReady(page, "/keys");
     await expect(page.getByRole("heading", { level: 1, name: "My keys" })).toBeVisible();
     // The module rail was a moot check until 2d-2 task-8: every module shipped built: false
     // (task-10-addendum.md §1), so neither ConsoleRail nor its phone trigger rendered for any role

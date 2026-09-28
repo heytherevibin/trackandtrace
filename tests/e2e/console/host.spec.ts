@@ -35,10 +35,13 @@ test("every console response carries a fresh nonce", async ({ request }) => {
  * tests/e2e/console-auth/sign-in.spec.ts ("the link alone opens nothing"), which covers `/` and an
  * unknown console address alike. What is provable without one is the host routing itself.
  */
-test("the console's home points into the console, and a traveller address is not one of its pages", async ({ request }) => {
+test("the console's home is the console's own page, and a traveller address is not one of its pages", async ({ request }) => {
+  // "/" is 01 Overview, which needs a member, so with no database it reaches the error boundary,
+  // exactly as /pnr does below. It used to redirect to /keys; what matters here is that it is never
+  // the traveller home, which answers 200 on the other host.
   const home = await request.get("/", { maxRedirects: 0 });
-  expect(home.status()).toBe(307);
-  expect(home.headers()["location"]).toMatch(/\/keys$/);
+  expect(home.status()).not.toBe(200);
+  expect(home.headers()["location"] ?? "").not.toMatch(/trakline\.in\/?$/);
   // /pnr answers 200 on the traveller host (tests/e2e/pages.spec.ts). On this one it reaches the
   // console's own catch-all, which needs a member -- so whatever it answers, it is never that page.
   expect((await request.get("/pnr", { maxRedirects: 0 })).status()).not.toBe(200);

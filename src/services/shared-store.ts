@@ -1,12 +1,15 @@
-import { createBreaker } from "./breaker";
+import { randomBytes } from "node:crypto";
+import { createBreaker, type BreakerScope } from "./breaker";
 import { pnrCache, type Cache } from "./cache";
 import { deriveDataKeys, keyedHash } from "./data-key";
 import { activePnrSource, env, isThirdPartySource, sharedStoreConfig, type Env, type ThirdPartySource } from "./env";
 import { liveChecksPerDay } from "./runtime-settings";
 import { MemoryKv, redisKv, resilientKv, type Kv } from "./kv";
 import { UNLIMITED_BUDGET, createLiveBudget, type LiveBudget } from "./live-budget";
+import { blockingLimiter, cachedBlocks, memoryBlocklist, redisBlocklist, type BlockedCheck, type Blocklist } from "./blocklist";
+import { memberFor, memoryLimitedLog, recordingLimiter, redisLimitedLog, type LimitedLog } from "./limited-log";
 import { log } from "./log";
-import { MemoryRateLimiter, SharedRateLimiter, type RateLimiter } from "./rate-limit";
+import { MemoryRateLimiter, SharedRateLimiter, addressKey, type RateLimiter } from "./rate-limit";
 import { EncryptedRedisCache } from "./redis-cache";
 import type { GuardDeps } from "./sources/guarded";
 import { connectRedis, upstashWindows } from "./upstash";
@@ -67,8 +70,100 @@ function store(current: Env): SharedStore | null {
   return stores.get(current) ?? null;
 }
 
-export function createRateLimiter(current: Env = env()): RateLimiter {
-  return store(current)?.limiter ?? new MemoryRateLimiter();
+/**
+ * Without a shared store, the address hash, the limited log and the blocklist live in this instance's memory.
+ * "This instance" is the PROCESS, not the module: Next bundles route handlers and pages as separate module
+ * instances in one process, so a module-level store would be two stores — the block route wrote to one and the
+ * /abuse page read the other (a block showed its toast, then an empty Blocked table; CI, 2026-09-28). So they are
+ * kept on globalThis under a registered symbol, which every copy of this module finds.
+ *
+ * With no DATA_KEY to hash with, the hash key is this process's own and never leaves memory.
+ */
+interface LocalGuards {
+  readonly hash: (address: string) => string;
+  readonly log: LimitedLog;
+  readonly blocks: Blocklist;
+  readonly blocked: BlockedCheck;
+}
+const LOCAL_GUARDS = Symbol.for("trakline.shared-store.local-guards");
+function localGuards(): LocalGuards {
+  const holder = globalThis as { [LOCAL_GUARDS]?: LocalGuards };
+  if (!holder[LOCAL_GUARDS]) {
+    const key = randomBytes(32);
+    const hash = (address: string): string => keyedHash(key, `address:${address}`);
+    const blocks = memoryBlocklist();
+    holder[LOCAL_GUARDS] = { hash, log: memoryLimitedLog(hash), blocks, blocked: cachedBlocks(blocks) };
+  }
+  return holder[LOCAL_GUARDS];
+}
+
+interface Guards {
+  readonly hash: (address: string) => string;
+  /** Which key hashed: a block made under another no longer matches its address. */
+  readonly keyId: string;
+  readonly log: LimitedLog;
+  readonly blocks: Blocklist;
+  readonly blocked: BlockedCheck;
+}
+
+const guardSets = new WeakMap<Env, Guards>();
+
+/** The address hash, the limited log and the blocklist for one environment: Upstash when configured, else this instance's memory. */
+function travellerGuards(current: Env): Guards {
+  const known = guardSets.get(current);
+  if (known) return known;
+  const config = sharedStoreConfig(current);
+  let made: Guards;
+  if (!config) {
+    made = { ...localGuards(), keyId: "local" };
+  } else {
+    const clientId = deriveDataKeys(config.dataKey).clientId;
+    const hash = (address: string): string => keyedHash(clientId, `address:${address}`);
+    const redis = connectRedis(config.credentials, STATE_TIMEOUT_MS);
+    const blocks = redisBlocklist(redis, config.prefix);
+    made = { hash, keyId: keyedHash(clientId, "key-id").slice(0, 8), log: redisLimitedLog(redis, config.prefix, hash), blocks, blocked: cachedBlocks(blocks) };
+  }
+  guardSets.set(current, made);
+  return made;
+}
+
+/** The limiter a traveller check asks, and — for tests — the one underneath doing the counting. */
+export interface TravellerLimiter extends RateLimiter {
+  readonly limiter: RateLimiter;
+}
+
+/**
+ * Every traveller check is refused outright when its address is blocked (module 04), and every
+ * refusal the limiter makes is written down. Both are best-effort around the limiter: a blocklist
+ * that cannot be read fails open, and a refusal that cannot be counted is dropped.
+ */
+export function createRateLimiter(current: Env = env()): TravellerLimiter {
+  const base = store(current)?.limiter ?? new MemoryRateLimiter();
+  const g = travellerGuards(current);
+  const guarded = blockingLimiter(recordingLimiter(base, g.log), g.blocked, g.blocks, g.hash);
+  return { limiter: base, check: (key, limit, windowMs) => guarded.check(key, limit, windowMs) };
+}
+
+/** The member a raw address is stored under — hashed on entry, the address itself kept nowhere. */
+export function addressMember(current: Env, address: string): string {
+  return memberFor(addressKey(address), travellerGuards(current).hash);
+}
+
+/**
+ * Module 04's writers and reader. `list` is strict: a store that does not answer throws, and the
+ * console says so. `invalidate` makes THIS instance apply a change at once; others follow within 30s.
+ */
+export function blocksForConsole(current: Env = env()): { readonly list: Blocklist; readonly keyId: string; readonly invalidate: () => void } {
+  const g = travellerGuards(current);
+  return { list: g.blocks, keyId: g.keyId, invalidate: () => g.blocked.invalidate() };
+}
+
+/**
+ * The limited log, for module 04 to read. Its reads throw when Upstash does not answer — the redis log
+ * has no fallback — so the page can say the counts are unavailable rather than draw a quiet day.
+ */
+export function limitedLogForReading(current: Env = env()): LimitedLog {
+  return travellerGuards(current).log;
 }
 
 export function createPnrCache(current: Env = env()): Cache {
@@ -102,6 +197,29 @@ export function publicStore(current: Env = env()): { readonly kv: Kv; readonly p
   return stateStore(current);
 }
 
+const readers = new WeakMap<Env, { readonly kv: Kv; readonly prefix: string }>();
+
+/**
+ * The same store as `publicStore`, for a page that REPORTS on it — without the fallback.
+ *
+ * `publicStore` answers from this instance's memory whenever Upstash errors, which is right for a
+ * breaker deciding whether to call and wrong for a dashboard: an unreachable store then reads as an
+ * empty one, and the page says "Answering" and "0 requests" about a day it knows nothing of. Here a
+ * failed read throws, so `readBreakerState` comes back `known: false` and `readUsageHistory` gives
+ * the day as unknown — the paths they were written with and could never reach.
+ *
+ * Unconfigured, it is the same memory `publicStore` uses, because that is where the counts are.
+ */
+export function publicStoreForReading(current: Env = env()): { readonly kv: Kv; readonly prefix: string } {
+  const config = sharedStoreConfig(current);
+  if (!config) return stateStore(current);
+  const known = readers.get(current);
+  if (known) return known;
+  const made = { kv: redisKv(connectRedis(config.credentials, STATE_TIMEOUT_MS)), prefix: config.prefix };
+  readers.set(current, made);
+  return made;
+}
+
 /** Today's live-request budget, shared by every instance. Sources that spend no provider quota have none. */
 export function liveBudget(current: Env = env()): LiveBudget {
   if (!isThirdPartySource(activePnrSource(current))) return UNLIMITED_BUDGET;
@@ -126,6 +244,21 @@ export function liveBudget(current: Env = env()): LiveBudget {
  */
 export type GuardEndpoint = "pnr" | "availability" | "route";
 
+/**
+ * The four keys a caller's fuse lives under, in ONE place.
+ *
+ * `providerGuard` builds a breaker over these; module 02's page reads the same keys to draw the
+ * fuse's state. Two callers computing a key shape is two key shapes waiting to disagree — and the
+ * failure would be silent in the worst way, a dashboard confidently reporting "Answering" off keys
+ * nothing writes.
+ *
+ * The provider base is the key this product has always used; adding a caller segment to it gives
+ * each caller its own four keys without moving anyone else's.
+ */
+export function breakerScopeFor(source: ThirdPartySource, endpoint: GuardEndpoint, prefix: string): BreakerScope {
+  return { provider: `${prefix}:breaker:${source}`, endpoint: `${prefix}:breaker:${source}:${endpoint}` };
+}
+
 /** One breaker per provider *and caller*, one usage counter per provider, shared by every check in this environment. */
 export function providerGuard(source: ThirdPartySource, endpoint: GuardEndpoint, current: Env = env()): GuardDeps {
   const perEnv = guards.get(current) ?? new Map<string, GuardDeps>();
@@ -138,9 +271,7 @@ export function providerGuard(source: ThirdPartySource, endpoint: GuardEndpoint,
   const made: GuardDeps = {
     breaker: createBreaker(
       kv,
-      // The provider base is the key this product has always used; adding a caller segment to it
-      // gives each caller its own four keys without moving anyone else's.
-      { provider: `${prefix}:breaker:${source}`, endpoint: `${prefix}:breaker:${caller}` },
+      breakerScopeFor(source, endpoint, prefix),
       {
         onChange: (event) =>
           log.warn(
