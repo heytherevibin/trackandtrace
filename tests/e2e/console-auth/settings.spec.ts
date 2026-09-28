@@ -24,7 +24,8 @@ test("an Owner changes the live-check limit, and it reaches the database", async
     await gotoReady(page, "/settings");
     const field = page.getByRole("spinbutton", { name: m.limits.liveChecks.name });
     await field.fill(String(next));
-    await page.getByRole("button", { name: m.limits.liveChecks.save }).click();
+    // Two plates on this page each have a "Save"; press the one beside this field.
+    await page.locator("section", { has: field }).getByRole("button", { name: m.limits.liveChecks.save }).click();
     await tapThrough(page, "Raising the budget for the long weekend");
 
     await expect(page.getByText(m.state.saved(`${m.limits.liveChecks.name} ${next}`))).toBeVisible();
@@ -49,8 +50,9 @@ test("an Owner turns the site notice on, and travellers see it until they close 
     await gotoReady(page, "/settings");
     const n = m.switches.notice;
     await page.getByLabel(n.textLabel).fill(text);
-    await page.getByRole("group", { name: n.name }).getByRole("button", { name: m.switches.on }).click();
-    await page.getByRole("button", { name: m.switches.save }).click();
+    const switches = page.getByRole("region", { name: m.switches.title });
+    await switches.getByRole("group", { name: n.name }).getByRole("button", { name: m.switches.on }).click();
+    await switches.getByRole("button", { name: m.switches.save }).click();
     await tapThrough(page, "Warning travellers about tonight's window");
     await expect(page.getByText(m.state.saved(`${n.name} ${m.switches.on}`))).toBeVisible();
 
