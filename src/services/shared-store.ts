@@ -6,9 +6,10 @@ import { activePnrSource, env, isThirdPartySource, sharedStoreConfig, type Env, 
 import { liveChecksPerDay } from "./runtime-settings";
 import { MemoryKv, redisKv, resilientKv, type Kv } from "./kv";
 import { UNLIMITED_BUDGET, createLiveBudget, type LiveBudget } from "./live-budget";
-import { memoryLimitedLog, recordingLimiter, redisLimitedLog, type LimitedLog, type RecordingLimiter } from "./limited-log";
+import { blockingLimiter, cachedBlocks, memoryBlocklist, redisBlocklist, type BlockedCheck, type Blocklist } from "./blocklist";
+import { memberFor, memoryLimitedLog, recordingLimiter, redisLimitedLog, type LimitedLog } from "./limited-log";
 import { log } from "./log";
-import { MemoryRateLimiter, SharedRateLimiter, type RateLimiter } from "./rate-limit";
+import { MemoryRateLimiter, SharedRateLimiter, addressKey, type RateLimiter } from "./rate-limit";
 import { EncryptedRedisCache } from "./redis-cache";
 import type { GuardDeps } from "./sources/guarded";
 import { connectRedis, upstashWindows } from "./upstash";
@@ -69,37 +70,100 @@ function store(current: Env): SharedStore | null {
   return stores.get(current) ?? null;
 }
 
-/** Without a shared store there is no DATA_KEY to hash with, so this instance hashes with a key of its own that never leaves memory. */
-const randomKey = randomBytes(32);
-const localLimited = memoryLimitedLog((address) => keyedHash(randomKey, `address:${address}`));
-const limitedLogs = new WeakMap<Env, LimitedLog>();
+/**
+ * Without a shared store, the address hash, the limited log and the blocklist live in this instance's memory.
+ * "This instance" is the PROCESS, not the module: Next bundles route handlers and pages as separate module
+ * instances in one process, so a module-level store would be two stores — the block route wrote to one and the
+ * /abuse page read the other (a block showed its toast, then an empty Blocked table; CI, 2026-09-28). So they are
+ * kept on globalThis under a registered symbol, which every copy of this module finds.
+ *
+ * With no DATA_KEY to hash with, the hash key is this process's own and never leaves memory.
+ */
+interface LocalGuards {
+  readonly hash: (address: string) => string;
+  readonly log: LimitedLog;
+  readonly blocks: Blocklist;
+  readonly blocked: BlockedCheck;
+}
+const LOCAL_GUARDS = Symbol.for("trakline.shared-store.local-guards");
+function localGuards(): LocalGuards {
+  const holder = globalThis as { [LOCAL_GUARDS]?: LocalGuards };
+  if (!holder[LOCAL_GUARDS]) {
+    const key = randomBytes(32);
+    const hash = (address: string): string => keyedHash(key, `address:${address}`);
+    const blocks = memoryBlocklist();
+    holder[LOCAL_GUARDS] = { hash, log: memoryLimitedLog(hash), blocks, blocked: cachedBlocks(blocks) };
+  }
+  return holder[LOCAL_GUARDS];
+}
 
-/** The limited log refusals are written to: Upstash when configured, else this instance's memory. */
-function limitedLog(current: Env): LimitedLog {
-  const config = sharedStoreConfig(current);
-  if (!config) return localLimited;
-  const known = limitedLogs.get(current);
+interface Guards {
+  readonly hash: (address: string) => string;
+  /** Which key hashed: a block made under another no longer matches its address. */
+  readonly keyId: string;
+  readonly log: LimitedLog;
+  readonly blocks: Blocklist;
+  readonly blocked: BlockedCheck;
+}
+
+const guardSets = new WeakMap<Env, Guards>();
+
+/** The address hash, the limited log and the blocklist for one environment: Upstash when configured, else this instance's memory. */
+function travellerGuards(current: Env): Guards {
+  const known = guardSets.get(current);
   if (known) return known;
-  const clientId = deriveDataKeys(config.dataKey).clientId;
-  const made = redisLimitedLog(connectRedis(config.credentials, STATE_TIMEOUT_MS), config.prefix, (address) => keyedHash(clientId, `address:${address}`));
-  limitedLogs.set(current, made);
+  const config = sharedStoreConfig(current);
+  let made: Guards;
+  if (!config) {
+    made = { ...localGuards(), keyId: "local" };
+  } else {
+    const clientId = deriveDataKeys(config.dataKey).clientId;
+    const hash = (address: string): string => keyedHash(clientId, `address:${address}`);
+    const redis = connectRedis(config.credentials, STATE_TIMEOUT_MS);
+    const blocks = redisBlocklist(redis, config.prefix);
+    made = { hash, keyId: keyedHash(clientId, "key-id").slice(0, 8), log: redisLimitedLog(redis, config.prefix, hash), blocks, blocked: cachedBlocks(blocks) };
+  }
+  guardSets.set(current, made);
   return made;
 }
 
-/**
- * Every refused TRAVELLER check is written down as it happens (module 04). Best-effort: the limiter's
- * verdict is returned unchanged whether or not the line was written.
- */
-export function createRateLimiter(current: Env = env()): RecordingLimiter {
-  return recordingLimiter(store(current)?.limiter ?? new MemoryRateLimiter(), limitedLog(current));
+/** The limiter a traveller check asks, and — for tests — the one underneath doing the counting. */
+export interface TravellerLimiter extends RateLimiter {
+  readonly limiter: RateLimiter;
 }
 
 /**
- * The same log, for module 04 to read. Its reads throw when Upstash does not answer — the redis log
+ * Every traveller check is refused outright when its address is blocked (module 04), and every
+ * refusal the limiter makes is written down. Both are best-effort around the limiter: a blocklist
+ * that cannot be read fails open, and a refusal that cannot be counted is dropped.
+ */
+export function createRateLimiter(current: Env = env()): TravellerLimiter {
+  const base = store(current)?.limiter ?? new MemoryRateLimiter();
+  const g = travellerGuards(current);
+  const guarded = blockingLimiter(recordingLimiter(base, g.log), g.blocked, g.blocks, g.hash);
+  return { limiter: base, check: (key, limit, windowMs) => guarded.check(key, limit, windowMs) };
+}
+
+/** The member a raw address is stored under — hashed on entry, the address itself kept nowhere. */
+export function addressMember(current: Env, address: string): string {
+  return memberFor(addressKey(address), travellerGuards(current).hash);
+}
+
+/**
+ * Module 04's writers and reader. `list` is strict: a store that does not answer throws, and the
+ * console says so. `invalidate` makes THIS instance apply a change at once; others follow within 30s.
+ */
+export function blocksForConsole(current: Env = env()): { readonly list: Blocklist; readonly keyId: string; readonly invalidate: () => void } {
+  const g = travellerGuards(current);
+  return { list: g.blocks, keyId: g.keyId, invalidate: () => g.blocked.invalidate() };
+}
+
+/**
+ * The limited log, for module 04 to read. Its reads throw when Upstash does not answer — the redis log
  * has no fallback — so the page can say the counts are unavailable rather than draw a quiet day.
  */
 export function limitedLogForReading(current: Env = env()): LimitedLog {
-  return limitedLog(current);
+  return travellerGuards(current).log;
 }
 
 export function createPnrCache(current: Env = env()): Cache {

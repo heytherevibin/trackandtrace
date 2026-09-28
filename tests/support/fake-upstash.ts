@@ -1,4 +1,5 @@
 import { INCRBY_SCRIPT, INCR_SCRIPT } from "@/services/kv";
+import { BLOCK_SCRIPT, LIST_BLOCKS_SCRIPT, REFUSED_SCRIPT, UNBLOCK_SCRIPT } from "@/services/blocklist";
 import { READ_LIMITED_SCRIPT, RECORD_LIMITED_SCRIPT } from "@/services/limited-log";
 import type { RedisLike, WindowLimiterFactory, WindowVerdict } from "@/services/upstash";
 
@@ -21,6 +22,13 @@ export function createFakeUpstash(): FakeUpstash {
   const store = new Map<string, { readonly value: string; readonly exp: number }>();
   /** Sorted sets, for the limited log's two scripts. Expiry is not modelled: those tests stay inside a day. */
   const zsets = new Map<string, Map<string, number>>();
+  /** Hashes, for the blocklist's scripts. */
+  const hashes = new Map<string, Map<string, string>>();
+  const hash = (key: string): Map<string, string> => {
+    const known = hashes.get(key) ?? new Map<string, string>();
+    hashes.set(key, known);
+    return known;
+  };
   const zset = (key: string): Map<string, number> => {
     const known = zsets.get(key) ?? new Map<string, number>();
     zsets.set(key, known);
@@ -55,6 +63,24 @@ export function createFakeUpstash(): FakeUpstash {
     },
     async eval(script, keys, args) {
       guard();
+      if (script === BLOCK_SCRIPT) {
+        hash(keys[0]!).set(args[0]!, args[1]!);
+        hash(keys[1]!).delete(args[0]!);
+        return 1;
+      }
+      if (script === UNBLOCK_SCRIPT) {
+        hash(keys[0]!).delete(args[0]!);
+        hash(keys[1]!).delete(args[0]!);
+        return 1;
+      }
+      if (script === REFUSED_SCRIPT) {
+        const next = Number(hash(keys[0]!).get(args[0]!) ?? 0) + 1;
+        hash(keys[0]!).set(args[0]!, String(next));
+        return next;
+      }
+      if (script === LIST_BLOCKS_SCRIPT) {
+        return [[...hash(keys[0]!)].flat(), [...hash(keys[1]!)].flat()];
+      }
       if (script === RECORD_LIMITED_SCRIPT) {
         const [member, at] = args as [string, string];
         const [times, first, last, total] = keys as [string, string, string, string];
@@ -109,7 +135,7 @@ export function createFakeUpstash(): FakeUpstash {
   return {
     redis,
     windows,
-    dump: () => [...[...store].map(([k, v]) => `${k}=${v.value}`), ...hits.keys(), ...[...zsets].flatMap(([k, z]) => [...z.keys()].map((m) => `${k}:${m}`))].join("\n"),
+    dump: () => [...[...store].map(([k, v]) => `${k}=${v.value}`), ...hits.keys(), ...[...zsets].flatMap(([k, z]) => [...z.keys()].map((m) => `${k}:${m}`)), ...[...hashes].flatMap(([k, h]) => [...h].map(([f, v]) => `${k}:${f}=${v}`))].join("\n"),
     entries: () => [...store].map(([k, v]) => [k, v.value] as const),
     put: (key, value) => {
       store.set(key, { value, exp: state.now + 60_000 });
@@ -124,6 +150,7 @@ export function createFakeUpstash(): FakeUpstash {
       store.clear();
       hits.clear();
       zsets.clear();
+      hashes.clear();
       state.now = 1_000_000;
       state.failing = false;
     },

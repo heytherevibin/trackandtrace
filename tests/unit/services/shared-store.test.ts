@@ -3,7 +3,7 @@ import { MemoryCache } from "@/services/cache";
 import { parseEnv } from "@/services/env";
 import { EncryptedRedisCache } from "@/services/redis-cache";
 import { UNLIMITED_BUDGET } from "@/services/live-budget";
-import { createPnrCache, createRateLimiter, limitedLogForReading, liveBudget, providerGuard, publicStore, publicStoreForReading, resetLocalState } from "@/services/shared-store";
+import { addressMember, blocksForConsole, createPnrCache, createRateLimiter, limitedLogForReading, liveBudget, providerGuard, publicStore, publicStoreForReading, resetLocalState } from "@/services/shared-store";
 import { readUsageHistory } from "@/services/usage";
 import type { SourceOutcome } from "@/services/sources/outcome";
 
@@ -77,6 +77,32 @@ describe("createRateLimiter and limitedLogForReading", () => {
   });
 });
 
+describe("blocking, end to end over this instance's memory", () => {
+  it("refuses a blocked address's next traveller check, and lets it through once lifted", async () => {
+    const current = envOf({ NODE_ENV: "test" });
+    const limiter = createRateLimiter(current);
+    const blocks = blocksForConsole(current);
+    const member = addressMember(current, "192.0.2.44");
+    const now = Date.now();
+
+    await blocks.list.block(member, { note: "", by: "Asha Rao", since: now, until: null, keyId: blocks.keyId });
+    blocks.invalidate();
+    expect((await limiter.check("pnr:192.0.2.44", 20, 60_000)).ok).toBe(false);
+    expect((await limiter.check("pnr:192.0.2.45", 20, 60_000)).ok).toBe(true);
+
+    await blocks.list.unblock(member);
+    blocks.invalidate();
+    expect((await limiter.check("pnr:192.0.2.44", 20, 60_000)).ok).toBe(true);
+  });
+
+  it("hashes an address the way the limited log does, so a Most limited row blocks the same address", () => {
+    const current = envOf({ NODE_ENV: "test" });
+    expect(addressMember(current, "192.0.2.44")).toMatch(/^4\.[A-Za-z0-9_-]{43}$/);
+    expect(addressMember(current, "2001:db8:0:1::5")).toMatch(/^6\./);
+    expect(addressMember(current, "2001:db8:0:1::5")).toBe(addressMember(current, "2001:db8:0:1::9"));
+  });
+});
+
 describe("liveBudget", () => {
   const FAKE_RAILKIT = `railkit_${"a1".repeat(16)}`;
 
@@ -136,5 +162,20 @@ describe("providerGuard", () => {
     await availability.breaker.record(keyRefused);
     await expect(pnr.breaker.admit()).resolves.toEqual({ open: true, retryAfterSeconds: 600 });
     warn.mockRestore();
+  });
+});
+
+describe("this instance's memory, when no shared store is configured", () => {
+  // Next bundles route handlers and pages as separate module instances in one process: a module-level store
+  // is then two stores. The console's block route wrote to one and the /abuse page read the other, so a block
+  // showed its toast and then an empty Blocked table (CI, 2026-09-28). "This instance" means the process.
+  it("is one store per process, however many times the module is loaded", async () => {
+    const current = envOf({ NODE_ENV: "test" });
+    const first = await import("@/services/shared-store");
+    vi.resetModules();
+    const second = await import("@/services/shared-store");
+    expect(second.blocksForConsole(current).list).toBe(first.blocksForConsole(current).list);
+    expect(second.limitedLogForReading(current)).toBe(first.limitedLogForReading(current));
+    expect(second.addressMember(current, "192.0.2.9")).toBe(first.addressMember(current, "192.0.2.9"));
   });
 });
