@@ -105,30 +105,33 @@ html.has-reg-cursor :is(input, textarea, [contenteditable="true"]) { cursor: tex
 html[data-journey="on"] .sound-toggle { display: inline-flex; }
 
 /* The drawn train's labels beside the drawing, with leaders to their parts: the still's columns (still.ts, J4-7), and
-   the live drawing's (live-labels.ts, J5-5), which share one look. */
-html[data-journey="on"] .anatomy-pin.is-columns { height: max(640px, calc(100svh - var(--header-height))); }
-html[data-journey="on"] .is-columns .anatomy-still { position: absolute; margin: 0; aspect-ratio: auto; z-index: 1; }
-html[data-journey="on"] .is-columns .callout-lines { display: block; position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; overflow: visible; }
+   the live drawing's (live-labels.ts, J5-5), which share one look. The still's never apply to a chapter pinned live
+   (:where, so no rule gains weight): a rebuild hands its columns to the still's successor (still.ts), and the drawing's
+   fit trial (drawing.ts liveFits), which pins the chapter for an instant before that successor starts, measured the live
+   list under them, its parts list hidden by the still's rule, and read a chapter that fits as too tall (review, I-1). */
+html[data-journey="on"] :where(#anatomy:not(.is-live)) .anatomy-pin.is-columns { height: max(640px, calc(100svh - var(--header-height))); }
+html[data-journey="on"] :where(#anatomy:not(.is-live)) .is-columns .anatomy-still { position: absolute; margin: 0; aspect-ratio: auto; z-index: 1; }
+html[data-journey="on"] :where(#anatomy:not(.is-live)) .is-columns .callout-lines { display: block; position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; overflow: visible; }
 html[data-journey="on"] .callout-lines line, html[data-journey="on"] .live-lines line { stroke: var(--line-strong); stroke-width: 1; }
 html[data-journey="on"] .callout-lines circle, html[data-journey="on"] .live-lines circle { fill: var(--surface-0); stroke: var(--accent); stroke-width: 1.5; }
-html[data-journey="on"] :is(.is-columns, [data-live="columns"]) .anatomy-legend { display: none; }
-html[data-journey="on"] :is(.is-columns, [data-live="columns"]) .callouts { inset: 0; width: auto; height: auto; overflow: visible; clip-path: none; z-index: 3; pointer-events: none; }
-html[data-journey="on"] :is(.is-columns, [data-live="columns"]) .callout { position: absolute; width: 16rem; display: grid; grid-template-columns: auto 1fr; column-gap: 10px; align-items: baseline; padding: 6px 0 7px; border-top: 1px solid var(--line); background: var(--surface-0); pointer-events: auto; }
+html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .anatomy-legend { display: none; }
+html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .callouts { inset: 0; width: auto; height: auto; overflow: visible; clip-path: none; z-index: 3; pointer-events: none; }
+html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .callout { position: absolute; width: 16rem; display: grid; grid-template-columns: auto 1fr; column-gap: 10px; align-items: baseline; padding: 6px 0 7px; border-top: 1px solid var(--line); background: var(--surface-0); pointer-events: auto; }
 html[data-journey="on"] [data-live="columns"] .callout { top: 0; }
-html[data-journey="on"] :is(.is-columns, [data-live="columns"]) .callout[data-side="left"] { left: 0; }
-html[data-journey="on"] :is(.is-columns, [data-live="columns"]) .callout[data-side="right"] { right: 0; }
-html[data-journey="on"] :is(.is-columns, [data-live="columns"]) .callout-num { font-family: var(--font-display); font-weight: 600; font-size: var(--text-label); letter-spacing: 0.08em; color: var(--accent-text); }
-html[data-journey="on"] :is(.is-columns, [data-live="columns"]) .callout-title { font-family: var(--font-display); font-weight: 600; font-size: var(--text-sm); line-height: 1.25rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-1); }
-html[data-journey="on"] :is(.is-columns, [data-live="columns"]) .callout-detail { grid-column: 2; font-size: var(--text-label); line-height: 1.125rem; color: var(--ink-2); }
-html[data-journey="on"] :is(.is-columns, [data-live="columns"]) .callout-detail b { font-weight: 600; color: var(--ink-1); }
-html[data-journey="on"] :is(.is-columns, [data-live="columns"]) .callout.is-hot { border-top-color: var(--accent); }
-html[data-journey="on"] :is(.is-columns, [data-live="columns"]) .callout.is-hot .callout-title { color: var(--accent-text); }
-html[data-journey="on"] :is(.is-columns.is-compact, [data-live="columns"][data-compact]) .callout-detail { display: none; }
-html[data-journey="on"] :is(.is-columns, [data-live="columns"]) .title-block { display: grid; position: absolute; right: 0; bottom: 16px; z-index: 3; grid-template-columns: minmax(0, 1fr) auto; width: 22rem; background: var(--surface-0); }
-html[data-journey="on"] :is(.is-columns, [data-live="columns"]) .tb-cell { padding: 4px 10px; font-family: var(--font-display); font-weight: 600; font-size: 0.6875rem; /* drawing units: no token matches v3's title-block instrument at its fixed 22rem width */ line-height: 1rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
-html[data-journey="on"] :is(.is-columns, [data-live="columns"]) .tb-cell:nth-of-type(n + 3) { border-top: 1px solid var(--line); }
-html[data-journey="on"] :is(.is-columns, [data-live="columns"]) .tb-cell:nth-of-type(even) { border-left: 1px solid var(--line); text-align: right; }
-html[data-journey="on"] :is(.is-columns, [data-live="columns"]) .tb-cell b { color: var(--ink-1); font-weight: 600; }
+html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .callout[data-side="left"] { left: 0; }
+html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .callout[data-side="right"] { right: 0; }
+html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .callout-num { font-family: var(--font-display); font-weight: 600; font-size: var(--text-label); letter-spacing: 0.08em; color: var(--accent-text); }
+html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .callout-title { font-family: var(--font-display); font-weight: 600; font-size: var(--text-sm); line-height: 1.25rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-1); }
+html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .callout-detail { grid-column: 2; font-size: var(--text-label); line-height: 1.125rem; color: var(--ink-2); }
+html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .callout-detail b { font-weight: 600; color: var(--ink-1); }
+html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .callout.is-hot { border-top-color: var(--accent); }
+html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .callout.is-hot .callout-title { color: var(--accent-text); }
+html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns.is-compact, [data-live="columns"][data-compact]) .callout-detail { display: none; }
+html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .title-block { display: grid; position: absolute; right: 0; bottom: 16px; z-index: 3; grid-template-columns: minmax(0, 1fr) auto; width: 22rem; background: var(--surface-0); }
+html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .tb-cell { padding: 4px 10px; font-family: var(--font-display); font-weight: 600; font-size: 0.6875rem; /* drawing units: no token matches v3's title-block instrument at its fixed 22rem width */ line-height: 1rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .tb-cell:nth-of-type(n + 3) { border-top: 1px solid var(--line); }
+html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .tb-cell:nth-of-type(even) { border-left: 1px solid var(--line); text-align: right; }
+html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .tb-cell b { color: var(--ink-1); font-weight: 600; }
 
 /* ---- GA · the drawn train, live (spec §3.A–C; J5). drawing.ts pins the chapter (#anatomy.is-live) only while the live
    drawing runs, and the scroll plays it. The engine's canvas is fixed over the page, under the pinned chapter,
