@@ -16,13 +16,20 @@ export async function waitForJourney(page: Page): Promise<void> {
   await frames(page, 2);
 }
 
-/** Aborts the one script chunk that carries `mark`, found by its content, so its hashed name never matters. */
+/** Aborts the one script chunk that carries `mark`, found by its content, so its hashed name never matters. The
+ * harness's own fetch of a chunk can fail under load (WebKit at four workers or more: `route.fetch: write EPIPE`, or
+ * ECONNRESET from the dev server), which is the harness's, not the page's: it is tried once more, then the request goes
+ * through untouched, and the test's own assertion decides. */
 export async function blockChunk(page: Page, mark: string): Promise<void> {
   await page.route("**/_next/static/**/*.js", async (route) => {
-    const response = await route.fetch();
-    const body = await response.text();
-    if (body.includes(mark)) return route.abort();
-    return route.fulfill({ response, body });
+    const read = async () => {
+      const response = await route.fetch();
+      return { response, body: await response.text() };
+    };
+    const got = await read().catch(() => read().catch(() => null));
+    if (!got) return route.continue();
+    if (got.body.includes(mark)) return route.abort();
+    return route.fulfill({ response: got.response, body: got.body });
   });
 }
 
