@@ -113,7 +113,9 @@ Three layers, loaded in order, so the check never waits for, or depends on, the 
 
 1. **Page (server).** Every section's markup, including all new ones, rendered by Server Components from pure
    geometry and copy modules: the dials, clock face, berth plan, route map, departure board, route strip, the
-   run's window layers, the labels, title block and legend. With no JavaScript the page is complete and static.
+   run's frame (its window's lines are drawn by `run.ts` from `geometry/run.ts`, since they follow the cards'
+   measured widths; J6-6, accepted at J6's pre-flight), the labels, title block and legend. With no JavaScript
+   the page is complete and static.
 2. **Journey (client island).** `JourneyLoader`, a small client component on "/", imports the journey chunk
    after hydration when the page is idle (`requestIdleCallback`, 1.5 s timeout) and calls its
    `startJourney(root)`. The chunk (Anime.js + journey modules, ≤ 70 KB compressed) animates the server
@@ -155,9 +157,12 @@ reduced-motion rules (motion.css) to every traveller page, so the switch means t
 |---|---|
 | Server markup | ~~`route-strip.tsx`~~ (removed by the owner, 2026-09-27), `departure-board.tsx`, `hero-dial.tsx`, `drawing-chapter.tsx`, `chapters-instrument.tsx`, `berth-plan.tsx`, `route-map.tsx`, `window-run.tsx`, `terminus-stage.tsx`, `journey-switches.tsx` |
 | Pure geometry and logic (unit-tested) | `geometry/dial.ts`, `geometry/clock.ts`, `geometry/berths.ts`, `geometry/route.ts`, `geometry/run.ts`, `pose.ts` (anatomy and terminus poses), `governor.ts`, `labels-layout.ts`, ~~`strip-position.ts`~~ (removed by the owner, 2026-09-27), `drawing-mode.ts`, `fit.ts`, `chart-countdown.ts` |
-| Client island | `journey-loader.tsx`, `start-journey.ts`, `observers.ts`, `motion-tokens.ts`, `intro.ts`, ~~`strip.ts`~~ (removed by the owner, 2026-09-27), `board.ts`, `hero.ts`, `chapters.ts`, `berths.ts`, `station-clock.tsx`, `clock.ts`, `route.ts`, `run.ts`, `arrivals.ts`, `cursor.ts`, `sound.ts`, `drawing.ts`, `still.ts`, `theme-sweep.ts`, `live-labels.ts`, `webgl-probe.ts`, `hud.ts`, `hud-gate.ts` |
+| Client island | `journey-loader.tsx`, `start-journey.ts`, `observers.ts`, `motion-tokens.ts`, `intro.ts`, ~~`strip.ts`~~ (removed by the owner, 2026-09-27), `board.ts`, `hero.ts`, `chapters.ts`, `berths.ts`, `station-clock.tsx`, `clock.ts`, `route.ts`, `run.ts`, `arrivals.ts`, `cursor.ts`, `sound.ts`, `drawing.ts`, `still.ts`, `keep-place.ts`, `live-labels.ts`, `webgl-probe.ts`, `hud.ts`, `hud-gate.ts` |
 | Scene (three.js) | `scene/engine.ts`, `scene/rig.ts`, `scene/rig-parts.ts`, `scene/lines.ts`, `scene/line-world.ts`, `scene/departure.ts`, `scene/beam.ts`, `scene/scan.ts`, `scene/fit.ts`, `scene/apply-pose.ts`, `scene/palette.ts`, `scene/live.ts`, `scene/glow.ts`, `scene/scene-mark.ts` |
 | Build-time | `scripts/bake-train-stills.mjs`, generated `still-manifest.ts` |
+
+Night falls lives with the theme button, not the journey: `src/components/theme/night-falls.ts`, shared by every
+traveller page (J6-10, accepted at J6's pre-flight).
 
 ### C. Drawing modes
 
@@ -216,7 +221,9 @@ The theme toggle's click runs `document.startViewTransition(async () => { flushS
 themeApplied(next); journey.redrawNow(); })` and animates `::view-transition-new(root)` with a clip-path circle
 from the toggle's centre (640 ms, `--ease-in-out`). `themeApplied` resolves when `data-theme` changes (a
 MutationObserver, 100 ms cap). No View Transitions, reduced motion or Motion off: the switch is instant.
-`::view-transition { pointer-events: none }` keeps clicks working during the sweep.
+`::view-transition { pointer-events: none }` keeps clicks working during the sweep. It runs on every traveller
+page where Motion is on (`html[data-motion="on"]`); the console, which has no Motion switch, always switches at
+once (J6-10).
 
 ### G. Accessibility
 
@@ -316,7 +323,7 @@ development, behind `?journey-hud`; production never renders it.
 | J3 | Journey island: `animejs` added; loader, observers, arrivals, intro and headline, strip, board, hero dial, chapters (pinned, fit rules), berths, clock, route, cursor, the Sound switch and its clack, plate morph; journey motion tokens; DESIGN.md's motion and hero-entrance rules; the chapters instrument; the departure board's status column | The page moves (except the train and the run) |
 | J4 | Still drawing: `three` added; the rig, poses and fit the bake and the live scene share; bake script, sprite, manifest, drawing chapter and terminus markup with the still; the head script gains `data-saver` and `data-drawing`; GA joins ~~the strip and~~ the board (the strip removed by the owner, 2026-09-27) | The train, drawn still |
 | J5 | Live drawing: engine, anatomy and terminus, scan, departure line side, beam, governor, WebGL loss, the departure horn, the frame meter | The train comes alive |
-| J6 | Window-seat run and Night falls; nightly workflow; performance budgets | v3 complete |
+| J6 | Window-seat run and Night falls; nightly workflow; performance budgets | v3 complete — done (J6) |
 
 Moved while planning J2 (2026-09-25): the chapters instrument and the board's status only exist with
 scroll-driven motion, so they land in J3; GA's station lands with its section in J4.
@@ -340,6 +347,42 @@ Decided while planning J5 (2026-09-27):
 - labels while live wipe in and rise, never fade, with their own writers (J5-5);
 - the palette reads four tokens (J5-8);
 - the frame meter ships with J5, for the owner's real-device check (J5-10).
+
+Decided while planning J6 (2026-09-28):
+- CI's Playwright run in four shards, the console suite in its own job, one `e2e` gate; the chunk budgets on every
+  PR (J6-1);
+- a production build serves the fixture only on this machine: `LOCAL_FIXTURE`, refused on Vercel and beside any live
+  credential, with an offline guard in the server (J6-2);
+- the nightly measures what a GPU-less runner can; frame times and long tasks are measured by hand on a real GPU
+  (J6-3);
+- one rule for where the reader goes, `readerPlace`, for every piece that changes height (J6-4);
+- `fit` judged before the scene is fetched, by a trial layout (J6-5);
+- the run's frame is server markup, its lines drawn by `run.ts` (J6-6; a departure from §3.B, accepted at J6's
+  pre-flight); it pins by `#run.is-running` inside `keepPlace`, only while the reader is not below it (J6-7); links
+  to 06 and 07 bring their stations to the window (J6-8);
+- J5-17 amended (the owner, 2026-09-28): only the reader's own scroll (a mostly vertical wheel that is not a
+  pinch-zoom, a finger dragging, a scroll key outside a text field with no Alt, Ctrl or Meta) cancels the Back
+  restore; a trackpad's swipe back, a tap and every other key leave it pending (J6-9);
+- Back into the run returns the reader where they left: a section riding it is read where `run.ts` says it stands
+  (`data-run-at`), so a reader who left at 07 comes back to 07 (J6-9);
+- Night falls on every traveller page with Motion on, from the theme button's own module,
+  `src/components/theme/night-falls.ts`, not the journey's `theme-sweep.ts` (J6-10; a departure from §3.B, accepted
+  at J6's pre-flight);
+- the nightly on a schedule, and on the pull request that changes it (J6-11); WebKit in the nightly (J6-12); 200%
+  text at the PR's three sizes (J6-13);
+- the by-hand frame-time check runs `npm run build:local && node scripts/journey-perf.mjs` after the gate: the
+  gate's plain `npm run build` leaves the build unstamped, and the served production path refuses an unstamped
+  build; the nightly runs `npm run build:local` too (2026-09-28);
+- a Tab glide that a place-keeping jump cuts short is taken up again (`focus-glide.ts`): armed only after a real
+  Tab (Option-Tab counts, since Safari moves to links with it; Ctrl or Meta combinations never count), taking up
+  at most 3 cuts, and letting go on the reader's own scroll, a pointerdown, or after 10 still frames; it also
+  re-aims once after Safari's own focus reveal, while the watch is armed (2026-09-28);
+- at 200% text, the masthead folds its nav into the menu button whenever the nav can't hold one row, sitewide
+  (100% text unchanged), by a container query in rem on an inner div, not the sticky header, since WebKit reads
+  the header's box stale during the run's unpin; the nightly's sweep adds 1024×768 at 200% text, and fails on
+  text clipped inside the page (2026-09-28);
+- Motion off relays the drawn train's columns inside the rebuild's own task, so 02's place guard never reads a
+  half-built page; before this, WebKit moved the reader 304 px (2026-09-28).
 
 Each PR brings the dependency, copy, tokens and DESIGN.md rules its own code first uses, so nothing lands
 unused, and nothing a traveller can see is inert (a Sound switch with no sound). Each runs `npm run check`
