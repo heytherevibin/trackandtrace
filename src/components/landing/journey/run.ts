@@ -1,7 +1,7 @@
 import { animate, onScroll, type JSAnimation, type ScrollObserver } from "animejs";
 import { messages } from "@/messages";
 import { readerPlace } from "./drawing-mode";
-import { keyboardFocus, watchGlide } from "./focus-glide";
+import { keyboardFocus, watchGlide, watchTab } from "./focus-glide";
 import { anchorOf, band, fitsRun, hereAt, layers, leanStep, offsets, runLayout, trainAt, type RunLayout } from "./geometry/run";
 import { LAYOUT_EVENT, emit } from "./journey-events";
 import { keepPlace, mastheadBottom } from "./keep-place";
@@ -58,8 +58,6 @@ export function startRun({ motion }: JourneyContext): Teardown {
   let placeFrame = 0;
   let layoutFrame = 0;
   let aimed = -1; // the station a Tab stop's glide is bringing to the window, while watch is armed for it
-  let tabbing = false; // a Tab (or Shift+Tab) keydown is being handled: the focus it moves comes in the same task
-  let tabTimer = 0;
 
   /** The scroll at which station i stands at the window: the run's start (its top under the masthead) plus its anchor. */
   const stationY = (i: number, layout: RunLayout): number =>
@@ -267,24 +265,15 @@ export function startRun({ motion }: JourneyContext): Teardown {
   };
 
   // Tab onto a link in a card: bring its station to the window (the page's own scroll-behavior glides it). Only the
-  // keyboard's focus (a Tab just pressed, and :focus-visible): a mouse's needs no glide, and focus returning to the window
+  // keyboard's focus (a Tab in this task, and :focus-visible): a mouse's needs no glide, and focus returning to the window
   // must not pull a reader who scrolled away back to it (Task 6 review, round 2).
-  const onKey = (event: KeyboardEvent) => {
-    if (event.key !== "Tab") return;
-    // a flag for this task, not a timestamp: a key event is stamped with its input time, which a busy page can dispatch
-    // long after (seen at 8 parallel runs)
-    tabbing = true;
-    window.clearTimeout(tabTimer);
-    tabTimer = window.setTimeout(() => {
-      tabbing = false;
-    }, 0);
-  };
+  const tab = watchTab();
   const onFocus = (event: FocusEvent) => {
     const layout = at;
     const el = event.target instanceof Element ? event.target : null;
     const station = el?.closest<HTMLElement>("[data-station]") ?? null;
     const i = station ? stations.indexOf(station) : -1;
-    if (!layout || !el || i < 0 || !tabbing || !keyboardFocus(el)) return;
+    if (!layout || !el || i < 0 || !tab.down() || !keyboardFocus(el)) return;
     const top = stationY(i, layout);
     if (Math.abs(top - window.scrollY) < 1) return; // at the window already: no glide to watch
     aimed = i;
@@ -292,12 +281,12 @@ export function startRun({ motion }: JourneyContext): Teardown {
     watch.arm();
   };
   /** The glide cut short by a place-keeping jump (the drawing falling to the still under load; WCAG 2.4.11): its station
-   * back to the window, once, while focus is still in it (focus-glide.ts's watch says when). */
+   * back to the window while focus is still in it, after each cut, at most three times (focus-glide.ts's watch says
+   * when). `aimed` stays: onFocus and a relayout reset it. */
   const watch = watchGlide(() => {
     const layout = at;
-    const station = stations[aimed];
     const i = aimed;
-    aimed = -1;
+    const station = stations[i];
     if (layout && station?.contains(document.activeElement)) window.scrollTo({ top: stationY(i, layout) });
   });
   // A link to 06 or 07 (the departure board's): its first station to the window, the address, and focus in place (J6-8).
@@ -319,7 +308,6 @@ export function startRun({ motion }: JourneyContext): Teardown {
   window.addEventListener("resize", soon);
   trackEl.addEventListener("focusin", onFocus);
   document.addEventListener("click", onClick);
-  window.addEventListener("keydown", onKey, { capture: true, passive: true });
   return () => {
     cancelAnimationFrame(placeFrame);
     cancelAnimationFrame(layoutFrame);
@@ -328,8 +316,7 @@ export function startRun({ motion }: JourneyContext): Teardown {
     window.removeEventListener("resize", soon);
     trackEl.removeEventListener("focusin", onFocus);
     document.removeEventListener("click", onClick);
-    window.removeEventListener("keydown", onKey, true);
-    window.clearTimeout(tabTimer);
+    tab.stop();
     watch.stop();
     if (!at) return;
     unpin();

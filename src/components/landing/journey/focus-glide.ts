@@ -6,12 +6,15 @@ import type { JourneyContext, Teardown } from "./start-journey";
 // A Tab stop's glide, taken up again (WCAG 2.4.11; Task 6 review). The browser glides a focused element outside the
 // window into it (the page's smooth scroll-behavior), and an instant scroll made meanwhile to keep the reader's place
 // (jumpTo: keepPlace, the still's settle, as the drawing falls to the still under load) cancels that glide, stranding
-// focus off-screen at rest. Never against the reader (round 2):
-// - armed only by keyboard focus that starts a glide: :focus-visible at the focus, and let go if neither the glide's
-//   first scroll nor a jump comes within six frames (a resize two frames in cuts a glide not yet scrolling: round 3);
+// focus off-screen at rest. Never against the reader (rounds 2–4):
+// - armed only by a Tab's focus that starts a glide: a Tab keydown in the same task (focus returning to the window is
+//   :focus-visible again, but no Tab moved it: round 4), :focus-visible, and let go if neither the glide's first scroll
+//   nor a jump comes within six frames (a resize two frames in cuts a glide not yet scrolling: round 3);
 // - taken up only after a place-keeping jump (JUMP_EVENT): a scrollbar drag, which sends no wheel, touch or key, is no
 //   jump, so a reader who leaves that way is never pulled back;
-// - taken up once, two frames after the last jump (the still settles a frame after the drawing's own jump);
+// - taken up two frames after the last jump (the still settles a frame after the drawing's own jump), and again after
+//   each later cut, at most three times: a resize can let the drawing decide, and the still's own jump then comes a few
+//   frames after the first was taken up (round 4);
 // - let go once the page has held still for ten frames, on the reader's own scroll or press, or once focus moves on.
 // A station of the running window-seat run is run.ts's, which brings it to the window sideways. Motion off: no glide.
 
@@ -21,6 +24,8 @@ const START = 6;
 const QUIET = 2;
 /** Frames the page holds still before a glide counts as over, landed or not. */
 const HELD = 10;
+/** The most times one glide is taken up. */
+const TAKES = 3;
 
 /** The events that let go of a glide: the reader's own scroll (place-memory's rule), and a press of the pointer. */
 const OWN = [...HAND, "pointerdown"] as const;
@@ -28,6 +33,36 @@ const OWN = [...HAND, "pointerdown"] as const;
 /** The reader's own scroll, by place-memory's rule (the owner's, 2026-09-28), or a press of the pointer. */
 function readersOwn(event: Event): boolean {
   return event.type === "pointerdown" || ownScroll(event);
+}
+
+export interface TabKey {
+  /** A Tab (or Shift+Tab) keydown is being handled: the focus it moves comes in the same task. */
+  down(): boolean;
+  stop(): void;
+}
+
+/** Knows a Tab for the keydown's own task: a flag a later task clears, not a timestamp (a key event is stamped with its
+ * input time, which a busy page can dispatch long after: round 3). */
+export function watchTab(): TabKey {
+  let down = false;
+  let timer = 0;
+  const onKey = (event: KeyboardEvent) => {
+    if (event.key !== "Tab") return;
+    down = true;
+    window.clearTimeout(timer);
+    timer = window.setTimeout(() => {
+      down = false;
+    }, 0);
+  };
+  window.addEventListener("keydown", onKey, { capture: true, passive: true });
+  return {
+    down: () => down,
+    stop: () => {
+      window.removeEventListener("keydown", onKey, true);
+      window.clearTimeout(timer);
+      down = false;
+    },
+  };
 }
 
 /** Focus the keyboard gave: it shows as :focus-visible. */
@@ -52,9 +87,11 @@ export interface GlideWatch {
   stop(): void;
 }
 
-/** Watches one glide at a time; `retake` is called at most once, when a jump cut the glide short (rules above). */
+/** Watches one glide at a time; `retake` is called each time a jump cut the glide short, at most TAKES times (rules
+ * above). */
 export function watchGlide(retake: () => void): GlideWatch {
   let armed = false;
+  let takes = 0;
   let started = false;
   let waited = 0;
   let cut = false;
@@ -84,9 +121,14 @@ export function watchGlide(retake: () => void): GlideWatch {
     if (cut) {
       quiet += 1;
       if (quiet >= QUIET) {
-        disarm();
+        takes += 1;
+        cut = false;
+        quiet = 0;
+        held = 0;
+        if (takes >= TAKES) disarm();
         retake();
-        return;
+        if (!armed) return; // the last take, or the retake let go
+        lastY = window.scrollY;
       }
     } else if (held >= HELD) {
       disarm();
@@ -115,6 +157,7 @@ export function watchGlide(retake: () => void): GlideWatch {
   return {
     arm: () => {
       armed = true;
+      takes = 0;
       started = false;
       waited = 0;
       cut = false;
@@ -135,18 +178,18 @@ export function watchGlide(retake: () => void): GlideWatch {
 
 export function startFocusGlide({ motion }: JourneyContext): Teardown {
   if (!motion) return () => {};
-  let target: Element | null = null;
+  let target: Element | null = null; // the Tab stop glided to, while watch is armed for it (onFocus and onBlur reset it)
 
+  const tab = watchTab();
   const watch = watchGlide(() => {
     const el = target;
-    target = null;
     if (el && el === document.activeElement && !seen(el)) el.scrollIntoView({ block: "center", inline: "nearest" });
   });
   const onFocus = (event: FocusEvent) => {
     watch.disarm();
     target = null;
     const el = event.target instanceof Element ? event.target : null;
-    if (!el || !keyboardFocus(el) || el.closest("#run.is-running [data-station]")) return;
+    if (!el || !tab.down() || !keyboardFocus(el) || el.closest("#run.is-running [data-station]")) return;
     const r = el.getBoundingClientRect();
     if (r.top >= 0 && r.bottom <= window.innerHeight) return; // in the viewport: the browser glides nowhere
     target = el;
@@ -161,6 +204,7 @@ export function startFocusGlide({ motion }: JourneyContext): Teardown {
   document.addEventListener("focusout", onBlur);
   return () => {
     watch.stop();
+    tab.stop();
     document.removeEventListener("focusin", onFocus);
     document.removeEventListener("focusout", onBlur);
   };

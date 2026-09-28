@@ -5,9 +5,9 @@ import { testContext } from "./journey-context";
 
 // The browser glides a Tab stop into the window, and an instant scroll that keeps the reader's place (jumpTo: keepPlace,
 // the still's settle, the drawing falling to the still under load) cancels that glide, stranding focus off-screen at rest
-// (WCAG 2.4.11). The glide is taken up again once, and only that: armed by keyboard focus that starts a glide, it never
-// pulls a reader who left by their own hand (a scrollbar drag sends no wheel, touch or key), and it lets go once the page
-// holds still (Task 6 review, round 2).
+// (WCAG 2.4.11). The glide is taken up again after each such cut, at most three times, and only that: armed by a Tab that
+// starts a glide, it never pulls a reader who left by their own hand (a scrollbar drag sends no wheel, touch or key), nor
+// one whom focus returning to the window finds away, and it lets go once the page holds still (Task 6 review, rounds 2–4).
 
 const reveal = vi.fn();
 let box = { top: 1400, bottom: 1432 }; // below a 900px window
@@ -48,9 +48,12 @@ const modality = (el: HTMLElement, keyboard: boolean) => {
   const own = Element.prototype.matches.bind(el);
   vi.spyOn(el, "matches").mockImplementation((selector: string) => (selector === ":focus-visible" ? keyboard : own(selector)));
 };
-/** Focus that starts the browser's glide: the keyboard's, unless said otherwise. */
+/** A Tab keydown: the focus it moves comes in the same task. */
+const pressTab = () => window.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab" }));
+/** Focus that starts the browser's glide: a Tab's (:focus-visible), unless said otherwise (a mouse's, with no Tab). */
 const tabOnto = (el: HTMLElement, keyboard = true) => {
   modality(el, keyboard);
+  if (keyboard) pressTab();
   el.focus();
   glide();
   frames(1);
@@ -61,15 +64,36 @@ const jump = () => {
   window.dispatchEvent(new Event(LAYOUT_EVENT));
 };
 
-describe("arming: keyboard focus that starts a glide", () => {
-  it("takes a glide a jump cut short up again, once, centred so the masthead never covers it", () => {
+describe("arming: a Tab's focus that starts a glide", () => {
+  it("takes a glide a jump cut short up again, centred so the masthead never covers it", () => {
     const stop = startFocusGlide(testContext());
     tabOnto(policy());
     jump();
     frames(3);
     expect(reveal).toHaveBeenCalledTimes(1);
     expect(reveal).toHaveBeenCalledWith({ block: "center", inline: "nearest" });
-    jump(); // once: a second cut is not taken up
+    stop();
+  });
+
+  it("takes up each later cut too (the still's jump, a few frames after the first), at most three times", () => {
+    const stop = startFocusGlide(testContext());
+    tabOnto(policy());
+    for (const times of [1, 2, 3, 3]) {
+      jump();
+      frames(3);
+      expect(reveal).toHaveBeenCalledTimes(times);
+    }
+    stop();
+  });
+
+  it("lets go once the page has held still for ten frames after a retake: a jump after that takes nothing up", () => {
+    const stop = startFocusGlide(testContext());
+    tabOnto(policy());
+    jump();
+    frames(3);
+    expect(reveal).toHaveBeenCalledTimes(1);
+    frames(10);
+    jump();
     frames(3);
     expect(reveal).toHaveBeenCalledTimes(1);
     stop();
@@ -99,6 +123,7 @@ describe("arming: keyboard focus that starts a glide", () => {
   it("arms at the focus: a jump before the glide's first scroll (a resize two frames in) is a cut, taken up", () => {
     const stop = startFocusGlide(testContext());
     modality(policy(), true);
+    pressTab();
     policy().focus();
     frames(1);
     jump(); // the glide has not scrolled yet: its first step can land in the third or fourth frame
@@ -110,6 +135,7 @@ describe("arming: keyboard focus that starts a glide", () => {
   it("still watches a glide whose first scroll comes late, within six frames", () => {
     const stop = startFocusGlide(testContext());
     modality(policy(), true);
+    pressTab();
     policy().focus();
     frames(4);
     glide();
@@ -119,12 +145,35 @@ describe("arming: keyboard focus that starts a glide", () => {
     stop();
   });
 
-  it("lets go if neither a scroll nor a jump comes within six frames of the focus (focus returning to the window)", () => {
+  it("lets go if neither a scroll nor a jump comes within six frames of the focus (no glide began)", () => {
     const stop = startFocusGlide(testContext());
     modality(policy(), true);
+    pressTab();
     policy().focus();
     frames(6);
     glide();
+    jump();
+    frames(3);
+    expect(reveal).not.toHaveBeenCalled();
+    stop();
+  });
+
+  it("is not armed by focus returning to the window: :focus-visible again, but no Tab moved it", () => {
+    const stop = startFocusGlide(testContext());
+    modality(policy(), true);
+    policy().focus();
+    jump(); // a resize that comes with it
+    frames(3);
+    expect(reveal).not.toHaveBeenCalled();
+    stop();
+  });
+
+  it("knows a Tab only in its own task: focus a later task moves is not the Tab's", async () => {
+    const stop = startFocusGlide(testContext());
+    modality(policy(), true);
+    pressTab();
+    await new Promise((done) => setTimeout(done, 0));
+    policy().focus();
     jump();
     frames(3);
     expect(reveal).not.toHaveBeenCalled();

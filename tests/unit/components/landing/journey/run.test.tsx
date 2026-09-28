@@ -105,7 +105,8 @@ describe("the window-seat run (J6-7, J6-8)", () => {
 
   // A Tab stop's glide to the window can be cut short: a piece above moves the page by a place-keeping jump (jumpTo; the
   // drawing falling to the still under load), and an instant scroll cancels the smooth one, leaving focus off-screen
-  // (WCAG 2.4.11). Its station is brought back once, and never against the reader (Task 6 review, round 2).
+  // (WCAG 2.4.11). Its station is brought back after each such cut, at most three times, and never against the reader
+  // (Task 6 review, rounds 2–4).
   describe("a Tab stop's glide to its station", () => {
     const watchlist = () => {
       const link = document.createElement("a");
@@ -133,20 +134,37 @@ describe("the window-seat run (J6-7, J6-8)", () => {
       window.dispatchEvent(new Event(LAYOUT_EVENT));
     };
 
-    it("glides for keyboard focus, and is taken up once after a jump cuts it short", () => {
+    /** The times its station was brought back to the window since the Tab's own glide. */
+    const retakes = () => vi.mocked(window.scrollTo).mock.calls.filter((call) => JSON.stringify(call) === '[{"top":700}]').length;
+
+    it("glides for keyboard focus, and takes it up after each jump that cuts it short, at most three times", () => {
       vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
       lay(200);
       const stop = startRun(testContext());
       tab(watchlist());
       expect(window.scrollTo).toHaveBeenLastCalledWith({ top: 700 });
       vi.mocked(window.scrollTo).mockClear();
+      for (const times of [1, 2, 3, 3]) {
+        jump(); // the still's jump comes a few frames after the first: taken up too
+        frames(3);
+        expect(retakes()).toBe(times);
+      }
+      stop();
+    });
+
+    it("lets go once the page has held still for ten frames after a retake", () => {
+      vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
+      lay(200);
+      const stop = startRun(testContext());
+      tab(watchlist());
+      vi.mocked(window.scrollTo).mockClear();
       jump();
       frames(3);
-      expect(window.scrollTo).toHaveBeenCalledWith({ top: 700 });
-      vi.mocked(window.scrollTo).mockClear();
-      jump(); // once
+      expect(retakes()).toBe(1);
+      frames(10);
+      jump();
       frames(3);
-      expect(window.scrollTo).not.toHaveBeenCalledWith({ top: 700 });
+      expect(retakes()).toBe(1);
       stop();
     });
 

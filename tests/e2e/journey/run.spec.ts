@@ -210,7 +210,8 @@ test.describe("the window-seat run (spec §3.A)", () => {
 
 // A Tab stop's glide to the window, cut short (Task 6 review): the drawing above fell to the still mid-glide, and the
 // instant scroll its keepPlace made (a no-op under scroll anchoring, a real move without it) cancelled the smooth one,
-// stranding focus off-screen at rest (WCAG 2.4.11). The glide is taken up once, and never against the reader (round 2).
+// stranding focus off-screen at rest (WCAG 2.4.11). The glide is taken up after each such cut, at most three times, and
+// never against the reader (rounds 2–4).
 test.describe("a Tab stop's glide into the run (spec §3.G; WCAG 2.4.11)", () => {
   const inWindow = (page: Page, name: string) =>
     page.getByRole("link", { name }).evaluate((a) => {
@@ -241,28 +242,33 @@ test.describe("a Tab stop's glide into the run (spec §3.G; WCAG 2.4.11)", () =>
       await expect.poll(() => inWindow(page, "Open Watchlist →")).toBe(true);
     });
 
-    for (const at of [2, 8]) {
-      test(`reaches the window though it is resized ${at} frames into the glide (scroll anchoring ${anchoring})`, async ({ page, isMobile }) => {
-        test.skip(isMobile, "the keyboard: one project is enough");
-        await page.setViewportSize({ width: 1440, height: 900 });
-        if (anchoring === "off") await noAnchoring(page);
-        await drawStill(page); // the drawing held to the still, as the governor floors it on a slow GPU
-        await page.goto("/");
-        await waitForJourney(page);
-        await running(page);
-        await scrollToId(page, "record", 100);
-        await frames(page, 3);
-        await readyTab(page, "#run", "Open Watchlist");
-        await page.keyboard.press("Tab");
-        await expect(page.getByRole("link", { name: "Open Watchlist →" })).toBeFocused();
-        await frames(page, at);
-        await page.setViewportSize({ width: 1440, height: 860 });
-        await atRest(page, 15);
-        await frames(page, 30); // the journey's own resize answer lands 150 ms later
-        await atRest(page, 15);
-        await expect.poll(() => inWindow(page, "Open Watchlist →")).toBe(true);
-      });
-    }
+    // With the drawing yet to decide at the Tab, the resize's first jump lets it decide, and the still's own jump cuts
+    // the glide again a few frames after it was taken up (round 4).
+    for (const drawing of ["still", "undecided"] as const)
+      for (const at of [2, 8]) {
+        const when = drawing === "still" ? "" : ", the drawing yet to decide";
+        test(`reaches the window though it is resized ${at} frames into the glide${when} (scroll anchoring ${anchoring})`, async ({ page, isMobile }) => {
+          test.skip(isMobile, "the keyboard: one project is enough");
+          await page.setViewportSize({ width: 1440, height: 900 });
+          if (anchoring === "off") await noAnchoring(page);
+          // the still: held there, as the governor floors it on a slow GPU; undecided: the Tab before the scene arrives
+          if (drawing === "still") await drawStill(page);
+          await page.goto("/");
+          await waitForJourney(page);
+          await running(page);
+          await scrollToId(page, "record", 100);
+          await frames(page, 3);
+          await readyTab(page, "#run", "Open Watchlist");
+          await page.keyboard.press("Tab");
+          await expect(page.getByRole("link", { name: "Open Watchlist →" })).toBeFocused();
+          await frames(page, at);
+          await page.setViewportSize({ width: 1440, height: 860 });
+          await atRest(page, 15);
+          await frames(page, 30); // the journey's own resize answer lands 150 ms later
+          await atRest(page, 15);
+          await expect.poll(() => inWindow(page, "Open Watchlist →")).toBe(true);
+        });
+      }
 
     test(`never pulls back a reader who dragged away mid-glide, however long after (scroll anchoring ${anchoring})`, async ({ page, isMobile }) => {
       test.skip(isMobile, "the keyboard: one project is enough");
