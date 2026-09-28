@@ -7,8 +7,12 @@ import { layoutBreaks } from "../layout";
 const BASE = "http://admin.localhost:4211";
 /** The traveller host of the same server: the proxy routes by host, so this reaches /api/pnr. */
 const TRAVELLER = (base: string) => base.replace("admin.localhost", "localhost");
-/** A documentation address (RFC 5737), sent as the client address the traveller routes read. */
-const ADDRESS = "198.51.100.77";
+/**
+ * A documentation address (RFC 5737), sent as the client address the traveller routes read. A fresh
+ * one per run: a block lives in the server's memory, so a retry after a failure part-way through
+ * would otherwise start with the last attempt's block still in force.
+ */
+const freshAddress = () => `198.51.100.${(Date.now() % 200) + 20}`;
 const m = consoleMessages.abuse;
 
 test.beforeEach(() => resetConsole());
@@ -35,6 +39,7 @@ test.describe("Abuse & limits", () => {
 
   test("a block made here refuses that address's traveller checks, and an unblock answers them again", async ({ page, baseURL, request }) => {
     const base = baseURL ?? BASE;
+    const ADDRESS = freshAddress();
     await setUpFirstOwner(page, base);
     const check = () => request.post(`${TRAVELLER(base)}/api/pnr`, { headers: { "x-forwarded-for": ADDRESS, "content-type": "application/json" }, data: { pnr: PNR.cnf } });
     expect((await check()).status(), "answered before any block").toBe(200);
@@ -47,7 +52,8 @@ test.describe("Abuse & limits", () => {
     // Hashed on entry: from here on the address is on the screen nowhere.
     await expect(page.getByText(ADDRESS)).toHaveCount(0);
     await tapThrough(page, "Scripted checks from one address all morning");
-    await expect(page.getByText(m.block.doneToast)).toBeVisible();
+    // Exact: "Blocked." is also a substring of the page's lead and of "No addresses are blocked.".
+    await expect(page.getByText(m.block.doneToast, { exact: true })).toBeVisible();
 
     const blocked = page.getByRole("table", { name: m.blocked.caption });
     await expect(blocked.getByRole("row")).toHaveCount(2);
