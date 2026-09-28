@@ -54,8 +54,6 @@ export const settings = {
 
   /** Confirm it's you, which every change on this page goes through. */
   tap: {
-    action: "Change the live-check limit",
-    target: "Switches & settings",
     summary: "This changes how many live checks travellers get in a day, for everyone, immediately.",
     changeLabel: "Live checks per day",
   },
