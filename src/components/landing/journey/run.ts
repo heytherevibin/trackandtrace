@@ -27,6 +27,11 @@ const PLACE_EVENTS = ["scroll", "resize", LAYOUT_EVENT] as const;
 const kmOf = (id: string): number => STATIONS.find((s) => s.id === id)?.km ?? 0;
 const KM = { from: kmOf("features"), to: kmOf("use") };
 
+/** y lies within a pixel of the span from `a` to `b`, either way round. */
+function between(y: number, a: number, b: number): boolean {
+  return y >= Math.min(a, b) - 1 && y <= Math.max(a, b) + 1;
+}
+
 function stroke(cls: string, d: string): SVGPathElement {
   const path = document.createElementNS(NS, "path");
   path.setAttribute("class", cls);
@@ -240,6 +245,7 @@ export function startRun({ motion }: JourneyContext): Teardown {
     startDriver();
     paint();
     emit(LAYOUT_EVENT);
+    aim();
   }
 
   /** Anything that moves the page re-measures the pinned run, inside keepPlace; a run that no longer fits unpins. A
@@ -274,21 +280,44 @@ export function startRun({ motion }: JourneyContext): Teardown {
     const el = event.target instanceof Element ? event.target : null;
     const station = el?.closest<HTMLElement>("[data-station]") ?? null;
     const i = station ? stations.indexOf(station) : -1;
-    if (!layout || !el || i < 0 || !tab.down() || !keyboardFocus(el)) return;
+    if (!el || i < 0 || !tab.down() || !keyboardFocus(el)) return;
+    if (!layout) {
+      // Not pinned (a reader below the run Shift+Tabs up into it): the browser glides to the card as to any link, and
+      // the glide may bring the run's top into the window, pinning it at its start with the card clipped far to the
+      // right. decide() aims its station then, while this watch still holds the glide (final review, I1).
+      aimed = i;
+      watch.arm();
+      return;
+    }
+    const from = window.scrollY;
     const top = stationY(i, layout);
-    if (Math.abs(top - window.scrollY) < 1) return; // at the window already: no glide to watch
+    if (Math.abs(top - from) < 1) return; // at the window already: no glide to watch
     aimed = i;
     window.scrollTo({ top });
     watch.arm();
     // Safari reveals the link with a glide of its own, begun after this listener, which replaces this one (Option-Tab
     // brought the station to rest 160px short): aimed again in the next task, while focus is still in the station and
-    // the watch still holds the glide (the reader's own scroll or a press of the pointer lets go of both).
+    // the watch still holds the glide (the reader's own scroll or a press of the pointer lets go of both), and only
+    // while the page still stands between where the Tab found it and the station. A drag of the scrollbar lets go of
+    // nothing, and on a busy page it can land before this task: a reader it took out of that span has moved on (final
+    // review, I2).
     window.clearTimeout(again);
     again = window.setTimeout(() => {
       const now = at;
-      if (now && aimed === i && watch.armed() && station?.contains(document.activeElement)) window.scrollTo({ top: stationY(i, now) });
+      if (!now || aimed !== i || !watch.armed() || !station?.contains(document.activeElement)) return;
+      const to = stationY(i, now);
+      if (between(window.scrollY, from, to)) window.scrollTo({ top: to });
     }, 0);
   };
+  /** Once the run pins under a Tab's glide begun while it was not pinned: that station to the window, while the watch
+   * still holds the glide and focus is still in the station (I1). */
+  function aim(): void {
+    const layout = at;
+    const station = stations[aimed];
+    if (!layout || !station || !watch.armed() || !station.contains(document.activeElement)) return;
+    const top = stationY(aimed, layout);
+    if (Math.abs(top - window.scrollY) >= 1) window.scrollTo({ top });
+  }
   /** The glide cut short by a place-keeping jump (the drawing falling to the still under load; WCAG 2.4.11): its station
    * back to the window while focus is still in it, after each cut, at most three times (focus-glide.ts's watch says
    * when). `aimed` stays: onFocus and a relayout reset it. */

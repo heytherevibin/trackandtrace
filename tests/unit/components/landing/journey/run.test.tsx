@@ -261,6 +261,81 @@ describe("the window-seat run (J6-7, J6-8)", () => {
       stop();
     });
 
+    // A drag of the scrollbar sends no wheel, touch or key, so it never lets go of the watch; and on a busy page the
+    // frames run before the next task, so the drag can land before the re-aim. Re-aimed only while the page still
+    // stands between where the Tab found it and the station: a reader who left that span moved on (final review, I2).
+    it("never aims again once the page has left the span between the focus and the station: a drag away before the next task", () => {
+      vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame", "setTimeout", "clearTimeout"] });
+      const scroll = { y: 100 };
+      vi.spyOn(window, "scrollY", "get").mockImplementation(() => scroll.y);
+      lay(200 - scroll.y);
+      const stop = startRun(testContext());
+      const link = watchlist();
+      tab(link); // its station at 700: the Tab found the page at 100
+      expect(window.scrollTo).toHaveBeenLastCalledWith({ top: 700 });
+      vi.mocked(window.scrollTo).mockClear();
+      scroll.y = 40; // dragged back up, out of the span
+      lay(200 - scroll.y);
+      vi.advanceTimersByTime(0);
+      expect(window.scrollTo).not.toHaveBeenCalled();
+      link.blur();
+      scroll.y = 100; // and a reveal that stopped short, inside it, is still aimed again
+      lay(200 - scroll.y);
+      tab(link);
+      vi.mocked(window.scrollTo).mockClear();
+      scroll.y = 540;
+      lay(200 - scroll.y);
+      vi.advanceTimersByTime(0);
+      expect(window.scrollTo).toHaveBeenCalledWith({ top: 700 });
+      stop();
+    });
+
+    // Shift+Tab from 08 for a reader below the run (a /#faq link, a Back restore): focus lands on a card while the run
+    // stands unpinned, and the browser glides up to it. The glide brings the run's top into the window, so it pins, at
+    // its start: the card now far to the right, clipped by the pin, and nothing would bring its station to the window
+    // (final review, I1; WCAG 2.4.11). Aimed once the pin takes hold, while the watch still holds the Tab's glide.
+    it("brings the station to the window once the run pins under a Tab's glide that began before it was pinned", () => {
+      vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
+      const run = lay(-500); // the reader below the run: it waits, unpinned
+      const stop = startRun(testContext());
+      expect(run.classList.contains("is-running")).toBe(false);
+      tab(watchlist());
+      expect(window.scrollTo).not.toHaveBeenCalled(); // the browser's own glide, not the run's
+      lay(100); // the glide brings the run's top into the window
+      window.dispatchEvent(new Event("scroll"));
+      vi.advanceTimersToNextFrame();
+      expect(run.classList.contains("is-running")).toBe(true);
+      expect(window.scrollTo).toHaveBeenCalledWith({ top: 600 }); // 100 + its station's anchor, 500
+      stop();
+    });
+
+    it("leaves the reader where they are when the run pins after they took the scroll from the Tab's glide", () => {
+      vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
+      const run = lay(-500);
+      const stop = startRun(testContext());
+      tab(watchlist());
+      window.dispatchEvent(new WheelEvent("wheel", { deltaY: -120 }));
+      lay(100);
+      window.dispatchEvent(new Event("scroll"));
+      vi.advanceTimersToNextFrame();
+      expect(run.classList.contains("is-running")).toBe(true);
+      expect(window.scrollTo).not.toHaveBeenCalled();
+      stop();
+    });
+
+    it("aims nothing when the run pins for focus the keyboard did not move there", () => {
+      vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
+      const run = lay(-500);
+      const stop = startRun(testContext());
+      keyboard(watchlist()).focus(); // :focus-visible, but no Tab moved it
+      lay(100);
+      window.dispatchEvent(new Event("scroll"));
+      vi.advanceTimersToNextFrame();
+      expect(run.classList.contains("is-running")).toBe(true);
+      expect(window.scrollTo).not.toHaveBeenCalled();
+      stop();
+    });
+
     it("lets go on the reader's own scroll: a press of the pointer", () => {
       vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
       lay(200);

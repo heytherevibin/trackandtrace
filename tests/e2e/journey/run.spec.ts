@@ -270,6 +270,42 @@ test.describe("a Tab stop's glide into the run (spec §3.G; WCAG 2.4.11)", () =>
         });
       }
 
+    // Shift+Tab from 08 for a reader below the run (here a /#faq link): focus lands on 06's last card while the run
+    // stands unpinned, and the browser glides up to it; the glide brings the run's top into the window, so it pins at
+    // its start, the card far to the right under the pin's clip. Its station is brought to the window as it pins
+    // (final review, I1).
+    for (const size of [
+      { width: 1440, height: 900 },
+      { width: 1024, height: 768 },
+    ])
+      test(`Shift+Tab from 08 into the run from below reaches the window as the run pins, at ${size.width}×${size.height} (scroll anchoring ${anchoring})`, async ({ page, isMobile }) => {
+        test.skip(isMobile, "the keyboard: one project is enough");
+        await drawStill(page);
+        await page.setViewportSize(size);
+        if (anchoring === "off") await noAnchoring(page);
+        await page.goto("/#faq");
+        await waitForJourney(page);
+        await expect(page.locator("#run")).not.toHaveClass(/is-running/);
+        await page.locator("#faq summary").first().evaluate((el) => (el as HTMLElement).focus({ preventScroll: true }));
+        await pressTab(page, true);
+        await expect.poll(() => page.evaluate(() => document.activeElement?.closest("#run [data-station]") !== null)).toBe(true);
+        await running(page);
+        await atRest(page);
+        await expect
+          .poll(() =>
+            page.evaluate(() => {
+              const a = document.activeElement;
+              if (!a) return "nothing focused";
+              const r = a.getBoundingClientRect();
+              const foot = document.querySelector("header")?.getBoundingClientRect().bottom ?? 0;
+              const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+              const whole = r.top >= foot && r.bottom <= window.innerHeight && r.left >= 0 && r.right <= window.innerWidth;
+              return whole && hit !== null && a.contains(hit) ? "in view" : `at ${Math.round(r.left)},${Math.round(r.top)}`;
+            }),
+          )
+          .toBe("in view");
+      });
+
     test(`never pulls back a reader who dragged away mid-glide, however long after (scroll anchoring ${anchoring})`, async ({ page, isMobile }) => {
       test.skip(isMobile, "the keyboard: one project is enough");
       await drawStill(page);

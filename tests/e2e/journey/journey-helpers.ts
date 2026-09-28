@@ -126,10 +126,10 @@ export async function readyTab(page: Page, within: string, name: string, then?: 
 
 /** Tab as the reader's browser takes it through links: Option-Tab (Alt+Tab) in WebKit on macOS, where a bare Tab skips
  * links unless the system's keyboard navigation is on (Safari's own default, which Playwright's WebKit keeps there);
- * Tab everywhere else. The page knows both for a Tab (focus-glide.ts's watchTab). */
-export async function pressTab(page: Page): Promise<void> {
+ * Tab everywhere else. The page knows both for a Tab (focus-glide.ts's watchTab). `back`: Shift with it. */
+export async function pressTab(page: Page, back = false): Promise<void> {
   const webkit = page.context().browser()?.browserType().name() === "webkit";
-  await page.keyboard.press(webkit && process.platform === "darwin" ? "Alt+Tab" : "Tab");
+  await page.keyboard.press(`${webkit && process.platform === "darwin" ? "Alt+" : ""}${back ? "Shift+" : ""}Tab`);
 }
 
 /** The page has held its scroll for `n` frames: at rest. */
