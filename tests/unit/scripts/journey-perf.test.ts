@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { attribute, frameStats, longest, softwareFailures } from "../../../scripts/journey-perf.mjs";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { attribute, drawingSettled, frameStats, longest, softwareFailures } from "../../../scripts/journey-perf.mjs";
 
 // The real-GPU budgets' arithmetic (spec §3.H), apart from the browser that feeds it: which long tasks are the
 // journey's (§3.H budgets the longest *journey* task at load, not the page's hydration), which are the scene's steps,
@@ -75,5 +75,26 @@ describe("softwareFailures: what a software GPU's run can fail on (J6-3)", () =>
     expect(softwareFailures({ ...clean, heaviest: true, why: "quality" })).toEqual([]);
     expect(softwareFailures({ ...clean, heaviest: true, why: "load" })).toEqual([]);
     expect(softwareFailures({ ...clean, heaviest: true, why: "place" })).toHaveLength(1);
+  });
+});
+
+describe("drawingSettled: when a software run stops waiting for the drawing", () => {
+  /** The page as the predicate reads it: whether #anatomy is pinned live, and <html data-drawing>. */
+  const page = (pinned: boolean, drawing: string) =>
+    vi.stubGlobal("document", {
+      querySelector: (selector: string) => (selector === "#anatomy.is-live" && pinned ? {} : null),
+      documentElement: { dataset: { drawing } },
+    });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("once the drawing is live and pinned, or once it has settled on the still: never 30 s for a pin that will not come", () => {
+    page(true, "live");
+    expect(drawingSettled()).toBe(true);
+    page(false, "still");
+    expect(drawingSettled()).toBe(true);
+    page(false, "live"); // the scene still on its way
+    expect(drawingSettled()).toBe(false);
   });
 });

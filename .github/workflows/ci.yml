@@ -44,7 +44,7 @@ jobs:
     # `next dev`; a failing shard keeps its blob report for the e2e job to merge.
     name: e2e shard ${{ matrix.shard }}/4
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
@@ -71,7 +71,8 @@ jobs:
       - name: Install Chromium's system libraries
         if: steps.browsers.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
-      # Three minutes inside the job's limit: a slow shard fails this step rather than the job, so its blob is still kept.
+      # Eight minutes inside the job's limit, room for a cache-miss setup before it and the upload after: a slow shard
+      # fails this step rather than the job, so its blob is still kept.
       - run: npx playwright test --shard=${{ matrix.shard }}/4
         timeout-minutes: 17
       - name: Keep the shard's report

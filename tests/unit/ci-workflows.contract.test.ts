@@ -103,6 +103,9 @@ describe("ci.yml", () => {
     const step = /^ {6}- run: npx playwright test --shard=\$\{\{ matrix\.shard \}\}\/4\n {8}timeout-minutes: (\d+)$/m.exec(shard);
     expect(step?.[1]).toBe("17");
     expect(Number(step?.[1])).toBeLessThan(job);
+    // and room around it for a cache-miss setup (npm ci, the browsers) and the report upload: the job's limit must never
+    // beat the step's to it, or the blob report is lost with the job (final review)
+    expect(job - Number(step?.[1])).toBeGreaterThanOrEqual(8);
   });
 
   it("holds the journey's chunk budgets on every pull request, after the production build", () => {
@@ -139,7 +142,7 @@ describe("journey-nightly.yml", () => {
     expect(nightly).toMatch(/pull_request:\n\s+paths: \[\.github\/workflows\/journey-nightly\.yml\]/);
   });
 
-  it("never runs on a fork, and gives every job a time limit", () => {
+  it("runs its jobs only under this repository's name (never a fork's own schedule or dispatch), and gives every job a time limit", () => {
     const jobs = (nightly.match(/runs-on:/g) ?? []).length;
     expect(jobs).toBe(2);
     expect((nightly.match(/if: github\.repository == 'heytherevibin\/trackandtrace'/g) ?? []).length).toBe(jobs);

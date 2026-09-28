@@ -21,15 +21,26 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test("'/' scrolled end to end breaks no rule of the security policy and asks no other host", async ({ page, baseURL }) => {
+test("'/' scrolled end to end breaks no rule of the security policy and asks no other host", async ({ page, context, baseURL }) => {
   const origin = new URL(baseURL ?? "http://localhost").origin;
   const foreign = new Set<string>();
-  page.on("request", (r) => {
+  const heard = { worker: 0 };
+  // Every request the context sees, the service worker's (/sw.js, which a production build registers) as well as the
+  // page's, and every WebSocket; a page listener alone hears neither (final review).
+  context.on("request", (r) => {
+    if (r.serviceWorker()) heard.worker += 1;
     const u = new URL(r.url());
     if (u.protocol.startsWith("http") && u.origin !== origin) foreign.add(u.origin);
   });
+  page.on("websocket", (ws) => {
+    const u = new URL(ws.url());
+    if (u.host !== new URL(origin).host) foreign.add(`${u.protocol}//${u.host}`);
+  });
   await page.goto("/");
   await waitForJourney(page);
+  // the worker has installed, and its precache has been heard: the watch covers it
+  await page.evaluate(() => navigator.serviceWorker.ready.then(() => undefined));
+  await expect.poll(() => heard.worker).toBeGreaterThan(0);
   const bottom = await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight);
   const step = await page.evaluate(() => Math.round(window.innerHeight * 0.5));
   for (let y = 0; y <= bottom + step; y += step) {

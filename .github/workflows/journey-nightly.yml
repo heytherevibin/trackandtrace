@@ -35,7 +35,9 @@ env:
 
 jobs:
   production:
-    # Never from a fork.
+    # Not a fork's own schedule or dispatch. A pull request from a fork that changes this file still runs here, under
+    # this repository's name: nothing to expose, with no secrets, a read-only token, and a first-time contributor's run
+    # held for approval.
     if: github.repository == 'heytherevibin/trackandtrace'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -83,7 +85,9 @@ jobs:
           retention-days: 14
 
   journey:
-    # Never from a fork.
+    # Not a fork's own schedule or dispatch. A pull request from a fork that changes this file still runs here, under
+    # this repository's name: nothing to expose, with no secrets, a read-only token, and a first-time contributor's run
+    # held for approval.
     if: github.repository == 'heytherevibin/trackandtrace'
     name: journey ${{ matrix.shard }}/3
     runs-on: ubuntu-24.04

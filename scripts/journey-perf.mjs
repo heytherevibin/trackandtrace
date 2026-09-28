@@ -193,6 +193,13 @@ async function measureRun(base, owners, { width, height, cpu }) {
   return { tasks: longest(tasks), all: tasks, cls: perf.cls, ...scroll, foreign: [...foreign] };
 }
 
+/** In the page: the drawing has settled, pinned live or on the still. A run that settled on the still stops waiting
+ * there, rather than for a pin that will not come (30 s a run, 90 s a night). Serialised into the page by Playwright,
+ * so it closes over nothing. */
+export function drawingSettled() {
+  return document.querySelector("#anatomy.is-live") !== null || document.documentElement.dataset.drawing === "still";
+}
+
 /**
  * One software-GPU run, in its own headless browser (SwiftShader): the page's decision, its quality step and its CLS;
  * its long tasks and, when live, its scroll, printed only.
@@ -208,7 +215,8 @@ async function softwareRun(base, owners, { width, height, cpu }) {
   await page.addInitScript(observe);
   await page.goto(base);
   const decided = await page.waitForSelector("html[data-drawing-why]", { state: "attached", timeout: 60_000 }).then(() => true, () => false);
-  const live = decided && (await page.waitForSelector("#anatomy.is-live", { state: "attached", timeout: 30_000 }).then(() => true, () => false));
+  const settled = decided && (await page.waitForFunction(drawingSettled, undefined, { timeout: 30_000 }).then(() => true, () => false));
+  const live = settled && (await page.locator("#anatomy.is-live").count()) > 0;
   const scroll = live ? await scrollThrough(page, { width, height }) : null;
   /** @type {{ tasks: Task[], scripts: Script[], cls: number }} */
   const perf = await page.evaluate(() => Reflect.get(window, "__perf"));
