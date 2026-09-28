@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { connection } from "next/server";
-import { NOTICE_COOKIE, SiteNoticeStrip } from "@/components/shell/site-notice";
+import { SiteNoticeStrip } from "@/components/shell/site-notice";
+import { NOTICE_COOKIE } from "@/components/shell/site-notice-cookie";
 import { siteNotice } from "@/services/runtime-settings";
 
 /**

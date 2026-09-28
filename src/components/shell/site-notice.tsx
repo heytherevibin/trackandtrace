@@ -1,12 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { NOTICE_COOKIE } from "@/components/shell/site-notice-cookie";
 import { messages } from "@/messages";
 
 const m = messages.shell.siteNotice;
-
-/** Which notice this device closed: its version, nothing else. Functional, holds no personal data. */
-export const NOTICE_COOKIE = "tt_notice_closed";
 
 /** Long enough to outlast any notice; a new notice has a new version and shows regardless. */
 const REMEMBER_SECONDS = 60 * 60 * 24 * 90;

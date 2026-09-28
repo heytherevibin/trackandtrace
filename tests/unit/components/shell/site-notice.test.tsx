@@ -11,7 +11,8 @@ vi.mock("@/services/runtime-settings", () => ({ siteNotice }));
 vi.mock("next/server", () => ({ connection }));
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => (cookieValue.current === undefined ? undefined : { value: cookieValue.current }) }) }));
 
-import { NOTICE_COOKIE, SiteNoticeStrip } from "@/components/shell/site-notice";
+import { SiteNoticeStrip } from "@/components/shell/site-notice";
+import { NOTICE_COOKIE } from "@/components/shell/site-notice-cookie";
 import { SiteNoticeSlot } from "@/components/shell/site-notice-slot";
 import { messages } from "@/messages";
 
