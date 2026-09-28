@@ -122,8 +122,10 @@ Hover is a tint. Press is the one app-wide movement: every button, button-styled
 box (`button`, `[role=button]`, `.press`) settles to 96% while held (90ms in) and eases back on
 release (200ms, no overshoot). It is a transform only, so layout never moves; keyboard activation and
 disabled controls never animate (rule in `src/styles/motion.css`, guarded by `tests/e2e/press.spec.ts`).
-The other movements: the theme button's turning icon, the invalid shake, the
-clock's flip, the digit caret, the running sweep, popup fades. All collapse under reduced motion, and under the Motion switch.
+The other movements: the theme button's turning icon, and Night falls, where the theme's change sweeps
+out from the button in a widening circle (a same-document View Transition, 640 ms, instant where the
+browser has none; `night-falls.ts`). Then the invalid shake, the clock's flip, the digit caret, the
+running sweep, and popup fades. All collapse under reduced motion, and under the Motion switch.
 
 **The Motion switch** sits in the landing footer's bar, after the clock, and is on by default. Off means
 what the device's reduced-motion setting means, on every traveller page. `motion.css` applies its
