@@ -5,6 +5,7 @@ import { frame } from "./en-IN/frame";
 import { frameSignedIn } from "./en-IN/frame-signed-in";
 import { keys } from "./en-IN/keys";
 import { myKeys } from "./en-IN/my-keys";
+import { overview } from "./en-IN/overview";
 import { session } from "./en-IN/session";
 import { settings } from "./en-IN/settings";
 import { sources } from "./en-IN/sources";
@@ -14,4 +15,4 @@ import { tap } from "./en-IN/tap";
 import { team } from "./en-IN/team";
 
 /** Console copy. It may name providers; traveller code never imports it (tests/unit/console/boundary.contract.test.ts). */
-export const consoleMessages = { frame, frameSignedIn, signIn, availability, session, email, keys, myKeys, setup, tap, team, audit, settings, sources } as const;
+export const consoleMessages = { frame, frameSignedIn, signIn, availability, session, email, keys, myKeys, setup, tap, team, audit, settings, sources, overview } as const;

@@ -11,6 +11,12 @@ import type { UsageDay } from "@/services/usage";
 //
 // A real zero is different and is counted: a quiet day is a day that happened.
 
+/**
+ * The primary source's plan (RailKit), a month. A constant: nothing reads the provider's plan back. Upgraded ten-fold on
+ * 2026-09-26 (8ce0ed8), when the crawler's own copy of it was found still describing the old one.
+ */
+export const PRIMARY_MONTHLY_PLAN = 100_000;
+
 export interface SourceUsage {
   /** The last day in the list, or null when that day could not be read. */
   readonly today: number | null;

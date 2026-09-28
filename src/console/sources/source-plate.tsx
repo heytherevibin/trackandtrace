@@ -22,6 +22,9 @@ const m = consoleMessages.sources;
 const LAMP = "inline-block size-2 shrink-0 rounded-full";
 const TAG = "inline-flex items-center gap-1.5 whitespace-nowrap px-2.5 py-[3px] text-2xs leading-normal tracking-head";
 
+/** The three callers that each have their own fuse, in the order the plates draw them. */
+export const FUSE_CALLERS = ["pnr", "availability", "route"] as const;
+
 export interface Fuse {
   readonly caller: keyof typeof m.fuses.caller;
   readonly state: BreakerState;
