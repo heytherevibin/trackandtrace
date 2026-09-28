@@ -13,6 +13,7 @@
 # testing
 /.offline-guard.log
 /playwright-report-production/
+/playwright-report-nightly/
 /coverage
 /blob-report/
 /all-blob-reports/

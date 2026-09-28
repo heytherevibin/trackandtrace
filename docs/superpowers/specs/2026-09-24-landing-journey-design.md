@@ -286,11 +286,26 @@ development, behind `?journey-hud`; production never renders it.
   links; theme sweep; axe at 12 positions (top, drawing, chapters, record, Night drawing, motion off, phone
   drawing, run, Night run, phone run, Data Saver, Night terminus); focus never obscured; existing home, responsive, axe, CSP,
   smoothness, press and tap-target specs kept green.
-- **Nightly** (`.github/workflows/journey-nightly.yml`, same pinning and permissions rules as CI): collisions
-  at 15 sizes (1440×900, 1280×720, 1024×768, 768×1024, 390×844, 360×740, 320×568, 844×390, 667×375, 280×653,
-  1280×600, 1180×820, 820×1180, 1920×1080, 2560×1440) and at 200% text; CDP-throttled performance at 4×, 6×, 10× (startup tasks, scroll frames,
-  governor steps); a production-build CSP smoke on "/" scrolled end to end; screenshots of every chapter in
-  Day, Night and phone.
+- **Nightly** (`.github/workflows/journey-nightly.yml`, same pinning and permissions rules as CI; J6-3). It runs at
+  03:00 IST, by hand, and on the pull request that changes it. It has two jobs:
+  - **production**, on this checkout's production build served on the runner with sample data and nothing live
+    (`scripts/serve-local-production.mjs`: `LOCAL_FIXTURE`, every credential blanked, an offline guard in the server;
+    J6-2):
+    - the chunk budgets;
+    - the production-build smoke: the security policy on "/" scrolled end to end, no other host, a sample check,
+      nothing refused by the guard;
+    - CDP-throttled runs at 4×, 6× and 10× on the runner's software GPU. These fail only on what holds on any
+      machine: another host, CLS, an undecided drawing, and at 10× a governor that never answered. They print
+      startup tasks and scroll frames without judging them;
+  - **journey**, on the fixture-mode `next dev`:
+    - collisions at 15 sizes (1440×900, 1280×720, 1024×768, 768×1024, 390×844, 360×740, 320×568, 844×390,
+      667×375, 280×653, 1280×600, 1180×820, 820×1180, 1920×1080, 2560×1440), and at 200% text at 1440×900,
+      390×844 and 844×390;
+    - screenshots of every chapter in Day, Night and on a phone;
+    - the place, run, Night falls and drawing specs in WebKit.
+
+  GitHub's runners have no GPU, so §3.H's frame-time and long-task budgets are measured by hand on a real GPU
+  (`npm run build:local && node scripts/journey-perf.mjs`, the owner's Mac), and their lines go into every journey PR.
 
 ## 6. Order of work (one PR each)
 
@@ -339,24 +354,24 @@ go-ahead. Each PR's plan is written when the one before it merges, from the code
   site-wide.** J1 is built on it.
 - Try the result on a real mid-range Android phone before J5 merges (a hidden `?journey-hud` query shows the
   frame meter on preview deployments and in development only; J5-10).
-- Decide whether the nightly workflow may run on a schedule (it costs CI minutes).
+- Decide whether the nightly workflow may run on a schedule. J6 ships it at 03:00 IST: the repository is public, so its Actions minutes are free (J6-11). Removing the two `schedule` lines keeps it manual.
 
 ## 8. Risks
 
 | Risk | Mitigation |
 |---|---|
 | Low-end GPUs (Mali, Adreno 6xx) slower than CPU throttling suggests | Governor steps and the still floor; real-device check before J5 merges |
-| iOS Safari: `svh`/`lvh`, sticky with `overflow: clip`, root scroll snapping, View Transitions (18+) | e2e on WebKit for the journey specs in the nightly run; static fallbacks |
+| iOS Safari: `svh`/`lvh`, sticky with `overflow: clip`, root scroll snapping, View Transitions (18+) | The place, run, Night falls and drawing specs in WebKit, desktop and phone, in the nightly run; every test that needs the live drawing skips, saying why, where that WebKit has no WebGL 2; static fallbacks |
 | Anime.js or three.js API churn | Exact versions pinned; upgrades are their own PRs with the full journey suite |
 | Strict Mode double mounts, route changes | Idempotent teardowns; engine disposed when leaving "/" |
-| CI e2e time grows | Heavy suites nightly; PR suite at three sizes |
+| CI e2e time grows | Four Playwright shards and the console suite in parallel on every PR (J6-1); heavy suites nightly |
 | Dev-only CSP in e2e hides a production-only violation | Nightly production-build CSP smoke |
-| Bundle creep | Budgets checked in the nightly run; `experimental-analyze` in review |
+| Bundle creep | Budgets checked on every PR (`verify`) and in the nightly run; `experimental-analyze` in review |
 
 ## 9. Acceptance
 
 - Every row of §3.A works in Day, Night and on a phone, and every "Motion off" column holds.
 - Every §4 failure produces the stated result, proven by an e2e test.
-- §3.H budgets met in the nightly run; no collisions at the 15 sizes or at 200% text in the journey's sections.
+- §3.H's chunk budgets met on every PR and in the nightly run; its frame-time and long-task budgets met on a real GPU (`journey-perf.mjs`) before each journey PR merges; CLS and the governor held in the nightly's throttled runs; no collisions at the 15 sizes or at 200% text in the journey's sections.
 - axe clean at the 12 positions; the CSP spec and the production-build smoke clean.
 - `npm run check` green on every PR; no raw hex, no file over 500 lines, no `Co-Authored-By` trailer.

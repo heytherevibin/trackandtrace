@@ -1,4 +1,4 @@
-import { expect, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { JOURNEY_CHUNK_MARK } from "@/components/landing/journey/journey-mark";
 import { SCENE_CHUNK_MARK } from "@/components/landing/journey/scene/scene-mark";
 
@@ -29,11 +29,23 @@ export async function blockChunk(page: Page, mark: string): Promise<void> {
 /** Aborts the journey chunk. */
 export const blockJourneyChunk = (page: Page): Promise<void> => blockChunk(page, JOURNEY_CHUNK_MARK);
 
-/** The drawing is live and pinned: the scene loaded, the engine built, the chapter began. */
+/** The drawing is live and pinned: the scene loaded, the engine built, the chapter began. Where the browser cannot draw
+ * it at all (a WebKit with no WebGL 2), the test skips there, saying so (skipWithoutWebgl2). */
 export async function waitForLive(page: Page): Promise<void> {
   await waitForJourney(page);
+  await skipWithoutWebgl2(page);
   await expect(page.locator("#anatomy")).toHaveClass(/is-live/, { timeout: 25_000 });
   await expect(page.locator("html")).toHaveAttribute("data-drawing", "live");
+}
+
+/** WebKit on a GPU-less Linux runner (the nightly's webkit projects, J6-12) may have no WebGL 2: there the live drawing
+ * cannot be drawn at all, so a test that needs it skips, saying so, instead of failing on the missing context. One
+ * place for every spec: waitForLive calls it (place, drawing-modes, night-falls), and live-drawing.spec.ts's own skip
+ * reuses it. Chromium always runs them. */
+export async function skipWithoutWebgl2(page: Page): Promise<void> {
+  if (page.context().browser()?.browserType().name() !== "webkit") return;
+  const webgl2 = await page.evaluate(() => document.createElement("canvas").getContext("webgl2") !== null);
+  test.info().skip(!webgl2, "this WebKit has no WebGL 2: the live drawing is proven in Chromium and on the owner's devices");
 }
 
 /** Holds the page to the still drawing for its session, as the quality floor does (J5-12): for specs about the still. */

@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 // Vercel's Node version, and actions pinned to a commit.
 
 const DIR = join(process.cwd(), ".github/workflows");
-const FILES = ["ci.yml", "audit.yml"] as const;
+const FILES = ["ci.yml", "audit.yml", "journey-nightly.yml"] as const;
 
 function read(name: string): string {
   const path = join(DIR, name);
@@ -127,5 +127,43 @@ describe("audit.yml", () => {
   it("runs weekly and when the dependency files change, never on unrelated work", () => {
     expect(audit).toMatch(/schedule:\n\s+- cron: /);
     expect(audit).toMatch(/paths: \[package\.json, package-lock\.json\]/);
+  });
+});
+
+describe("journey-nightly.yml", () => {
+  const nightly = read("journey-nightly.yml");
+
+  it("runs at night and by hand, and on a pull request only when it changes itself (J6-11)", () => {
+    expect(nightly).toMatch(/schedule:\n\s+- cron: /);
+    expect(nightly).toContain("workflow_dispatch:");
+    expect(nightly).toMatch(/pull_request:\n\s+paths: \[\.github\/workflows\/journey-nightly\.yml\]/);
+  });
+
+  it("never runs on a fork, and gives every job a time limit", () => {
+    const jobs = (nightly.match(/runs-on:/g) ?? []).length;
+    expect(jobs).toBe(2);
+    expect((nightly.match(/if: github\.repository == 'heytherevibin\/trackandtrace'/g) ?? []).length).toBe(jobs);
+    expect((nightly.match(/timeout-minutes:/g) ?? []).length).toBe(jobs);
+  });
+
+  it("serves sample data and nothing live: no live source, no credential, nowhere", () => {
+    expect(nightly).not.toMatch(/PNR_SOURCE:\s*(railkit|live)/);
+    expect(nightly).not.toMatch(/RAILKIT|UPSTASH|SUPABASE|DATA_KEY|SENTRY|RESEND|LOCAL_FIXTURE/);
+  });
+
+  it("measures what a GPU-less runner can: the chunk budgets, the production build, the throttled runs, the wide e2e", () => {
+    // read from `jobs:` on: the header comment names the build too, and must not stand in for the build step. The
+    // build is build:local, the only build the serve script accepts (a plain `npm run build` leaves it unstamped).
+    const steps = nightly.slice(nightly.search(/^jobs:$/m));
+    const order = ["npm run build:local", "node scripts/journey-budgets.mjs", "npx playwright test -c playwright.production.config.ts", "node scripts/journey-perf.mjs --software"].map((step) => steps.indexOf(step));
+    expect(order.every((i) => i >= 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(nightly).toContain("npx playwright test -c playwright.nightly.config.ts --shard=${{ matrix.shard }}/3");
+    expect(nightly).toContain("npx playwright install --with-deps chromium webkit");
+  });
+
+  it("says plainly that the real-GPU budgets are measured by hand", () => {
+    expect(nightly).toContain("node scripts/journey-perf.mjs");
+    expect(nightly).toMatch(/no GPU/);
   });
 });

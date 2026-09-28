@@ -3,7 +3,11 @@ import { expect, test } from "../fixtures";
 import { SCENE_CHUNK_MARK } from "@/components/landing/journey/scene/scene-mark";
 import { collisionsInView } from "./collisions";
 import { drawingCollisions } from "./drawing-checks";
-import { frames, scrollIntoChapter, scrollToId, waitForJourney, waitForLive } from "./journey-helpers";
+import { frames, scrollIntoChapter, scrollToId, skipWithoutWebgl2, waitForJourney, waitForLive } from "./journey-helpers";
+
+// Every test here needs the live drawing: in a WebKit with no WebGL 2 (J6-12) each skips before it starts, saying so,
+// by the same check waitForLive makes.
+test.beforeEach(async ({ page }) => skipWithoutWebgl2(page));
 
 test.describe("the train, drawn live (spec §3.A, §3.C)", () => {
   test("loads its scene, pins the chapter and draws into its stage", async ({ page }) => {
