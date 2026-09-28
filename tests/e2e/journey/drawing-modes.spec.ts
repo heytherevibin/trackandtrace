@@ -166,6 +166,17 @@ test.describe("J5: every reason not to draw live (spec §3.C, §4)", () => {
     if (!isMobile) await expect(page.locator("#how")).toHaveClass(/is-pinned/);
   });
 
+  // A font request that never answers leaves document.fonts loading for good: the fit judgement waits for it only so
+  // long, and the scene's 20 s limit counts that wait in, so the chapter always decides (re-review, N1).
+  test("web fonts that never arrive: the chapter still decides, live or still with its reason", async ({ page }) => {
+    await page.route("**/*.woff2", () => undefined); // never answered
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await waitForJourney(page);
+    expect(await page.evaluate(() => document.fonts.status)).toBe("loading"); // the stall holds
+    const decided = () => page.evaluate(() => document.querySelector("#anatomy.is-live") !== null || (document.documentElement.dataset.drawingWhy ?? "") !== "");
+    await expect.poll(decided, { timeout: 25_000 }).toBe(true);
+  });
+
   test("the session's quality floor: still, and three.js never downloaded", async ({ page }) => {
     const three = watchThree(page);
     await drawStill(page);

@@ -21,8 +21,9 @@ export interface Ask {
 }
 /** Starts the prepared live drawing on the pinned chapter; its teardown stops it. */
 export type Begin = () => Teardown;
-/** Prepares the live drawing and resolves to what begins it. `signal` aborts when the module that asked has ended. */
-export type LoadLive = (ask: Ask, ctx: JourneyContext, signal?: AbortSignal) => Promise<Begin>;
+/** Prepares the live drawing and resolves to what begins it. `signal` aborts when the module that asked has ended;
+ * `since` is when the scene was first wanted (performance.now()), from which its time limit counts. */
+export type LoadLive = (ask: Ask, ctx: JourneyContext, signal?: AbortSignal, since?: number) => Promise<Begin>;
 
 export const noLiveDrawing: LoadLive = () => Promise.reject(new Error("no live drawing in this build"));
 
@@ -72,6 +73,11 @@ export function liveFits(section: HTMLElement | null): boolean {
   return fits;
 }
 
+/** The longest the fit judgement waits for the page's web fonts (re-review, N1): a font request that never answers
+ * would leave the chapter with no drawing and no reason. After it, fit is judged in whatever type the page has; a
+ * misjudgement only falls back to the still. */
+export const FONT_WAIT_MS = 3_000;
+
 /** The page's web fonts are still arriving: fit judged now would measure the fallback's lines. */
 function fontsLoading(): boolean {
   return "fonts" in document && document.fonts.status === "loading";
@@ -100,8 +106,11 @@ export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2,
     let quiet = 0;
     let waiting = false;
     // Fit is judged in the page's own type: a first visit's chapter measured in the fallback font can read as too tall
-    // and hold the still for the whole build (Task 4 review). Until the fonts load, nothing is judged or fetched.
+    // and hold the still for the whole build (Task 4 review). Until the fonts load, or FONT_WAIT_MS passes, nothing is
+    // judged or fetched; the scene's time limit counts from when it was first wanted, that wait included (N1).
     let typeset = !fontsLoading();
+    let typeWait = 0;
+    let wanted: number | null = null;
 
     const report = (now: DrawingMode) => {
       html.dataset.drawing = now;
@@ -131,7 +140,7 @@ export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2,
 
     const prepare = () => {
       if (prepared) return;
-      const mine = loadLive(ask, ctx, ended.signal);
+      const mine = loadLive(ask, ctx, ended.signal, wanted ?? undefined);
       prepared = mine;
       mine.catch((error: unknown) => {
         if (prepared !== mine) return;
@@ -268,6 +277,9 @@ export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2,
 
     function apply(): void {
       if (!alive) return;
+      // when the scene was first wanted, for its time limit; forgotten while nothing wants it and nothing was asked
+      if (!wantsScene(reasons)) wanted = prepared ? wanted : null;
+      else wanted ??= performance.now();
       // judged once, just before the first fetch: a chapter that cannot fit its window never downloads the scene (J6-5)
       if (typeset && wantsScene(reasons) && !prepared && !fits(section)) reasons = withReason(reasons, "fit", true);
       if (typeset && wantsScene(reasons)) prepare();
@@ -294,11 +306,16 @@ export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2,
     window.addEventListener(WEBGL_EVENT, onWebgl);
 
     apply();
-    if (!typeset)
-      void document.fonts.ready.then(() => {
-        typeset = true;
-        apply();
-      });
+    const typeReady = () => {
+      if (typeset) return;
+      typeset = true;
+      window.clearTimeout(typeWait);
+      apply();
+    };
+    if (!typeset) {
+      typeWait = window.setTimeout(typeReady, FONT_WAIT_MS);
+      void document.fonts.ready.then(typeReady);
+    }
     return () => {
       alive = false;
       ended.abort();
@@ -312,6 +329,7 @@ export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2,
       window.removeEventListener(LAYOUT_EVENT, learn);
       window.removeEventListener("resize", onResize);
       window.clearTimeout(quiet);
+      window.clearTimeout(typeWait);
       const pinned = section?.classList.contains(PINNED) ?? false;
       // The unpin and the still's return (data-drawing-why gone, the load window's rule lets go of it) are one change
       // to the reader below the chapter, kept in place together: the next build's report sees nothing left to keep.
@@ -329,7 +347,8 @@ export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2,
   };
 }
 
-/** The scene chunk may take this long to arrive before the page gives up and draws still (spec §3.C, load; J5-11). */
+/** The scene chunk may take this long to arrive before the page gives up and draws still (spec §3.C, load; J5-11),
+ * counted from when the drawing first wanted it: the wait for the page's fonts is inside it (N1). */
 export const LOAD_LIMIT_MS = 20_000;
 
 /** The scene chunk's one export this module calls. */
@@ -340,13 +359,13 @@ interface SceneChunk {
 /** The live drawing's only door: the scene chunk (three.js), imported on demand, then its engine prepared. A unit test
  * passes an import that never settles, to prove the limit (J5 pre-flight #14). */
 export function sceneLoader(importScene: () => Promise<SceneChunk> = () => import("./scene/live")): LoadLive {
-  return (ask, ctx, signal) =>
+  return (ask, ctx, signal, since) =>
     new Promise<Begin>((resolve, reject) => {
       let settled = false; // the limit has passed: a chunk that arrives now builds nothing (J5 final review, minor 2)
       const timer = window.setTimeout(() => {
         settled = true;
         reject(new Error("the live drawing took over 20 s to arrive"));
-      }, LOAD_LIMIT_MS);
+      }, Math.max(0, LOAD_LIMIT_MS - (since === undefined ? 0 : performance.now() - since)));
       importScene().then(
         (scene) => {
           window.clearTimeout(timer);

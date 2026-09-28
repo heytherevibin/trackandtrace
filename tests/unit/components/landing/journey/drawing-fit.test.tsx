@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { LOAD_LIMIT_MS, drawingModule, liveFits, sceneLoader, type Begin, type LoadLive } from "@/components/landing/journey/drawing";
+import { FONT_WAIT_MS, LOAD_LIMIT_MS, drawingModule, liveFits, sceneLoader, type Begin, type LoadLive } from "@/components/landing/journey/drawing";
 import { testContext } from "./journey-context";
 
 // drawing.ts's J6 additions, apart from drawing.test.tsx (at its line limit): fit judged before the scene is fetched
@@ -158,6 +158,66 @@ describe("fit, judged before the scene is fetched (J6-5)", () => {
     await Promise.resolve();
     expect(fits).not.toHaveBeenCalled();
     expect(load).not.toHaveBeenCalled();
+  });
+
+  // A font request that never answers leaves document.fonts loading forever: the wait is capped, then fit is judged in
+  // whatever type the page has (a misjudgement only falls back to the still), and the 20 s scene limit counts from
+  // when the scene was first wanted, the wait included (re-review, N1; §3.C, J5 pre-flight #14).
+  describe("web fonts that never load", () => {
+    const stalled = () => Object.defineProperty(document, "fonts", { configurable: true, value: { status: "loading", ready: new Promise<void>(() => undefined) } });
+
+    it("stops waiting after about 3 s, then judges fit and asks for the scene", async () => {
+      vi.useFakeTimers();
+      stalled();
+      const fits = vi.fn(() => true);
+      const load = vi.fn<LoadLive>(() => new Promise<Begin>(() => undefined));
+      const stop = drawingModule(load, () => true, fits)(testContext());
+      expect(FONT_WAIT_MS).toBeLessThanOrEqual(3_000);
+      await vi.advanceTimersByTimeAsync(FONT_WAIT_MS - 1);
+      expect(fits).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(fits).toHaveBeenCalledTimes(1);
+      expect(load).toHaveBeenCalledTimes(1);
+      stop();
+    });
+
+    it("settles on the still for fit once the wait is over, when the chapter cannot fit", async () => {
+      vi.useFakeTimers();
+      stalled();
+      const load = vi.fn<LoadLive>();
+      const stop = drawingModule(load, () => true, () => false)(testContext());
+      await vi.advanceTimersByTimeAsync(FONT_WAIT_MS);
+      expect(html.dataset.drawing).toBe("still");
+      expect(html.dataset.drawingWhy).toBe("fit");
+      expect(load).not.toHaveBeenCalled();
+      stop();
+    });
+
+    it("settles on the still (load) 20 s after the scene was first wanted, the font wait included", async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date", "performance"] });
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+      stalled();
+      const stop = drawingModule(sceneLoader(() => new Promise(() => undefined)), () => true, () => true)(testContext());
+      await vi.advanceTimersByTimeAsync(LOAD_LIMIT_MS - 1);
+      expect(html.dataset.drawingWhy).toBe("");
+      await vi.advanceTimersByTimeAsync(1);
+      expect(html.dataset.drawing).toBe("still");
+      expect(html.dataset.drawingWhy).toBe("load");
+      stop();
+      warn.mockRestore();
+    });
+
+    it("leaves nothing waiting once its module has ended", async () => {
+      vi.useFakeTimers();
+      stalled();
+      const fits = vi.fn(() => true);
+      const load = vi.fn<LoadLive>();
+      drawingModule(load, () => true, fits)(testContext())();
+      await vi.advanceTimersByTimeAsync(FONT_WAIT_MS);
+      expect(fits).not.toHaveBeenCalled();
+      expect(load).not.toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(0);
+    });
   });
 
   it("asks for the scene when it fits", () => {
