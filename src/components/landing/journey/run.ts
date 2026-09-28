@@ -6,7 +6,7 @@ import { anchorOf, band, fitsRun, hereAt, layers, leanStep, offsets, runLayout, 
 import { LAYOUT_EVENT, emit } from "./journey-events";
 import { keepPlace, mastheadBottom } from "./keep-place";
 import { SMOOTH } from "./motion-tokens";
-import { track } from "./observers";
+import { refreshObserver, track } from "./observers";
 import type { JourneyContext, Teardown } from "./start-journey";
 import { STATIONS, kmFigure } from "./stations";
 
@@ -262,7 +262,9 @@ export function startRun({ motion }: JourneyContext): Teardown {
       emit(LAYOUT_EVENT);
       return;
     }
-    driver?.observer.refresh();
+    // through observers.ts's door: the run can pin in a frame whose queued layout change re-measures it before anime's
+    // first tick has adopted the new observer's target, which anime then refreshes itself
+    if (driver) refreshObserver(driver.observer);
     paint();
     if (run.offsetHeight !== before) emit(LAYOUT_EVENT);
   };

@@ -5,9 +5,28 @@ import { MODULES } from "@/components/landing/journey/start-journey";
 import { testContext } from "./journey-context";
 
 // run.ts on a laid-out stand-in (jsdom lays nothing out): three stations 300px wide, 500px apart, on a 1440×836 pin.
-// Anime's scroll sync is the e2e's to prove (run.spec.ts); here it is a stand-in.
+// Anime's scroll sync is the e2e's to prove (run.spec.ts); here it is a stand-in, faithful in one thing: an observer
+// adopts its target only on anime's first tick after it is made (target null until then), and refreshing it before
+// that reads the null target's box and throws, as anime's own updateBounds does.
+const anime = vi.hoisted(() => ({ observers: [] as Array<{ target: Element | null; refreshes: number; reverted: boolean }> }));
 vi.mock("animejs", () => ({
-  onScroll: () => ({ revert: () => undefined, refresh: () => undefined, reverted: false, target: null }),
+  onScroll: () => {
+    const observer = {
+      target: null as Element | null,
+      refreshes: 0,
+      reverted: false,
+      refresh() {
+        if (!this.target) throw new TypeError("Cannot read properties of null (reading 'getBoundingClientRect')");
+        this.refreshes += 1;
+        return this;
+      },
+      revert() {
+        this.reverted = true;
+      },
+    };
+    anime.observers.push(observer);
+    return observer;
+  },
   animate: () => ({ revert: () => undefined }),
 }));
 
@@ -28,6 +47,7 @@ function lay(runTop: number, pinHeight = 836): HTMLElement {
 }
 
 beforeEach(() => {
+  anime.observers.length = 0;
   document.body.innerHTML = MARKUP;
   vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener: () => undefined, removeEventListener: () => undefined }));
   vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
@@ -96,6 +116,32 @@ describe("the window-seat run (J6-7, J6-8)", () => {
     expect(push).toHaveBeenCalledWith(null, "", "#use");
     expect(window.scrollTo).toHaveBeenCalledWith({ top: 1200 });
     expect(document.activeElement?.id).toBe("use");
+    stop();
+  });
+
+  // The run pins in a frame (a reader below it coming back above it, as on /#faq), and a layout change already queued
+  // for that frame re-measures it before anime's first tick has adopted the new observer's target: refreshing it then
+  // threw, uncaught (final review ruling). Anime refreshes a target it adopts itself, reading the layout as it stands.
+  it("re-measures on a layout change before anime has adopted its observer's target, without refreshing it", () => {
+    vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
+    const run = lay(200);
+    const stop = startRun(testContext());
+    expect(run.classList.contains("is-running")).toBe(true);
+    window.dispatchEvent(new Event(LAYOUT_EVENT));
+    expect(() => vi.advanceTimersToNextFrame()).not.toThrow();
+    expect(anime.observers.at(-1)?.refreshes).toBe(0);
+    stop();
+  });
+
+  it("refreshes its observer on a layout change once anime has adopted its target", () => {
+    vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
+    const run = lay(200);
+    const stop = startRun(testContext());
+    const observer = anime.observers.at(-1)!;
+    observer.target = run; // anime's first tick
+    window.dispatchEvent(new Event(LAYOUT_EVENT));
+    vi.advanceTimersToNextFrame();
+    expect(observer.refreshes).toBe(1);
     stop();
   });
 
