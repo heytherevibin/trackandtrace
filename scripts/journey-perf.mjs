@@ -19,14 +19,22 @@
 //   the jump into #anatomy, with the progress through #anatomy of every frame over 25 ms.
 // The software run (J6-3): a headless Chromium drawing through SwiftShader, on the CPU: a phone at 4×, 6× and 10× CPU,
 // and the desktop at 1×. A software GPU measures the rasteriser, not the page, so frame times and long tasks are printed
-// only. It fails on what holds on any machine: another host asked, CLS over 0.05, a drawing that never decided, and at
-// 10× a governor that never answered (no quality step stored in tt.q, and no still for quality or load).
+// only. It fails on what holds on any machine: another host asked, CLS over 0.05, a drawing that never decided (or
+// decided live and never settled), and at 10× a governor that never answered (no quality step stored in tt.q, and no
+// still for quality or load). How long the pin takes is the runner's, not the page's: printed, never judged.
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chunksIn, measure } from "./journey-budgets.mjs";
 import { refusals, startLocalProduction } from "./serve-local-production.mjs";
 
 export const BUDGETS = { journeyTask: 120, sceneStep: 61, cls: 0.05, desktopP95: 12, desktopOver25: 0, phoneFps: 55, phoneOver33: 2 };
+
+/** How long a software run waits, once the drawing has decided live, for the chapter to pin (or settle on the still): a
+ * bound on how slow the runner may be, not a budget. The page limits only the scene chunk's arrival (20 s), never the
+ * engine's build, and on a GPU-less runner the build compiles every shader on the CPU: the nightly's 10× pin had not come
+ * after 30 s (run 36406365173), and in a Linux container at 1 CPU the 40× pin came 33 s after the decision. The governor
+ * is fed frames only once the chapter is pinned and scrolled, so a wait that ends first judges nothing of it. */
+export const SETTLE_MS = 180_000;
 
 /** @typedef {{ readonly start: number, readonly duration: number }} Task */
 /** @typedef {{ readonly start: number, readonly duration: number, readonly url: string }} Script */
@@ -76,9 +84,11 @@ export function frameStats(frames) {
 }
 
 /**
- * What a software GPU's run can fail on (J6-3): another host asked, CLS over budget, a drawing that never decided, and
- * at the heaviest rate a governor that never answered. Frame times and long tasks are never its business.
- * @param {{ rate: number, foreign: readonly string[], cls: number, why: string | null, q: string | null, heaviest: boolean }} run
+ * What a software GPU's run can fail on (J6-3): another host asked, CLS over budget, a drawing that never decided (or
+ * decided live and never settled: pinned, or on the still), and at the heaviest rate a governor that never answered,
+ * judged only once the drawing has settled (it is fed no frame before the pin). Frame times and long tasks are never its
+ * business.
+ * @param {{ rate: number, foreign: readonly string[], cls: number, why: string | null, q: string | null, heaviest: boolean, settled: boolean }} run
  * @returns {string[]}
  */
 export function softwareFailures(run) {
@@ -87,6 +97,8 @@ export function softwareFailures(run) {
   if (run.foreign.length) out.push(`asked ${run.foreign.join(", ")}`);
   if (run.cls > BUDGETS.cls) out.push(`CLS ${run.cls.toFixed(3)} over ${BUDGETS.cls}`);
   if (run.why === null) out.push("the drawing never decided");
+  else if (!run.settled) out.push(`the drawing decided live but neither pinned nor settled on the still in ${SETTLE_MS / 1000} s`);
+  if (run.why === null || !run.settled) return out;
   const answered = run.q !== null || /\b(quality|load)\b/.test(run.why ?? "");
   if (run.heaviest && !answered) out.push("the governor never answered: no quality step stored, and no still for quality or load");
   return out;
@@ -194,7 +206,7 @@ async function measureRun(base, owners, { width, height, cpu }) {
 }
 
 /** In the page: the drawing has settled, pinned live or on the still. A run that settled on the still stops waiting
- * there, rather than for a pin that will not come (30 s a run, 90 s a night). Serialised into the page by Playwright,
+ * there, rather than for a pin that will not come (up to SETTLE_MS a run). Serialised into the page by Playwright,
  * so it closes over nothing. */
 export function drawingSettled() {
   return document.querySelector("#anatomy.is-live") !== null || document.documentElement.dataset.drawing === "still";
@@ -215,14 +227,16 @@ async function softwareRun(base, owners, { width, height, cpu }) {
   await page.addInitScript(observe);
   await page.goto(base);
   const decided = await page.waitForSelector("html[data-drawing-why]", { state: "attached", timeout: 60_000 }).then(() => true, () => false);
-  const settled = decided && (await page.waitForFunction(drawingSettled, undefined, { timeout: 30_000 }).then(() => true, () => false));
+  const since = Date.now();
+  const settled = decided && (await page.waitForFunction(drawingSettled, undefined, { timeout: SETTLE_MS }).then(() => true, () => false));
+  const settling = (Date.now() - since) / 1000;
   const live = settled && (await page.locator("#anatomy.is-live").count()) > 0;
   const scroll = live ? await scrollThrough(page, { width, height }) : null;
   /** @type {{ tasks: Task[], scripts: Script[], cls: number }} */
   const perf = await page.evaluate(() => Reflect.get(window, "__perf"));
   const state = await page.evaluate(() => ({ why: document.documentElement.getAttribute("data-drawing-why"), q: window.sessionStorage.getItem("tt.q") }));
   await browser.close();
-  return { width, height, cpu, tasks: longest(attribute(perf.tasks, perf.scripts, owners)), cls: perf.cls, stats: scroll?.stats ?? null, foreign: [...foreign], ...state };
+  return { width, height, cpu, tasks: longest(attribute(perf.tasks, perf.scripts, owners)), cls: perf.cls, stats: scroll?.stats ?? null, foreign: [...foreign], settled, settling, ...state };
 }
 
 /**
@@ -263,8 +277,9 @@ async function software(base, owners) {
     const r = await softwareRun(base, owners, run);
     const scrolled = r.stats ? `scroll median ${r.stats.medianFps} fps, p95 ${r.stats.p95.toFixed(1)} ms, ${r.stats.over33}% > 33 ms` : "not live, so no scroll";
     const drawing = r.why === null ? "undecided" : r.why === "" ? "live" : `still (${r.why})`;
-    console.log(`${r.width}×${r.height} at ${r.cpu}× (software GPU, printed only): longest journey task ${ms(r.tasks.journey)}, scene step ${ms(r.tasks.scene)}, page ${ms(r.tasks.page)}; ${scrolled}; drawing ${drawing}; quality step ${r.q ?? "none stored"}`);
-    const failures = softwareFailures({ rate: r.cpu, foreign: r.foreign, cls: r.cls, why: r.why, q: r.q, heaviest: r.cpu === 10 });
+    const settledIn = r.settled ? `settled ${r.settling.toFixed(1)} s after it decided` : "never settled";
+    console.log(`${r.width}×${r.height} at ${r.cpu}× (software GPU, printed only): longest journey task ${ms(r.tasks.journey)}, scene step ${ms(r.tasks.scene)}, page ${ms(r.tasks.page)}; ${scrolled}; drawing ${drawing}, ${settledIn}; quality step ${r.q ?? "none stored"}`);
+    const failures = softwareFailures({ rate: r.cpu, foreign: r.foreign, cls: r.cls, why: r.why, q: r.q, heaviest: r.cpu === 10, settled: r.settled });
     lines.push([`${r.width}×${r.height} at ${r.cpu}×: CLS ${r.cls.toFixed(3)}, other hosts ${r.foreign.join(", ") || "none"}, drawing ${drawing}${failures.length ? `: ${failures.join("; ")}` : ""}`, failures.length === 0]);
   }
   return lines;

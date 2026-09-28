@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { attribute, drawingSettled, frameStats, longest, softwareFailures } from "../../../scripts/journey-perf.mjs";
+import { SETTLE_MS, attribute, drawingSettled, frameStats, longest, softwareFailures } from "../../../scripts/journey-perf.mjs";
 
 // The real-GPU budgets' arithmetic (spec §3.H), apart from the browser that feeds it: which long tasks are the
 // journey's (§3.H budgets the longest *journey* task at load, not the page's hydration), which are the scene's steps,
@@ -57,7 +57,7 @@ describe("frameStats", () => {
 });
 
 describe("softwareFailures: what a software GPU's run can fail on (J6-3)", () => {
-  const clean = { rate: 4, foreign: [], cls: 0.002, why: "", q: null, heaviest: false } as const;
+  const clean = { rate: 4, foreign: [], cls: 0.002, why: "", q: null, heaviest: false, settled: true } as const;
 
   it("passes a run that asked no other host, held its layout and decided its drawing; frame times are not its business", () => {
     expect(softwareFailures(clean)).toEqual([]);
@@ -76,6 +76,16 @@ describe("softwareFailures: what a software GPU's run can fail on (J6-3)", () =>
     expect(softwareFailures({ ...clean, heaviest: true, why: "load" })).toEqual([]);
     expect(softwareFailures({ ...clean, heaviest: true, why: "place" })).toHaveLength(1);
   });
+
+  // The nightly's 10× run on a GPU-less runner (run 36406365173): the drawing decided live, and the pin had not come when
+  // the wait for it ended, so nothing was scrolled and the governor was fed no frame at all. It was never asked: the run
+  // says what did not happen, and judges the governor only once the chapter has pinned.
+  it("fails a drawing that decided live but neither pinned nor settled on the still in the wait as that, and never blames the governor for it", () => {
+    const unsettled = `the drawing decided live but neither pinned nor settled on the still in ${SETTLE_MS / 1000} s`;
+    expect(softwareFailures({ ...clean, heaviest: true, settled: false })).toEqual([unsettled]);
+    expect(softwareFailures({ ...clean, settled: false })).toEqual([unsettled]);
+    expect(softwareFailures({ ...clean, why: null, settled: false })).toEqual(["the drawing never decided"]);
+  });
 });
 
 describe("drawingSettled: when a software run stops waiting for the drawing", () => {
@@ -89,7 +99,7 @@ describe("drawingSettled: when a software run stops waiting for the drawing", ()
     vi.unstubAllGlobals();
   });
 
-  it("once the drawing is live and pinned, or once it has settled on the still: never 30 s for a pin that will not come", () => {
+  it("once the drawing is live and pinned, or once it has settled on the still: never the whole wait for a pin that will not come", () => {
     page(true, "live");
     expect(drawingSettled()).toBe(true);
     page(false, "still");
