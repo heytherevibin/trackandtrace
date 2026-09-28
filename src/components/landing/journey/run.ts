@@ -24,8 +24,6 @@ const NS = "http://www.w3.org/2000/svg";
 const PHONE = "(max-width: 47.99rem)";
 const COARSE = "(pointer: coarse)";
 const PLACE_EVENTS = ["scroll", "resize", LAYOUT_EVENT] as const;
-/** How soon after a Tab press a focus counts as that Tab's: the same task, allowing for a slow device. */
-const TAB_FOCUS_MS = 250;
 const kmOf = (id: string): number => STATIONS.find((s) => s.id === id)?.km ?? 0;
 const KM = { from: kmOf("features"), to: kmOf("use") };
 
@@ -60,7 +58,8 @@ export function startRun({ motion }: JourneyContext): Teardown {
   let placeFrame = 0;
   let layoutFrame = 0;
   let aimed = -1; // the station a Tab stop's glide is bringing to the window, while watch is armed for it
-  let tabAt = Number.NEGATIVE_INFINITY; // when Tab (or Shift+Tab) was last pressed
+  let tabbing = false; // a Tab (or Shift+Tab) keydown is being handled: the focus it moves comes in the same task
+  let tabTimer = 0;
 
   /** The scroll at which station i stands at the window: the run's start (its top under the masthead) plus its anchor. */
   const stationY = (i: number, layout: RunLayout): number =>
@@ -271,14 +270,21 @@ export function startRun({ motion }: JourneyContext): Teardown {
   // keyboard's focus (a Tab just pressed, and :focus-visible): a mouse's needs no glide, and focus returning to the window
   // must not pull a reader who scrolled away back to it (Task 6 review, round 2).
   const onKey = (event: KeyboardEvent) => {
-    if (event.key === "Tab") tabAt = event.timeStamp;
+    if (event.key !== "Tab") return;
+    // a flag for this task, not a timestamp: a key event is stamped with its input time, which a busy page can dispatch
+    // long after (seen at 8 parallel runs)
+    tabbing = true;
+    window.clearTimeout(tabTimer);
+    tabTimer = window.setTimeout(() => {
+      tabbing = false;
+    }, 0);
   };
   const onFocus = (event: FocusEvent) => {
     const layout = at;
     const el = event.target instanceof Element ? event.target : null;
     const station = el?.closest<HTMLElement>("[data-station]") ?? null;
     const i = station ? stations.indexOf(station) : -1;
-    if (!layout || !el || i < 0 || event.timeStamp - tabAt > TAB_FOCUS_MS || !keyboardFocus(el)) return;
+    if (!layout || !el || i < 0 || !tabbing || !keyboardFocus(el)) return;
     const top = stationY(i, layout);
     if (Math.abs(top - window.scrollY) < 1) return; // at the window already: no glide to watch
     aimed = i;
@@ -323,6 +329,7 @@ export function startRun({ motion }: JourneyContext): Teardown {
     trackEl.removeEventListener("focusin", onFocus);
     document.removeEventListener("click", onClick);
     window.removeEventListener("keydown", onKey, true);
+    window.clearTimeout(tabTimer);
     watch.stop();
     if (!at) return;
     unpin();

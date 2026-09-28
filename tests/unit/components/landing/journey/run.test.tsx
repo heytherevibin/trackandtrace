@@ -150,6 +150,19 @@ describe("the window-seat run (J6-7, J6-8)", () => {
       stop();
     });
 
+    it("glides for a Tab a busy page dispatches late: a key event is stamped with its input time, long before the focus", () => {
+      vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
+      lay(200);
+      const stop = startRun(testContext());
+      const link = keyboard(watchlist());
+      const late = new KeyboardEvent("keydown", { key: "Tab" });
+      Object.defineProperty(late, "timeStamp", { value: performance.now() - 2000 }); // input taken 2 s before it ran
+      window.dispatchEvent(late);
+      link.focus();
+      expect(window.scrollTo).toHaveBeenLastCalledWith({ top: 700 });
+      stop();
+    });
+
     it("does not glide for focus that is not the keyboard's: a mouse, or the window regaining focus", () => {
       vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
       lay(200);

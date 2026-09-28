@@ -96,11 +96,34 @@ describe("arming: keyboard focus that starts a glide", () => {
     stop();
   });
 
-  it("is not armed when no scroll follows the focus within a few frames (focus returning to the window)", () => {
+  it("arms at the focus: a jump before the glide's first scroll (a resize two frames in) is a cut, taken up", () => {
+    const stop = startFocusGlide(testContext());
+    modality(policy(), true);
+    policy().focus();
+    frames(1);
+    jump(); // the glide has not scrolled yet: its first step can land in the third or fourth frame
+    frames(3);
+    expect(reveal).toHaveBeenCalledTimes(1);
+    stop();
+  });
+
+  it("still watches a glide whose first scroll comes late, within six frames", () => {
     const stop = startFocusGlide(testContext());
     modality(policy(), true);
     policy().focus();
     frames(4);
+    glide();
+    jump();
+    frames(3);
+    expect(reveal).toHaveBeenCalledTimes(1);
+    stop();
+  });
+
+  it("lets go if neither a scroll nor a jump comes within six frames of the focus (focus returning to the window)", () => {
+    const stop = startFocusGlide(testContext());
+    modality(policy(), true);
+    policy().focus();
+    frames(6);
     glide();
     jump();
     frames(3);

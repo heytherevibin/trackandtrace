@@ -7,6 +7,7 @@ import { readerPlace } from "./drawing-mode";
 import { ease } from "./ease";
 import { fitsWindow, type Span } from "./fit";
 import { LAYOUT_EVENT, REBUILD_EVENT } from "./journey-events";
+import { jumpTo } from "./keep-place";
 import { SMOOTH, STAGGER, T } from "./motion-tokens";
 import { track } from "./observers";
 import type { JourneyContext, Teardown } from "./start-journey";
@@ -65,8 +66,9 @@ function settlePlace(section: HTMLElement, was: Place): Place {
   const now = docBox(section);
   const { y } = was;
   const where = readerPlace({ top: was.box.top - y, bottom: was.box.bottom - y }, was.vh);
-  if (where === "past") window.scrollTo({ top: y + now.bottom - was.box.bottom, behavior: "instant" });
-  else if (where === "inside") window.scrollTo({ top: now.top - Number.parseFloat(getComputedStyle(section).scrollMarginTop), behavior: "instant" });
+  // through jumpTo, as every place-keeping move: announced, so a Tab stop's glide it cuts short is taken up again
+  if (where === "past") jumpTo(y + now.bottom - was.box.bottom);
+  else if (where === "inside") jumpTo(now.top - Number.parseFloat(getComputedStyle(section).scrollMarginTop));
   return { box: now, y: window.scrollY, vh: window.innerHeight };
 }
 

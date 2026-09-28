@@ -45,6 +45,27 @@ test.describe("a Tab stop's glide (spec §3.G; WCAG 2.4.11)", () => {
         expect(await inWindow(page), "the focused link is wholly in the window, below the masthead").toBe(true);
       });
 
+      // A resize mid-glide (a window resized or zoomed, browser UI changing the height) makes 02's guard, the drawing and
+      // the still keep the reader's place, and their instant scrolls cut the glide (round 3).
+      for (const at of [2, 8]) {
+        test(`reaches the window though it is resized ${at} frames into the glide`, async ({ page }) => {
+          await drawStill(page); // the drawing held to the still, as the governor floors it on a slow GPU
+          await page.goto("/");
+          await waitForJourney(page);
+          await scrollToId(page, "record", 100);
+          await frames(page, 3);
+          await readyTab(page, "#reliability", POLICY);
+          await page.keyboard.press("Tab");
+          await expect(policy(page)).toBeFocused();
+          await frames(page, at);
+          await page.setViewportSize({ width: 1440, height: 860 });
+          await atRest(page, 15);
+          await frames(page, 30); // the journey's own resize answer lands 150 ms later
+          await atRest(page, 15);
+          expect(await inWindow(page), "the focused link is wholly in the window, below the masthead").toBe(true);
+        });
+      }
+
       test("never pulls back a reader who dragged away mid-glide: a layout change and a resize leave them put", async ({ page }) => {
         await drawStill(page);
         await page.goto("/");

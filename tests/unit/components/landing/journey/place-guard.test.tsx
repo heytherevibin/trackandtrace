@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MOTION_BEFORE_EVENT, MOTION_EVENT } from "@/components/motion/use-motion";
 import { startPlaceGuard } from "@/components/landing/journey/chapters";
-import { LAYOUT_EVENT } from "@/components/landing/journey/journey-events";
+import { JUMP_EVENT, LAYOUT_EVENT } from "@/components/landing/journey/journey-events";
 
 // 02's place guard (chapters.ts) keeps a reader inside or past #how in place when #how changes size. The drawing
 // above it (J5) moves the reader with its own height changes (drawing.ts's keepPlace), by an instant scroll, and then
@@ -139,6 +139,38 @@ describe("02's place guard", () => {
     observed([], {} as ResizeObserver); // 02's observer, a frame later
     expect(y).toBe(9000 - 400 - 2565); // the run's move stands
     expect(scrollTo).toHaveBeenCalledTimes(1);
+    stop();
+  });
+
+  // Its instant scroll cuts a Tab stop's glide in flight like any other: a resize of #how (the window resized or zoomed)
+  // mid-glide stranded focus off-screen unless the move is announced, as every place-keeping jump is (round 3).
+  it("announces its move as a place-keeping jump, so a glide it cuts short is taken up again", () => {
+    let observed: ResizeObserverCallback = () => undefined;
+    window.ResizeObserver = class {
+      constructor(callback: ResizeObserverCallback) {
+        observed = callback;
+      }
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
+    };
+    document.body.innerHTML = `<header></header><section id="how"></section>`;
+    const how = document.getElementById("how")!;
+    const doc = { top: 1000, height: 3000 };
+    let y = 0;
+    vi.spyOn(window, "scrollY", "get").mockImplementation(() => y);
+    how.getBoundingClientRect = () => ({ top: doc.top - y, bottom: doc.top - y + doc.height, width: 800, height: doc.height }) as DOMRect;
+    vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+    const jumps = vi.fn();
+    window.addEventListener(JUMP_EVENT, jumps);
+    const stop = startPlaceGuard();
+    y = 3880; // past 02
+    window.dispatchEvent(new Event("scroll"));
+    doc.height = 2600; // the window is resized: 02 refits
+    observed([], {} as ResizeObserver);
+    expect(window.scrollTo).toHaveBeenCalledWith({ top: 3880 - 400, behavior: "instant" });
+    expect(jumps).toHaveBeenCalledTimes(1);
+    window.removeEventListener(JUMP_EVENT, jumps);
     stop();
   });
 });

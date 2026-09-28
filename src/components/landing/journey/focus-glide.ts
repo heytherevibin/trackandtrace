@@ -7,15 +7,16 @@ import type { JourneyContext, Teardown } from "./start-journey";
 // window into it (the page's smooth scroll-behavior), and an instant scroll made meanwhile to keep the reader's place
 // (jumpTo: keepPlace, the still's settle, as the drawing falls to the still under load) cancels that glide, stranding
 // focus off-screen at rest. Never against the reader (round 2):
-// - armed only by keyboard focus that starts a glide: :focus-visible, and a scroll within a few frames;
+// - armed only by keyboard focus that starts a glide: :focus-visible at the focus, and let go if neither the glide's
+//   first scroll nor a jump comes within six frames (a resize two frames in cuts a glide not yet scrolling: round 3);
 // - taken up only after a place-keeping jump (JUMP_EVENT): a scrollbar drag, which sends no wheel, touch or key, is no
 //   jump, so a reader who leaves that way is never pulled back;
 // - taken up once, two frames after the last jump (the still settles a frame after the drawing's own jump);
 // - let go once the page has held still for ten frames, on the reader's own scroll or press, or once focus moves on.
 // A station of the running window-seat run is run.ts's, which brings it to the window sideways. Motion off: no glide.
 
-/** Frames a glide must begin in after the focus that asks for it. */
-const START = 3;
+/** Frames a glide must begin in (its first scroll, or a jump that cuts it) after the focus that asks for it. */
+const START = 6;
 /** Frames after the last place-keeping jump before a cut glide is taken up. */
 const QUIET = 2;
 /** Frames the page holds still before a glide counts as over, landed or not. */
@@ -54,6 +55,8 @@ export interface GlideWatch {
 /** Watches one glide at a time; `retake` is called at most once, when a jump cut the glide short (rules above). */
 export function watchGlide(retake: () => void): GlideWatch {
   let armed = false;
+  let started = false;
+  let waited = 0;
   let cut = false;
   let quiet = 0;
   let held = 0;
@@ -69,6 +72,12 @@ export function watchGlide(retake: () => void): GlideWatch {
   const tick = () => {
     frame = 0;
     if (!armed) return;
+    if (!started) {
+      waited += 1;
+      if (waited >= START) disarm();
+      else frame = requestAnimationFrame(tick);
+      return;
+    }
     const y = window.scrollY;
     held = y === lastY ? held + 1 : 0;
     lastY = y;
@@ -87,17 +96,27 @@ export function watchGlide(retake: () => void): GlideWatch {
   };
   const onJump = () => {
     if (!armed) return;
+    started = true;
     cut = true;
     quiet = 0;
+  };
+  const onScroll = () => {
+    if (!armed || started) return;
+    started = true;
+    held = 0;
+    lastY = window.scrollY;
   };
   const onOwn = (event: Event) => {
     if (readersOwn(event)) disarm();
   };
   window.addEventListener(JUMP_EVENT, onJump);
+  window.addEventListener("scroll", onScroll, { passive: true });
   for (const type of OWN) window.addEventListener(type, onOwn, { capture: true, passive: true });
   return {
     arm: () => {
       armed = true;
+      started = false;
+      waited = 0;
       cut = false;
       quiet = 0;
       held = 0;
@@ -108,6 +127,7 @@ export function watchGlide(retake: () => void): GlideWatch {
     stop: () => {
       disarm();
       window.removeEventListener(JUMP_EVENT, onJump);
+      window.removeEventListener("scroll", onScroll);
       for (const type of OWN) window.removeEventListener(type, onOwn, true);
     },
   };
@@ -116,58 +136,32 @@ export function watchGlide(retake: () => void): GlideWatch {
 export function startFocusGlide({ motion }: JourneyContext): Teardown {
   if (!motion) return () => {};
   let target: Element | null = null;
-  let candidate: Element | null = null;
-  let age = 0;
-  let ageFrame = 0;
 
   const watch = watchGlide(() => {
     const el = target;
     target = null;
     if (el && el === document.activeElement && !seen(el)) el.scrollIntoView({ block: "center", inline: "nearest" });
   });
-  const forget = () => {
-    candidate = null;
-    cancelAnimationFrame(ageFrame);
-    ageFrame = 0;
-  };
-  const ageing = () => {
-    ageFrame = 0;
-    age += 1;
-    if (age >= START) forget();
-    else if (candidate) ageFrame = requestAnimationFrame(ageing);
-  };
   const onFocus = (event: FocusEvent) => {
     watch.disarm();
     target = null;
-    forget();
     const el = event.target instanceof Element ? event.target : null;
     if (!el || !keyboardFocus(el) || el.closest("#run.is-running [data-station]")) return;
     const r = el.getBoundingClientRect();
     if (r.top >= 0 && r.bottom <= window.innerHeight) return; // in the viewport: the browser glides nowhere
-    candidate = el;
-    age = 0;
-    ageFrame = requestAnimationFrame(ageing);
-  };
-  const onScroll = () => {
-    if (!candidate) return;
-    target = candidate;
-    forget();
-    watch.arm();
+    target = el;
+    watch.arm(); // at the focus: a jump before the glide's first scroll is a cut too
   };
   const onBlur = () => {
     watch.disarm();
     target = null;
-    forget();
   };
 
   document.addEventListener("focusin", onFocus);
   document.addEventListener("focusout", onBlur);
-  window.addEventListener("scroll", onScroll, { passive: true });
   return () => {
-    forget();
     watch.stop();
     document.removeEventListener("focusin", onFocus);
     document.removeEventListener("focusout", onBlur);
-    window.removeEventListener("scroll", onScroll);
   };
 }
