@@ -244,6 +244,23 @@ describe("the window-seat run (J6-7, J6-8)", () => {
       stop();
     });
 
+    it("never aims again once the reader has taken the scroll: a wheel, or a press of the pointer, before the next task", () => {
+      vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame", "setTimeout", "clearTimeout"] });
+      lay(200);
+      const stop = startRun(testContext());
+      const link = watchlist();
+      for (const own of [new WheelEvent("wheel", { deltaY: 120 }), new PointerEvent("pointerdown")]) {
+        tab(link);
+        expect(window.scrollTo).toHaveBeenCalledTimes(1);
+        window.dispatchEvent(own);
+        vi.advanceTimersByTime(0);
+        expect(window.scrollTo, own.type).toHaveBeenCalledTimes(1);
+        link.blur();
+        vi.mocked(window.scrollTo).mockClear();
+      }
+      stop();
+    });
+
     it("lets go on the reader's own scroll: a press of the pointer", () => {
       vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
       lay(200);

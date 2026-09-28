@@ -17,7 +17,9 @@ export function SpecimenRecord({ specimen }: { readonly specimen: Specimen | nul
   return (
     <section id="record" aria-labelledby="record-title" className="section-pad">
       <SectionKicker rule="mb-6">{m.kicker}</SectionKicker>
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,380px),1fr))] items-start gap-x-[clamp(24px,4vw,64px)] gap-y-8">
+      {/* Two columns where each has 23.75rem (380px as drawn); in rem, so with its text at 200% the record's four-column
+          table gets the whole width instead of running past the window beside the words. */}
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,23.75rem),1fr))] items-start gap-x-[clamp(24px,4vw,64px)] gap-y-8">
         <div className="min-w-0">
           <h2 id="record-title" className={H2}>
             {m.title}

@@ -6,7 +6,15 @@ import { Wordmark } from "@/components/brand/wordmark";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { messages } from "@/messages";
 import { cn } from "@/utils/cn";
-import { MASTHEAD_CONTROL, MINIMAL_HEADER_ROUTES, NAV_ITEM_ACTIVE, NAV_ITEM_IDLE, PRIMARY_NAV, isActive, navTarget } from "./nav-config";
+import {
+  MASTHEAD_CONTROL,
+  MINIMAL_HEADER_ROUTES,
+  NAV_ITEM_ACTIVE,
+  NAV_ITEM_IDLE,
+  PRIMARY_NAV,
+  isActive,
+  navTarget,
+} from "./nav-config";
 import { NavMenu } from "./nav-menu";
 import { UserMenu } from "./user-menu";
 
@@ -27,36 +35,67 @@ export function TopNav() {
   const minimal = MINIMAL_HEADER_ROUTES.includes(pathname);
 
   return (
-    <header className={cn("border-b border-line bg-surface-0", !minimal && "sticky top-0 z-nav")} style={{ viewTransitionName: "site-header" }}>
-      {/* One row, 64px, at every width the design draws. Text made larger than the row allows (200%) reflows: the
-          nav's boxes wrap among themselves and the controls drop to a row of their own, each row as tall as the
-          first, so nothing is pushed past the window's edge. At the design's own sizes nothing wraps. */}
-      <div className="page-frame flex min-h-16 flex-wrap items-center gap-x-3 lg:gap-x-5">
-        {minimal ? null : <NavMenu pathname={pathname} className="lg:hidden" />}
-        {/* The mark alone is 24px wide on a phone. Its hit area grows rightward into the mr-auto gap
+    <header
+      className={cn(
+        "border-b border-line bg-surface-0",
+        !minimal && "sticky top-0 z-nav",
+      )}
+      style={{ viewTransitionName: "site-header" }}
+    >
+      {/* A query container, in rem, the masthead's full width: the nav stands open only where the window is lg AND this
+          is 62rem wide, which at the drawn sizes is the same (62rem is lg less the widest scrollbar), and with text made
+          larger (200%) is not: then the nav folds into the menu, and the masthead keeps its one row, the height every
+          pinned piece sticks under. Not the sticky header itself: WebKit then read the header's box stale in the task
+          a scroll changed (by the header's old place), and the run's unpin landed a reader 402px off (J6 nightly).
+          One row, 64px. Should even the menu's row not fit (a phone, text at 200%), it reflows as the last resort: the
+          controls drop to a row of their own, as tall as the first, so nothing is pushed past the window's edge. */}
+      <div className="@container">
+        <div className="page-frame flex min-h-16 flex-wrap items-center gap-x-3 lg:gap-x-5">
+          {minimal ? null : (
+            <NavMenu pathname={pathname} className="lg:@min-[62rem]:hidden" />
+          )}
+          {/* The mark alone is 24px wide on a phone. Its hit area grows rightward into the mr-auto gap
             (motion.css): centred, it would reach back over the menu button beside it. */}
-        <Link href="/" aria-label={messages.common.productName} className="tap-44-start mr-auto inline-flex h-16 items-center text-ink-1 no-underline hover:text-ink-1 lg:mr-2">
-          <Wordmark nameFrom={minimal ? undefined : "lg"} />
-        </Link>
-        {minimal ? null : (
-          <>
-            <nav aria-label={messages.shell.nav.primaryLabel} className="hidden flex-1 flex-wrap items-center gap-2 lg:flex">
-              {PRIMARY_NAV.map(({ href, label, Icon }) => {
-                const active = isActive(pathname, href);
-                return (
-                  <Link key={href} href={navTarget(pathname, href)} aria-current={active ? "page" : undefined} className={cn(ITEM, active ? NAV_ITEM_ACTIVE : NAV_ITEM_IDLE)}>
-                    <Icon className="size-5 shrink-0" aria-hidden="true" />
-                    <span>{href === "/" ? messages.shell.nav.cta : label}</span>
-                  </Link>
-                );
-              })}
-            </nav>
-            <div className="ml-auto flex min-h-16 items-center gap-2">
-              <ThemeToggle />
-              <UserMenu />
-            </div>
-          </>
-        )}
+          <Link
+            href="/"
+            aria-label={messages.common.productName}
+            className="tap-44-start mr-auto inline-flex h-16 items-center text-ink-1 no-underline hover:text-ink-1 lg:mr-2"
+          >
+            <Wordmark nameFrom={minimal ? undefined : "lg"} />
+          </Link>
+          {minimal ? null : (
+            <>
+              <nav
+                aria-label={messages.shell.nav.primaryLabel}
+                className="hidden flex-1 flex-wrap items-center gap-2 lg:@min-[62rem]:flex"
+              >
+                {PRIMARY_NAV.map(({ href, label, Icon }) => {
+                  const active = isActive(pathname, href);
+                  return (
+                    <Link
+                      key={href}
+                      href={navTarget(pathname, href)}
+                      aria-current={active ? "page" : undefined}
+                      className={cn(
+                        ITEM,
+                        active ? NAV_ITEM_ACTIVE : NAV_ITEM_IDLE,
+                      )}
+                    >
+                      <Icon className="size-5 shrink-0" aria-hidden="true" />
+                      <span>
+                        {href === "/" ? messages.shell.nav.cta : label}
+                      </span>
+                    </Link>
+                  );
+                })}
+              </nav>
+              <div className="ml-auto flex min-h-16 items-center gap-2">
+                <ThemeToggle />
+                <UserMenu />
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </header>
   );

@@ -79,11 +79,13 @@ describe("TopNav", () => {
     render(<TopNav />);
     const menu = screen.getByRole("button", { name: "Open menu" });
     const brand = screen.getByRole("link", { name: "Trakline" });
-    expect(menu).toHaveClass("lg:hidden");
+    // the nav opens from lg only where the masthead, a query container, is also 62rem wide: with text at 200% it is not
+    expect(screen.getByRole("banner").firstElementChild).toHaveClass("@container");
+    expect(menu).toHaveClass("lg:@min-[62rem]:hidden");
     expect(menu.compareDocumentPosition(brand) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(brand.querySelector("svg")).not.toBeNull();
     expect(within(brand).getByText("Trakline").parentElement).toHaveClass("hidden", "lg:flex");
-    expect(screen.getByRole("navigation", { name: "Primary" })).toHaveClass("hidden", "lg:flex");
+    expect(screen.getByRole("navigation", { name: "Primary" })).toHaveClass("hidden", "lg:@min-[62rem]:flex");
   });
 
   it("shows only the brand on sign in", () => {

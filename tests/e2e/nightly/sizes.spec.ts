@@ -1,6 +1,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "../fixtures";
 import { gotoReady } from "../helpers";
+import { cutText } from "../layout";
 import { LANDING_INSTRUMENTS, collisionsInView, collisionsTopToBottom } from "../journey/collisions";
 import { waitForJourney } from "../journey/journey-helpers";
 
@@ -27,37 +28,25 @@ const SIZES = [
   [1920, 1080],
   [2560, 1440],
 ] as const;
-const AT_200 = new Set(["1440×900", "390×844", "844×390"]);
+const AT_200 = new Set(["1440×900", "1024×768", "390×844", "844×390"]);
 /** Pages other than the landing that carry the full masthead: it is the same on every page, so it reflows on each. */
 const OTHER_PAGES = ["/pre-booking", "/accuracy", "/watchlist", "/privacy"] as const;
 
 /** Text at 200%, from before the page's first paint (the browser's own text-size setting, as the landing's spec sets it). */
 const text200 = (page: Page) => page.addInitScript(() => document.addEventListener("DOMContentLoaded", () => document.documentElement.style.setProperty("font-size", "200%")));
 
-/** Words the window's edge cuts off: a line of text that runs past the window's side where the page clips it (the
- * sideways overflow the collision checker sees is the page scrolling instead). Clipped inside the page on purpose (a
- * wipe, a scroller, screen-reader-only text) is not cut by the window, and is left alone. Laid-out boxes, so it reads
- * the whole page from wherever it stands. */
-async function cutAtTheEdge(page: Page): Promise<string[]> {
+/** Pieces pinned under the masthead stick at its height as drawn (--header-height, 4rem): a masthead taller than that
+ * covers the top of every pinned piece for the whole of its pin (the drawing at 1024×768, text at 200%). */
+async function mastheadOverPins(page: Page): Promise<string[]> {
   return page.evaluate(() => {
-    const vw = document.documentElement.clientWidth;
-    const found: string[] = [];
-    for (const el of document.querySelectorAll<HTMLElement>("body *")) {
-      const own = [...el.childNodes].some((n) => n.nodeType === Node.TEXT_NODE && (n.textContent ?? "").trim() !== "");
-      if (!own || el.closest(".sr-only, [aria-hidden='true'], svg, noscript") || !el.checkVisibility()) continue;
-      const r = el.getBoundingClientRect();
-      if (r.width < 1 || (r.right <= vw + 1 && r.left >= -1)) continue;
-      let clip: DOMRect | null = null;
-      for (let n = el.parentElement; n && n !== document.documentElement; n = n.parentElement) {
-        if (getComputedStyle(n).overflowX !== "visible") {
-          clip = n.getBoundingClientRect();
-          break;
-        }
-      }
-      if (clip && clip.right < vw - 1 && clip.left > 1) continue;
-      found.push(`"${(el.textContent ?? "").trim().slice(0, 40)}" runs ${Math.round(Math.max(r.right - vw, -r.left))}px past the window`);
-    }
-    return found;
+    const probe = document.createElement("div");
+    probe.style.height = "var(--header-height)";
+    document.body.append(probe);
+    const pinsAt = probe.getBoundingClientRect().height;
+    probe.remove();
+    const masthead = document.querySelector("header")?.getBoundingClientRect().height ?? 0;
+    const pinned = ["#anatomy.is-live", "#how.is-pinned", "#run.is-running"].filter((selector) => document.querySelector(selector));
+    return masthead > pinsAt + 1 ? pinned.map((selector) => `the masthead (${Math.round(masthead)}px) covers ${selector}'s pin, which sticks at ${Math.round(pinsAt)}px`) : [];
   });
 }
 
@@ -80,7 +69,10 @@ for (const [width, height] of SIZES) {
         await text200(page);
         await gotoReady(page, "/");
         await waitForJourney(page);
-        expect(await cutAtTheEdge(page), "cut off at the window's edge").toEqual([]);
+        // the drawing has decided: pinned live, or the still
+        await expect(page.locator('html[data-drawing="still"], #anatomy.is-live')).not.toHaveCount(0, { timeout: 25_000 });
+        expect(await mastheadOverPins(page)).toEqual([]);
+        expect(await cutText(page), "text cut off").toEqual([]);
         expect(await collisionsTopToBottom(page, { ...LANDING_INSTRUMENTS, step: 0.15 })).toEqual([]);
       });
 
@@ -88,7 +80,7 @@ for (const [width, height] of SIZES) {
         await text200(page);
         for (const path of OTHER_PAGES) {
           await gotoReady(page, path);
-          expect([...(await collisionsInView(page)), ...(await cutAtTheEdge(page))], path).toEqual([]);
+          expect([...(await collisionsInView(page)), ...(await cutText(page))], path).toEqual([]);
         }
       });
     }

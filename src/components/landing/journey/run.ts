@@ -281,11 +281,12 @@ export function startRun({ motion }: JourneyContext): Teardown {
     window.scrollTo({ top });
     watch.arm();
     // Safari reveals the link with a glide of its own, begun after this listener, which replaces this one (Option-Tab
-    // brought the station to rest 160px short): aimed again in the next task, while focus is still in the station.
+    // brought the station to rest 160px short): aimed again in the next task, while focus is still in the station and
+    // the watch still holds the glide (the reader's own scroll or a press of the pointer lets go of both).
     window.clearTimeout(again);
     again = window.setTimeout(() => {
       const now = at;
-      if (now && aimed === i && station?.contains(document.activeElement)) window.scrollTo({ top: stationY(i, now) });
+      if (now && aimed === i && watch.armed() && station?.contains(document.activeElement)) window.scrollTo({ top: stationY(i, now) });
     }, 0);
   };
   /** The glide cut short by a place-keeping jump (the drawing falling to the still under load; WCAG 2.4.11): its station

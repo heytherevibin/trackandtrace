@@ -85,6 +85,8 @@ function seen(el: Element): boolean {
 export interface GlideWatch {
   /** A glide has begun: watch it for a place-keeping jump that cuts it short. */
   arm(): void;
+  /** Still watching the glide it was armed for: not let go by the reader's own scroll or pointer, nor by the page. */
+  armed(): boolean;
   disarm(): void;
   stop(): void;
 }
@@ -168,6 +170,7 @@ export function watchGlide(retake: () => void): GlideWatch {
       lastY = window.scrollY;
       if (!frame) frame = requestAnimationFrame(tick);
     },
+    armed: () => armed,
     disarm,
     stop: () => {
       disarm();

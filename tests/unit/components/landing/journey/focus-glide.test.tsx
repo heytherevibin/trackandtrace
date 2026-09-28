@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { startFocusGlide, watchTab } from "@/components/landing/journey/focus-glide";
+import { startFocusGlide, watchGlide, watchTab } from "@/components/landing/journey/focus-glide";
 import { JUMP_EVENT, LAYOUT_EVENT } from "@/components/landing/journey/journey-events";
 import { testContext } from "./journey-context";
 
@@ -289,6 +289,20 @@ describe("the Tab it knows (watchTab)", () => {
       press(init);
       expect(tab.down(), JSON.stringify(init)).toBe(false);
       tab.stop();
+    }
+  });
+});
+
+describe("a glide's watch says whether it still holds (armed)", () => {
+  it("from arm until the reader's own scroll or a press of the pointer lets go of it", () => {
+    for (const own of [new WheelEvent("wheel", { deltaY: 120 }), new PointerEvent("pointerdown")]) {
+      const watch = watchGlide(() => undefined);
+      expect(watch.armed()).toBe(false);
+      watch.arm();
+      expect(watch.armed()).toBe(true);
+      window.dispatchEvent(own);
+      expect(watch.armed(), own.type).toBe(false);
+      watch.stop();
     }
   });
 });
