@@ -20,32 +20,42 @@ function offTrain(page: Page, i: number): Promise<number> {
 const here = (page: Page) => page.locator("#run [data-station]").evaluateAll((els) => els.findIndex((el) => el.classList.contains("is-here")));
 const stationOf = (page: Page, selector: string) => page.locator("#run [data-station]").evaluateAll((els, sel) => els.findIndex((el) => el.matches(sel) || el.querySelector(sel) !== null || el.closest(sel) !== null), selector);
 const running = (page: Page) => expect(page.locator("#run")).toHaveClass(/is-running/);
+/** The longest the rest wait lasts before it gives up and the place is judged anyway: it then fails with the train's
+ * distance from the station and says it was still moving, never as a bare test timeout (nightly review, I-2). */
+const REST_MS = 20_000;
 /** The page and the run's track have both held still for ten frames: the scroll has landed (a glide down to the run
- * leaves the track still until it gets there) and the track's smoothing has come to rest, however long that took. Anime
- * eases it a fixed share of the way each frame, so the time to settle is the machine's: on the nightly's GPU-less WebKit
- * runner (about 8 frames a second as the page loads) a jump across the run took about 7 s, still closing in when a 5 s
- * poll gave up (1,864 px, then 1,015, 385, 115 and 28 at the cutoff; run 36406365173). A state wait, then the place is
- * judged. */
-const trackAtRest = (page: Page) =>
+ * leaves the track still until it gets there) and the track's smoothing has come to rest, however long that took, up to
+ * REST_MS. Anime eases it a fixed share of the way each frame, so the time to settle is the machine's: on the nightly's
+ * GPU-less WebKit runner (about 8 frames a second as the page loads) a jump across the run took about 7 s, still closing
+ * in when a 5 s poll gave up (1,864 px, then 1,015, 385, 115 and 28 at the cutoff; run 36406365173). A state wait, then
+ * the place is judged. True once at rest; false when it gave up still moving. */
+const trackAtRest = (page: Page): Promise<boolean> =>
   page.evaluate(
-    () =>
-      new Promise<void>((done) => {
+    (limit) =>
+      new Promise<boolean>((done) => {
+        const until = performance.now() + limit;
         let last = "";
         let held = 0;
         const tick = () => {
           const now = `${window.scrollY} ${document.querySelector<HTMLElement>("#run .run-track")?.style.transform ?? ""}`;
           held = now === last ? held + 1 : 0;
           last = now;
-          if (held >= 10) done();
+          if (held >= 10) done(true);
+          else if (performance.now() > until) done(false);
           else requestAnimationFrame(tick);
         };
         requestAnimationFrame(tick);
       }),
+    REST_MS,
   );
-/** Station i at the window once the track has come to rest: within 3 px of the train. */
+/** Station i at the window once the track has come to rest: within 3 px of the train. A track still moving after REST_MS
+ * fails here, saying how far off it was. A test that waits on it more than once sets its own timeout (up to REST_MS a
+ * wait, plus its pages' own loads). */
 const atTheWindow = async (page: Page, i: number) => {
-  await trackAtRest(page);
-  expect(await offTrain(page, i)).toBeLessThanOrEqual(3);
+  const rested = await trackAtRest(page);
+  const off = await offTrain(page, i);
+  expect(off, `station ${i} ${off}px off the train, ${rested ? "at rest" : `still moving after ${REST_MS / 1000} s`}`).toBeLessThanOrEqual(3);
+  expect(rested, `the run's track still moving after ${REST_MS / 1000} s, station ${i} ${off}px off the train`).toBe(true);
 };
 /** How far 07's top stands from the masthead's foot, read as place-memory reads it (J6-9): where run.ts says it stands
  * while the run is pinned (data-run-at), its own box otherwise. 0 when the reader is at 07. */
@@ -64,6 +74,7 @@ test.describe("the window-seat run (spec §3.A)", () => {
   });
 
   test("pins 06–07 and carries each station to the window in turn, lit, its words never fading", async ({ page }) => {
+    test.setTimeout(60_000); // the rest wait's own limit (REST_MS) per station, and the page's loads
     await page.goto("/");
     await waitForJourney(page);
     await running(page);
@@ -97,6 +108,7 @@ test.describe("the window-seat run (spec §3.A)", () => {
   });
 
   test("a link to 07 on the departure board brings its words to the window, and the address and the board say so", async ({ page }) => {
+    test.setTimeout(60_000); // the rest wait's own limit (REST_MS) per station, and the page's loads
     await page.goto("/");
     await waitForJourney(page);
     await running(page);
@@ -113,6 +125,7 @@ test.describe("the window-seat run (spec §3.A)", () => {
   // event; one frame longer than that ended it short, the train left 1,500 px from 07 until the next scroll (Linux WebKit;
   // observers.ts keepUp). A slow device's stall, two frames after the jump: the busy loop is the stall itself, not a wait.
   test("a jump to 07 brings its first station to the window though a frame stalls past anime's wake (a slow device)", async ({ page, isMobile }) => {
+    test.setTimeout(60_000); // the rest wait's own limit (REST_MS) per station, and the page's loads
     test.skip(isMobile, "one project is enough");
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/");
@@ -135,6 +148,7 @@ test.describe("the window-seat run (spec §3.A)", () => {
   });
 
   test("Back from 07, inside the run, returns the reader to 07, not 06 (J6-9)", async ({ page, isMobile }) => {
+    test.setTimeout(60_000); // the rest wait's own limit (REST_MS) per station, and the page's loads
     test.skip(isMobile, "one project is enough");
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/");
@@ -157,6 +171,7 @@ test.describe("the window-seat run (spec §3.A)", () => {
   });
 
   test("Tab brings each card to the window, never under the masthead (spec §3.G; WCAG 2.4.11)", async ({ page, isMobile }) => {
+    test.setTimeout(90_000); // the rest wait's own limit (REST_MS) per station, and the page's loads
     test.skip(isMobile, "the keyboard: one project is enough");
     await page.goto("/");
     await waitForJourney(page);
