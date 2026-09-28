@@ -3,7 +3,7 @@ import { MemoryCache } from "@/services/cache";
 import { parseEnv } from "@/services/env";
 import { EncryptedRedisCache } from "@/services/redis-cache";
 import { UNLIMITED_BUDGET } from "@/services/live-budget";
-import { createPnrCache, liveBudget, providerGuard, publicStore, publicStoreForReading, resetLocalState } from "@/services/shared-store";
+import { createPnrCache, createRateLimiter, limitedLogForReading, liveBudget, providerGuard, publicStore, publicStoreForReading, resetLocalState } from "@/services/shared-store";
 import { readUsageHistory } from "@/services/usage";
 import type { SourceOutcome } from "@/services/sources/outcome";
 
@@ -56,6 +56,24 @@ describe("publicStoreForReading", () => {
   it("keeps the prefix the writers use", () => {
     const current = envOf(UNREACHABLE);
     expect(publicStoreForReading(current).prefix).toBe(publicStore(current).prefix);
+  });
+});
+
+describe("createRateLimiter and limitedLogForReading", () => {
+  it("writes each refused traveller check where module 04 reads it, and never the address", async () => {
+    const current = envOf({ NODE_ENV: "test" });
+    const limiter = createRateLimiter(current);
+    const before = (await limitedLogForReading(current).today(10, Date.now())).total;
+    for (let i = 0; i < 3; i += 1) await limiter.check("pnr:198.51.100.7", 1, 60_000);
+
+    const today = await limitedLogForReading(current).today(10, Date.now());
+    expect(today.total - before).toBe(2);
+    expect(JSON.stringify(today)).not.toContain("198.51.100.7");
+  });
+
+  it("fails a read when the shared store cannot be reached", async () => {
+    const current = envOf({ NODE_ENV: "test", KV_REST_API_URL: "http://127.0.0.1:1", KV_REST_API_TOKEN: "t", DATA_KEY });
+    await expect(limitedLogForReading(current).today(10, Date.now())).rejects.toThrow();
   });
 });
 
