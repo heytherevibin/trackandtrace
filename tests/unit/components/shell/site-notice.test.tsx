@@ -2,11 +2,13 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { siteNotice, cookieValue } = vi.hoisted(() => ({
+const { siteNotice, cookieValue, connection } = vi.hoisted(() => ({
   siteNotice: vi.fn<() => Promise<{ readonly text: string; readonly version: number } | null>>(),
   cookieValue: { current: undefined as string | undefined },
+  connection: vi.fn(async () => undefined),
 }));
 vi.mock("@/services/runtime-settings", () => ({ siteNotice }));
+vi.mock("next/server", () => ({ connection }));
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => (cookieValue.current === undefined ? undefined : { value: cookieValue.current }) }) }));
 
 import { NOTICE_COOKIE, SiteNoticeStrip } from "@/components/shell/site-notice";
@@ -28,6 +30,9 @@ const TEXT = "Planned maintenance on 21 Sep, 02:00–03:00 IST. Checks may be sl
 
 afterEach(() => {
   cookieValue.current = undefined;
+  siteNotice.mockReset();
+  connection.mockReset();
+  connection.mockImplementation(async () => undefined);
   document.cookie = `${NOTICE_COOKIE}=; max-age=0; path=/`;
 });
 
@@ -70,6 +75,21 @@ describe("SiteNoticeSlot", () => {
     cookieValue.current = "3";
     await slot();
     expect(screen.getByRole("region", { name: m.label })).toHaveTextContent("Checks are back.");
+  });
+
+  /**
+   * Found 2026-09-28: when the build read the notice as off, the slot returned before touching the
+   * cookie, so nothing marked the page as per-request — /privacy, /tos, /pnr and the rest were
+   * prerendered with no notice, and would never have shown one. Next's connection() is the signal:
+   * during a prerender it does not return (it marks the page per-request), so the slot must reach it before reading anything.
+   */
+  it("waits for a real request before reading the notice, so no page is built with one baked in", async () => {
+    connection.mockImplementation(() => new Promise<undefined>(() => {}));
+    siteNotice.mockResolvedValue({ text: TEXT, version: 3 });
+    void SiteNoticeSlot();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(connection).toHaveBeenCalled();
+    expect(siteNotice).not.toHaveBeenCalled();
   });
 
   it("draws nothing when the notice is off", async () => {
