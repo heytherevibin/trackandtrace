@@ -14,7 +14,7 @@ import { liveRequestsPerDay } from "@/services/env";
 import { AppError } from "@/services/errors";
 import { log } from "@/services/log";
 import { liveSpendToday } from "@/services/live-budget";
-import { publicStore } from "@/services/shared-store";
+import { publicStoreForReading } from "@/services/shared-store";
 
 const m = consoleMessages.settings;
 
@@ -71,7 +71,9 @@ export default async function SettingsPage() {
     readSettingsRow(environment),
     // Null, not zero. "0 used today" is a claim about a quiet day; an unread counter is an absence,
     // and drawing the first for the second tells an operator the site is idle when it may be busy.
-    liveSpendToday(publicStore().kv, publicStore().prefix),
+    // The reading store, not `publicStore`: that one answers from this instance's memory when
+    // Upstash is down, which would draw "0 used" rather than the null this comment is about.
+    liveSpendToday(publicStoreForReading().kv, publicStoreForReading().prefix),
   ]);
 
   const limits = readLimits(row, { used, fallback: liveRequestsPerDay() });

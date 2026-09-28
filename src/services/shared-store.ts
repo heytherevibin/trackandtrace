@@ -1,4 +1,4 @@
-import { createBreaker } from "./breaker";
+import { createBreaker, type BreakerScope } from "./breaker";
 import { pnrCache, type Cache } from "./cache";
 import { deriveDataKeys, keyedHash } from "./data-key";
 import { activePnrSource, env, isThirdPartySource, sharedStoreConfig, type Env, type ThirdPartySource } from "./env";
@@ -102,6 +102,29 @@ export function publicStore(current: Env = env()): { readonly kv: Kv; readonly p
   return stateStore(current);
 }
 
+const readers = new WeakMap<Env, { readonly kv: Kv; readonly prefix: string }>();
+
+/**
+ * The same store as `publicStore`, for a page that REPORTS on it — without the fallback.
+ *
+ * `publicStore` answers from this instance's memory whenever Upstash errors, which is right for a
+ * breaker deciding whether to call and wrong for a dashboard: an unreachable store then reads as an
+ * empty one, and the page says "Answering" and "0 requests" about a day it knows nothing of. Here a
+ * failed read throws, so `readBreakerState` comes back `known: false` and `readUsageHistory` gives
+ * the day as unknown — the paths they were written with and could never reach.
+ *
+ * Unconfigured, it is the same memory `publicStore` uses, because that is where the counts are.
+ */
+export function publicStoreForReading(current: Env = env()): { readonly kv: Kv; readonly prefix: string } {
+  const config = sharedStoreConfig(current);
+  if (!config) return stateStore(current);
+  const known = readers.get(current);
+  if (known) return known;
+  const made = { kv: redisKv(connectRedis(config.credentials, STATE_TIMEOUT_MS)), prefix: config.prefix };
+  readers.set(current, made);
+  return made;
+}
+
 /** Today's live-request budget, shared by every instance. Sources that spend no provider quota have none. */
 export function liveBudget(current: Env = env()): LiveBudget {
   if (!isThirdPartySource(activePnrSource(current))) return UNLIMITED_BUDGET;
@@ -126,6 +149,21 @@ export function liveBudget(current: Env = env()): LiveBudget {
  */
 export type GuardEndpoint = "pnr" | "availability" | "route";
 
+/**
+ * The four keys a caller's fuse lives under, in ONE place.
+ *
+ * `providerGuard` builds a breaker over these; module 02's page reads the same keys to draw the
+ * fuse's state. Two callers computing a key shape is two key shapes waiting to disagree — and the
+ * failure would be silent in the worst way, a dashboard confidently reporting "Answering" off keys
+ * nothing writes.
+ *
+ * The provider base is the key this product has always used; adding a caller segment to it gives
+ * each caller its own four keys without moving anyone else's.
+ */
+export function breakerScopeFor(source: ThirdPartySource, endpoint: GuardEndpoint, prefix: string): BreakerScope {
+  return { provider: `${prefix}:breaker:${source}`, endpoint: `${prefix}:breaker:${source}:${endpoint}` };
+}
+
 /** One breaker per provider *and caller*, one usage counter per provider, shared by every check in this environment. */
 export function providerGuard(source: ThirdPartySource, endpoint: GuardEndpoint, current: Env = env()): GuardDeps {
   const perEnv = guards.get(current) ?? new Map<string, GuardDeps>();
@@ -138,9 +176,7 @@ export function providerGuard(source: ThirdPartySource, endpoint: GuardEndpoint,
   const made: GuardDeps = {
     breaker: createBreaker(
       kv,
-      // The provider base is the key this product has always used; adding a caller segment to it
-      // gives each caller its own four keys without moving anyone else's.
-      { provider: `${prefix}:breaker:${source}`, endpoint: `${prefix}:breaker:${caller}` },
+      breakerScopeFor(source, endpoint, prefix),
       {
         onChange: (event) =>
           log.warn(

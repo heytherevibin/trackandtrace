@@ -3,7 +3,8 @@ import { MemoryCache } from "@/services/cache";
 import { parseEnv } from "@/services/env";
 import { EncryptedRedisCache } from "@/services/redis-cache";
 import { UNLIMITED_BUDGET } from "@/services/live-budget";
-import { createPnrCache, liveBudget, providerGuard, resetLocalState } from "@/services/shared-store";
+import { createPnrCache, liveBudget, providerGuard, publicStore, publicStoreForReading, resetLocalState } from "@/services/shared-store";
+import { readUsageHistory } from "@/services/usage";
 import type { SourceOutcome } from "@/services/sources/outcome";
 
 const DATA_KEY = Buffer.alloc(32, 7).toString("base64");
@@ -27,6 +28,34 @@ describe("createPnrCache", () => {
   it("builds one store per environment, shared by the cache and the limiter", () => {
     const current = envOf({ NODE_ENV: "test", KV_REST_API_URL: "https://x.upstash.io", KV_REST_API_TOKEN: "t", DATA_KEY });
     expect(createPnrCache(current)).toBe(createPnrCache(current));
+  });
+});
+
+describe("publicStoreForReading", () => {
+  // A dashboard reading the shared store must be told when it cannot. `publicStore` falls back to
+  // this instance's memory on any error — right for a breaker deciding whether to call, wrong for a
+  // page reporting what every instance did: an unreachable Upstash then reads as an empty store, and
+  // the page says "Answering" and "0 requests" about a day it knows nothing of.
+  const UNREACHABLE = { NODE_ENV: "test", KV_REST_API_URL: "http://127.0.0.1:1", KV_REST_API_TOKEN: "t", DATA_KEY };
+
+  it("fails a read when the shared store cannot be reached, rather than answering from this instance", async () => {
+    await expect(publicStoreForReading(envOf(UNREACHABLE)).kv.get("anything")).rejects.toThrow();
+  });
+
+  it("so a day the store could not answer for reads as unknown, not as a quiet day", async () => {
+    const { kv, prefix } = publicStoreForReading(envOf(UNREACHABLE));
+    const [day] = await readUsageHistory(kv, prefix, "railkit", 1);
+    expect(day?.requests).toBeNull();
+  });
+
+  it("reads this instance's memory when no shared store is configured, because that is where the counts are", () => {
+    const current = envOf({ NODE_ENV: "test" });
+    expect(publicStoreForReading(current)).toEqual(publicStore(current));
+  });
+
+  it("keeps the prefix the writers use", () => {
+    const current = envOf(UNREACHABLE);
+    expect(publicStoreForReading(current).prefix).toBe(publicStore(current).prefix);
   });
 });
 

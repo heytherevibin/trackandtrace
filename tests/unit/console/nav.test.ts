@@ -56,15 +56,18 @@ describe("railFor against today's real CONSOLE_MODULES", () => {
   // 11 Switches & settings flipped on 2026-09-27, and it shares the `configure` group with 13 Team
   // — the first time two built modules have sat in one group, so this is also the first time the
   // within-group ordering has been exercised against the real list rather than the fixture above.
+  const SOURCES = CONSOLE_MODULES.find((m) => m.num === "02");
   const SWITCHES = CONSOLE_MODULES.find((m) => m.num === "11");
   const TEAM = CONSOLE_MODULES.find((m) => m.num === "13");
   const AUDIT = CONSOLE_MODULES.find((m) => m.num === "14");
 
   it("gives an Owner every built module, grouped, in the sheet's order", () => {
+    expect(SOURCES).toBeDefined();
     expect(SWITCHES).toBeDefined();
     expect(TEAM).toBeDefined();
     expect(AUDIT).toBeDefined();
     expect(railFor("owner")).toEqual([
+      { group: "operate", modules: [SOURCES] },
       { group: "configure", modules: [SWITCHES, TEAM] },
       { group: "record", modules: [AUDIT] },
     ]);
@@ -73,16 +76,21 @@ describe("railFor against today's real CONSOLE_MODULES", () => {
   // Main.dc.html:293-298's own access.Admin list has no '13' -- Team is Owner-only, whatever the
   // plan's table said (task-4-addendum.md §5, re-checked for task-8 in task-7-addendum.md §6) --
   // but it does have '14'.
-  it("gives an Admin Switches and the Audit log, but not Team", () => {
+  it("gives an Admin Sources, Switches and the Audit log, but not Team", () => {
     expect(railFor("admin")).toEqual([
+      { group: "operate", modules: [SOURCES] },
       { group: "configure", modules: [SWITCHES] },
       { group: "record", modules: [AUDIT] },
     ]);
   });
 
-  it("gives Support and a Viewer nothing, because no built module is theirs", () => {
+  // 02 Sources & usage is Owner+Admin+Viewer, so a VIEWER now has a rail — the first role other
+  // than Owner and Admin to get one. Support still has none: its three modules (06 Leads,
+  // 09 Privacy requests, 10 Wrong-status reports) are all unbuilt, so a Support member still signs
+  // in to nothing. That is worth keeping asserted rather than assumed.
+  it("gives a Viewer the one module that is theirs, and Support still nothing", () => {
+    expect(railFor("viewer")).toEqual([{ group: "operate", modules: [SOURCES] }]);
     expect(railFor("support")).toEqual([]);
-    expect(railFor("viewer")).toEqual([]);
   });
 });
 
@@ -126,8 +134,8 @@ describe("CONSOLE_MODULES", () => {
   // 11 Switches or 01 Overview arrives, this test names what changed instead of counting one more.
   // A tripwire, and it is meant to fire: a module flips only in the PR that adds its page, so an
   // unexplained change here is a rail link to a route that does not exist.
-  it("builds 11 Switches, 13 Team and 14 Audit log, and nothing else yet", () => {
-    expect(CONSOLE_MODULES.filter((m) => m.built).map((m) => m.num)).toEqual(["11", "13", "14"]);
+  it("builds 02 Sources, 11 Switches, 13 Team and 14 Audit log, and nothing else yet", () => {
+    expect(CONSOLE_MODULES.filter((m) => m.built).map((m) => m.num)).toEqual(["02", "11", "13", "14"]);
   });
 
   it("gives every module a distinct, non-empty label and a console href", () => {

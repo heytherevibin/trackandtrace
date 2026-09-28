@@ -157,8 +157,17 @@ describe("today's reality: the rail and its phone trigger render for an Owner an
     }
   });
 
-  it("and false for a Support member and a Viewer", () => {
-    for (const role of ROLES.filter((r) => r !== "owner" && r !== "admin")) {
+  // A Viewer left this list on 2026-09-28: 02 Sources & usage is the first built module that role
+  // may open, and the sheet gives it no actions at all, which is why a read-only role gets it.
+  it("is true for a Viewer too, now that one module is theirs", () => {
+    expect(railFor("viewer").length > 0).toBe(true);
+    expect(railFor("viewer", CONSOLE_MODULES).length > 0).toBe(true);
+  });
+
+  // Support's three — 06 Leads, 09 Privacy requests, 10 Wrong-status reports — are the queues that
+  // role exists for, and none is built. A Support member still signs in to nothing.
+  it("and false for a Support member, who still has no built module at all", () => {
+    for (const role of ROLES.filter((r) => r === "support")) {
       expect(railFor(role).length > 0, role).toBe(false);
       expect(railFor(role, CONSOLE_MODULES).length > 0, role).toBe(false);
     }
@@ -189,14 +198,16 @@ describe("today's reality: the rail and its phone trigger render for an Owner an
   // flipped on 2026-09-27 and is Owner+Admin, where 13 Team in the same group is Owner-only. So the
   // group is rendered, and rendered SHORT — which is the case that would have hidden a bug where a
   // group's presence was inferred from the Owner's copy of it rather than this role's.
-  it("gives an Admin Configure and Record, with Team absent from Configure", () => {
+  it("gives an Admin Operate, Configure and Record, with Team absent from Configure", () => {
     render(<ConsoleRail groups={railFor("admin")} />);
     const rail = screen.getByRole("navigation", { name: "Console" });
+    expect(within(rail).getByText("Operate")).toBeVisible();
     expect(within(rail).getByText("Record")).toBeVisible();
     expect(within(rail).getByText("Configure")).toBeVisible();
     expect(within(rail).queryByRole("link", { name: /Team/ })).not.toBeInTheDocument();
+    expect(within(rail).getByRole("link", { name: /Sources/ })).toHaveAttribute("href", "/sources");
     expect(within(rail).getByRole("link", { name: /Switches/ })).toHaveAttribute("href", "/settings");
-    expect(within(rail).getAllByRole("link")).toHaveLength(2);
+    expect(within(rail).getAllByRole("link")).toHaveLength(3);
   });
 });
 
