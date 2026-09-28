@@ -5,8 +5,9 @@ import { keepUp } from "@/components/landing/journey/observers";
 
 // Anime's smoothed scroll sync eases a drawn progress toward the scroll's only while its 500 ms wake timer runs; one frame
 // longer than that (a slow device's stall) ends it short, and nothing wakes it until the next scroll event (Linux WebKit:
-// the run's train 1,500 px from 07 after one 700 ms frame). keepUp watches from each scroll and wakes it, as a scroll event would, on a frame
-// in which the drawn progress stood still short of the scroll. A stand-in observer: its progress is the scroll's.
+// the run's train 1,500 px from 07 after one 700 ms frame). keepUp watches from each scroll and wakes it, as a scroll
+// event would, on a frame in which the drawn progress stood still short of the scroll. A stand-in observer: its progress
+// is the scroll's.
 function observer(progress: number): ScrollObserver & { readonly wakes: () => number } {
   const handleScroll = vi.fn();
   const o = { progress, reverted: false, target: document.body, container: { handleScroll } };

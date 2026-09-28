@@ -20,6 +20,33 @@ function offTrain(page: Page, i: number): Promise<number> {
 const here = (page: Page) => page.locator("#run [data-station]").evaluateAll((els) => els.findIndex((el) => el.classList.contains("is-here")));
 const stationOf = (page: Page, selector: string) => page.locator("#run [data-station]").evaluateAll((els, sel) => els.findIndex((el) => el.matches(sel) || el.querySelector(sel) !== null || el.closest(sel) !== null), selector);
 const running = (page: Page) => expect(page.locator("#run")).toHaveClass(/is-running/);
+/** The page and the run's track have both held still for ten frames: the scroll has landed (a glide down to the run
+ * leaves the track still until it gets there) and the track's smoothing has come to rest, however long that took. Anime
+ * eases it a fixed share of the way each frame, so the time to settle is the machine's: on the nightly's GPU-less WebKit
+ * runner (about 8 frames a second as the page loads) a jump across the run took about 7 s, still closing in when a 5 s
+ * poll gave up (1,864 px, then 1,015, 385, 115 and 28 at the cutoff; run 36406365173). A state wait, then the place is
+ * judged. */
+const trackAtRest = (page: Page) =>
+  page.evaluate(
+    () =>
+      new Promise<void>((done) => {
+        let last = "";
+        let held = 0;
+        const tick = () => {
+          const now = `${window.scrollY} ${document.querySelector<HTMLElement>("#run .run-track")?.style.transform ?? ""}`;
+          held = now === last ? held + 1 : 0;
+          last = now;
+          if (held >= 10) done();
+          else requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      }),
+  );
+/** Station i at the window once the track has come to rest: within 3 px of the train. */
+const atTheWindow = async (page: Page, i: number) => {
+  await trackAtRest(page);
+  expect(await offTrain(page, i)).toBeLessThanOrEqual(3);
+};
 /** How far 07's top stands from the masthead's foot, read as place-memory reads it (J6-9): where run.ts says it stands
  * while the run is pinned (data-run-at), its own box otherwise. 0 when the reader is at 07. */
 const from07 = (page: Page) =>
@@ -44,10 +71,10 @@ test.describe("the window-seat run (spec §3.A)", () => {
     expect(count).toBe(6);
     await scrollIntoRun(page, 0);
     await expect.poll(() => here(page)).toBe(0);
-    await expect.poll(() => offTrain(page, 0)).toBeLessThanOrEqual(3);
+    await atTheWindow(page, 0);
     await scrollIntoRun(page, 1);
     await expect.poll(() => here(page)).toBe(count - 1);
-    await expect.poll(() => offTrain(page, count - 1)).toBeLessThanOrEqual(3);
+    await atTheWindow(page, count - 1);
     await expect(page.locator("#run [data-station].is-passed")).toHaveCount(count - 1);
     await expect(page.locator("#run .run-stop.is-lit")).toHaveCount(count);
     expect(await page.locator("#run [data-station]").evaluateAll((els) => els.every((el) => getComputedStyle(el).opacity === "1"))).toBe(true);
@@ -76,15 +103,15 @@ test.describe("the window-seat run (spec §3.A)", () => {
     await page.locator(".board").getByRole("link", { name: "Where it gets used" }).click();
     await expect(page).toHaveURL(/#use$/);
     const first07 = await stationOf(page, "#use *");
-    await expect.poll(() => offTrain(page, first07)).toBeLessThanOrEqual(3);
+    await atTheWindow(page, first07);
     expect(await page.evaluate(() => document.activeElement?.id)).toBe("use");
     // 07's row: the board's rows follow the stations after DEP, one each (departure-board.tsx)
     await expect(page.locator('.board tr[data-stop="8"] td.board-status')).toHaveText(/At\s*platform/i);
   });
 
   // Anime's smoothed scroll sync eases the run toward the scroll only while its wake timer runs, 500 ms after each scroll
-  // event; one frame longer than that ends it short (the nightly's WebKit runner: the train 6–35 px short of 07, both
-  // tries). A slow device's stall, two frames after the jump: the busy loop is the stall itself, not a wait.
+  // event; one frame longer than that ended it short, the train left 1,500 px from 07 until the next scroll (Linux WebKit;
+  // observers.ts keepUp). A slow device's stall, two frames after the jump: the busy loop is the stall itself, not a wait.
   test("a jump to 07 brings its first station to the window though a frame stalls past anime's wake (a slow device)", async ({ page, isMobile }) => {
     test.skip(isMobile, "one project is enough");
     await page.setViewportSize({ width: 1440, height: 900 });
@@ -104,7 +131,7 @@ test.describe("the window-seat run (spec §3.A)", () => {
       );
     });
     const first07 = await stationOf(page, "#use *");
-    await expect.poll(() => offTrain(page, first07)).toBeLessThanOrEqual(3);
+    await atTheWindow(page, first07);
   });
 
   test("Back from 07, inside the run, returns the reader to 07, not 06 (J6-9)", async ({ page, isMobile }) => {
@@ -120,7 +147,7 @@ test.describe("the window-seat run (spec §3.A)", () => {
       window.scrollTo({ top: Number(use?.dataset.runAt) - head, behavior: "instant" });
     });
     const first07 = await stationOf(page, "#use *");
-    await expect.poll(() => offTrain(page, first07)).toBeLessThanOrEqual(3);
+    await atTheWindow(page, first07);
     await frames(page); // the scroll has been sampled
     await page.getByLabel("Primary").getByRole("link", { name: "Watchlist" }).click();
     await expect(page).toHaveURL(/\/watchlist/);
@@ -142,7 +169,7 @@ test.describe("the window-seat run (spec §3.A)", () => {
       const link = page.getByRole("link", { name });
       await expect(link).toBeFocused();
       const i = await link.evaluate((a) => [...document.querySelectorAll("#run [data-station]")].findIndex((s) => s.contains(a)));
-      await expect.poll(() => offTrain(page, i)).toBeLessThanOrEqual(3);
+      await atTheWindow(page, i);
       const seen = await link.evaluate((a) => {
         const r = a.getBoundingClientRect();
         const foot = document.querySelector("header")?.getBoundingClientRect().bottom ?? 0;
