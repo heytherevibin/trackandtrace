@@ -369,20 +369,22 @@ Decided while planning J6 (2026-09-28):
   `src/components/theme/night-falls.ts`, not the journey's `theme-sweep.ts` (J6-10; a departure from §3.B, accepted
   at J6's pre-flight);
 - the nightly on a schedule, and on the pull request that changes it (J6-11); WebKit in the nightly (J6-12); 200%
-  text at the PR's three sizes (J6-13);
+  text at the PR's three sizes (J6-13).
+
+Found while building J6 (2026-09-28):
 - the by-hand frame-time check runs `npm run build:local && node scripts/journey-perf.mjs` after the gate: the
   gate's plain `npm run build` leaves the build unstamped, and the served production path refuses an unstamped
-  build; the nightly runs `npm run build:local` too (2026-09-28);
+  build; the nightly runs `npm run build:local` too;
 - a Tab glide that a place-keeping jump cuts short is taken up again (`focus-glide.ts`): armed only after a real
   Tab (Option-Tab counts, since Safari moves to links with it; Ctrl or Meta combinations never count), taking up
   at most 3 cuts, and letting go on the reader's own scroll, a pointerdown, or after 10 still frames; it also
-  re-aims once after Safari's own focus reveal, while the watch is armed (2026-09-28);
+  re-aims once after Safari's own focus reveal, while the watch is armed;
 - at 200% text, the masthead folds its nav into the menu button whenever the nav can't hold one row, sitewide
   (100% text unchanged), by a container query in rem on an inner div, not the sticky header, since WebKit reads
   the header's box stale during the run's unpin; the nightly's sweep adds 1024×768 at 200% text, and fails on
-  text clipped inside the page (2026-09-28);
+  text clipped inside the page;
 - Motion off relays the drawn train's columns inside the rebuild's own task, so 02's place guard never reads a
-  half-built page; before this, WebKit moved the reader 304 px (2026-09-28).
+  half-built page; before this, WebKit moved the reader 304 px.
 
 Each PR brings the dependency, copy, tokens and DESIGN.md rules its own code first uses, so nothing lands
 unused, and nothing a traveller can see is inert (a Sound switch with no sound). Each runs `npm run check`
