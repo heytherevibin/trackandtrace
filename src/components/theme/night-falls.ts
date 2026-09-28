@@ -61,7 +61,11 @@ export function nightFalls(from: Element, apply: () => void, resolved: "light" |
   }
   const { x, y, reach } = sweepFrom(from.getBoundingClientRect(), { width: window.innerWidth, height: window.innerHeight });
   const easing = getComputedStyle(html).getPropertyValue(EASE_IN_OUT).trim() || "ease-in-out";
-  html.dataset.themeSweep = "";
+  // Each sweep's own mark: a second click starts a new transition, which cancels this one, and this one's `finished`
+  // settles after the new mark is written. Only the sweep whose mark still stands clears it, so the second keeps its
+  // rules (no cross-fade, the masthead swept with the page).
+  const mark = String(Number(html.dataset.themeSweep ?? 0) + 1);
+  html.dataset.themeSweep = mark;
   const transition = document.startViewTransition(async () => {
     flushSync(apply);
     await themeApplied(resolved);
@@ -71,6 +75,8 @@ export function nightFalls(from: Element, apply: () => void, resolved: "light" |
     () => html.animate({ clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${reach}px at ${x}px ${y}px)`] }, { duration: SWEEP_MS, easing, pseudoElement: "::view-transition-new(root)" }),
     () => undefined,
   );
-  const done = () => delete html.dataset.themeSweep;
+  const done = () => {
+    if (html.dataset.themeSweep === mark) delete html.dataset.themeSweep;
+  };
   transition.finished.then(done, done);
 }

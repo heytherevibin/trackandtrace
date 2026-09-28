@@ -94,6 +94,44 @@ describe("nightFalls", () => {
     theme.stop();
   });
 
+  it("switches at once on the console, whose layout writes no data-motion, even where View Transitions exist", async () => {
+    html.dataset.theme = "light";
+    const start = vi.fn();
+    Object.defineProperty(document, "startViewTransition", { configurable: true, value: start });
+    const theme = listen();
+    const apply = vi.fn(() => {
+      html.dataset.theme = "dark";
+    });
+    nightFalls(button(), apply, "dark");
+    expect(apply).toHaveBeenCalledTimes(1);
+    expect(start).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(theme.heard()).toBe(1));
+    theme.stop();
+  });
+
+  it("keeps a second sweep a sweep when it starts before the first settles: two quick clicks, System to Night", async () => {
+    html.dataset.motion = "on";
+    html.dataset.theme = "light";
+    const finishers: Array<() => void> = [];
+    const start = vi.fn(() => {
+      const finished = new Promise<void>((resolve) => {
+        finishers.push(resolve);
+      });
+      return { ready: Promise.resolve(), finished, updateCallbackDone: Promise.resolve(), skipTransition: () => undefined };
+    });
+    Object.defineProperty(document, "startViewTransition", { configurable: true, value: start });
+    Object.defineProperty(html, "animate", { configurable: true, value: vi.fn() });
+    nightFalls(button(), () => undefined, "light");
+    nightFalls(button(), () => undefined, "dark");
+    expect(start).toHaveBeenCalledTimes(2);
+    finishers[0]!(); // the browser settles the first, cancelled by the second's start
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(html.dataset.themeSweep, "the second sweep's rules still hold").toBeDefined();
+    finishers[1]!();
+    await vi.waitFor(() => expect(html.dataset.themeSweep).toBeUndefined());
+  });
+
   it("sweeps out from the button: the change inside a view transition, the train redrawn in it, the new page revealed by a widening circle", async () => {
     html.dataset.motion = "on";
     html.dataset.theme = "light";
@@ -115,7 +153,7 @@ describe("nightFalls", () => {
     });
     nightFalls(button(), apply, "dark");
     expect(start).toHaveBeenCalledTimes(1);
-    expect(html.dataset.themeSweep).toBe("");
+    expect(html.dataset.themeSweep).toBe("1");
     expect(apply).not.toHaveBeenCalled(); // only inside the transition's update
     await updates[0]!();
     expect(apply).toHaveBeenCalledTimes(1);
