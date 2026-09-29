@@ -17,23 +17,77 @@ export function untrackAll(): void {
   live.clear();
 }
 
+/** Re-measures an observer, if there is anything to re-measure. Anime adopts an observer's target on its first tick
+ * after the observer is made (target null until then) and refreshes it itself as it does, reading the layout as it
+ * stands then; refreshing it before that reads the null target's box and throws. So a layout change in that window
+ * needs no refresh of its own, and a reverted observer needs none either. The one door for every refresh. */
+export function refreshObserver(o: ScrollObserver): void {
+  if (!o.reverted && o.target) o.refresh();
+}
+
 export function refreshAll(): void {
   if (queued) return;
   queued = requestAnimationFrame(() => {
     queued = 0;
     for (const o of live) {
-      if (o.reverted) live.delete(o);
-      // An observer's target is assigned lazily, on the frame after it is created; skip one that has not
-      // settled yet rather than crash on it, and never let one observer's failure stop the rest refreshing.
-      else if (o.target) {
-        try {
-          o.refresh();
-        } catch (error) {
-          console.error(error);
-        }
+      if (o.reverted) {
+        live.delete(o);
+        continue;
+      }
+      // never let one observer's failure stop the rest refreshing
+      try {
+        refreshObserver(o);
+      } catch (error) {
+        console.error(error);
       }
     }
   });
+}
+
+/** How many frames in a row a woken sync may leave the drawing where it stood before keepUp stops waking it (until the
+ * next scroll): a drawing no wake can move is never watched frame after frame for ever. */
+const IDLE_WAKES = 30;
+
+/**
+ * Anime's smoothed scroll sync (sync: SMOOTH) eases a drawn progress toward the scroll's only while its wake timer runs:
+ * 500 ms of anime's clock after each scroll event, restarted by each eased step. One frame longer than that (a slow
+ * device's stall) spends the whole window in a single tick, and the drawing stops short of the scroll until the reader
+ * scrolls again: after a jump to 07 and one 700 ms frame, Linux WebKit left the run's train 1,500 px from its station
+ * for good. So from each scroll (and layout change) until the drawing has caught up, a frame in which the drawn progress
+ * stood still while it still disagrees with the scroll's wakes the sync, as a scroll event would. scene/live.ts does the
+ * same inside its own render loop. Returns the teardown.
+ */
+export function keepUp(observer: ScrollObserver, drawn: () => number): () => void {
+  let frame = 0;
+  let last = Number.NaN;
+  let idle = 0;
+  const check = () => {
+    frame = 0;
+    if (observer.reverted) return;
+    const p = drawn();
+    if (Math.abs(observer.progress - p) <= 1e-4) return;
+    if (p === last) {
+      idle += 1;
+      if (idle > IDLE_WAKES) return;
+      observer.container.handleScroll();
+    } else idle = 0;
+    last = p;
+    frame = requestAnimationFrame(check);
+  };
+  const watch = () => {
+    if (frame) return;
+    last = Number.NaN;
+    idle = 0;
+    frame = requestAnimationFrame(check);
+  };
+  window.addEventListener("scroll", watch, { passive: true });
+  window.addEventListener(LAYOUT_EVENT, watch);
+  return () => {
+    cancelAnimationFrame(frame);
+    frame = 0;
+    window.removeEventListener("scroll", watch);
+    window.removeEventListener(LAYOUT_EVENT, watch);
+  };
 }
 
 /** One replaying entrance: its trigger's box decides; arm puts the start state on, play animates to rest,

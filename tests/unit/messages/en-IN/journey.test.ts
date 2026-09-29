@@ -8,3 +8,10 @@ describe("the chapters' trace card", () => {
     expect(journey.chapters.partyOf(7)).toBe("7 passengers");
   });
 });
+
+describe("the window-seat run", () => {
+  it("labels a kilometre post as v3 does, with the figure it is given", () => {
+    expect(journey.run.km("530")).toBe("KM 530");
+    expect(journey.run.km("084")).toBe("KM 084");
+  });
+});

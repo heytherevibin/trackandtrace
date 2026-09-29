@@ -73,4 +73,8 @@ export const journey = {
     time: (time: string) => `${time} IST`,
     stamp: (time: string) => `Retrieved ${time} IST · Sample data`,
   },
+  run: {
+    /** A kilometre post along the run's line (v3: "KM 530"). */
+    km: (figure: string) => `KM ${figure}`,
+  },
 } as const satisfies MessageTree;

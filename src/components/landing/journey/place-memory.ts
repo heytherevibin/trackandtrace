@@ -62,11 +62,40 @@ function navigationTarget(): EventTarget | null {
   return nav instanceof EventTarget ? nav : null;
 }
 
-/** The reader's own hand: any of these before the restore means they have moved on, and nothing is restored under them. */
-const HAND = ["wheel", "touchstart", "keydown"] as const;
+/** The events that can carry the reader's own scroll; ownScroll says which of them do. Shared by focus-glide.ts. */
+export const HAND = ["wheel", "touchmove", "keydown"] as const;
+/** The keys that scroll the page: the arrows up and down, Page Up and Page Down, Home, End and Space (Shift+Space up). */
+const SCROLL_KEYS: ReadonlySet<string> = new Set(["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "]);
+/** Where a key types or picks rather than scrolls. */
+const TEXT_FIELD = "input, textarea, select, [contenteditable]:not([contenteditable='false'])";
+
+/**
+ * The reader's own scroll (J5-17, amended by the owner on 2026-09-28; J6-9): before the restore, it means they have
+ * moved on, and nothing is restored under them. Only a scroll counts:
+ * - a wheel that is mostly vertical and not a pinch-zoom (ctrl+wheel). A sideways wheel is a trackpad's swipe back, or
+ *   its momentum as the page returns;
+ * - a finger dragging (touchmove). A tap (touchstart alone) is not a scroll;
+ * - a scroll key, with focus outside a text field and no Alt, Ctrl or Meta: Alt+← and Cmd+[ are Back and Forward.
+ * A swipe back, a tap and every other key leave the restore pending.
+ */
+export function ownScroll(event: Event): boolean {
+  if (event.type === "touchmove") return true;
+  if (event instanceof WheelEvent) return !event.ctrlKey && Math.abs(event.deltaY) > Math.abs(event.deltaX);
+  if (!(event instanceof KeyboardEvent) || !SCROLL_KEYS.has(event.key)) return false;
+  if (event.altKey || event.ctrlKey || event.metaKey) return false;
+  return !(event.target instanceof Element && event.target.closest(TEXT_FIELD));
+}
 
 function mastheadFoot(): number {
   return document.querySelector("header")?.getBoundingClientRect().bottom ?? 0;
+}
+
+/** A section's top in the window, where the reader reads it: while it rides the window-seat run, where run.ts says it
+ * stands (data-run-at, the page y it would have were it not riding, as station-progress.ts reads it; J6-9), not the
+ * pinned box it shares with the other; otherwise its own box. */
+function topOf(el: HTMLElement): number {
+  const riding = Number(el.dataset.runAt);
+  return el.dataset.runAt !== undefined && Number.isFinite(riding) ? riding - window.scrollY : el.getBoundingClientRect().top;
 }
 
 /** Where the reader stands now, on this page's own sections; null once they have left the document. */
@@ -75,7 +104,7 @@ function placeNow(): Place | null {
   if (!entry) return null;
   const tops = IDS.flatMap((id) => {
     const el = document.getElementById(id);
-    return el?.isConnected ? [{ id, top: el.getBoundingClientRect().top }] : [];
+    return el?.isConnected ? [{ id, top: topOf(el) }] : [];
   });
   const on = pickPlace(tops, mastheadFoot());
   return on ? { entry, ...on } : null;
@@ -152,7 +181,8 @@ export function startPlaceMemory(): PlaceMemory {
   const stopHand = () => {
     for (const type of HAND) window.removeEventListener(type, onHand, true);
   };
-  const onHand = () => {
+  const onHand = (event: Event) => {
+    if (!ownScroll(event)) return;
     pending = null;
     stopHand();
   };
@@ -166,7 +196,7 @@ export function startPlaceMemory(): PlaceMemory {
       pending = null;
       const el = place ? document.getElementById(place.id) : null;
       if (!place || !el) return;
-      const by = el.getBoundingClientRect().top - mastheadFoot() - place.offset;
+      const by = topOf(el) - mastheadFoot() - place.offset;
       window.scrollTo({ top: window.scrollY + by, behavior: "instant" });
       sample();
     },

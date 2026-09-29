@@ -122,8 +122,10 @@ Hover is a tint. Press is the one app-wide movement: every button, button-styled
 box (`button`, `[role=button]`, `.press`) settles to 96% while held (90ms in) and eases back on
 release (200ms, no overshoot). It is a transform only, so layout never moves; keyboard activation and
 disabled controls never animate (rule in `src/styles/motion.css`, guarded by `tests/e2e/press.spec.ts`).
-The other movements: the theme button's turning icon, the invalid shake, the
-clock's flip, the digit caret, the running sweep, popup fades. All collapse under reduced motion, and under the Motion switch.
+The other movements: the theme button's turning icon, and Night falls, where the theme's change sweeps
+out from the button in a widening circle (a same-document View Transition, 640 ms, instant where the
+browser has none; `night-falls.ts`). Then the invalid shake, the clock's flip, the digit caret, the
+running sweep, and popup fades. All collapse under reduced motion, and under the Motion switch.
 
 **The Motion switch** sits in the landing footer's bar, after the clock, and is on by default. Off means
 what the device's reduced-motion setting means, on every traveller page. `motion.css` applies its
@@ -149,6 +151,14 @@ these rules.
   `<h1>` before and after; the split exists only while the letters move.
 - **Scroll-driven pieces follow the scroll both ways:** the strip, the board's status, the chapters, the berths
   and the route. Pinned pieces pin only while their content fits the window.
+- **Nothing moves under the reader.** A piece that grows or shrinks (the drawing's pin, 02's dial, the still's
+  columns, the run) judges the reader by one rule (`readerPlace`). Above it, its top in view, the change lands below
+  them. Inside it, with over half the window in it, they go to its start. Past it, its foot within the window's top
+  half, they move by exactly the change, so what follows it stays where they were reading.
+- **The window-seat run (06–07)** pins only while Motion is on, the reader is not below it, and every station fits
+  the window. The scroll then carries the two sections sideways past a window along a line diagram, the train holding
+  the window. Tab, and the board's links to 06 and 07, bring a station to the window. On touch screens each station is
+  a resting point (proximity snapping). Otherwise the sections read as they always did.
 - **Motion off means still.** True readings keep updating (the strip's place, the board's status, the dial's
   segments and chart face), with no movement.
 - **The registration-mark cursor**, page-wide on fine pointers with Motion on: a hairline steel cross follows

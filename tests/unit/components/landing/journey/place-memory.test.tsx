@@ -197,6 +197,81 @@ describe("startPlaceMemory", () => {
     memory.stop();
   });
 
+  // Only the reader's own scroll cancels the restore (J6-9; the owner, 2026-09-28, amending J5-17's "any key"): a
+  // mostly vertical wheel that is not a pinch-zoom, a finger dragging, and a scroll key outside a text field with no
+  // Alt, Ctrl or Meta. A swipe back, Back and Forward's own keys, a tap and every other key leave it pending.
+  type Act = [name: string, act: () => void];
+  const wheel =
+    (init: WheelEventInit) =>
+    (): void => {
+      window.dispatchEvent(new WheelEvent("wheel", init));
+    };
+  const key =
+    (k: string, init: KeyboardEventInit = {}) =>
+    (): void => {
+      document.body.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, ...init }));
+    };
+  const inField =
+    (tag: "input" | "textarea" | "select" | "div", k: string, editable = "") =>
+    (): void => {
+      const field = document.createElement(tag);
+      if (tag === "div") field.setAttribute("contenteditable", editable);
+      document.body.append(field);
+      field.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true }));
+    };
+  const cancels: Act[] = [
+    ["a mostly vertical wheel", wheel({ deltaX: 12, deltaY: 40 })],
+    ["a finger dragging (touchmove)", () => window.dispatchEvent(new Event("touchmove"))],
+    ["ArrowUp", key("ArrowUp")],
+    ["ArrowDown", key("ArrowDown")],
+    ["PageUp", key("PageUp")],
+    ["PageDown", key("PageDown")],
+    ["Home", key("Home")],
+    ["End", key("End")],
+    ["Space", key(" ")],
+    ["Shift+Space", key(" ", { shiftKey: true })],
+    ["End inside a region made not editable (contenteditable=false)", inField("div", "End", "false")],
+  ];
+  const keeps: Act[] = [
+    ["a trackpad's swipe back (a sideways wheel)", wheel({ deltaX: -60 })],
+    ["a wheel as much sideways as down", wheel({ deltaX: 30, deltaY: 30 })],
+    ["a pinch-zoom (ctrl+wheel)", wheel({ deltaY: 40, ctrlKey: true })],
+    ["a tap (touchstart alone)", () => window.dispatchEvent(new Event("touchstart"))],
+    ["the a key", key("a")],
+    ["Tab", key("Tab")],
+    ["Shift", key("Shift")],
+    ["Escape", key("Escape")],
+    ["ArrowLeft", key("ArrowLeft")],
+    ["ArrowRight", key("ArrowRight")],
+    ["Alt+ArrowLeft (Back)", key("ArrowLeft", { altKey: true })],
+    ["Meta+[ (Back)", key("[", { metaKey: true })],
+    ["Alt+ArrowDown", key("ArrowDown", { altKey: true })],
+    ["Ctrl+End", key("End", { ctrlKey: true })],
+    ["Meta+ArrowUp", key("ArrowUp", { metaKey: true })],
+    ["ArrowDown in a text input", inField("input", "ArrowDown")],
+    ["Space in a textarea", inField("textarea", " ")],
+    ["End in an editable region", inField("div", "End")],
+    ["ArrowDown on a select (it picks an option)", inField("select", "ArrowDown")],
+  ];
+
+  it.each(cancels)("restores nothing once the reader scrolls by their own hand: %s", (_, act) => {
+    store({ entry: "k1", id: "record", offset: 136 });
+    const memory = startPlaceMemory();
+    act();
+    memory.restore();
+    expect(scrolls).toEqual([]);
+    memory.stop();
+  });
+
+  it.each(keeps)("still restores after what is not the reader's own scroll: %s", (_, act) => {
+    store({ entry: "k1", id: "record", offset: 136 });
+    const memory = startPlaceMemory();
+    act();
+    memory.restore();
+    expect(scrolls).toEqual([3000 - 64 - 136]);
+    memory.stop();
+  });
+
   it("stops listening when stopped", () => {
     const removeWindow = vi.spyOn(window, "removeEventListener");
     const removeNav = vi.spyOn(nav, "removeEventListener");
@@ -215,5 +290,31 @@ describe("startPlaceMemory", () => {
     const memory = startPlaceMemory();
     memory.restore();
     expect(() => memory.stop()).not.toThrow();
+  });
+
+  // The window-seat run (J6-9): #features and #use ride it inside one pin, so their boxes stand together, far from
+  // where their words come to the window. run.ts writes where each would stand (data-run-at), as station-progress reads.
+  const ride = () => {
+    document.body.insertAdjacentHTML("beforeend", `<section id="features" data-run-at="3600"></section><section id="use" data-run-at="4600"></section>`);
+    for (const id of ["features", "use"]) document.getElementById(id)!.getBoundingClientRect = () => ({ top: 3600 - scrollY }) as DOMRect;
+  };
+
+  it("reads a section riding the run where run.ts says it stands, not at the pinned box it shares", () => {
+    ride();
+    const memory = startPlaceMemory();
+    scrollY = 4600 - 40; // 07's top 40px down the window, 24px above the masthead's foot
+    window.dispatchEvent(new Event("scroll"));
+    vi.advanceTimersToNextFrame();
+    memory.stop();
+    expect(parsePlace(window.sessionStorage.getItem(PLACE_KEY))).toEqual({ entry: "k1", id: "use", offset: -24 });
+  });
+
+  it("restores a place in the run where run.ts says it stands", () => {
+    ride();
+    store({ entry: "k1", id: "use", offset: -24 });
+    const memory = startPlaceMemory();
+    memory.restore();
+    expect(scrolls).toEqual([4600 - 64 + 24]);
+    memory.stop();
   });
 });

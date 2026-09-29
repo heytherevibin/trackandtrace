@@ -11,6 +11,8 @@
     "test": "vitest run",
     "dev:fixture": "PNR_SOURCE=fixture next dev",
     "dev:railkit": "PNR_SOURCE=railkit next dev",
+    "build:local": "node scripts/serve-local-production.mjs build",
+    "serve:local": "node scripts/serve-local-production.mjs",
     "test:unit": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

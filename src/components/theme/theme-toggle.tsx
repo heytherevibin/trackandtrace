@@ -6,6 +6,7 @@ import { DarkThemeFilled, WeatherMoonFilled, WeatherSunnyFilled } from "@/compon
 import { messages } from "@/messages";
 import { MASTHEAD_CONTROL, MASTHEAD_ICON_CONTROL } from "@/components/shell/nav-config";
 import { cn } from "@/utils/cn";
+import { nightFalls, resolvedChoice } from "./night-falls";
 import { useTheme, type ThemeChoice } from "./use-theme";
 
 const subscribeNever = () => () => undefined;
@@ -46,7 +47,8 @@ function modeAfter(value: ThemeChoice): Mode {
 
 /**
  * One square theme icon button. It shows only the active mode's icon; the mode and the next one live in
- * its accessible name and tooltip ("Theme: Day. Switch to Night"). A click moves System → Day → Night. The
+ * its accessible name and tooltip ("Theme: Day. Switch to Night"). A click moves System → Day → Night. With Motion
+ * on, the change sweeps out from the button in a circle (Night falls, night-falls.ts). The
  * press is the app-wide one (motion.css); the old icon turns out as the new one turns in. Reduced motion
  * (MotionConfig "user") drops the turn and keeps the change. Until the stored choice is known it holds its
  * size without claiming a mode.
@@ -61,7 +63,7 @@ export function ThemeToggle({ className }: { readonly className?: string }) {
   return (
     <button
       type="button"
-      onClick={() => switchTheme(setTheme, next.value)}
+      onClick={(event) => nightFalls(event.currentTarget, () => switchTheme(setTheme, next.value), resolvedChoice(next.value))}
       aria-label={mounted ? label : messages.shell.theme.label}
       title={mounted ? label : undefined}
       className={cn(MASTHEAD_CONTROL, MASTHEAD_ICON_CONTROL, className)}

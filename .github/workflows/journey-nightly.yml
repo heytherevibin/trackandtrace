@@ -1,0 +1,131 @@
+# The landing journey's nightly checks (spec 2026-09-24 §5, §8; J6-3): what a pull request's CI cannot afford, or
+# cannot do at all.
+# - production: this checkout's production build, served on the runner with sample data and nothing live
+#   (scripts/serve-local-production.mjs, an offline guard in the server): the chunk budgets, the production-build smoke
+#   (the security policy scrolled end to end, no other host, a sample check), and the throttled runs at 4×, 6× and 10×.
+# - journey: the fixture-mode `next dev` every PR runs on. Collisions at fifteen sizes and at 200% text, every chapter
+#   photographed in Day, Night and on a phone (kept as an artifact), and the journey's specs in WebKit.
+# What it does NOT measure: §3.H's frame times and long tasks. GitHub's runners have no GPU (Chromium draws WebGL through
+# SwiftShader, on the CPU), so the throttled runs judge only what holds on any machine and print the rest. Those budgets
+# are measured by hand on a real GPU, before each journey PR merges: `npm run build:local && node scripts/journey-perf.mjs`.
+# No secrets: every run serves sample data, and the serve script blanks every credential.
+name: Journey nightly
+
+on:
+  # 03:00 IST: after the day's merges, before the availability crawler (05:30 IST)
+  schedule:
+    - cron: "30 21 * * *"
+  workflow_dispatch:
+  # The pull request that changes this file proves it before it merges; no other pull request runs it.
+  pull_request:
+    paths: [.github/workflows/journey-nightly.yml]
+
+permissions:
+  contents: read
+
+# Always cancelled by a newer run, unlike ci.yml's (which keeps a push to main's run whole): every run here is a check,
+# never a record, so a newer one of the same ref (a push to the PR that changes this file, a hand dispatch over the
+# night's) supersedes it.
+concurrency:
+  group: journey-nightly-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  production:
+    # Not a fork's own schedule or dispatch. A pull request from a fork that changes this file still runs here, under
+    # this repository's name: nothing to expose, with no secrets, a read-only token, and a first-time contributor's run
+    # held for approval.
+    if: github.repository == 'heytherevibin/trackandtrace'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # The only build the serve script accepts: every live variable blanked, and stamped as its own (a plain
+      # `npm run build` is refused at serve time).
+      - run: npm run build:local
+      - name: Chunk budgets (70 KB, 240 KB, three.js only in the scene)
+        run: node scripts/journey-budgets.mjs
+      - name: Read the Playwright version
+        id: playwright
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Cache Playwright browsers
+        id: browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      - name: Install Chromium and its system libraries
+        if: steps.browsers.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+      - name: Install Chromium's system libraries
+        if: steps.browsers.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+      - name: The production build's smoke (the security policy, other hosts, a sample check, the offline guard)
+        run: npx playwright test -c playwright.production.config.ts
+      - name: Throttled at 4×, 6× and 10× on the runner's software GPU (frame times printed, not judged)
+        shell: bash
+        run: node scripts/journey-perf.mjs --software | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Keep the report
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: production-report
+          path: |
+            playwright-report-production/
+            test-results/
+            .offline-guard.log
+          retention-days: 14
+
+  journey:
+    # Not a fork's own schedule or dispatch. A pull request from a fork that changes this file still runs here, under
+    # this repository's name: nothing to expose, with no secrets, a read-only token, and a first-time contributor's run
+    # held for approval.
+    if: github.repository == 'heytherevibin/trackandtrace'
+    name: journey ${{ matrix.shard }}/3
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Read the Playwright version
+        id: playwright
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Cache Playwright browsers
+        id: browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-webkit-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      - name: Install Chromium, WebKit and their system libraries
+        if: steps.browsers.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium webkit
+      - name: Install Chromium's and WebKit's system libraries
+        if: steps.browsers.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium webkit
+      - run: npx playwright test -c playwright.nightly.config.ts --shard=${{ matrix.shard }}/3
+      - name: Keep the report and the photographs
+        # kept whether the shard passed or failed, for a person to look at; a cancelled run keeps nothing
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: journey-${{ matrix.shard }}
+          path: |
+            playwright-report-nightly/
+            test-results/
+          retention-days: 14

@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 // Vercel's Node version, and actions pinned to a commit.
 
 const DIR = join(process.cwd(), ".github/workflows");
-const FILES = ["ci.yml", "audit.yml"] as const;
+const FILES = ["ci.yml", "audit.yml", "journey-nightly.yml"] as const;
 
 function read(name: string): string {
   const path = join(DIR, name);
@@ -61,6 +61,63 @@ describe("ci.yml", () => {
     expect(ci).toContain("npx playwright test");
     expect(ci).toMatch(/if: failure\(\)\n\s+uses: actions\/upload-artifact@/);
   });
+
+  it("shards the browser suite over four parallel jobs, and the e2e check waits for every shard and the console suite", () => {
+    expect(ci).toMatch(/^ {2}e2e-shard:$/m);
+    expect(ci).toContain("shard: [1, 2, 3, 4]");
+    expect(ci).toContain("npx playwright test --shard=${{ matrix.shard }}/4");
+    expect(ci).toMatch(/^ {2}console:$/m);
+    const gate = ci.slice(ci.search(/^ {2}e2e:$/m));
+    expect(gate).toContain("needs: [e2e-shard, console]");
+    expect(gate).toContain("npx playwright merge-reports --reporter html ./all-blob-reports");
+  });
+
+  it("always reports the e2e check, and fails it unless every shard and the console suite succeeded", () => {
+    const gate = ci.slice(ci.search(/^ {2}e2e:$/m));
+    // A skipped required check counts as passing: the gate must run even when a job it needs was cancelled or skipped.
+    expect(gate).toMatch(/^ {4}if: \$\{\{ always\(\) \}\}$/m);
+    expect(gate).not.toMatch(/^ {4}if: \$\{\{ !cancelled\(\) \}\}$/m);
+    // …and it passes only on `success`: cancelled, skipped and failure all fail it.
+    expect(gate).toContain("SHARDS: ${{ needs.e2e-shard.result }}");
+    expect(gate).toContain("CONSOLE: ${{ needs.console.result }}");
+    expect(gate).toContain('run: test "$SHARDS" = success && test "$CONSOLE" = success');
+    // The report steps run after a real failure, never for a cancelled run.
+    const conditions = [...gate.matchAll(/^ {6}(?:- | {2})if: (.+)$/gm)].map((m) => m[1]);
+    expect(conditions).toHaveLength(6);
+    for (const condition of conditions) expect(condition).toBe("${{ failure() && !cancelled() }}");
+  });
+
+  it("runs the database tests and the console suite against a local Supabase stack, in their own job", () => {
+    const job = ci.slice(ci.search(/^ {2}console:$/m), ci.search(/^ {2}e2e:$/m));
+    expect(job).toContain("npx supabase@2.117.0 test db");
+    expect(job).toContain("npm run test:e2e:console");
+  });
+
+  it("gives every job a time limit", () => {
+    expect((ci.match(/^ {4}timeout-minutes:/gm) ?? []).length).toBe((ci.match(/^ {4}runs-on:/gm) ?? []).length);
+  });
+
+  it("stops a slow shard's tests inside its job's limit, so the step fails and its blob report is still kept", () => {
+    const shard = ci.slice(ci.search(/^ {2}e2e-shard:$/m), ci.search(/^ {2}console:$/m));
+    const job = Number(/^ {4}timeout-minutes: (\d+)$/m.exec(shard)?.[1]);
+    const step = /^ {6}- run: npx playwright test --shard=\$\{\{ matrix\.shard \}\}\/4\n {8}timeout-minutes: (\d+)$/m.exec(shard);
+    expect(step?.[1]).toBe("17");
+    expect(Number(step?.[1])).toBeLessThan(job);
+    // and room around it for a cache-miss setup (npm ci, the browsers) and the report upload: the job's limit must never
+    // beat the step's to it, or the blob report is lost with the job (final review)
+    expect(job - Number(step?.[1])).toBeGreaterThanOrEqual(8);
+  });
+
+  it("holds the journey's chunk budgets on every pull request, after the production build", () => {
+    const build = ci.indexOf("npm run build");
+    expect(build).toBeGreaterThan(-1);
+    expect(ci.indexOf("node scripts/journey-budgets.mjs")).toBeGreaterThan(build);
+  });
+
+  it("keeps each shard's results as a blob report, for the gate to merge when a shard fails", () => {
+    const config = readFileSync(join(process.cwd(), "playwright.config.ts"), "utf8");
+    expect(config).toContain('reporter: process.env.CI ? [["github"], ["blob"]] : [["list"]]');
+  });
 });
 
 describe("audit.yml", () => {
@@ -73,5 +130,43 @@ describe("audit.yml", () => {
   it("runs weekly and when the dependency files change, never on unrelated work", () => {
     expect(audit).toMatch(/schedule:\n\s+- cron: /);
     expect(audit).toMatch(/paths: \[package\.json, package-lock\.json\]/);
+  });
+});
+
+describe("journey-nightly.yml", () => {
+  const nightly = read("journey-nightly.yml");
+
+  it("runs at night and by hand, and on a pull request only when it changes itself (J6-11)", () => {
+    expect(nightly).toMatch(/schedule:\n\s+- cron: /);
+    expect(nightly).toContain("workflow_dispatch:");
+    expect(nightly).toMatch(/pull_request:\n\s+paths: \[\.github\/workflows\/journey-nightly\.yml\]/);
+  });
+
+  it("runs its jobs only under this repository's name (never a fork's own schedule or dispatch), and gives every job a time limit", () => {
+    const jobs = (nightly.match(/runs-on:/g) ?? []).length;
+    expect(jobs).toBe(2);
+    expect((nightly.match(/if: github\.repository == 'heytherevibin\/trackandtrace'/g) ?? []).length).toBe(jobs);
+    expect((nightly.match(/timeout-minutes:/g) ?? []).length).toBe(jobs);
+  });
+
+  it("serves sample data and nothing live: no live source, no credential, nowhere", () => {
+    expect(nightly).not.toMatch(/PNR_SOURCE:\s*(railkit|live)/);
+    expect(nightly).not.toMatch(/RAILKIT|UPSTASH|SUPABASE|DATA_KEY|SENTRY|RESEND|LOCAL_FIXTURE/);
+  });
+
+  it("measures what a GPU-less runner can: the chunk budgets, the production build, the throttled runs, the wide e2e", () => {
+    // read from `jobs:` on, so only the steps count, never a comment above them. The build is build:local, the only
+    // build the serve script accepts (a plain `npm run build` leaves it unstamped).
+    const steps = nightly.slice(nightly.search(/^jobs:$/m));
+    const order = ["npm run build:local", "node scripts/journey-budgets.mjs", "npx playwright test -c playwright.production.config.ts", "node scripts/journey-perf.mjs --software"].map((step) => steps.indexOf(step));
+    expect(order.every((i) => i >= 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(nightly).toContain("npx playwright test -c playwright.nightly.config.ts --shard=${{ matrix.shard }}/3");
+    expect(nightly).toContain("npx playwright install --with-deps chromium webkit");
+  });
+
+  it("says plainly that the real-GPU budgets are measured by hand", () => {
+    expect(nightly).toContain("node scripts/journey-perf.mjs");
+    expect(nightly).toMatch(/no GPU/);
   });
 });

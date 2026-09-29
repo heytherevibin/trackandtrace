@@ -1,6 +1,6 @@
 import { animate, onScroll } from "animejs";
 import { SMOOTH } from "./motion-tokens";
-import { track } from "./observers";
+import { keepUp, track } from "./observers";
 import type { JourneyContext, Teardown } from "./start-journey";
 
 // 05 · the roadmap's track while the journey runs (spec §3.A): the scroll lays the line, sleepers a little
@@ -38,8 +38,10 @@ export function startRoute({ motion }: JourneyContext): Teardown {
   paint(0);
   const observer = track(onScroll({ target: section, enter: "bottom-=25% top", leave: "bottom-=10% bottom", sync: SMOOTH }));
   const drive = animate(state, { p: [0, 1], ease: "linear", duration: 1000, onUpdate: () => paint(state.p), autoplay: observer });
+  const awake = keepUp(observer, () => state.p); // the line catches the scroll up though a frame outlasts anime's wake
 
   return () => {
+    awake();
     drive.revert();
     observer.revert();
     path.style.removeProperty("stroke-dasharray");

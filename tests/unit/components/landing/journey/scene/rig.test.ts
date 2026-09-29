@@ -100,7 +100,8 @@ describe("the drawn train's rig", () => {
   it("builds a part at a time, and only hands over the rig once it is whole", () => {
     const out: { rig?: Rig } = {};
     let steps = 0;
-    for (const _ of rigSteps(style, { coaches: 1 }, out)) {
+    const build = rigSteps(style, { coaches: 1 }, out);
+    for (let next = build.next(); !next.done; next = build.next()) {
       steps += 1;
       expect(out.rig).toBeUndefined();
     }

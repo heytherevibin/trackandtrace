@@ -5,7 +5,7 @@
 // - the scene, at most 240 KB gzip, downloaded only when the page may draw live: every chunk the scene's own loader
 //   fetches (its mark, three.js), and any other chunk carrying three.js's own message text (it survives
 //   minification). A chunk the journey and the scene share is fetched with the journey, so it counts there, once;
-// - never the frame meter (`?journey-hud`, previews and development only; J5-10), found by its close button's label.
+// - never the frame meter (`?journey-hud`, previews and development only; J5-10), found by its own mark (hud-mark.ts).
 // Any other chunk the journey loads lazily fails the run: a split the budgets cannot place must be named, not skipped.
 // The e2e "three.js never downloaded" specs are the guard that three.js stays behind the scene's door at runtime.
 //   node scripts/journey-budgets.mjs
@@ -14,7 +14,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
 
-export const MARKS = { journey: "tt-journey-chunk", scene: "tt-scene-chunk", three: "THREE.WebGLRenderer", hud: "Close the frame meter" };
+export const MARKS = { journey: "tt-journey-chunk", scene: "tt-scene-chunk", three: "THREE.WebGLRenderer", hud: "tt-hud-chunk" };
 export const BUDGETS = { journey: 70 * 1024, scene: 240 * 1024 };
 
 /** A lazy loader as Turbopack writes one: `Promise.all(["static/chunks/a.js", …].map(…))`. */
@@ -68,12 +68,18 @@ export function measure(chunks, { requireLoader = false } = {}) {
       if (seen.has(group.join())) continue;
       seen.add(group.join());
       const fetched = resolve(group);
-      if (fetched.some((c) => c.text.includes(MARKS.hud))) continue;
-      if (inScene || fetched.some((c) => c.text.includes(MARKS.scene))) {
+      const carries = (/** @type {string} */ mark) => fetched.some((c) => c.text.includes(mark));
+      if (carries(MARKS.scene) && carries(MARKS.hud)) {
+        failures.push(`one loader fetches both the scene and the frame meter (${group.join(", ")}): the budgets cannot tell them apart`);
+        continue;
+      }
+      // the scene first: a group is the meter's only when it carries no scene
+      if (inScene || carries(MARKS.scene)) {
         sceneLoaded.push(...fetched);
         follow(fetched, true);
         continue;
       }
+      if (carries(MARKS.hud)) continue;
       for (const c of fetched) if (!inJourney.has(c.name)) failures.push(`the journey loads ${c.name}, which no budget can place: mark it, or count it here`);
     }
   };
@@ -90,6 +96,7 @@ export function measure(chunks, { requireLoader = false } = {}) {
   if (!marked.length) head.push("no chunk carries the journey's mark");
   if (!scene.length) head.push("no chunk carries the scene");
   if (requireLoader && marked.length && !withJourney.length) head.push("no loader fetches the journey chunk, so what loads beside it cannot be counted");
+  if (requireLoader && byMark.some((c) => c.text.includes(MARKS.scene)) && !sceneLoaded.length) head.push("no loader fetches the scene chunk, so what loads beside it cannot be counted");
   if (journeyBytes > BUDGETS.journey) head.push(`the journey chunk is ${kb(journeyBytes)}, over its 70 KB`);
   if (sceneBytes > BUDGETS.scene) head.push(`the scene is ${kb(sceneBytes)}, over its 240 KB`);
   return { journeyBytes, sceneBytes, journey: journey.map((c) => c.name), scene: scene.map((c) => c.name), failures: [...head, ...failures] };

@@ -200,3 +200,7 @@ html:not([data-motion]) .still-drawing:not(.is-noscript) { display: none; }
 .terminus-stage { position: relative; height: clamp(200px, 30vh, 320px); margin-bottom: 20px; }
 .terminus-caption { position: absolute; left: 0; top: 0; z-index: 2; }
 .terminus-still { position: absolute; inset: 18px 0 0; }
+
+/* ---- 06–07 · the window-seat run: its window and train only while it runs (journey-island.css, run.ts) */
+.run { position: relative; }
+.run-window, .run-train { display: none; }

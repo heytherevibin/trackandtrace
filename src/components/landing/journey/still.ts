@@ -1,4 +1,6 @@
+import { pastShift } from "./drawing-mode";
 import { DRAWING_EVENT, LAYOUT_EVENT, emit, type DrawingDetail } from "./journey-events";
+import { jumpTo } from "./keep-place";
 import { columnsFit, columnsZone, distribute, leaderFrom, letterbox } from "./labels-layout";
 import type { JourneyContext, Teardown } from "./start-journey";
 import { STILL_MANIFEST } from "./still-manifest";
@@ -56,16 +58,20 @@ export function startStill({ still }: JourneyContext): Teardown {
   // Whether the labels are the live drawing's (standAside, below). A build that starts while the drawing is already
   // live (a rebuild) finds them so.
   let aside = document.documentElement.dataset.drawing === "live";
+  // The reader's scroll while the pin was last the height on record (below), learned only then: a scroll once it has
+  // changed is someone answering that change (02's guard, scroll anchoring, a clamp), never the reader.
+  let seenY = window.scrollY;
+  const learn = () => {
+    const height = still.get().height;
+    if (height === null || pin.getBoundingClientRect().height === height) seenY = window.scrollY;
+  };
 
   const clear = () => {
     pin.classList.remove("is-columns", "is-compact");
     for (const label of labels) label.style.top = "";
     for (const key of HOLDER) holder.style[key] = "";
     lines.removeAttribute("viewBox");
-    for (const { line, dot } of leaders) {
-      line.remove();
-      dot.remove();
-    }
+    lines.replaceChildren(); // every leader, a predecessor's included (the successor's hand-over, below)
     leaders = [];
   };
 
@@ -141,21 +147,23 @@ export function startStill({ still }: JourneyContext): Teardown {
     return true;
   };
 
-  // A reader already below the chapter never asked to move: the pin taking its columns for the first time,
-  // giving them up, or its own height formula answering a plain resize while staying in columns, must shift
-  // such a reader by exactly the height that gained or lost, never snap them to its start. Never reacts while
-  // list on both sides of the change, though (never a plain resize to the ordinary, content-driven list
-  // height, which nothing here writes or is answerable for): #how keeps its own reader in place
-  // independently in that case, via chapters.ts, and the two must never both react to the same resize.
-  // Compared against what the reader last actually settled on (ctx.still, above) when there is one, never a
-  // value measured fresh in this same call: a rebuild's teardown already having run, or the columns formula
-  // answering a resize, is never caught mid-change by any callback, only after, so there is no "before" left
-  // to measure at that moment except what was already on record (prototype v3's placeBox pattern, chapters.ts's
-  // own settlePlace) — comparing a fresh instance's first pass against a live read instead would misread the
-  // rebuild itself (list, briefly, while nothing is watching, then columns again) as a flip the reader lived
-  // through. Only the very first settle this lifetime, with nothing on record yet, measures fresh: at that
-  // moment the pin still carries its untouched server-rendered height, which a live read is the right (and
-  // only) way to learn.
+  // A reader past the chapter (readerPlace's past: its foot within the window's top half) never asked to move:
+  // the pin taking its columns for the first time, giving them up, or its own height formula answering a plain
+  // resize while staying in columns, must shift such a reader by exactly the height that gained or lost, never
+  // snap them to its start. Never reacts while list on both sides of the change, though (never a plain resize
+  // to the ordinary, content-driven list height, which nothing here writes or is answerable for): #how keeps
+  // its own reader in place independently in that case, via chapters.ts, and the two must never both react to
+  // the same resize.
+  // The change is measured from the height on record (ctx.still, above) while the reader still stands where the last
+  // settle left them (seenY, learned only while the pin is that height): a rebuild's teardown already having run, or
+  // the columns formula answering a resize, is never caught mid-change by any callback, only after, so there is no
+  // "before" left to measure at that moment except what was already on record (prototype v3's placeBox pattern,
+  // chapters.ts's own settlePlace) — comparing a fresh instance's first pass against a live read instead would misread
+  // the rebuild itself (list, briefly, while nothing is watching, then columns again) as a flip the reader lived
+  // through. Once the reader has been moved since (02's guard, scroll anchoring or a clamp answered the change), it is
+  // measured fresh (`from = beforeRect.height`), so this pass answers only its own change, never one already answered
+  // (Task 3). With nothing on record yet (the first settle this lifetime) the pin carries its untouched
+  // server-rendered height, which a live read is the right (and only) way to learn.
   const layout = () => {
     frame = 0;
     if (document.documentElement.dataset.drawing !== "still") return standAside();
@@ -170,10 +178,16 @@ export function startStill({ still }: JourneyContext): Teardown {
     const afterHeight = pin.getBoundingClientRect().height;
 
     if (wasColumns || isColumns) {
-      const beforeDocBottom = beforeRect.top + beforeScrollY + beforeHeight;
-      if (beforeScrollY >= beforeDocBottom && afterHeight !== beforeHeight) window.scrollTo({ top: beforeScrollY + (afterHeight - beforeHeight), behavior: "instant" });
+      // The change to answer: this pass's own, from the height on record, unless the reader was already moved since it
+      // changed (a resize 02's guard answered, its move covering everything above #how's foot): then this pass's own only.
+      const from = beforeScrollY === seenY ? beforeHeight : beforeRect.height;
+      // Past the pin by the rule every piece uses (J6-4): its foot within the window's top half. The window's top edge
+      // alone missed a reader at #principles, the pin's foot a few px under the masthead, and moved them 77 px.
+      const shift = pastShift({ top: beforeRect.top, bottom: beforeRect.top + from }, afterHeight - from, window.innerHeight);
+      if (shift !== 0) jumpTo(beforeScrollY + shift);
     }
     still.set({ columns: isColumns, height: afterHeight });
+    seenY = window.scrollY;
     // the chapter changed height: every module that measures sections hears it (only on a change, or it would loop)
     if (wasColumns !== isColumns) emit(LAYOUT_EVENT);
   };
@@ -222,6 +236,7 @@ export function startStill({ still }: JourneyContext): Teardown {
 
   window.addEventListener(DRAWING_EVENT, onDrawing);
   window.addEventListener(LAYOUT_EVENT, schedule);
+  window.addEventListener("scroll", learn, { passive: true });
   columns.addEventListener("change", schedule);
   // The pin's own box (fixed by CSS in columns mode) never answers a label, the title block or the copy
   // changing size — a font swapping in after the first pass, say — so each is watched too. layout() itself
@@ -234,7 +249,13 @@ export function startStill({ still }: JourneyContext): Teardown {
   observer.observe(titleBlock);
   for (const label of labels) observer.observe(label);
   void document.fonts.ready.then(schedule);
-  schedule();
+  // A rebuild's successor (Motion, a fit change) finds the columns its predecessor left standing (the teardown, below)
+  // and takes them over in this same task: laid out afresh against the place on record (nothing the reader saw has
+  // changed, so nobody moves), or cleared at once when the drawing is now live. Its own leaders replace the predecessor's.
+  if (pin.classList.contains("is-columns")) {
+    lines.replaceChildren();
+    layout();
+  } else schedule();
 
   return () => {
     alive = false;
@@ -242,10 +263,22 @@ export function startStill({ still }: JourneyContext): Teardown {
     frame = 0;
     window.removeEventListener(DRAWING_EVENT, onDrawing);
     window.removeEventListener(LAYOUT_EVENT, schedule);
+    window.removeEventListener("scroll", learn);
     columns.removeEventListener("change", schedule);
     observer.disconnect();
     for (const stop of pointing) stop();
     if (!aside) light(null);
-    clear();
+    if (!pin.classList.contains("is-columns")) return clear();
+    // The columns the reader is looking at stand until the task ends, for a rebuild's successor to take over (a rebuild
+    // starts every module before it returns: start-journey.ts). Cleared here, the chapter stood 304 px shorter for every
+    // layout the other teardowns and starts force before the successor laid them out again, and Linux WebKit's scroll
+    // anchoring moved the reader for that collapse and never for the columns' return (the nightly, run 36406365173).
+    // No successor took them (the journey ended, or its rebuild failed): cleared then, and the place on record with them.
+    const handed = still.get();
+    queueMicrotask(() => {
+      if (still.get() !== handed) return;
+      clear();
+      still.set({ columns: false, height: null });
+    });
   };
 }

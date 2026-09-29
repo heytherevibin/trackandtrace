@@ -121,6 +121,21 @@ html[data-theme-switching] *::after {
   animation-timing-function: var(--ease-out-expo);
 }
 
+/* Night falls (spec 2026-09-24 §3.F; night-falls.ts): while the theme sweeps, the new page is revealed over the old,
+   held still, by a clip-path circle from the theme button, never a cross-fade. The masthead rides in the page's own
+   capture, so the circle sweeps it too. */
+html[data-theme-sweep]::view-transition-old(root),
+html[data-theme-sweep]::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+html[data-theme-sweep]::view-transition-new(root) {
+  z-index: 1;
+}
+html[data-theme-sweep] header {
+  view-transition-name: none !important; /* over top-nav.tsx's inline name, for the sweep only */
+}
+
 @utility spin {
   animation: spin 800ms linear infinite;
 }

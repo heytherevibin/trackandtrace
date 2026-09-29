@@ -6,6 +6,7 @@ import { startChapters, startPlaceGuard } from "./chapters";
 import { startClock } from "./clock";
 import { startCursor } from "./cursor";
 import { startDrawing } from "./drawing";
+import { startFocusGlide } from "./focus-glide";
 import { startHero } from "./hero";
 import { introWanted, startIntro } from "./intro";
 import { LAYOUT_EVENT, REBUILD_EVENT, type ResultDetail } from "./journey-events";
@@ -14,6 +15,7 @@ import { refreshAll, untrackAll } from "./observers";
 import { pause } from "./pause";
 import { startPlaceMemory } from "./place-memory";
 import { startRoute } from "./route";
+import { startRun } from "./run";
 import type { Engine } from "./scene/engine";
 import { startSound } from "./sound";
 import { startStationProgress } from "./station-progress";
@@ -105,8 +107,10 @@ export interface JourneyOptions {
   readonly hud?: boolean;
 }
 
-/** In start order. Later tasks append their modules here. */
-export const MODULES: readonly JourneyModule[] = [startArrivals, startBoard, startStationProgress, startHero, startChapters, startBerths, startClock, startRoute, startCursor, startSound, startDrawing, startStill];
+/** In start order; a rebuild tears them down in reverse. The run (06–07) is last, so it is torn down first: its unpin
+ * is measured on the page the reader sees, before the still's and the drawing's teardowns change the layout above it
+ * for a moment (J6-7). Later tasks append their modules before it. */
+export const MODULES: readonly JourneyModule[] = [startArrivals, startBoard, startStationProgress, startHero, startChapters, startBerths, startClock, startRoute, startCursor, startSound, startDrawing, startStill, startFocusGlide, startRun];
 
 export function startJourney(options: JourneyOptions = {}): Teardown {
   const html = document.documentElement;
@@ -200,6 +204,12 @@ export function startJourney(options: JourneyOptions = {}): Teardown {
   window.addEventListener(REBUILD_EVENT, rebuild);
   window.addEventListener("resize", onResize);
   window.addEventListener(LAYOUT_EVENT, refreshAll);
+  // Web fonts still arriving as the journey starts: every piece that measured itself in the fallback's lines (02's fit,
+  // on a small phone too tall to pin) measures again once they land. Already loaded: nothing to announce.
+  if ("fonts" in document && document.fonts.status === "loading")
+    void document.fonts.ready.then(() => {
+      if (!ended) window.dispatchEvent(new Event(LAYOUT_EVENT));
+    });
   build(pause).then(
     () => {
       if (ended) return;

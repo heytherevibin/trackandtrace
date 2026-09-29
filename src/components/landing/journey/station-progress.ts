@@ -37,7 +37,11 @@ export function startStationProgress(): Teardown {
   const measure = () => {
     const anchors = STATIONS.map((s) => {
       const el = document.getElementById(s.id);
-      return el ? el.getBoundingClientRect().top + window.scrollY : 0;
+      if (!el) return 0;
+      // A section riding the window-seat run (run.ts) stands where its first station reaches the window, not at the
+      // pinned box it shares with the other (J6-8).
+      const riding = Number(el.dataset.runAt);
+      return el.dataset.runAt !== undefined && Number.isFinite(riding) ? riding : el.getBoundingClientRect().top + window.scrollY;
     });
     tops = stationTops(anchors, window.innerHeight * 0.35);
   };

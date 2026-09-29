@@ -125,6 +125,7 @@ test.describe("J5: every reason not to draw live (spec §3.C, §4)", () => {
     await page.goto("/");
     await waitForJourney(page);
     await expect(page.locator("html")).toHaveAttribute("data-drawing-why", "webgl");
+    await expect(page.locator("html")).toHaveAttribute("data-drawing", "still");
     await expect(drawn(page).first()).toBeAttached();
     // A window is the assertion: a download that never starts has no state to wait on.
     await page.waitForTimeout(1_500);
@@ -141,6 +142,7 @@ test.describe("J5: every reason not to draw live (spec §3.C, §4)", () => {
       lose.loseContext();
     });
     await expect(page.locator("html")).toHaveAttribute("data-drawing-why", "webgl");
+    await expect(page.locator("html")).toHaveAttribute("data-drawing", "still");
     await expect(page.locator("#anatomy")).not.toHaveClass(/is-live/);
     await expect(drawn(page).first()).toBeAttached();
     await page.evaluate(() => {
@@ -158,9 +160,21 @@ test.describe("J5: every reason not to draw live (spec §3.C, §4)", () => {
     await page.goto("/");
     await waitForJourney(page);
     await expect(page.locator("html")).toHaveAttribute("data-drawing-why", "load", { timeout: 25_000 });
+    await expect(page.locator("html")).toHaveAttribute("data-drawing", "still");
     await expect(drawn(page).first()).toBeAttached();
     await expect(page.locator("html")).toHaveAttribute("data-journey", "on");
     if (!isMobile) await expect(page.locator("#how")).toHaveClass(/is-pinned/);
+  });
+
+  // A font request that never answers leaves document.fonts loading for good: the fit judgement waits for it only so
+  // long, and the scene's 20 s limit counts that wait in, so the chapter always decides (re-review, N1).
+  test("web fonts that never arrive: the chapter still decides, live or still with its reason", async ({ page }) => {
+    await page.route("**/*.woff2", () => undefined); // never answered
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await waitForJourney(page);
+    expect(await page.evaluate(() => document.fonts.status)).toBe("loading"); // the stall holds
+    const decided = () => page.evaluate(() => document.querySelector("#anatomy.is-live") !== null || (document.documentElement.dataset.drawingWhy ?? "") !== "");
+    await expect.poll(decided, { timeout: 25_000 }).toBe(true);
   });
 
   test("the session's quality floor: still, and three.js never downloaded", async ({ page }) => {
@@ -169,28 +183,62 @@ test.describe("J5: every reason not to draw live (spec §3.C, §4)", () => {
     await page.goto("/");
     await waitForJourney(page);
     await expect(page.locator("html")).toHaveAttribute("data-drawing-why", "quality");
+    await expect(page.locator("html")).toHaveAttribute("data-drawing", "still");
     // A window is the assertion: a download that never starts has no state to wait on.
     await page.waitForTimeout(1_500);
     expect(three()).toEqual([]);
   });
 
-  test("words too large for the window, even as a list: still (fit)", async ({ page }) => {
+  test("words too large for the window, even as a list: still (fit), and three.js never downloaded (J6-5)", async ({ page }) => {
+    const three = watchThree(page);
     // A phone with its text at 200%: the lead and the parts list leave the drawing less than its 150px (spec §3.C).
     await page.setViewportSize({ width: 390, height: 844 });
     await page.addInitScript(() => document.addEventListener("DOMContentLoaded", () => document.documentElement.style.setProperty("font-size", "200%")));
     await page.goto("/");
     await waitForJourney(page);
-    // the scene's own check decides it, after the scene has loaded to measure (spec §3.C)
-    await expect(page.locator("html")).toHaveAttribute("data-drawing-why", "fit", { timeout: 25_000 });
+    // judged before the scene is fetched: the pinned layout, laid out for an instant and put back
+    await expect(page.locator("html")).toHaveAttribute("data-drawing-why", "fit");
     await expect(page.locator("html")).toHaveAttribute("data-drawing", "still");
     await expect(page.locator("#anatomy")).not.toHaveClass(/is-live/);
     await expect(drawn(page).first()).toBeAttached();
+    // A window is the assertion: a download that never starts has no state to wait on.
+    await page.waitForTimeout(1_500);
+    expect(three()).toEqual([]);
   });
+
+  // Motion turned back on rebuilds the journey, and the drawing judges fit (J6-5) while the still's columns, handed over
+  // to its own successor (still.ts), still stand on the pin. Their rules hid the parts list the live list layout
+  // measures, so a chapter that fits as a list read as too tall: still (fit) for the session (nightly review, I-1).
+  for (const text of ["140%", "150%"] as const) {
+    test(`Motion turned back on judges fit as a fresh load does: a short window with text at ${text}`, async ({ page, browser, isMobile }) => {
+      test.skip(isMobile, "the still's columns stand on wide screens only");
+      const size = { width: 1440, height: 640 };
+      const scaled = (p: import("@playwright/test").Page) => p.addInitScript((v) => document.addEventListener("DOMContentLoaded", () => document.documentElement.style.setProperty("font-size", v)), text);
+      await page.setViewportSize(size);
+      await scaled(page);
+      await page.goto("/");
+      await waitForJourney(page);
+      const fresh = await page.locator("html").getAttribute("data-drawing-why");
+      expect(fresh, "a fresh load at this size fits the chapter (as a list)").not.toMatch(/fit/);
+      const context = await browser.newContext({ viewport: size, userAgent: await page.evaluate(() => navigator.userAgent) });
+      const again = await context.newPage();
+      await motionOff(again);
+      await scaled(again);
+      await again.goto("/");
+      await waitForJourney(again);
+      await expect(again.locator("#anatomy .anatomy-pin")).toHaveClass(/is-columns/); // the still's columns stand
+      await again.getByRole("contentinfo").getByRole("switch", { name: "Motion" }).evaluate((el) => (el as HTMLElement).click());
+      await expect(again.locator("html")).toHaveAttribute("data-motion", "on");
+      await expect(again.locator("html")).toHaveAttribute("data-drawing-why", fresh ?? "");
+      await context.close();
+    });
+  }
 
   test("a reader landing below the chapter: still (place) until they come back above it", async ({ page }) => {
     await page.goto("/#faq");
     await waitForJourney(page);
     await expect(page.locator("html")).toHaveAttribute("data-drawing-why", "place");
+    await expect(page.locator("html")).toHaveAttribute("data-drawing", "still");
     await expect(page.locator("#anatomy")).not.toHaveClass(/is-live/);
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
     await waitForLive(page);

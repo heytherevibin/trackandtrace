@@ -1,6 +1,6 @@
 import { expect, test } from "../fixtures";
 import { expectAxeClean } from "../helpers";
-import { motionOff, scrollIntoChapter, scrollToId, stubSaveData, waitForJourney, waitForLive } from "./journey-helpers";
+import { drawStill, motionOff, scrollIntoChapter, scrollIntoRun, scrollToId, stubSaveData, waitForJourney, waitForLive } from "./journey-helpers";
 
 const POSITIONS: readonly (readonly [name: string, id: string | null, fraction?: number])[] = [
   ["top", null],
@@ -23,6 +23,22 @@ test.describe("axe, while the journey runs", () => {
         }, [id, fraction] as const);
       } else if (id) await scrollToId(page, id, 40);
       await page.waitForTimeout(1_200);
+      await expectAxeClean(page);
+    });
+  }
+
+  for (const [name, night] of [
+    ["the run, midway", false],
+    ["Night, at the run, midway", true],
+  ] as const) {
+    test(`clean at ${name}`, async ({ page }) => {
+      if (night) await page.addInitScript(() => window.localStorage.setItem("tt.theme", "dark"));
+      await drawStill(page);
+      await page.goto("/");
+      await waitForJourney(page);
+      await expect(page.locator("#run")).toHaveClass(/is-running/);
+      await scrollIntoRun(page, 0.5);
+      await expect(page.locator("#run [data-station].is-here")).toHaveCount(1);
       await expectAxeClean(page);
     });
   }

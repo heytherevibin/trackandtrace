@@ -105,30 +105,33 @@ html.has-reg-cursor :is(input, textarea, [contenteditable="true"]) { cursor: tex
 html[data-journey="on"] .sound-toggle { display: inline-flex; }
 
 /* The drawn train's labels beside the drawing, with leaders to their parts: the still's columns (still.ts, J4-7), and
-   the live drawing's (live-labels.ts, J5-5), which share one look. */
-html[data-journey="on"] .anatomy-pin.is-columns { height: max(640px, calc(100svh - var(--header-height))); }
-html[data-journey="on"] .is-columns .anatomy-still { position: absolute; margin: 0; aspect-ratio: auto; z-index: 1; }
-html[data-journey="on"] .is-columns .callout-lines { display: block; position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; overflow: visible; }
+   the live drawing's (live-labels.ts, J5-5), which share one look. The still's never apply to a chapter pinned live
+   (:where, so no rule gains weight): a rebuild hands its columns to the still's successor (still.ts), and the drawing's
+   fit trial (drawing.ts liveFits), which pins the chapter for an instant before that successor starts, measured the live
+   list under them, its parts list hidden by the still's rule, and read a chapter that fits as too tall (review, I-1). */
+html[data-journey="on"] :where(#anatomy:not(.is-live)) .anatomy-pin.is-columns { height: max(640px, calc(100svh - var(--header-height))); }
+html[data-journey="on"] :where(#anatomy:not(.is-live)) .is-columns .anatomy-still { position: absolute; margin: 0; aspect-ratio: auto; z-index: 1; }
+html[data-journey="on"] :where(#anatomy:not(.is-live)) .is-columns .callout-lines { display: block; position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; overflow: visible; }
 html[data-journey="on"] .callout-lines line, html[data-journey="on"] .live-lines line { stroke: var(--line-strong); stroke-width: 1; }
 html[data-journey="on"] .callout-lines circle, html[data-journey="on"] .live-lines circle { fill: var(--surface-0); stroke: var(--accent); stroke-width: 1.5; }
-html[data-journey="on"] :is(.is-columns, [data-live="columns"]) .anatomy-legend { display: none; }
-html[data-journey="on"] :is(.is-columns, [data-live="columns"]) .callouts { inset: 0; width: auto; height: auto; overflow: visible; clip-path: none; z-index: 3; pointer-events: none; }
-html[data-journey="on"] :is(.is-columns, [data-live="columns"]) .callout { position: absolute; width: 16rem; display: grid; grid-template-columns: auto 1fr; column-gap: 10px; align-items: baseline; padding: 6px 0 7px; border-top: 1px solid var(--line); background: var(--surface-0); pointer-events: auto; }
+html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .anatomy-legend { display: none; }
+html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .callouts { inset: 0; width: auto; height: auto; overflow: visible; clip-path: none; z-index: 3; pointer-events: none; }
+html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .callout { position: absolute; width: 16rem; display: grid; grid-template-columns: auto 1fr; column-gap: 10px; align-items: baseline; padding: 6px 0 7px; border-top: 1px solid var(--line); background: var(--surface-0); pointer-events: auto; }
 html[data-journey="on"] [data-live="columns"] .callout { top: 0; }
-html[data-journey="on"] :is(.is-columns, [data-live="columns"]) .callout[data-side="left"] { left: 0; }
-html[data-journey="on"] :is(.is-columns, [data-live="columns"]) .callout[data-side="right"] { right: 0; }
-html[data-journey="on"] :is(.is-columns, [data-live="columns"]) .callout-num { font-family: var(--font-display); font-weight: 600; font-size: var(--text-label); letter-spacing: 0.08em; color: var(--accent-text); }
-html[data-journey="on"] :is(.is-columns, [data-live="columns"]) .callout-title { font-family: var(--font-display); font-weight: 600; font-size: var(--text-sm); line-height: 1.25rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-1); }
-html[data-journey="on"] :is(.is-columns, [data-live="columns"]) .callout-detail { grid-column: 2; font-size: var(--text-label); line-height: 1.125rem; color: var(--ink-2); }
-html[data-journey="on"] :is(.is-columns, [data-live="columns"]) .callout-detail b { font-weight: 600; color: var(--ink-1); }
-html[data-journey="on"] :is(.is-columns, [data-live="columns"]) .callout.is-hot { border-top-color: var(--accent); }
-html[data-journey="on"] :is(.is-columns, [data-live="columns"]) .callout.is-hot .callout-title { color: var(--accent-text); }
-html[data-journey="on"] :is(.is-columns.is-compact, [data-live="columns"][data-compact]) .callout-detail { display: none; }
-html[data-journey="on"] :is(.is-columns, [data-live="columns"]) .title-block { display: grid; position: absolute; right: 0; bottom: 16px; z-index: 3; grid-template-columns: minmax(0, 1fr) auto; width: 22rem; background: var(--surface-0); }
-html[data-journey="on"] :is(.is-columns, [data-live="columns"]) .tb-cell { padding: 4px 10px; font-family: var(--font-display); font-weight: 600; font-size: 0.6875rem; /* drawing units: no token matches v3's title-block instrument at its fixed 22rem width */ line-height: 1rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
-html[data-journey="on"] :is(.is-columns, [data-live="columns"]) .tb-cell:nth-of-type(n + 3) { border-top: 1px solid var(--line); }
-html[data-journey="on"] :is(.is-columns, [data-live="columns"]) .tb-cell:nth-of-type(even) { border-left: 1px solid var(--line); text-align: right; }
-html[data-journey="on"] :is(.is-columns, [data-live="columns"]) .tb-cell b { color: var(--ink-1); font-weight: 600; }
+html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .callout[data-side="left"] { left: 0; }
+html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .callout[data-side="right"] { right: 0; }
+html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .callout-num { font-family: var(--font-display); font-weight: 600; font-size: var(--text-label); letter-spacing: 0.08em; color: var(--accent-text); }
+html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .callout-title { font-family: var(--font-display); font-weight: 600; font-size: var(--text-sm); line-height: 1.25rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-1); }
+html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .callout-detail { grid-column: 2; font-size: var(--text-label); line-height: 1.125rem; color: var(--ink-2); }
+html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .callout-detail b { font-weight: 600; color: var(--ink-1); }
+html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .callout.is-hot { border-top-color: var(--accent); }
+html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .callout.is-hot .callout-title { color: var(--accent-text); }
+html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns.is-compact, [data-live="columns"][data-compact]) .callout-detail { display: none; }
+html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .title-block { display: grid; position: absolute; right: 0; bottom: 16px; z-index: 3; grid-template-columns: minmax(0, 1fr) auto; width: 22rem; background: var(--surface-0); }
+html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .tb-cell { padding: 4px 10px; font-family: var(--font-display); font-weight: 600; font-size: 0.6875rem; /* drawing units: no token matches v3's title-block instrument at its fixed 22rem width */ line-height: 1rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .tb-cell:nth-of-type(n + 3) { border-top: 1px solid var(--line); }
+html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .tb-cell:nth-of-type(even) { border-left: 1px solid var(--line); text-align: right; }
+html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .tb-cell b { color: var(--ink-1); font-weight: 600; }
 
 /* ---- GA · the drawn train, live (spec §3.A–C; J5). drawing.ts pins the chapter (#anatomy.is-live) only while the live
    drawing runs, and the scroll plays it. The engine's canvas is fixed over the page, under the pinned chapter,
@@ -141,6 +144,9 @@ html[data-journey="on"] :is(.is-columns, [data-live="columns"]) .tb-cell b { col
 html[data-journey="on"][data-drawing="live"][data-drawing-why] #anatomy:not(.is-live) .anatomy-still { display: none; }
 html[data-journey="on"] #journey-canvas:not([hidden]) { display: block; position: fixed; inset: 0 0 auto 0; width: 100%; height: 100lvh; z-index: 1; pointer-events: none; }
 html[data-journey="on"] #anatomy.is-live { height: 520vh; padding-top: 0; padding-bottom: 0; }
+/* The pin and the unpin land whole in the task that makes them, so keepPlace (J5-3) measures all of the change: under
+   Motion off's 0.01ms transitions (motion.css) the paddings would land a frame later, under a reader nobody moves. */
+html[data-journey="on"] :is(#anatomy, #anatomy .anatomy-copy) { transition-property: none; }
 html[data-journey="on"] #anatomy.is-live .anatomy-pin { position: sticky; z-index: 2; top: var(--header-height); height: calc(100svh - var(--header-height)); min-height: 520px; }
 html[data-journey="on"] #anatomy.is-live .anatomy-stage { display: block; position: absolute; inset: 0; }
 html[data-journey="on"] #anatomy.is-live .anatomy-still { display: none; }
@@ -163,6 +169,60 @@ html[data-journey="on"] #anatomy.is-live [data-live="list"] .anatomy-legend { po
 @media (max-height: 520px) and (orientation: landscape) {
   html[data-journey="on"] #anatomy.is-live [data-live="list"] .anatomy-legend { top: calc(var(--anatomy-copy-h, 0px) + 10px); bottom: 10px; left: auto; width: 36%; grid-template-columns: 1fr; align-content: center; border-top: 0; border-left: 1px solid var(--line); padding: 0 0 0 12px; }
 }
+
+/* ---- 06–07 · the window-seat run (spec §3.A; J6). run.ts pins it (#run.is-running) only while Motion is on, the reader
+   is not below it and every station fits the window, and writes --run-h (the pin plus the travel) and --run-band (the
+   line diagram's height). Only run.ts writes .is-running, always inside keepPlace (J5-3, J6-7), so these rules are not
+   gated on data-motion: Motion off unpins it there, with the reader kept. Otherwise both sections keep their layout. */
+html[data-journey="on"] #run.is-running { height: var(--run-h); }
+/* The pin and the unpin land whole in the task that makes them, so keepPlace (J5-3) measures all of the change, as
+   #anatomy's do: under Motion off's 0.01ms transitions (motion.css) the run's height and its pieces' widths, paddings
+   and type (the kicker's too) would land a frame later, under a reader nobody moves. Deliberately with Motion on too,
+   and unpinned: the run pins and unpins with Motion on, and any length that transitioned there would land after
+   keepPlace measured. A lit plate's own transition, below, outranks this; it moves no box. A hover or press transition
+   added inside 06–07 must outrank it the same way, and move no box. */
+html[data-journey="on"] :is(#run, #run *) { transition-property: none; }
+/* clip, not hidden: a clipped box is not a scroll container, so focusing a card cannot scroll it sideways */
+html[data-journey="on"] #run.is-running .run-pin { position: sticky; top: var(--header-height); z-index: 2; height: calc(100svh - var(--header-height)); overflow: clip; }
+html[data-journey="on"] #run.is-running :is(.run-window, .run-train) { display: block; }
+html[data-journey="on"] #run.is-running .run-window { position: absolute; inset: 0; pointer-events: none; }
+html[data-journey="on"] #run.is-running .run-window svg { position: absolute; left: 0; top: 0; height: 100%; overflow: visible; will-change: transform; }
+html[data-journey="on"] #run.is-running .run-far { z-index: 0; }
+html[data-journey="on"] #run.is-running .run-line { z-index: 1; }
+html[data-journey="on"] #run.is-running .run-near { z-index: 4; }
+html[data-journey="on"] #run.is-running .run-train { position: absolute; bottom: 44px; z-index: 3; width: 74px; height: 28px; transform: translateX(-50%); color: var(--accent); pointer-events: none; }
+html[data-journey="on"] #run.is-running .run-train > span { display: block; width: 100%; height: 100%; transform-origin: 50% 100%; }
+html[data-journey="on"] #run.is-running .run-train svg { display: block; width: 100%; height: 100%; }
+html[data-journey="on"] #run.is-running .run-track { position: relative; z-index: 2; display: flex; align-items: flex-end; gap: clamp(56px, 9vw, 150px); width: max-content; height: calc(100% - var(--run-band, 124px)); padding: 0; will-change: transform; }
+html[data-journey="on"] #run.is-running .run-track > section { display: flex; align-items: flex-end; gap: clamp(48px, 7vw, 120px); padding: 0; margin: 0; }
+html[data-journey="on"] #run.is-running .run-cards { display: contents; }
+html[data-journey="on"] #run.is-running [data-station] { flex: none; background: var(--surface-0); }
+html[data-journey="on"] #run.is-running .run-intro { width: min(19rem, 80vw); padding-bottom: 8px; }
+html[data-journey="on"] #run.is-running .run-intro > span { font-size: clamp(1.625rem, 2.6vw, 2.25rem); line-height: 1.12; letter-spacing: 0.04em; }
+html[data-journey="on"] #run.is-running .run-intro > hr { margin: 14px 0 0; }
+html[data-journey="on"] #run.is-running .run-cards > [data-station] { width: min(22rem, 80vw); }
+html[data-journey="on"] #run.is-running #use > div[data-station] { width: min(34rem, 84vw); }
+html[data-journey="on"] #run.is-running #use > figure[data-station] { width: min(38rem, 84vw); }
+html[data-journey="on"] #run.is-running .blueprint[data-station] { transition: box-shadow 240ms var(--ease-out), border-color 240ms var(--ease-out); }
+html[data-journey="on"] #run.is-running .blueprint[data-station].is-here { border-color: var(--line-strong); box-shadow: inset 0 2px 0 var(--accent); }
+/* a link to 06 or 07 focuses the section itself, in place, so the next Tab starts inside it; no ring on a section */
+html[data-journey="on"] #run.is-running :is(#features, #use):focus { outline: none; }
+html[data-journey="on"] .run-stroke { fill: none; stroke: var(--line-strong); stroke-width: 1; vector-effect: non-scaling-stroke; }
+html[data-journey="on"] .run-stroke:is(.is-faint, .is-far) { stroke: var(--line); }
+html[data-journey="on"] .run-stroke.is-mast { opacity: 0.6; }
+html[data-journey="on"] .run-stroke.is-near { stroke: var(--ink-3); opacity: 0.5; }
+html[data-journey="on"] .run-stop.is-lit :is(.is-tick, .is-platform) { stroke: var(--accent); }
+html[data-journey="on"] .run-km { fill: var(--ink-3); font-family: var(--font-display); font-weight: 600; font-size: 0.625rem; /* drawing units, as v3's posts: no token matches */ letter-spacing: 0.08em; }
+/* short windows: 07's words run wider (and so shorter) to stand in the window */
+@media (max-height: 760px) and (min-width: 48rem) {
+  html[data-journey="on"] #run.is-running #use > div[data-station] { width: min(46rem, 60vw); }
+  html[data-journey="on"] #run.is-running #use > div[data-station] p { max-width: 64ch; }
+  html[data-journey="on"] #run.is-running #use > div[data-station] h2 { font-size: 2.5rem; line-height: 2.75rem; }
+  html[data-journey="on"] #run.is-running #use > figure[data-station] { width: min(38rem, 52vw, calc((100svh - var(--header-height) - var(--run-band, 124px) - 28px) * 1.45)); }
+}
+/* touch screens: each station is a resting point (run.ts places these marks) */
+html[data-journey="on"] .run-snap { position: absolute; left: 0; width: 1px; height: 1px; pointer-events: none; scroll-snap-align: start; }
+html[data-journey="on"]:has(#run.is-running .run-snap) { scroll-snap-type: y proximity; }
 
 /* ---- The frame meter: previews and development only, with ?journey-hud (J5-10) */
 html[data-journey="on"] .journey-hud { position: fixed; right: 12px; bottom: 12px; z-index: var(--z-toast); min-width: 17rem; padding: 6px 10px 8px; background: var(--surface-1); border: 1px solid var(--line-strong); color: var(--ink-1); font-size: var(--text-xs); }

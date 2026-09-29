@@ -14,12 +14,15 @@ export function Features() {
   const m = messages.home.features;
   return (
     <section id="features" aria-label={m.kicker} className="section-pad">
-      <SectionKicker rule="mb-8">{m.kicker}</SectionKicker>
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,260px),1fr))] gap-[clamp(28px,3vw,48px)]">
+      {/* data-station: a stop of the window-seat run (run.ts); inert, and the layout the same, without it */}
+      <div className="run-intro" data-station="">
+        <SectionKicker rule="mb-8">{m.kicker}</SectionKicker>
+      </div>
+      <div className="run-cards grid grid-cols-[repeat(auto-fit,minmax(min(100%,260px),1fr))] gap-[clamp(28px,3vw,48px)]">
         {FEATURES.map(({ key, href }) => {
           const cell = m[key];
           return (
-            <Plate key={key} as="article" padding="lg">
+            <Plate key={key} as="article" padding="lg" data-station="">
               <h3 className={H3}>{cell.title}</h3>
               <p className={`mt-3.5 ${BODY}`}>{cell.detail}</p>
               <p className="mt-4">

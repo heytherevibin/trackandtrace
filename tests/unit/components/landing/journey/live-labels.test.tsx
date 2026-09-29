@@ -54,6 +54,28 @@ describe("the labels while the drawing is live (J5-5)", () => {
     expect(labels.layout()).toBeNull();
   });
 
+  it("leave the drawing no zone when the list itself runs past its own box (a phone on its side, its text at 200%)", () => {
+    vi.stubGlobal("matchMedia", () => ({ matches: true })); // narrow: the list, never columns
+    document.body.innerHTML = `<section id="anatomy"><div class="anatomy-pin"><div class="anatomy-copy"></div><ol class="callouts"></ol><ol class="anatomy-legend"></ol><div class="title-block"></div><p class="anatomy-caption"></p></div></section>`;
+    const section = document.getElementById("anatomy")!;
+    const box = (el: Element, left: number, top: number, width: number, height: number) => {
+      el.getBoundingClientRect = () => DOMRect.fromRect({ x: left, y: top, width, height });
+    };
+    const labels = createLiveLabels(section)!;
+    box(labels.pin, 0, 0, 844, 390);
+    box(section.querySelector(".anatomy-copy")!, 0, 0, 844, 40);
+    const legend = section.querySelector<HTMLElement>(".anatomy-legend")!;
+    box(legend, 540, 50, 304, 330); // beside the drawing (a phone on its side)
+    const sized = (scroll: number, client: number) => {
+      Object.defineProperty(legend, "scrollHeight", { configurable: true, value: scroll });
+      Object.defineProperty(legend, "clientHeight", { configurable: true, value: client });
+    };
+    sized(306, 306); // every part in its box
+    expect(labels.layout()).toEqual({ l: 8, r: 528, t: 56, b: 378 });
+    sized(434, 242); // the parts run past their box, over the chapter's words and the section below
+    expect(labels.layout()).toBeNull();
+  });
+
   it("are nothing without the chapter's markup", () => {
     document.body.innerHTML = `<section id="anatomy"></section>`;
     expect(createLiveLabels(document.getElementById("anatomy")!)).toBeNull();

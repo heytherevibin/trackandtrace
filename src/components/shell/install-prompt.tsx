@@ -20,7 +20,7 @@ export function InstallPrompt() {
         <Mark size={32} />
         <div className="min-w-0 flex-1">
           <p className="caps text-label text-ink-1">{m.title}</p>
-          <p className="truncate text-label text-ink-3">{platform === "ios" ? m.iosHint : m.detail}</p>
+          <p className="text-label text-ink-3">{platform === "ios" ? m.iosHint : m.detail}</p>
         </div>
         {platform === "chromium" ? (
           <Button variant="primary" size="sm" onClick={install}>

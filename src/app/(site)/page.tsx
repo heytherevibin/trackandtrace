@@ -9,6 +9,7 @@ import { DepartureBoard } from "@/components/landing/journey/departure-board";
 import { DrawingChapter } from "@/components/landing/journey/drawing-chapter";
 import { hudAllowed } from "@/components/landing/journey/hud-gate";
 import { JourneyLoader } from "@/components/landing/journey/journey-loader";
+import { WindowRun } from "@/components/landing/journey/window-run";
 import { PhotoSplit } from "@/components/landing/photo-split";
 import { PrinciplesSheet } from "@/components/landing/principles-sheet";
 import { Roadmap } from "@/components/landing/roadmap";
@@ -44,8 +45,10 @@ export default async function HomePage() {
       <SpecimenRecord specimen={specimen} />
       <ReliabilityBand checks={status.checks} />
       <Roadmap />
-      <Features />
-      <PhotoSplit />
+      <WindowRun>
+        <Features />
+        <PhotoSplit />
+      </WindowRun>
       <Faq />
       <ClosingCta sampleMode={sampleMode} connected={connected} />
       <JourneyLoader hud={hudAllowed(current)} />

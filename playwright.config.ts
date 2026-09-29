@@ -21,7 +21,8 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : [["list"]],
+  // On CI each shard writes a blob; the e2e job merges a failing run's blobs into one HTML report (ci.yml).
+  reporter: process.env.CI ? [["github"], ["blob"]] : [["list"]],
   use: {
     baseURL,
     trace: "on-first-retry",
@@ -32,13 +33,15 @@ export default defineConfig({
       name: "desktop",
       // console/ is this file's own fixture-mode console specs; console-auth/ is
       // playwright.console.config.ts's real-Supabase suite, run separately (npm run test:e2e:console)
-      // -- neither belongs here.
-      testIgnore: /console(-auth)?\//,
+      // -- neither belongs here. production/ runs against a production build (playwright.production.config.ts),
+      // nightly/ in the nightly's own config (playwright.nightly.config.ts): neither belongs to the fixture-mode
+      // `next dev` run.
+      testIgnore: /(console(-auth)?|production|nightly)\//,
       use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 } },
     },
     {
       name: "mobile",
-      testIgnore: /console(-auth)?\//,
+      testIgnore: /(console(-auth)?|production|nightly)\//,
       use: { ...devices["Pixel 7"], viewport: { width: 390, height: 844 } },
     },
     // The console host, served by the same dev server: Chromium resolves *.localhost to this machine.

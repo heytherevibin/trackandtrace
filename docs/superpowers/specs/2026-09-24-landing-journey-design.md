@@ -113,7 +113,9 @@ Three layers, loaded in order, so the check never waits for, or depends on, the 
 
 1. **Page (server).** Every section's markup, including all new ones, rendered by Server Components from pure
    geometry and copy modules: the dials, clock face, berth plan, route map, departure board, route strip, the
-   run's window layers, the labels, title block and legend. With no JavaScript the page is complete and static.
+   run's frame (its window's lines are drawn by `run.ts` from `geometry/run.ts`, since they follow the cards'
+   measured widths; J6-6, accepted at J6's pre-flight), the labels, title block and legend. With no JavaScript
+   the page is complete and static.
 2. **Journey (client island).** `JourneyLoader`, a small client component on "/", imports the journey chunk
    after hydration when the page is idle (`requestIdleCallback`, 1.5 s timeout) and calls its
    `startJourney(root)`. The chunk (Anime.js + journey modules, ≤ 70 KB compressed) animates the server
@@ -155,9 +157,12 @@ reduced-motion rules (motion.css) to every traveller page, so the switch means t
 |---|---|
 | Server markup | ~~`route-strip.tsx`~~ (removed by the owner, 2026-09-27), `departure-board.tsx`, `hero-dial.tsx`, `drawing-chapter.tsx`, `chapters-instrument.tsx`, `berth-plan.tsx`, `route-map.tsx`, `window-run.tsx`, `terminus-stage.tsx`, `journey-switches.tsx` |
 | Pure geometry and logic (unit-tested) | `geometry/dial.ts`, `geometry/clock.ts`, `geometry/berths.ts`, `geometry/route.ts`, `geometry/run.ts`, `pose.ts` (anatomy and terminus poses), `governor.ts`, `labels-layout.ts`, ~~`strip-position.ts`~~ (removed by the owner, 2026-09-27), `drawing-mode.ts`, `fit.ts`, `chart-countdown.ts` |
-| Client island | `journey-loader.tsx`, `start-journey.ts`, `observers.ts`, `motion-tokens.ts`, `intro.ts`, ~~`strip.ts`~~ (removed by the owner, 2026-09-27), `board.ts`, `hero.ts`, `chapters.ts`, `berths.ts`, `station-clock.tsx`, `clock.ts`, `route.ts`, `run.ts`, `arrivals.ts`, `cursor.ts`, `sound.ts`, `drawing.ts`, `still.ts`, `theme-sweep.ts`, `live-labels.ts`, `webgl-probe.ts`, `hud.ts`, `hud-gate.ts` |
+| Client island | `journey-loader.tsx`, `start-journey.ts`, `observers.ts`, `motion-tokens.ts`, `intro.ts`, ~~`strip.ts`~~ (removed by the owner, 2026-09-27), `board.ts`, `hero.ts`, `chapters.ts`, `berths.ts`, `station-clock.tsx`, `clock.ts`, `route.ts`, `run.ts`, `arrivals.ts`, `cursor.ts`, `sound.ts`, `drawing.ts`, `still.ts`, `keep-place.ts`, `live-labels.ts`, `webgl-probe.ts`, `hud.ts`, `hud-gate.ts` |
 | Scene (three.js) | `scene/engine.ts`, `scene/rig.ts`, `scene/rig-parts.ts`, `scene/lines.ts`, `scene/line-world.ts`, `scene/departure.ts`, `scene/beam.ts`, `scene/scan.ts`, `scene/fit.ts`, `scene/apply-pose.ts`, `scene/palette.ts`, `scene/live.ts`, `scene/glow.ts`, `scene/scene-mark.ts` |
 | Build-time | `scripts/bake-train-stills.mjs`, generated `still-manifest.ts` |
+
+Night falls lives with the theme button, not the journey: `src/components/theme/night-falls.ts`, shared by every
+traveller page (J6-10, accepted at J6's pre-flight).
 
 ### C. Drawing modes
 
@@ -169,7 +174,7 @@ The train is drawn **live** unless a reason holds; reasons come and go and the p
 | `saver` | Data Saver, a slow-2g/2g/3g connection, `prefers-reduced-data` | next visit without them |
 | `webgl` | no WebGL 2, or the GPU drops the context | the context is restored |
 | `quality` | adaptive quality's floor (below) | next session |
-| `load` | the scene chunk failed or took over 20 s | next visit |
+| `load` | the scene chunk failed or took over 20 s | the next rebuild (a Motion toggle, a fit change) retries |
 | `fit` | the chapter cannot fit its words even as a list | the next rebuild |
 | `place` | the reader is below the chapter's top when the live drawing would begin | they come back above it |
 
@@ -178,10 +183,10 @@ While `place` is the only reason, the scene still loads and builds, so the switc
 **Still** is the same drawing baked at build time (§3.D): unpinned, fully apart, every label beside it with
 leaders to its part (or listed under it), label↔part highlight kept; the terminus shows the arrived train. A
 still page never downloads three.js, except while `place` is the only reason, when the scene prepares in the
-background (J5-2), or when the live chapter's fit check finds the drawing cannot fit its window. That check
-(`live-labels.ts` `layout()`) is a DOM measurement with no three.js, but of the pinned layout, which exists only
-once the live chapter is laid out, after the scene has loaded. Switching mid-chapter keeps the reader at the
-chapter's start.
+background (J5-2). Whether the chapter fits is judged before the scene is fetched: `drawing.ts`'s `liveFits` lays
+the pinned chapter out for an instant, measures it with `live-labels.ts`'s own `layout()` (a DOM measurement, no
+three.js), and puts it back in the same task (J6-5). The scene's own check, on every relayout while live, stands
+behind it. Switching mid-chapter keeps the reader at the chapter's start.
 
 **Adaptive quality.** A governor watches intervals between frames the drawing actually drew within one scroll
 gesture. p90 over 26 ms for 30 frames steps down (resolution 2× → 1.5× → 1×; Night effects off; coaches 3 →
@@ -216,7 +221,9 @@ The theme toggle's click runs `document.startViewTransition(async () => { flushS
 themeApplied(next); journey.redrawNow(); })` and animates `::view-transition-new(root)` with a clip-path circle
 from the toggle's centre (640 ms, `--ease-in-out`). `themeApplied` resolves when `data-theme` changes (a
 MutationObserver, 100 ms cap). No View Transitions, reduced motion or Motion off: the switch is instant.
-`::view-transition { pointer-events: none }` keeps clicks working during the sweep.
+`::view-transition { pointer-events: none }` keeps clicks working during the sweep. It runs on every traveller
+page where Motion is on (`html[data-motion="on"]`); the console, which has no Motion switch, always switches at
+once (J6-10).
 
 ### G. Accessibility
 
@@ -235,7 +242,7 @@ reader's hand.
 |---|---|---|
 | Check interactive | never waits on journey code | holds; a blocked CDN still leaves Run working |
 | Journey chunk | ≤ 70 KB compressed | Anime.js 39 KB (full) + modules |
-| Scene chunk | ≤ 240 KB compressed, live only, except while `place` is the only reason, or when the live chapter's fit check finds the drawing cannot fit its window (§3.C) | three.js ~188 KB (full) + scene |
+| Scene chunk | ≤ 240 KB compressed, live only, except while `place` is the only reason (§3.C) | three.js ~188 KB (full) + scene |
 | Still drawings | ≤ 60 KB compressed per page | 23 + 34 KB |
 | Longest journey task at load, 4× CPU phone | ≤ 120 ms | scene steps ≤ 61 ms (page total 202 ms incl. first layout) |
 | Scroll, reference desktop | p95 ≤ 12 ms, 0% > 25 ms | p95 9.8 ms, 0% |
@@ -286,11 +293,26 @@ development, behind `?journey-hud`; production never renders it.
   links; theme sweep; axe at 12 positions (top, drawing, chapters, record, Night drawing, motion off, phone
   drawing, run, Night run, phone run, Data Saver, Night terminus); focus never obscured; existing home, responsive, axe, CSP,
   smoothness, press and tap-target specs kept green.
-- **Nightly** (`.github/workflows/journey-nightly.yml`, same pinning and permissions rules as CI): collisions
-  at 15 sizes (1440×900, 1280×720, 1024×768, 768×1024, 390×844, 360×740, 320×568, 844×390, 667×375, 280×653,
-  1280×600, 1180×820, 820×1180, 1920×1080, 2560×1440) and at 200% text; CDP-throttled performance at 4×, 6×, 10× (startup tasks, scroll frames,
-  governor steps); a production-build CSP smoke on "/" scrolled end to end; screenshots of every chapter in
-  Day, Night and phone.
+- **Nightly** (`.github/workflows/journey-nightly.yml`, same pinning and permissions rules as CI; J6-3). It runs at
+  03:00 IST, by hand, and on the pull request that changes it. It has two jobs:
+  - **production**, on this checkout's production build served on the runner with sample data and nothing live
+    (`scripts/serve-local-production.mjs`: `LOCAL_FIXTURE`, every credential blanked, an offline guard in the server;
+    J6-2):
+    - the chunk budgets;
+    - the production-build smoke: the security policy on "/" scrolled end to end, no other host, a sample check,
+      nothing refused by the guard;
+    - CDP-throttled runs at 4×, 6× and 10× on the runner's software GPU. These fail only on what holds on any
+      machine: another host, CLS, an undecided drawing, and at 10× a governor that never answered. They print
+      startup tasks and scroll frames without judging them;
+  - **journey**, on the fixture-mode `next dev`:
+    - collisions at 15 sizes (1440×900, 1280×720, 1024×768, 768×1024, 390×844, 360×740, 320×568, 844×390,
+      667×375, 280×653, 1280×600, 1180×820, 820×1180, 1920×1080, 2560×1440), and at 200% text at 1440×900,
+      390×844 and 844×390;
+    - screenshots of every chapter in Day, Night and on a phone;
+    - the place, run, Night falls and drawing specs in WebKit.
+
+  GitHub's runners have no GPU, so §3.H's frame-time and long-task budgets are measured by hand on a real GPU
+  (`npm run build:local && node scripts/journey-perf.mjs`, the owner's Mac), and their lines go into every journey PR.
 
 ## 6. Order of work (one PR each)
 
@@ -301,7 +323,7 @@ development, behind `?journey-hud`; production never renders it.
 | J3 | Journey island: `animejs` added; loader, observers, arrivals, intro and headline, strip, board, hero dial, chapters (pinned, fit rules), berths, clock, route, cursor, the Sound switch and its clack, plate morph; journey motion tokens; DESIGN.md's motion and hero-entrance rules; the chapters instrument; the departure board's status column | The page moves (except the train and the run) |
 | J4 | Still drawing: `three` added; the rig, poses and fit the bake and the live scene share; bake script, sprite, manifest, drawing chapter and terminus markup with the still; the head script gains `data-saver` and `data-drawing`; GA joins ~~the strip and~~ the board (the strip removed by the owner, 2026-09-27) | The train, drawn still |
 | J5 | Live drawing: engine, anatomy and terminus, scan, departure line side, beam, governor, WebGL loss, the departure horn, the frame meter | The train comes alive |
-| J6 | Window-seat run and Night falls; nightly workflow; performance budgets | v3 complete |
+| J6 | Window-seat run and Night falls; nightly workflow; performance budgets | v3 complete — done (J6) |
 
 Moved while planning J2 (2026-09-25): the chapters instrument and the board's status only exist with
 scroll-driven motion, so they land in J3; GA's station lands with its section in J4.
@@ -326,6 +348,44 @@ Decided while planning J5 (2026-09-27):
 - the palette reads four tokens (J5-8);
 - the frame meter ships with J5, for the owner's real-device check (J5-10).
 
+Decided while planning J6 (2026-09-28):
+- CI's Playwright run in four shards, the console suite in its own job, one `e2e` gate; the chunk budgets on every
+  PR (J6-1);
+- a production build serves the fixture only on this machine: `LOCAL_FIXTURE`, refused on Vercel and beside any live
+  credential, with an offline guard in the server (J6-2);
+- the nightly measures what a GPU-less runner can; frame times and long tasks are measured by hand on a real GPU
+  (J6-3);
+- one rule for where the reader goes, `readerPlace`, for every piece that changes height (J6-4);
+- `fit` judged before the scene is fetched, by a trial layout (J6-5);
+- the run's frame is server markup, its lines drawn by `run.ts` (J6-6; a departure from §3.B, accepted at J6's
+  pre-flight); it pins by `#run.is-running` inside `keepPlace`, only while the reader is not below it (J6-7); links
+  to 06 and 07 bring their stations to the window (J6-8);
+- J5-17 amended (the owner, 2026-09-28): only the reader's own scroll (a mostly vertical wheel that is not a
+  pinch-zoom, a finger dragging, a scroll key outside a text field with no Alt, Ctrl or Meta) cancels the Back
+  restore; a trackpad's swipe back, a tap and every other key leave it pending (J6-9);
+- Back into the run returns the reader where they left: a section riding it is read where `run.ts` says it stands
+  (`data-run-at`), so a reader who left at 07 comes back to 07 (J6-9);
+- Night falls on every traveller page with Motion on, from the theme button's own module,
+  `src/components/theme/night-falls.ts`, not the journey's `theme-sweep.ts` (J6-10; a departure from §3.B, accepted
+  at J6's pre-flight);
+- the nightly on a schedule, and on the pull request that changes it (J6-11); WebKit in the nightly (J6-12); 200%
+  text at the PR's three sizes (J6-13).
+
+Found while building J6 (2026-09-28):
+- the by-hand frame-time check runs `npm run build:local && node scripts/journey-perf.mjs` after the gate: the
+  gate's plain `npm run build` leaves the build unstamped, and the served production path refuses an unstamped
+  build; the nightly runs `npm run build:local` too;
+- a Tab glide that a place-keeping jump cuts short is taken up again (`focus-glide.ts`): armed only after a real
+  Tab (Option-Tab counts, since Safari moves to links with it; Ctrl or Meta combinations never count), taking up
+  at most 3 cuts, and letting go on the reader's own scroll, a pointerdown, or after 10 still frames; it also
+  re-aims once after Safari's own focus reveal, while the watch is armed;
+- at 200% text, the masthead folds its nav into the menu button whenever the nav can't hold one row, sitewide
+  (100% text unchanged), by a container query in rem on an inner div, not the sticky header, since WebKit reads
+  the header's box stale during the run's unpin; the nightly's sweep adds 1024×768 at 200% text, and fails on
+  text clipped inside the page;
+- Motion off relays the drawn train's columns inside the rebuild's own task, so 02's place guard never reads a
+  half-built page; before this, WebKit moved the reader 304 px.
+
 Each PR brings the dependency, copy, tokens and DESIGN.md rules its own code first uses, so nothing lands
 unused, and nothing a traveller can see is inert (a Sound switch with no sound). Each runs `npm run check`
 and the e2e suite, ships behind nothing (every PR leaves the landing whole), and merges only with the user's
@@ -339,24 +399,24 @@ go-ahead. Each PR's plan is written when the one before it merges, from the code
   site-wide.** J1 is built on it.
 - Try the result on a real mid-range Android phone before J5 merges (a hidden `?journey-hud` query shows the
   frame meter on preview deployments and in development only; J5-10).
-- Decide whether the nightly workflow may run on a schedule (it costs CI minutes).
+- Decide whether the nightly workflow may run on a schedule. J6 ships it at 03:00 IST: the repository is public, so its Actions minutes are free (J6-11). Removing the two `schedule` lines keeps it manual.
 
 ## 8. Risks
 
 | Risk | Mitigation |
 |---|---|
 | Low-end GPUs (Mali, Adreno 6xx) slower than CPU throttling suggests | Governor steps and the still floor; real-device check before J5 merges |
-| iOS Safari: `svh`/`lvh`, sticky with `overflow: clip`, root scroll snapping, View Transitions (18+) | e2e on WebKit for the journey specs in the nightly run; static fallbacks |
+| iOS Safari: `svh`/`lvh`, sticky with `overflow: clip`, root scroll snapping, View Transitions (18+) | The place, run, Night falls and drawing specs in WebKit, desktop and phone, in the nightly run; every test that needs the live drawing skips, saying why, where that WebKit has no WebGL 2; static fallbacks |
 | Anime.js or three.js API churn | Exact versions pinned; upgrades are their own PRs with the full journey suite |
 | Strict Mode double mounts, route changes | Idempotent teardowns; engine disposed when leaving "/" |
-| CI e2e time grows | Heavy suites nightly; PR suite at three sizes |
+| CI e2e time grows | Four Playwright shards and the console suite in parallel on every PR (J6-1); heavy suites nightly |
 | Dev-only CSP in e2e hides a production-only violation | Nightly production-build CSP smoke |
-| Bundle creep | Budgets checked in the nightly run; `experimental-analyze` in review |
+| Bundle creep | Budgets checked on every PR (`verify`) and in the nightly run; `experimental-analyze` in review |
 
 ## 9. Acceptance
 
 - Every row of §3.A works in Day, Night and on a phone, and every "Motion off" column holds.
 - Every §4 failure produces the stated result, proven by an e2e test.
-- §3.H budgets met in the nightly run; no collisions at the 15 sizes or at 200% text in the journey's sections.
+- §3.H's chunk budgets met on every PR and in the nightly run; its frame-time and long-task budgets met on a real GPU (`journey-perf.mjs`) before each journey PR merges; CLS and the governor held in the nightly's throttled runs; no collisions at the 15 sizes or at 200% text in the journey's sections.
 - axe clean at the 12 positions; the CSP spec and the production-build smoke clean.
 - `npm run check` green on every PR; no raw hex, no file over 500 lines, no `Co-Authored-By` trailer.

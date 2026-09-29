@@ -1,7 +1,7 @@
 import { expect, test, type ElementHandle, type Page } from "@playwright/test";
 import { JOURNEY_CHUNK_MARK } from "@/components/landing/journey/journey-mark";
 import { collisionsInView } from "./collisions";
-import { motionOff, scrollToId, waitForJourney } from "./journey-helpers";
+import { drawStill, motionOff, scrollToId, waitForJourney } from "./journey-helpers";
 
 // A window too short for every stop of 02 to fit pinned below the masthead. The masthead is one row since the
 // route strip became a left rail (2026-09-27), 32px shorter than with the strip's row, so 02 now fits pinned from
@@ -93,6 +93,39 @@ test.describe("02 · the chapters, pinned", () => {
     }
   });
 
+  // Anime's smoothed scroll sync eases 02 toward the scroll only while its wake timer runs, 500 ms after each scroll
+  // event; one frame longer than that ends it short (observers.ts keepUp). A slow device's stall, two frames after a
+  // jump deep into 02: the busy loop is the stall itself, not a wait. The rail's marker stands at 02's drawn progress.
+  test("a jump deep into 02 plays through to the scroll though a frame stalls past anime's wake (a slow device)", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/");
+    await waitForJourney(page);
+    await expect(page.locator("#how")).toHaveClass(/is-pinned/);
+    await frames(page, 10);
+    await page.evaluate(() => {
+      const how = document.getElementById("how")!;
+      window.scrollTo({ top: how.getBoundingClientRect().top + window.scrollY + (how.offsetHeight - window.innerHeight) * 0.9, behavior: "instant" });
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          const end = performance.now() + 700;
+          while (performance.now() < end);
+        }),
+      );
+    });
+    // 02's progress by the scroll, as its observer reads it: from its top under the masthead to its foot at the window's
+    const behind = () =>
+      page.evaluate(() => {
+        const how = document.getElementById("how")!;
+        const top = how.getBoundingClientRect().top + window.scrollY;
+        const start = top - Math.round(document.querySelector("header")!.getBoundingClientRect().height);
+        const end = top + how.offsetHeight - window.innerHeight;
+        const scrolled = Math.min(1, Math.max(0, (window.scrollY - start) / (end - start)));
+        const drawn = Number.parseFloat(how.querySelector<HTMLElement>(".rail-marker")!.style.left) / 100;
+        return Math.abs(scrolled - drawn);
+      });
+    await expect.poll(behind).toBeLessThanOrEqual(0.005);
+  });
+
   test("never collides while it plays: desktop, short desktop, phone, and a phone on its side", async ({ page }) => {
     for (const size of [{ width: 1440, height: 900 }, { width: 1440, height: 600 }, { width: 390, height: 844 }, { width: 844, height: 390 }]) {
       await page.setViewportSize(size);
@@ -119,24 +152,26 @@ test.describe("02 · the chapters, pinned", () => {
     await page.waitForTimeout(300);
     const headerBottom = await page.locator("header").evaluate((h) => Math.round(h.getBoundingClientRect().bottom));
     const target = headerBottom + 100;
-    await scrollToId(page, "features", target);
+    // The reader reads 03, a section below 02 with a box of its own: 06's box rides the pinned window-seat run, where its
+    // top is not where the reader reads it (run.spec holds the run's own Motion switch).
+    await scrollToId(page, "record", target);
     // No wait for the scroll's own "scroll" event: the place guard reads the reader's place as Motion changes,
     // whether or not a frame has delivered that event yet (the next test holds it to exactly that).
     await clickMotionSwitch(page);
     await expect(page.locator("#how")).not.toHaveClass(/is-pinned/);
     // The collapse lands over two frames (the height, then the padding); a few more let any late move show.
     await frames(page, 6);
-    let top = await page.locator("#features").evaluate((el) => el.getBoundingClientRect().top);
+    let top = await page.locator("#record").evaluate((el) => el.getBoundingClientRect().top);
     expect(Math.abs(top - target)).toBeLessThanOrEqual(4);
 
     await clickMotionSwitch(page);
     await expect(page.locator("html")).toHaveAttribute("data-motion", "on");
     await frames(page, 6);
     // Motion re-enabling does not, by itself, re-pin #how here: the reader is still below its start (at
-    // #features), and pinning is deferred until they scroll back above it (spec §3.A) — the point of that
+    // #record), and pinning is deferred until they scroll back above it (spec §3.A) — the point of that
     // deferral is exactly that this toggle must not grow #how under them, so nothing moves either way.
     await expect(page.locator("#how")).not.toHaveClass(/is-pinned/);
-    top = await page.locator("#features").evaluate((el) => el.getBoundingClientRect().top);
+    top = await page.locator("#record").evaluate((el) => el.getBoundingClientRect().top);
     expect(Math.abs(top - target)).toBeLessThanOrEqual(4);
   });
 
@@ -156,7 +191,7 @@ test.describe("02 · the chapters, pinned", () => {
     const toggle = await motionSwitch(page);
     await page.evaluate(
       ([by, sw]) => {
-        const el = document.getElementById("features")!;
+        const el = document.getElementById("record")!;
         window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - by, behavior: "instant" });
         (sw as HTMLElement).click();
       },
@@ -166,7 +201,7 @@ test.describe("02 · the chapters, pinned", () => {
     await expect(page.locator("#how")).not.toHaveClass(/is-pinned/);
     // The collapse lands over two frames (the height, then the padding); a few more let any late move show.
     await frames(page, 6);
-    const top = await page.locator("#features").evaluate((el) => el.getBoundingClientRect().top);
+    const top = await page.locator("#record").evaluate((el) => el.getBoundingClientRect().top);
     expect(Math.abs(top - target)).toBeLessThanOrEqual(4);
   });
 
@@ -391,5 +426,42 @@ test.describe("02 · the chapters, pinned", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.waitForTimeout(600);
     expect(await howOffLanding(page)).toBeLessThanOrEqual(4);
+  });
+});
+
+// A reader whose web fonts land late: 02 judged whether it fits in the fallback's lines, which on a small phone are
+// too tall for its stops, and nothing judged it again once the page's own type arrived, so 02 stayed a plain section
+// though it fits. The journey announces tt:layout when the fonts land, and 02 measures again (final review, ruling).
+test.describe("02 and fonts that land after it has decided", () => {
+  test("pins once the page's own type arrives, though it could not in the fallback's", async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 568 });
+    // the still, as the quality floor draws it: the live drawing's own wait for the fonts, and its pin, would announce
+    // a layout of their own once the fonts land, and hide what this is about
+    await drawStill(page);
+    // how many frames since the page last announced tt:layout: the journey's own start has gone quiet
+    await page.addInitScript(() => {
+      let quiet = 0;
+      window.addEventListener("tt:layout", () => (quiet = 0));
+      const tick = () => {
+        quiet += 1;
+        Reflect.set(window, "__quiet", quiet);
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+    let land: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => (land = resolve));
+    await page.route("**/*.woff2", async (route) => {
+      await held;
+      await route.continue();
+    });
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await waitForJourney(page);
+    await expect.poll(() => page.evaluate(() => Number(Reflect.get(window, "__quiet")))).toBeGreaterThan(30);
+    expect(await page.evaluate(() => document.fonts.status)).toBe("loading");
+    await expect(page.locator("#how")).not.toHaveClass(/is-pinned/); // decided in the fallback's lines
+    land();
+    await page.evaluate(() => document.fonts.ready.then(() => undefined));
+    await expect(page.locator("#how")).toHaveClass(/is-pinned/);
   });
 });

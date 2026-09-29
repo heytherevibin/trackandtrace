@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "../fixtures";
 import { PNR } from "../helpers";
-import { blockJourneyChunk, waitForJourney } from "./journey-helpers";
+import { blockJourneyChunk, pressTab, waitForJourney } from "./journey-helpers";
 
 /** Frames the wait below gives a focus that never comes wholly into the window before checking it as it stands
  * (it then counts as hidden: the check samples the window's edge). The longest glide in the run, Tab wrapping from
@@ -11,8 +11,8 @@ const FOCUS_SETTLE_FRAME_CAP = 600;
 /** `<html data-scroll-behavior="smooth">` (base.css) animates every focus-driven scroll; without this, reading
  * the focused element's geometry mid-animation reports positions no reader ever actually sees it at. Waits, in
  * frames, until the focused element lies wholly inside the window, no scroll is under way (a `scroll` since the
- * last `scrollend`), and scrollY has held for two frames. "scrollY stopped changing" alone is not enough: it is
- * just as true before a smooth scroll's first frame, and a CI runner can take longer than two samples to draw
+ * last `scrollend`), and scrollY and the element's own box have held for two frames. "scrollY stopped changing"
+ * alone is not enough: it is just as true before a smooth scroll's first frame, and a CI runner can take longer than two samples to draw
  * that frame (2026-09-27: the check then read the board's "On the roadmap" link below the fold, under its own
  * table cell). A focused control the browser leaves under the masthead is already wholly in the window, so it
  * is still checked, and still caught. */
@@ -32,12 +32,17 @@ async function waitForFocusSettled(page: Page): Promise<void> {
         let frames = 0;
         let held = 0;
         let lastY = window.scrollY;
+        let lastAt = "";
         const tick = () => {
           frames += 1;
-          held = window.scrollY === lastY ? held + 1 : 0;
-          lastY = window.scrollY;
           const el = document.activeElement;
           const r = el && el !== document.body ? el.getBoundingClientRect() : null;
+          // the focused element's own place too: the window-seat run carries its cards sideways by transform, trailing
+          // the scroll, so a card can still be sliding once scrollY holds
+          const at = r ? `${Math.round(r.left)},${Math.round(r.top)}` : "";
+          held = window.scrollY === lastY && at === lastAt ? held + 1 : 0;
+          lastY = window.scrollY;
+          lastAt = at;
           const inWindow = !r || (r.top >= 0 && r.left >= 0 && r.bottom <= window.innerHeight && r.right <= window.innerWidth);
           if ((inWindow && !scrolling && held >= 2) || frames >= cap) {
             window.removeEventListener("scroll", onScroll);
@@ -119,7 +124,7 @@ test("Tab never leaves focus under the masthead or behind a pinned piece", async
   await page.goto("/");
   await waitForJourney(page);
   for (let i = 0; i < 80; i += 1) {
-    await page.keyboard.press("Tab");
+    await pressTab(page);
     await waitForFocusSettled(page);
     expect(await page.evaluate(coveredFocusLabel)).toBeNull();
   }
