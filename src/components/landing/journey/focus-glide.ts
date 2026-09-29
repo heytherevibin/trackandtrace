@@ -22,10 +22,11 @@ import type { JourneyContext, Teardown } from "./start-journey";
 // the link was. Taken up under the same bounds, and only:
 // - when the relayout (tt:layout, or the window's resize) moved the link on the page, not for every announcement;
 // - while the page stands between where the glide began and the farthest a reveal could take it: a scrollbar drag that
-//   took the reader out of that span is theirs (run.ts's rule for its own stations, final review I2), and the glide is
-//   let go, jumps and all;
+//   took the reader out of that span is theirs (run.ts's rule for its own stations, final review I2), and once a
+//   relayout or a rebuild finds the page off it the glide is let go (a jump alone still takes the glide up, as in J6);
 // - through the journey's rebuild (a late font changing a piece's fit), which tears this module down and starts it again
-//   in one task: the new start takes up the glide the old one watched, with the takes it had left.
+//   in one task: the new start takes up the glide the old one watched, with the takes it had left, on the same course
+//   rule (review F1).
 // A station of the running window-seat run is run.ts's, which brings it to the window sideways. Motion off: no glide.
 
 /** Frames a glide must begin in (its first scroll, or a jump that cuts it) after the focus that asks for it. */
@@ -206,6 +207,8 @@ const RUNNING = "#run.is-running [data-station]";
 interface Handover {
   readonly target: Element;
   readonly taken: number;
+  readonly course: Course;
+  readonly lastY: number;
 }
 let handover: Handover | null = null;
 
@@ -216,6 +219,11 @@ interface Course {
   readonly high: number;
   readonly place: number;
 }
+/** Whether the page, at `y`, still stood on the glide's course. */
+function onCourse(y: number, course: Course): boolean {
+  return y >= course.low - 1 && y <= course.high + 1;
+}
+
 function courseTo(el: Element): Course {
   const r = el.getBoundingClientRect();
   const from = window.scrollY;
@@ -236,8 +244,9 @@ export function startFocusGlide({ motion }: JourneyContext): Teardown {
   const tab = watchTab();
   const watch = watchGlide(() => {
     const el = target;
-    if (el && el === document.activeElement && !seen(el)) el.scrollIntoView({ block: "center", inline: "nearest" });
-    if (el) aim(el);
+    if (!el || el.closest(RUNNING)) return; // the run pinned under the glide: run.ts's
+    if (el === document.activeElement && !seen(el)) el.scrollIntoView({ block: "center", inline: "nearest" });
+    aim(el);
   });
   const onFocus = (event: FocusEvent) => {
     watch.disarm();
@@ -261,28 +270,38 @@ export function startFocusGlide({ motion }: JourneyContext): Teardown {
   const onJump = () => {
     if (target && watch.armed()) aim(target);
   };
+  const letGo = () => {
+    watch.disarm();
+    target = null;
+  };
   /** A relayout: a cut when it moved the link on the page, and the page, until it, stood on the glide's course; the glide
-   * let go when the page stood off it. */
+   * let go when the page stood off it, or when the run pinned under it (run.ts's then). */
   const onLayout = () => {
     const el = target;
     const was = course;
-    if (!el || !was || !watch.armed() || el.closest(RUNNING)) return; // the run pinned under the glide: run.ts's
+    if (!el || !was || !watch.armed()) return;
+    if (el.closest(RUNNING)) return letGo();
     const place = el.getBoundingClientRect().top + window.scrollY;
     if (Math.abs(place - was.place) < 1) return; // the link stands where it did: the glide still ends at it
-    if (lastY < was.low - 1 || lastY > was.high + 1) {
+    if (!onCourse(lastY, was)) {
       // off the glide's course before the page moved: the reader took the page there, and it stays theirs
-      watch.disarm();
-      target = null;
-      return;
+      return letGo();
     }
     aim(el);
     watch.cut();
   };
 
-  // The rebuild's teardown left a glide it watched: taken up here, since the rebuild itself relaid the page out.
+  // The rebuild's teardown left a glide it watched: taken up here, since the rebuild itself relaid the page out, if the
+  // page stood on its course until the rebuild (a reader a drag took off it keeps their place: review F1).
   const passed = handover;
   handover = null;
-  if (passed && passed.target === document.activeElement && passed.target.isConnected && !passed.target.closest(RUNNING)) {
+  if (
+    passed &&
+    onCourse(passed.lastY, passed.course) &&
+    passed.target === document.activeElement &&
+    passed.target.isConnected &&
+    !passed.target.closest(RUNNING)
+  ) {
     target = passed.target;
     aim(passed.target);
     watch.arm(passed.taken);
@@ -296,8 +315,8 @@ export function startFocusGlide({ motion }: JourneyContext): Teardown {
   window.addEventListener(LAYOUT_EVENT, onLayout);
   window.addEventListener("resize", onLayout);
   return () => {
-    if (target && watch.armed()) {
-      const left: Handover = { target, taken: watch.taken() };
+    if (target && course && watch.armed()) {
+      const left: Handover = { target, taken: watch.taken(), course, lastY };
       handover = left;
       queueMicrotask(() => {
         if (handover === left) handover = null;

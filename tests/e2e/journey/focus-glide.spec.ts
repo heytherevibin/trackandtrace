@@ -173,7 +173,34 @@ test.describe("a Tab stop's glide (spec §3.G; WCAG 2.4.11)", () => {
         expect(await principlesTop(page), "the drag left the reader at 01, and nothing took them back").toBeCloseTo(100, -1);
       });
 
-      test("never pulls back a reader whom a mouse focused, though the page is relaid out after the click", async ({ page }) => {
+      // A rebuild (02's refit, 200 ms after a tt:layout) hands the watched glide to the rebuilt module: a reader a drag took
+      // off the glide's course before it keeps their place there too (review F1).
+      test("never pulls back a reader who dragged away mid-glide, though the journey then rebuilds", async ({ page }) => {
+        await drawStill(page);
+        await page.goto("/");
+        await waitForJourney(page);
+        await scrollToId(page, "record", 100);
+        await frames(page, 3);
+        await readyTab(page, "#reliability", POLICY, "away"); // the drag: two frames after the focus
+        await page.evaluate((name) => {
+          const link = [...document.querySelectorAll<HTMLElement>("#reliability a")].find((a) => a.textContent?.includes(name));
+          if (!link) throw new Error("no data policy link");
+          const wait = (left: number): void => {
+            if (left <= 0) window.dispatchEvent(new Event("tt:rebuild"));
+            else requestAnimationFrame(() => wait(left - 1));
+          };
+          link.addEventListener("focus", () => wait(4), { once: true }); // two frames after the drag, still watched
+        }, POLICY);
+        await pressTab(page);
+        await expect(policy(page)).toBeFocused();
+        await atRest(page, 20);
+        await frames(page, 30);
+        await atRest(page, 20);
+        expect(await principlesTop(page), "the drag left the reader at 01, and nothing took them back").toBeCloseTo(100, -1);
+      });
+
+      test("never pulls back a reader whom a mouse focused, though the page is relaid out after the click", async ({ page, browserName }) => {
+        test.skip(browserName === "webkit", "WebKit doesn't focus a link on click");
         await drawStill(page);
         await page.goto("/");
         await waitForJourney(page);
@@ -217,12 +244,12 @@ test.describe("a Tab stop's glide (spec §3.G; WCAG 2.4.11)", () => {
           const a = document.activeElement;
           if (!(a instanceof HTMLElement)) throw new Error("nothing is focused");
           a.blur();
-          // above the link: it moves 300px down the page, still above the window whether or not anchoring answers
+          a.focus({ preventScroll: true });
+          // then, above the link: it moves 300px down the page, still above the window whether or not anchoring answers
           const grow = document.createElement("div");
           grow.setAttribute("data-relayout", "");
           grow.style.height = "300px";
           document.getElementById("principles")?.before(grow);
-          a.focus({ preventScroll: true });
           window.dispatchEvent(new Event("tt:layout"));
         });
         await atRest(page, 20);
@@ -289,7 +316,8 @@ test.describe("a Tab stop's glide (spec §3.G; WCAG 2.4.11)", () => {
         });
       }
 
-      test("never pulls back a reader whom a mouse focused: a click on a link cut off at the window's foot starts no glide", async ({ page }) => {
+      test("never pulls back a reader whom a mouse focused: a click on a link cut off at the window's foot starts no glide", async ({ page, browserName }) => {
+        test.skip(browserName === "webkit", "WebKit doesn't focus a link on click");
         await drawStill(page);
         await page.goto("/");
         await waitForJourney(page);

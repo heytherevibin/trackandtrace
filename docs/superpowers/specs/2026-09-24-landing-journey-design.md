@@ -384,8 +384,9 @@ Found while building J6 (2026-09-28):
   shrinks between the reader and the link (the live drawing pinning a frame after the Tab, a late web font, a resize)
   leaves the glide landing where the link was. It counts only when the relayout (`tt:layout`, or the window's resize)
   moved the link on the page, and only while the page still stood between the glide's start and the farthest a reveal
-  could take it, so a reader who dragged away is never pulled back; a journey rebuild (a late font changing a piece's
-  fit) hands the watched glide to the rebuilt module in the same task, with the takes it has left;
+  could take it: a relayout that finds a reader dragged off that course lets the glide go (a jump alone still takes it
+  up, as in J6); a journey rebuild (a late font changing a piece's fit) hands the watched glide to the rebuilt module in
+  the same task, with the takes it has left, under the same course rule; a station of the running run stays `run.ts`'s;
 - at 200% text, the masthead folds its nav into the menu button whenever the nav can't hold one row, sitewide
   (100% text unchanged), by a container query in rem on an inner div, not the sticky header, since WebKit reads
   the header's box stale during the run's unpin; the nightly's sweep adds 1024×768 at 200% text, and fails on
