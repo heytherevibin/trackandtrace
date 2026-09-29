@@ -4,7 +4,8 @@ import { cn } from "@/utils/cn";
 /**
  * An email address that wraps rather than being cut short. It may break after the @ and before each dot, as addresses
  * are set in print, and inside a word only as the last resort, when that word is wider than the whole line. The
- * breaks are <wbr>: nothing is added to the text, so it reads, copies and announces as the one address.
+ * breaks are <wbr>: nothing is added to the text, so it copies as the one address, and its paragraph reads as the one
+ * address (tests/e2e/account-identity.spec.ts). The browser's accessibility tree still holds one text node per part.
  */
 export function EmailText({ email, className }: { readonly email: string; readonly className?: string }) {
   const parts = email.split(/(?<=@)|(?=\.)/);

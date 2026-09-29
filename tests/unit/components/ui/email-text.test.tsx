@@ -13,9 +13,12 @@ describe("EmailText", () => {
     expect(drawn(container)).toBe("venkataramanan|.subramanian@|example|.co|.in");
   });
 
-  it("reads, copies and announces as the one address", () => {
+  it("adds nothing to the address: its text is the address, split only by <wbr>, no wrapping element and no character", () => {
     const { container } = render(<EmailText email="asha@example.com" />);
-    expect(container.textContent).toBe("asha@example.com");
+    const span = container.firstElementChild;
+    expect(span?.textContent).toBe("asha@example.com");
+    expect([...(span?.children ?? [])].map((child) => child.tagName)).toEqual(["WBR", "WBR"]);
+    // How it reads in the accessibility tree and when it is copied: tests/e2e/account-identity.spec.ts.
   });
 
   it("breaks a long word only as the last resort, when it is wider than the whole line", () => {
