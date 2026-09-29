@@ -110,3 +110,27 @@ test("the lifecycle marks the route resolved and the search done", async ({ page
   await expect(lifecycle.getByRole("listitem").nth(1)).toHaveAttribute("data-state", "done");
   await expect(lifecycle.getByRole("listitem").nth(2)).toHaveAttribute("data-state", "done");
 });
+
+test("the chart's column names fit their own cells once the rows stack", async ({ page, isMobile }) => {
+  test.skip(!isMobile, "the stacked layout only exists below sm");
+  await gotoReady(page, "/pre-booking");
+  await pickRoute(page, "SBC", "NDLS");
+  await search(page);
+  await page
+    .getByRole("button", { name: /More classes and dates|Three more dates/ })
+    .first()
+    .click();
+  await expect(page.getByRole("table", { name: "Availability" }).first()).toBeVisible();
+
+  // Below sm each row becomes a labelled record and the column name is drawn from `data-label` as
+  // generated text. Those cells are `overflow: visible`, so a name too wide for its cell is not
+  // hidden — it is painted across the neighbouring column, and the two names read as one
+  // run-together word. That is why `layoutBreaks` does not catch this: it looks for content a box
+  // HIDES, and nothing here is hidden.
+  const spill = await page.evaluate(() =>
+    [...document.querySelectorAll<HTMLElement>("td[data-label]")]
+      .filter((td) => td.scrollWidth > td.clientWidth + 1)
+      .map((td) => `"${td.dataset.label}" needs ${td.scrollWidth}px of a ${td.clientWidth}px cell`),
+  );
+  expect(spill, spill.join("\n")).toEqual([]);
+});
