@@ -134,3 +134,44 @@ test("the chart's column names fit their own cells once the rows stack", async (
   );
   expect(spill, spill.join("\n")).toEqual([]);
 });
+
+test("the chart's values start on one line when the rows stack", async ({ page, isMobile }) => {
+  test.skip(!isMobile, "the stacked layout only exists below sm");
+  await gotoReady(page, "/pre-booking");
+  await pickRoute(page, "SBC", "NDLS");
+  await search(page);
+  await page
+    .getByRole("button", { name: /More classes and dates|Three more dates/ })
+    .first()
+    .click();
+  await expect(page.getByRole("table", { name: "Availability" }).first()).toBeVisible();
+
+  // Two cells side by side in a record each draw their own name above their own value, and a name
+  // that takes two lines pushes its value a line below its neighbour's. The reader then sees two
+  // figures on different lines with no rule saying which belongs to which name.
+  //
+  // A Range over a cell's child nodes measures the VALUE: generated content is not in the DOM, so
+  // the ::before name is left out of the box it reports.
+  const drift = await page.evaluate(() => {
+    const out: string[] = [];
+    for (const row of document.querySelectorAll<HTMLElement>("tr")) {
+      const bands = new Map<number, { label: string; top: number }[]>();
+      for (const td of row.querySelectorAll<HTMLElement>("td[data-label]")) {
+        const box = td.getBoundingClientRect();
+        if (box.width === 0) continue;
+        const range = document.createRange();
+        range.selectNodeContents(td);
+        const band = [...bands.keys()].find((k) => Math.abs(k - box.top) < 4) ?? Math.round(box.top);
+        bands.set(band, [...(bands.get(band) ?? []), { label: td.dataset.label ?? "", top: Math.round(range.getBoundingClientRect().top) }]);
+      }
+      for (const group of bands.values()) {
+        if (group.length < 2) continue;
+        const tops = group.map((g) => g.top);
+        const apart = Math.max(...tops) - Math.min(...tops);
+        if (apart > 1) out.push(`${apart}px apart: ${group.map((g) => `${g.label}@${g.top}`).join(" | ")}`);
+      }
+    }
+    return [...new Set(out)];
+  });
+  expect(drift, drift.join("\n")).toEqual([]);
+});
