@@ -62,28 +62,57 @@ function navigationTarget(): EventTarget | null {
   return nav instanceof EventTarget ? nav : null;
 }
 
-/** The events that can carry the reader's own scroll; ownScroll says which of them do. Shared by focus-glide.ts. */
+/** The events that can carry the reader taking over; ownScroll says which of them do. Shared by focus-glide.ts. */
 export const HAND = ["wheel", "touchmove", "keydown"] as const;
 /** The keys that scroll the page: the arrows up and down, Page Up and Page Down, Home, End and Space (Shift+Space up). */
 const SCROLL_KEYS: ReadonlySet<string> = new Set(["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "]);
-/** Where a key types or picks rather than scrolls. */
-const TEXT_FIELD = "input, textarea, select, [contenteditable]:not([contenteditable='false'])";
+/** Where a key types or picks rather than scrolls: the focused element itself (below), or an editing host it sits in. */
+const TEXT_FIELD = "input, textarea, select";
+/** Where Space acts rather than scrolls, as the browser has it: a button, a summary, a field, a media control, and the
+ * roles a page gives a control of its own (a Base UI switch is a role=switch). Not a link, and not a range slider:
+ * Space on either scrolls the page. The roles are the ARIA authoring contract: a widget with one of these roles is
+ * expected to handle Space itself, so it is judged as one that does, even where a bare div with the role would not. */
+const TAKES_SPACE = [
+  "input:not([type='range']), textarea, select",
+  "button",
+  "summary",
+  "audio[controls]",
+  "video[controls]",
+  "[role='button'], [role='switch'], [role='checkbox'], [role='radio'], [role='tab'], [role='option']",
+  "[role='menuitem'], [role='menuitemcheckbox'], [role='menuitemradio'], [role='combobox'], [role='slider']",
+  "[role='spinbutton'], [role='textbox'], [role='searchbox']",
+].join(", ");
+
+/** Inside an editing host, by the nearest contenteditable attribute: a region made not editable inside one is not. */
+function inEditable(el: Element): boolean {
+  const host = el.closest("[contenteditable]");
+  return host !== null && host.getAttribute("contenteditable") !== "false";
+}
 
 /**
- * The reader's own scroll (J5-17, amended by the owner on 2026-09-28; J6-9): before the restore, it means they have
- * moved on, and nothing is restored under them. Only a scroll counts:
+ * The reader taking over (J5-17, amended by the owner on 2026-09-28 and again on 2026-09-29; J6-9): before the
+ * restore, it means they have moved on, and nothing is restored under them. What counts:
  * - a wheel that is mostly vertical and not a pinch-zoom (ctrl+wheel). A sideways wheel is a trackpad's swipe back, or
  *   its momentum as the page returns;
  * - a finger dragging (touchmove). A tap (touchstart alone) is not a scroll;
- * - a scroll key, with focus outside a text field and no Alt, Ctrl or Meta: Alt+← and Cmd+[ are Back and Forward.
+ * - a scroll key, with focus outside a text field and no Alt, Ctrl or Meta: Alt+← and Cmd+[ are Back and Forward. Space
+ *   counts only where it would scroll the page: on a control that takes Space (a button, a switch, a checkbox, a
+ *   summary ...; not a link, which Space scrolls past) it acts, and the restore goes on;
+ * - Tab and Shift+Tab, and Alt+Tab (Safari moves to links with Option-Tab): a reader who starts tabbing is moving on,
+ *   and the restore must not pull them from their focus. Not Ctrl+Tab or Meta+Tab, which are the browser's own tabs.
  * A swipe back, a tap and every other key leave the restore pending.
  */
 export function ownScroll(event: Event): boolean {
   if (event.type === "touchmove") return true;
   if (event instanceof WheelEvent) return !event.ctrlKey && Math.abs(event.deltaY) > Math.abs(event.deltaX);
-  if (!(event instanceof KeyboardEvent) || !SCROLL_KEYS.has(event.key)) return false;
-  if (event.altKey || event.ctrlKey || event.metaKey) return false;
-  return !(event.target instanceof Element && event.target.closest(TEXT_FIELD));
+  if (!(event instanceof KeyboardEvent)) return false;
+  if (event.ctrlKey || event.metaKey) return false;
+  if (event.key === "Tab") return true;
+  if (!SCROLL_KEYS.has(event.key) || event.altKey) return false;
+  // The focused element itself, never its ancestors: a link inside a role=option or a summary is a link.
+  const focused = event.target instanceof Element ? event.target : null;
+  if (!focused) return true;
+  return !(focused.matches(event.key === " " ? TAKES_SPACE : TEXT_FIELD) || inEditable(focused));
 }
 
 function mastheadFoot(): number {
