@@ -1,6 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { startFocusGlide, watchGlide, watchTab } from "@/components/landing/journey/focus-glide";
-import { JUMP_EVENT, LAYOUT_EVENT } from "@/components/landing/journey/journey-events";
+import { LAYOUT_EVENT } from "@/components/landing/journey/journey-events";
+import { at, frames, glide, jump, modality, policy, pressTab, reveal, tabOnto, setUpGlideRig } from "./focus-glide-rig";
 import { testContext } from "./journey-context";
 
 // The browser glides a Tab stop into the window, and an instant scroll that keeps the reader's place (jumpTo: keepPlace,
@@ -8,61 +9,9 @@ import { testContext } from "./journey-context";
 // (WCAG 2.4.11). The glide is taken up again after each such cut, at most three times, and only that: armed by a Tab that
 // starts a glide, it never pulls a reader who left by their own hand (a scrollbar drag sends no wheel, touch or key), nor
 // one whom focus returning to the window finds away, and it lets go once the page holds still (Task 6 review, rounds 2–4).
+// A relayout's cut is focus-glide-relayout.test.tsx's.
 
-const reveal = vi.fn();
-let box = { top: 1400, bottom: 1432 }; // below a 900px window
-let y = 0;
-
-beforeEach(() => {
-  vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
-  vi.spyOn(window, "innerHeight", "get").mockReturnValue(900);
-  y = 0;
-  vi.spyOn(window, "scrollY", "get").mockImplementation(() => y);
-  document.body.innerHTML = `<header></header><section id="reliability"><a href="/accuracy">Read the data policy</a></section><div id="run" class="run is-running"><section id="features"><article data-station=""><a href="/watchlist">Open Watchlist</a></article></section></div>`;
-  document.querySelector("header")!.getBoundingClientRect = () => ({ bottom: 64 }) as DOMRect;
-  box = { top: 1400, bottom: 1432 };
-  for (const a of document.querySelectorAll("a")) {
-    a.getBoundingClientRect = () => box as DOMRect;
-    a.scrollIntoView = reveal;
-  }
-  reveal.mockClear();
-});
-afterEach(() => {
-  vi.useRealTimers();
-  vi.restoreAllMocks();
-  document.body.replaceChildren();
-});
-
-const policy = () => document.querySelector<HTMLAnchorElement>("#reliability a")!;
-const frames = (n: number) => {
-  for (let k = 0; k < n; k += 1) vi.advanceTimersToNextFrame();
-};
-/** The browser's glide: a scroll step, each frame. */
-const glide = (by = 40) => {
-  y += by;
-  window.dispatchEvent(new Event("scroll"));
-};
-/** Focus as the keyboard gives it (:focus-visible), or as a mouse does: said outright, since jsdom's own modality guess
- * carries from test to test. */
-const modality = (el: HTMLElement, keyboard: boolean) => {
-  const own = Element.prototype.matches.bind(el);
-  vi.spyOn(el, "matches").mockImplementation((selector: string) => (selector === ":focus-visible" ? keyboard : own(selector)));
-};
-/** A Tab keydown: the focus it moves comes in the same task. */
-const pressTab = () => window.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab" }));
-/** Focus that starts the browser's glide: a Tab's (:focus-visible), unless said otherwise (a mouse's, with no Tab). */
-const tabOnto = (el: HTMLElement, keyboard = true) => {
-  modality(el, keyboard);
-  if (keyboard) pressTab();
-  el.focus();
-  glide();
-  frames(1);
-};
-/** A place-keeping jump, as the drawing falls to the still: it cuts the glide, and the page's layout changes. */
-const jump = () => {
-  window.dispatchEvent(new Event(JUMP_EVENT));
-  window.dispatchEvent(new Event(LAYOUT_EVENT));
-};
+setUpGlideRig();
 
 describe("arming: a Tab's focus that starts a glide", () => {
   it("takes a glide a jump cut short up again, centred so the masthead never covers it", () => {
@@ -80,7 +29,7 @@ describe("arming: a Tab's focus that starts a glide", () => {
     tabOnto(policy()); // a glide armed for the first Tab stop
     const other = document.createElement("a"); // a second Tab stop below the window, outside the run
     other.href = "/tos";
-    other.getBoundingClientRect = () => box as DOMRect;
+    other.getBoundingClientRect = () => ({ top: at.box.top - at.y, bottom: at.box.bottom - at.y }) as DOMRect; // below the window, as the policy link
     other.scrollIntoView = reveal;
     document.getElementById("reliability")!.append(other);
     tabOnto(other); // the next Tab: its keydown lets go of the first glide, its focus arms the second
@@ -197,11 +146,11 @@ describe("arming: a Tab's focus that starts a glide", () => {
 
   it("is not armed for a Tab stop already in the viewport, nor for a station of the running run (run.ts's)", () => {
     const stop = startFocusGlide(testContext());
-    box = { top: 40, bottom: 72 }; // in the viewport, if under the masthead: the browser does not scroll for it
+    at.box = { top: 40, bottom: 72 }; // in the viewport, if under the masthead: the browser does not scroll for it
     tabOnto(policy());
     jump();
     frames(3);
-    box = { top: 1400, bottom: 1432 };
+    at.box = { top: 1400, bottom: 1432 };
     tabOnto(document.querySelector<HTMLAnchorElement>("#run a")!);
     jump();
     frames(3);
@@ -214,7 +163,7 @@ describe("never against the reader", () => {
   it("does not pull back a reader who left mid-glide by a drag (no wheel, touch or key): only a jump cuts a glide", () => {
     const stop = startFocusGlide(testContext());
     tabOnto(policy());
-    y = 1410; // a scrollbar drag, away
+    at.y = 1410; // a scrollbar drag, away
     window.dispatchEvent(new Event("scroll"));
     window.dispatchEvent(new Event(LAYOUT_EVENT));
     window.dispatchEvent(new Event("resize"));

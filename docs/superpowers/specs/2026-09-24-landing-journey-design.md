@@ -392,6 +392,14 @@ Found while building J6 (2026-09-28):
   Tab (Option-Tab counts, since Safari moves to links with it; Ctrl or Meta combinations never count), taking up
   at most 3 cuts, and letting go on the reader's own scroll, a pointerdown, or after 10 still frames; it also
   re-aims once after Safari's own focus reveal, while the watch is armed;
+- after J6 (the owner, 2026-09-28): a Tab glide that a layout change cuts short is taken up too, under the same bounds
+  (the same 3 takes, shared with the jumps). The browser sets a glide's end as it begins, so a piece that grows or
+  shrinks between the reader and the link (the live drawing pinning a frame after the Tab, a late web font, a resize)
+  leaves the glide landing where the link was. It counts only when the relayout (`tt:layout`, or the window's resize)
+  moved the link on the page, and only while the page still stood between the glide's start and the farthest a reveal
+  could take it: a relayout that finds a reader dragged off that course lets the glide go (a jump alone still takes it
+  up, as in J6); a journey rebuild (a late font changing a piece's fit) hands the watched glide to the rebuilt module in
+  the same task, with the takes it has left, under the same course rule; a station of the running run stays `run.ts`'s;
 - at 200% text, the masthead folds its nav into the menu button whenever the nav can't hold one row, sitewide
   (100% text unchanged), by a container query in rem on an inner div, not the sticky header, since WebKit reads
   the header's box stale during the run's unpin; the nightly's sweep adds 1024×768 at 200% text, and fails on
