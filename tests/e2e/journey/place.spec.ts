@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "../fixtures";
 import { REBUILD_EVENT } from "@/components/landing/journey/journey-events";
-import { drawStill, frames, noAnchoring, scrollToId, waitForJourney, waitForLive } from "./journey-helpers";
+import { drawStill, frames, noAnchoring, pressTab, scrollToId, waitForJourney, waitForLive } from "./journey-helpers";
 
 // The places the journey keeps (J5-17, J5-19): a change of height above 02 (the live drawing pinning, J5) must never
 // throw a reader inside 02 when Motion then goes off; and Back, Forward, Back finds the reader's place each time.
@@ -81,6 +81,91 @@ test.describe("the reader's place", () => {
     await page.goBack();
     await waitForJourney(page);
     await expect.poll(drift).toBeLessThanOrEqual(4);
+  });
+
+  // What cancels a Back restore (J6-9; the owner, 2026-09-28 and 2026-09-29): the reader taking over. Space only where it
+  // would scroll the page; Tab always (never Ctrl or Meta with it). The restore waits for the first build, which
+  // pauses between its modules through scheduler.yield (pause.ts): these specs hold that pause, so the restore is
+  // pending, press the key as a reader would, then let the build go on.
+  interface Hold {
+    __ttHold?: boolean;
+    __ttRelease?: () => void;
+  }
+  async function holdable(page: Page): Promise<void> {
+    await page.addInitScript(() => {
+      const w = window as unknown as Hold;
+      let open: () => void = () => undefined;
+      const gate = new Promise<void>((resolve) => {
+        open = resolve;
+      });
+      w.__ttRelease = () => {
+        w.__ttHold = false;
+        open();
+      };
+      const held = Reflect.get(window, "scheduler") as { yield?: () => Promise<void> } | undefined;
+      const real = held?.yield?.bind(held);
+      Object.defineProperty(window, "scheduler", {
+        configurable: true,
+        value: { yield: () => (w.__ttHold ? gate : (real?.() ?? new Promise<void>((resolve) => setTimeout(resolve, 0)))) },
+      });
+    });
+  }
+  /** Leaves "/" from 05 by a link and comes Back with the build held: the restore is pending, the listeners are up. */
+  async function backHeld(page: Page): Promise<number> {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await holdable(page);
+    await page.goto("/");
+    await waitForJourney(page);
+    await scrollToId(page, "record", 120);
+    await frames(page); // the scroll has been sampled
+    const before = await page.locator("#record").evaluate((el) => el.getBoundingClientRect().top);
+    await page.getByLabel("Primary").getByRole("link", { name: "Watchlist" }).click();
+    await expect(page).toHaveURL(/\/watchlist/);
+    await page.evaluate(() => Reflect.set(window, "__ttHold", true));
+    await page.goBack();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.locator("html")).toHaveAttribute("data-journey", "on");
+    return before;
+  }
+  async function release(page: Page): Promise<void> {
+    await page.evaluate(() => (window as unknown as Hold).__ttRelease?.());
+    await waitForJourney(page);
+    await page.waitForTimeout(400); // a restore, if one was coming, has landed
+  }
+
+  test("Back, then Space on a focused control: the control acts, and the restore still lands", async ({ page }) => {
+    const before = await backHeld(page);
+    const theme = page.getByRole("banner").getByRole("button", { name: /^Theme:/ });
+    const named = await theme.getAttribute("aria-label");
+    await theme.evaluate((el) => el.focus({ preventScroll: true }));
+    await page.keyboard.press("Space");
+    await expect(theme).not.toHaveAttribute("aria-label", named ?? "");
+    await release(page);
+    expect(Math.abs((await recordTop(page)) - before)).toBeLessThanOrEqual(4);
+  });
+
+  test("Back, then Tab: the restore is cancelled, and focus stays in view", async ({ page }) => {
+    const before = await backHeld(page);
+    await pressTab(page);
+    const focus = () =>
+      page.evaluate(() => {
+        const r = document.activeElement?.getBoundingClientRect();
+        return r ? { top: r.top, bottom: r.bottom, height: window.innerHeight, body: document.activeElement === document.body } : null;
+      });
+    await release(page);
+    const at = await focus();
+    expect(at?.body).toBe(false);
+    expect(at?.top).toBeGreaterThanOrEqual(0);
+    expect(at?.bottom).toBeLessThanOrEqual(at?.height ?? 0);
+    expect(Math.abs((await recordTop(page)) - before)).toBeGreaterThan(4); // not restored
+  });
+
+  test("Back, then Space with nothing focused: the restore is cancelled, as before", async ({ page }) => {
+    const before = await backHeld(page);
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await page.keyboard.press("Space"); // the page scrolls a screen
+    await release(page);
+    expect(Math.abs((await recordTop(page)) - before)).toBeGreaterThan(4); // not restored
   });
 
   // The journey marks the page as its own (data-journey="on") before drawing.ts, eleventh of the modules it starts a

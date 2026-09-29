@@ -197,9 +197,11 @@ describe("startPlaceMemory", () => {
     memory.stop();
   });
 
-  // Only the reader's own scroll cancels the restore (J6-9; the owner, 2026-09-28, amending J5-17's "any key"): a
-  // mostly vertical wheel that is not a pinch-zoom, a finger dragging, and a scroll key outside a text field with no
-  // Alt, Ctrl or Meta. A swipe back, Back and Forward's own keys, a tap and every other key leave it pending.
+  // What cancels the restore is the reader taking over (J6-9; the owner, 2026-09-28, amending J5-17's "any key", and
+  // again on 2026-09-29): a mostly vertical wheel that is not a pinch-zoom, a finger dragging, a scroll key outside a
+  // text field with no Alt, Ctrl or Meta, and Space only where it would scroll the page (a control that takes Space
+  // acts instead), and Tab and Shift+Tab, and Alt+Tab (Safari's Option-Tab), but never Ctrl+Tab or Meta+Tab (the
+  // browser's own tabs). A swipe back, Back and Forward's own keys, a tap and every other key leave it pending.
   type Act = [name: string, act: () => void];
   const wheel =
     (init: WheelEventInit) =>
@@ -219,6 +221,17 @@ describe("startPlaceMemory", () => {
       document.body.append(field);
       field.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true }));
     };
+  /** A key on a focused element made from `html`: the keydown's target is the focused element. */
+  const onEl =
+    (html: string, k: string, init: KeyboardEventInit = {}) =>
+    (): void => {
+      const host = document.createElement("div");
+      host.innerHTML = html;
+      document.body.append(host);
+      const el = host.firstElementChild;
+      if (!el) throw new Error("no element");
+      el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, ...init }));
+    };
   const cancels: Act[] = [
     ["a mostly vertical wheel", wheel({ deltaX: 12, deltaY: 40 })],
     ["a finger dragging (touchmove)", () => window.dispatchEvent(new Event("touchmove"))],
@@ -230,6 +243,13 @@ describe("startPlaceMemory", () => {
     ["End", key("End")],
     ["Space", key(" ")],
     ["Shift+Space", key(" ", { shiftKey: true })],
+    ["Space on a focused element that takes no Space (a plain div)", onEl("<div tabindex='0'></div>", " ")],
+    ["Space on a heading that is not a control", onEl("<h2 tabindex='-1'>x</h2>", " ")],
+    ["Tab", key("Tab")],
+    ["Shift+Tab", key("Tab", { shiftKey: true })],
+    ["Alt+Tab (Safari's Option-Tab)", key("Tab", { altKey: true })],
+    ["Tab on a button", onEl("<button>x</button>", "Tab")],
+    ["Tab in a text field", inField("input", "Tab")],
     ["End inside a region made not editable (contenteditable=false)", inField("div", "End", "false")],
   ];
   const keeps: Act[] = [
@@ -238,7 +258,26 @@ describe("startPlaceMemory", () => {
     ["a pinch-zoom (ctrl+wheel)", wheel({ deltaY: 40, ctrlKey: true })],
     ["a tap (touchstart alone)", () => window.dispatchEvent(new Event("touchstart"))],
     ["the a key", key("a")],
-    ["Tab", key("Tab")],
+    ["Ctrl+Tab (the browser's tabs)", key("Tab", { ctrlKey: true })],
+    ["Meta+Tab", key("Tab", { metaKey: true })],
+    ["Ctrl+Shift+Tab", key("Tab", { ctrlKey: true, shiftKey: true })],
+    ["Space on a button", onEl("<button>x</button>", " ")],
+    ["Shift+Space on a button", onEl("<button>x</button>", " ", { shiftKey: true })],
+    ["Space on a link", onEl("<a href='/x'>x</a>", " ")],
+    ["Space on a switch (role=switch)", onEl("<span role='switch' tabindex='0' aria-checked='false'></span>", " ")],
+    ["Space on a checkbox", onEl("<input type='checkbox'>", " ")],
+    ["Space on a radio", onEl("<input type='radio'>", " ")],
+    ["Space on a summary", onEl("<summary>x</summary>", " ")],
+    ["Space on a role=button", onEl("<div role='button' tabindex='0'></div>", " ")],
+    ["Space on a role=checkbox", onEl("<div role='checkbox' tabindex='0'></div>", " ")],
+    ["Space on a role=tab", onEl("<div role='tab' tabindex='0'></div>", " ")],
+    ["Space on a control's inner span (a button's label)", () => {
+      const host = document.createElement("div");
+      host.innerHTML = "<button><span>x</span></button>";
+      document.body.append(host);
+      host.querySelector("span")?.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true }));
+    }],
+    ["Space in a select", inField("select", " ")],
     ["Shift", key("Shift")],
     ["Escape", key("Escape")],
     ["ArrowLeft", key("ArrowLeft")],
