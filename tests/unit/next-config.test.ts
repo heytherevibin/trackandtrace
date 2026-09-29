@@ -85,6 +85,12 @@ describe("headers by host", () => {
     }
   });
 
+  it("asks crawlers never to index the end-to-end run's fixture pages", async () => {
+    for (const url of ["https://trakline.in/e2e/signed-in", "http://localhost:4210/e2e/signed-in"]) {
+      expect((await headersAt(url)).get("x-robots-tag"), url).toBe("noindex, nofollow, noarchive");
+    }
+  });
+
   it("keeps the traveller host's headers as they were", async () => {
     const headers = await headersAt("https://trakline.in/pnr");
     expect(headers.get("content-security-policy")).toContain("default-src 'self'");

@@ -41,7 +41,8 @@ export async function layoutBreaks(page: Page): Promise<string[]> {
 
 /** Words a reader cannot read to the end (spec §9's 200% text; J6 nightly): a line of text that runs past the window's
  * side where the page clips it (the sideways overflow the collision checker sees is the page scrolling instead), or
- * text its own box cuts off inside the page (overflow hidden or clipped, an ellipsis). Clipped inside the page on
+ * text its own box cuts off inside the page: at its side (overflow hidden or clipped, an ellipsis) or at its foot
+ * (overflow hidden or clipped, or clamped to a number of lines, with lines below the box). Clipped inside the page on
  * purpose by a parent (a wipe, a scroller) is left alone, as is anything screen-reader-only. Laid-out boxes, so it reads
  * the whole page (or `scope`) from wherever it stands. */
 export async function cutText(page: Page, scope = "body"): Promise<string[]> {
@@ -57,6 +58,9 @@ export async function cutText(page: Page, scope = "body"): Promise<string[]> {
       const style = getComputedStyle(el);
       const clips = style.overflowX === "hidden" || style.overflowX === "clip" || style.textOverflow === "ellipsis";
       if (clips && el.scrollWidth > el.clientWidth + 1) found.push(`${text} is cut off by its own box (${el.scrollWidth - el.clientWidth}px)`);
+      const clamped = style.getPropertyValue("-webkit-line-clamp") !== "none" && style.getPropertyValue("-webkit-line-clamp") !== "";
+      const clipsFoot = style.overflowY === "hidden" || style.overflowY === "clip" || clamped;
+      if (clipsFoot && el.scrollHeight > el.clientHeight + 1) found.push(`${text} is cut off at its foot by its own box (${el.scrollHeight - el.clientHeight}px)`);
       if (r.right <= vw + 1 && r.left >= -1) continue;
       let clip: DOMRect | null = null;
       for (let n = el.parentElement; n && n !== document.documentElement; n = n.parentElement) {
@@ -70,4 +74,27 @@ export async function cutText(page: Page, scope = "body"): Promise<string[]> {
     }
     return found;
   }, scope);
+}
+
+/** Words broken across two lines (spec §9's 200% text): each word of the text in `selector`, read as a range, and any
+ * whose glyphs sit on more than one line. A word longer than its whole line has to break somewhere; nothing else may. */
+export async function brokenWords(page: Page, selector: string): Promise<string[]> {
+  return page.evaluate((sel) => {
+    const found: string[] = [];
+    for (const el of document.querySelectorAll<HTMLElement>(sel)) {
+      if (!el.checkVisibility()) continue;
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const value = node.textContent ?? "";
+        for (const word of value.matchAll(/\S+/g)) {
+          const range = document.createRange();
+          range.setStart(node, word.index);
+          range.setEnd(node, word.index + word[0].length);
+          const lines = new Set([...range.getClientRects()].filter((r) => r.width > 0).map((r) => Math.round(r.top)));
+          if (lines.size > 1) found.push(`"${word[0]}" breaks across ${lines.size} lines in ${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ""}`);
+        }
+      }
+    }
+    return found;
+  }, selector);
 }

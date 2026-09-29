@@ -360,9 +360,15 @@ Decided while planning J6 (2026-09-28):
 - the run's frame is server markup, its lines drawn by `run.ts` (J6-6; a departure from §3.B, accepted at J6's
   pre-flight); it pins by `#run.is-running` inside `keepPlace`, only while the reader is not below it (J6-7); links
   to 06 and 07 bring their stations to the window (J6-8);
-- J5-17 amended (the owner, 2026-09-28): only the reader's own scroll (a mostly vertical wheel that is not a
-  pinch-zoom, a finger dragging, a scroll key outside a text field with no Alt, Ctrl or Meta) cancels the Back
-  restore; a trackpad's swipe back, a tap and every other key leave it pending (J6-9);
+- J5-17 amended (the owner, 2026-09-28), amended again (the owner, 2026-09-29): the reader taking over cancels the
+  Back restore. That is a mostly vertical wheel that is not a pinch-zoom, a finger dragging, a scroll key (the arrows,
+  Page Up and Down, Home, End, Space) outside a text field with no Alt, Ctrl or Meta, and Tab or Shift+Tab, and
+  Alt+Tab (Safari moves to links with Option-Tab), but not Ctrl+Tab or Meta+Tab (the browser's own tabs). Space
+  cancels only where it would scroll the page: on a control that takes Space (a button, a switch, a checkbox, a
+  radio, a summary, a select, a text field, or a control with such a role) the control acts and the restore goes
+  on; on a link it does cancel, since Space scrolls past a focused link and never follows it; Shift+Space follows the
+  same rule. A trackpad's swipe back, a tap and every other key leave it pending (J6-9);
+  `focus-glide.ts` lets go of a glide by the same rule (`ownScroll`);
 - Back into the run returns the reader where they left: a section riding it is read where `run.ts` says it stands
   (`data-run-at`), so a reader who left at 07 comes back to 07 (J6-9);
 - Night falls on every traveller page with Motion on, from the theme button's own module,
@@ -393,6 +399,22 @@ Found while building J6 (2026-09-28):
   text clipped inside the page;
 - Motion off relays the drawn train's columns inside the rebuild's own task, so 02's place guard never reads a
   half-built page; before this, WebKit moved the reader 304 px.
+
+Found after J6, finishing 200% text (2026-09-29; 100% text unchanged throughout):
+- the masthead keeps one row at 390×844 with 200% text: below 16.5rem of its inner query container SIGN IN keeps only
+  its icon (its name stays, visually hidden), as it already does below xs; 16.5rem is 264px at 100% text, inside xs.
+  A narrower phone at 200% (360px, 280px) still takes the last-resort second row;
+- section headings (`heading-fit`) grow with larger text only while the column holds their longest word whole,
+  CONSTRUCTION, and never below the drawn 32px: no word breaks from 280px up at 200% text; `wrap-anywhere` breaks a
+  word only in a column narrower than that word at 32px (a window under about 260px at 200%);
+- nothing is cut short with an ellipsis: the route popover's station names, and the account view's and account menu's
+  name and email, wrap; an email breaks after its @ and before a dot (`EmailText`), and inside a word only when that
+  word is wider than the whole line. The route popover holds to the room its row gives it, never below the drawn
+  256px; menus hold to the window, never below 192px;
+- the nightly's 200% text checks also fail on text cut at its foot (overflow hidden or clipped, or a line clamp), on
+  a heading's word broken across lines, and on a masthead taller than its one row; and they open the route popover,
+  the account view and the account menu (`/e2e/signed-in`: a fixture traveller, only on Playwright's own server with
+  no accounts configured, a 404 and never indexed anywhere else).
 
 Each PR brings the dependency, copy, tokens and DESIGN.md rules its own code first uses, so nothing lands
 unused, and nothing a traveller can see is inert (a Sound switch with no sound). Each runs `npm run check`

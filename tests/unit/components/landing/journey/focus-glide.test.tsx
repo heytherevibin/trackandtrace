@@ -24,6 +24,21 @@ describe("arming: a Tab's focus that starts a glide", () => {
     stop();
   });
 
+  it("a Tab's own keydown lets go of the glide before it, never of the glide its focus arms (Tab counts as taking over, as place-memory has it)", () => {
+    const stop = startFocusGlide(testContext());
+    tabOnto(policy()); // a glide armed for the first Tab stop
+    const other = document.createElement("a"); // a second Tab stop below the window, outside the run
+    other.href = "/tos";
+    other.getBoundingClientRect = () => box as DOMRect;
+    other.scrollIntoView = reveal;
+    document.getElementById("reliability")!.append(other);
+    tabOnto(other); // the next Tab: its keydown lets go of the first glide, its focus arms the second
+    jump();
+    frames(3);
+    expect(reveal).toHaveBeenCalledTimes(1); // taken up once, for the stop focus is on
+    stop();
+  });
+
   it("takes up each later cut too (the still's jump, a few frames after the first), at most three times", () => {
     const stop = startFocusGlide(testContext());
     tabOnto(policy());

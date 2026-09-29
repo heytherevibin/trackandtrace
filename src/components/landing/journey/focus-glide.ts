@@ -41,7 +41,8 @@ const TAKES = 3;
 /** The events that let go of a glide: the reader's own scroll (place-memory's rule), and a press of the pointer. */
 const OWN = [...HAND, "pointerdown"] as const;
 
-/** The reader's own scroll, by place-memory's rule (the owner's, 2026-09-28), or a press of the pointer. */
+/** The reader's own scroll, by place-memory's rule (the owner's, 2026-09-28 and 2026-09-29: Tab too, Space only where
+ * it scrolls), or a press of the pointer. */
 function readersOwn(event: Event): boolean {
   return event.type === "pointerdown" || ownScroll(event);
 }

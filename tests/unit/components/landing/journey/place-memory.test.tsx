@@ -197,9 +197,13 @@ describe("startPlaceMemory", () => {
     memory.stop();
   });
 
-  // Only the reader's own scroll cancels the restore (J6-9; the owner, 2026-09-28, amending J5-17's "any key"): a
-  // mostly vertical wheel that is not a pinch-zoom, a finger dragging, and a scroll key outside a text field with no
-  // Alt, Ctrl or Meta. A swipe back, Back and Forward's own keys, a tap and every other key leave it pending.
+  // What cancels the restore is the reader taking over (J6-9; the owner, 2026-09-28, amending J5-17's "any key", and
+  // again on 2026-09-29): a mostly vertical wheel that is not a pinch-zoom, a finger dragging, a scroll key outside a
+  // text field with no Alt, Ctrl or Meta, and Space only where it would scroll the page. A control that takes Space
+  // acts instead (a button, a switch, a checkbox, a radio, a summary, a select, a field); a link does not, and a range
+  // slider does not, since Space scrolls past both. Also Tab and Shift+Tab, and Alt+Tab (Safari's Option-Tab), but never
+  // Ctrl+Tab or Meta+Tab (the browser's own tabs). A swipe back, Back and Forward's own keys, a tap and every other key
+  // leave it pending.
   type Act = [name: string, act: () => void];
   const wheel =
     (init: WheelEventInit) =>
@@ -219,6 +223,28 @@ describe("startPlaceMemory", () => {
       document.body.append(field);
       field.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true }));
     };
+  /** A key on a focused element made from `html`: the keydown's target is the focused element. */
+  const onEl =
+    (html: string, k: string, init: KeyboardEventInit = {}) =>
+    (): void => {
+      const host = document.createElement("div");
+      host.innerHTML = html;
+      document.body.append(host);
+      const el = host.firstElementChild;
+      if (!el) throw new Error("no element");
+      el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, ...init }));
+    };
+  /** A key on the element `inner` finds inside `html`: the keydown's target is that focused element, not its ancestors. */
+  const onInner =
+    (html: string, inner: string, k: string) =>
+    (): void => {
+      const host = document.createElement("div");
+      host.innerHTML = html;
+      document.body.append(host);
+      const el = host.querySelector(inner);
+      if (!el) throw new Error("no element");
+      el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true }));
+    };
   const cancels: Act[] = [
     ["a mostly vertical wheel", wheel({ deltaX: 12, deltaY: 40 })],
     ["a finger dragging (touchmove)", () => window.dispatchEvent(new Event("touchmove"))],
@@ -230,6 +256,21 @@ describe("startPlaceMemory", () => {
     ["End", key("End")],
     ["Space", key(" ")],
     ["Shift+Space", key(" ", { shiftKey: true })],
+    ["Space on a focused element that takes no Space (a plain div)", onEl("<div tabindex='0'></div>", " ")],
+    ["Space on a heading that is not a control", onEl("<h2 tabindex='-1'>x</h2>", " ")],
+    ["Space on a focused link (it scrolls the page, and does not follow the link)", onEl("<a href='/x'>x</a>", " ")],
+    ["Shift+Space on a focused link", onEl("<a href='/x'>x</a>", " ", { shiftKey: true })],
+    ["Space on a role=link", onEl("<span role='link' tabindex='0'></span>", " ")],
+    ["Space on a range slider (it scrolls the page)", onEl("<input type='range'>", " ")],
+    ["Space on a focused link inside a role=option", onInner("<div role='option'><a href='/x'>x</a></div>", "a", " ")],
+    ["Space on a focused link inside a summary", onInner("<details><summary><a href='/x'>x</a></summary></details>", "a", " ")],
+    ["Space on a focused link inside a role=button", onInner("<div role='button'><a href='/x'>x</a></div>", "a", " ")],
+    ["Space on a non-editable island inside an editable region", onInner("<div contenteditable><span contenteditable='false' tabindex='0'>x</span></div>", "span", " ")],
+    ["Tab", key("Tab")],
+    ["Shift+Tab", key("Tab", { shiftKey: true })],
+    ["Alt+Tab (Safari's Option-Tab)", key("Tab", { altKey: true })],
+    ["Tab on a button", onEl("<button>x</button>", "Tab")],
+    ["Tab in a text field", inField("input", "Tab")],
     ["End inside a region made not editable (contenteditable=false)", inField("div", "End", "false")],
   ];
   const keeps: Act[] = [
@@ -238,7 +279,36 @@ describe("startPlaceMemory", () => {
     ["a pinch-zoom (ctrl+wheel)", wheel({ deltaY: 40, ctrlKey: true })],
     ["a tap (touchstart alone)", () => window.dispatchEvent(new Event("touchstart"))],
     ["the a key", key("a")],
-    ["Tab", key("Tab")],
+    ["Ctrl+Tab (the browser's tabs)", key("Tab", { ctrlKey: true })],
+    ["Meta+Tab", key("Tab", { metaKey: true })],
+    ["Ctrl+Shift+Tab", key("Tab", { ctrlKey: true, shiftKey: true })],
+    ["Space on a button", onEl("<button>x</button>", " ")],
+    ["Shift+Space on a button", onEl("<button>x</button>", " ", { shiftKey: true })],
+    ["Space on a switch (role=switch)", onEl("<span role='switch' tabindex='0' aria-checked='false'></span>", " ")],
+    ["Space on a checkbox", onEl("<input type='checkbox'>", " ")],
+    ["Space on a radio", onEl("<input type='radio'>", " ")],
+    ["Space on a summary", onEl("<summary>x</summary>", " ")],
+    ["Space on a role=button", onEl("<div role='button' tabindex='0'></div>", " ")],
+    ["Space on a role=checkbox", onEl("<div role='checkbox' tabindex='0'></div>", " ")],
+    ["Space on a role=tab", onEl("<div role='tab' tabindex='0'></div>", " ")],
+    ["Space in a select", inField("select", " ")],
+    ["Space on a role=radio", onEl("<div role='radio' tabindex='0'></div>", " ")],
+    ["Space on a role=option", onEl("<div role='option' tabindex='0'></div>", " ")],
+    ["Space on a role=menuitem", onEl("<div role='menuitem' tabindex='0'></div>", " ")],
+    ["Space on a role=menuitemcheckbox", onEl("<div role='menuitemcheckbox' tabindex='0'></div>", " ")],
+    ["Space on a role=menuitemradio", onEl("<div role='menuitemradio' tabindex='0'></div>", " ")],
+    ["Space on a role=combobox", onEl("<div role='combobox' tabindex='0'></div>", " ")],
+    ["Space on a role=slider", onEl("<div role='slider' tabindex='0'></div>", " ")],
+    ["Space on a role=spinbutton", onEl("<div role='spinbutton' tabindex='0'></div>", " ")],
+    ["Space on a role=textbox", onEl("<div role='textbox' tabindex='0'></div>", " ")],
+    ["Space on a role=searchbox", onEl("<div role='searchbox' tabindex='0'></div>", " ")],
+    ["Space in a contenteditable region", inField("div", " ", "true")],
+    ["Space in a contenteditable region (the bare attribute)", inField("div", " ", "")],
+    ["Space in a descendant of a contenteditable region", onInner("<div contenteditable><span>x</span></div>", "span", " ")],
+    ["Space on audio with controls", onEl("<audio controls></audio>", " ")],
+    ["Space on video with controls", onEl("<video controls></video>", " ")],
+    ["Space in an input, a textarea (a field types it)", inField("textarea", " ")],
+    ["ArrowDown on a range slider (it moves the value)", onEl("<input type='range'>", "ArrowDown")],
     ["Shift", key("Shift")],
     ["Escape", key("Escape")],
     ["ArrowLeft", key("ArrowLeft")],
