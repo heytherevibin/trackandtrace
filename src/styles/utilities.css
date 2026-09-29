@@ -91,6 +91,15 @@
   margin-left: -0.052em;
 }
 
+/* The landing's section headings (sheet-type H2): 32/36 as drawn. With the text made larger they grow with it for as
+   long as the page's column holds their longest word whole: CONSTRUCTION, 5.6em wide with its tracking, fits a column
+   5.8em wide. So on a narrow window at 200% text they stop short of 2rem, and never go below the drawn 32px; at 100%
+   text this is exactly 32/36 at every width. */
+@utility heading-fit {
+  font-size: min(var(--text-5xl), max(32px, (100vw - 2 * var(--gutter)) / 5.8));
+  line-height: 1.125;
+}
+
 /* Blueprint object: square, hairline, transparent. Pair with <Corners /> for the registration marks. */
 @utility blueprint {
   position: relative;

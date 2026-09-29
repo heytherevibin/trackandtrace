@@ -8,13 +8,22 @@ import { messages } from "@/messages";
 import { useUser } from "@/components/session/session-provider";
 import { Avatar } from "@/components/ui/avatar";
 import { buttonClassName } from "@/components/ui/button";
+import { EmailText } from "@/components/ui/email-text";
 import { MenuContent, MenuItem, MenuLinkItem, MenuRoot, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
 import { signOutEverywhere } from "@/services/auth-client";
 import { cn } from "@/utils/cn";
 import { MASTHEAD_CONTROL } from "./nav-config";
 
+/**
+ * SIGN IN keeps only its icon (its name stays, visually hidden) below xs, and wherever the masthead is narrower than
+ * 16.5rem, which is where its one row, the menu, the mark and the controls, stops holding the full label: text made
+ * larger (200% on a 390px phone). At 100% text, 16.5rem is 264px, inside xs already, so the drawn masthead is unchanged.
+ * The query container is top-nav.tsx's inner div, never the sticky header.
+ */
+const COMPACT = "max-xs:w-9 max-xs:justify-center max-xs:px-0 @max-[16.5rem]:w-9 @max-[16.5rem]:justify-center @max-[16.5rem]:px-0";
+
 function Placeholder() {
-  return <span className="inline-block h-9 w-9 border border-line xs:w-[104px]" aria-hidden="true" />;
+  return <span className="inline-block h-9 w-9 border border-line xs:@min-[16.5rem]:w-[104px]" aria-hidden="true" />;
 }
 
 function UserMenuInner() {
@@ -22,9 +31,9 @@ function UserMenuInner() {
   const user = useUser();
   if (!user) {
     return (
-      <Link href="/login" className={cn(buttonClassName({ variant: "secondary" }), MASTHEAD_CONTROL, "py-0 max-xs:w-9 max-xs:justify-center max-xs:px-0")} data-testid="sign-in">
+      <Link href="/login" className={cn(buttonClassName({ variant: "secondary" }), MASTHEAD_CONTROL, "py-0", COMPACT)} data-testid="sign-in">
         <PersonFilled className="size-5 shrink-0" aria-hidden="true" />
-        <span className="max-xs:sr-only">{messages.shell.nav.signIn}</span>
+        <span className="max-xs:sr-only @max-[16.5rem]:sr-only">{messages.shell.nav.signIn}</span>
       </Link>
     );
   }
@@ -35,9 +44,14 @@ function UserMenuInner() {
         <Avatar name={name} src={user.avatarUrl} size="sm" />
       </MenuTrigger>
       <MenuContent>
+        {/* Wrapped, never cut short: the popup holds to the window (menu.tsx), and these lines wrap inside it. */}
         <div className="px-3 py-2">
-          <p className="truncate text-sm font-medium text-ink-1">{name}</p>
-          {user.email && user.name ? <p className="truncate text-label text-ink-3">{user.email}</p> : null}
+          <p className="wrap-break-word text-sm font-medium text-ink-1">{name}</p>
+          {user.email && user.name ? (
+            <p className="text-label text-ink-3">
+              <EmailText email={user.email} />
+            </p>
+          ) : null}
         </div>
         <MenuSeparator />
         <MenuLinkItem render={<Link href="/account" />}>{messages.shell.nav.account}</MenuLinkItem>

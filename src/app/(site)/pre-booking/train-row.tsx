@@ -111,7 +111,8 @@ export function TrainRowView({
   const choosing = showDates && asked.length > 1;
 
   return (
-    <div data-testid="train-row" className={cn("px-5 py-4", last ? "" : "border-b border-line")}>
+    // A query container, so the run's popover can hold to the room this row gives it (train-route-strip.tsx).
+    <div data-testid="train-row" className={cn("@container px-5 py-4", last ? "" : "border-b border-line")}>
       <div className="flex items-start gap-3">
         <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-1">
           <span className="font-data">{row.train.trainNo}</span>
