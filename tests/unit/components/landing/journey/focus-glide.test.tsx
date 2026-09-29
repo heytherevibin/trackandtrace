@@ -10,7 +10,7 @@ import { testContext } from "./journey-context";
 // one whom focus returning to the window finds away, and it lets go once the page holds still (Task 6 review, rounds 2–4).
 
 const reveal = vi.fn();
-let box = { top: 1400, bottom: 1432 }; // below a 900px window
+let box = { top: 1400, bottom: 1432 }; // on the page: below a 900px window at the top
 let y = 0;
 
 beforeEach(() => {
@@ -22,7 +22,7 @@ beforeEach(() => {
   document.querySelector("header")!.getBoundingClientRect = () => ({ bottom: 64 }) as DOMRect;
   box = { top: 1400, bottom: 1432 };
   for (const a of document.querySelectorAll("a")) {
-    a.getBoundingClientRect = () => box as DOMRect;
+    a.getBoundingClientRect = () => ({ top: box.top - y, bottom: box.bottom - y }) as DOMRect; // in the window, as scrolled
     a.scrollIntoView = reveal;
   }
   reveal.mockClear();
@@ -268,6 +268,182 @@ describe("never against the reader", () => {
     jump();
     frames(3);
     expect(reveal).not.toHaveBeenCalled();
+  });
+});
+
+/** A relayout between the reader and the link (the live drawing pinning, a late font, a resize): the link moves `by` down
+ * the page, and the page says so, as tt:layout or as the window's resize. */
+const relayout = (by = 2400, type: string = LAYOUT_EVENT) => {
+  box = { top: box.top + by, bottom: box.bottom + by };
+  window.dispatchEvent(new Event(type));
+};
+
+describe("a relayout that moves the link under its glide (the owner, 2026-09-28)", () => {
+  it("takes the glide up again: the browser set its end at the Tab, and the link has moved past it", () => {
+    const stop = startFocusGlide(testContext());
+    tabOnto(policy());
+    relayout();
+    frames(3);
+    expect(reveal).toHaveBeenCalledTimes(1);
+    expect(reveal).toHaveBeenCalledWith({ block: "center", inline: "nearest" });
+    stop();
+  });
+
+  it("takes up a resize that moves the link, and a move up the page as well as down", () => {
+    const stop = startFocusGlide(testContext());
+    tabOnto(policy());
+    relayout(-300, "resize");
+    frames(3);
+    expect(reveal).toHaveBeenCalledTimes(1);
+    stop();
+  });
+
+  it("takes up a relayout before the glide's first scroll: the live drawing pins a frame after the Tab", () => {
+    const stop = startFocusGlide(testContext());
+    modality(policy(), true);
+    pressTab();
+    policy().focus();
+    frames(1);
+    relayout();
+    frames(3);
+    expect(reveal).toHaveBeenCalledTimes(1);
+    stop();
+  });
+
+  it("takes nothing up for a relayout that leaves the link where it was on the page", () => {
+    const stop = startFocusGlide(testContext());
+    tabOnto(policy());
+    relayout(0);
+    relayout(0, "resize");
+    frames(3);
+    expect(reveal).not.toHaveBeenCalled();
+    stop();
+  });
+
+  it("shares the three takes with the place-keeping jumps", () => {
+    const stop = startFocusGlide(testContext());
+    tabOnto(policy());
+    for (const [cut, times] of [[jump, 1], [() => relayout(), 2], [jump, 3], [() => relayout(), 3]] as const) {
+      cut();
+      frames(3);
+      expect(reveal).toHaveBeenCalledTimes(times);
+    }
+    stop();
+  });
+
+  it("lets go once the page has held still for ten frames: a relayout after that takes nothing up", () => {
+    const stop = startFocusGlide(testContext());
+    tabOnto(policy());
+    frames(10);
+    relayout();
+    frames(3);
+    expect(reveal).not.toHaveBeenCalled();
+    stop();
+  });
+
+  it("carries a watched glide through the journey's rebuild, in the task that tears it down and starts it again", () => {
+    const before = startFocusGlide(testContext());
+    tabOnto(policy());
+    relayout(); // a late font: 02's fit changes with it, and the journey rebuilds
+    before();
+    const after = startFocusGlide(testContext());
+    frames(3);
+    expect(reveal).toHaveBeenCalledTimes(1);
+    after();
+  });
+
+  it("carries its takes through the rebuild: three in all", () => {
+    const before = startFocusGlide(testContext());
+    tabOnto(policy());
+    for (let k = 0; k < 2; k += 1) {
+      jump();
+      frames(3);
+    }
+    expect(reveal).toHaveBeenCalledTimes(2);
+    before();
+    const after = startFocusGlide(testContext());
+    frames(3);
+    jump();
+    frames(3);
+    relayout();
+    frames(3);
+    expect(reveal).toHaveBeenCalledTimes(3);
+    after();
+  });
+
+  it("carries nothing to a start in a later task, nor to one with Motion off", async () => {
+    const first = startFocusGlide(testContext());
+    tabOnto(policy());
+    first();
+    const off = startFocusGlide(testContext({ motion: false }));
+    off();
+    await Promise.resolve();
+    const later = startFocusGlide(testContext());
+    relayout();
+    frames(3);
+    expect(reveal).not.toHaveBeenCalled();
+    later();
+  });
+});
+
+describe("a relayout never takes up a glide against the reader", () => {
+  for (const [name, to] of [
+    ["back, above where the Tab found them", 100],
+    ["on, past the link's place", 3000],
+  ] as const) {
+    it(`does not pull back a reader who dragged out of the glide's span (${name}), though the link then moves`, () => {
+      y = 600;
+      box = { top: 2400, bottom: 2432 }; // 1800px down the window: its glide spans 600 to 2336
+      const stop = startFocusGlide(testContext());
+      tabOnto(policy());
+      expect(reveal).not.toHaveBeenCalled();
+      y = to; // a scrollbar drag: no wheel, touch or key
+      window.dispatchEvent(new Event("scroll"));
+      relayout();
+      frames(3);
+      relayout(100, "resize");
+      frames(3);
+      jump(); // let go: a jump after it takes nothing up either
+      frames(3);
+      expect(reveal).not.toHaveBeenCalled();
+      stop();
+    });
+  }
+
+  it("is not armed by mouse focus, nor by focus returning to the window", () => {
+    const stop = startFocusGlide(testContext());
+    tabOnto(policy(), false);
+    relayout();
+    frames(3);
+    policy().blur();
+    modality(policy(), true);
+    policy().focus();
+    relayout();
+    frames(3);
+    expect(reveal).not.toHaveBeenCalled();
+    stop();
+  });
+
+  it("leaves a station to run.ts once the run pins under the glide: its relayout is the run's to answer", () => {
+    const run = document.querySelector("#run")!;
+    run.classList.remove("is-running"); // a reader below the run Shift+Tabs up into it
+    const stop = startFocusGlide(testContext());
+    tabOnto(document.querySelector<HTMLAnchorElement>("#run a")!);
+    run.classList.add("is-running");
+    relayout();
+    frames(3);
+    expect(reveal).not.toHaveBeenCalled();
+    stop();
+  });
+
+  it("lets go on the reader's own scroll: a relayout after a wheel takes nothing up", () => {
+    const stop = startFocusGlide(testContext());
+    tabOnto(policy());
+    window.dispatchEvent(new WheelEvent("wheel", { deltaY: 120 }));
+    relayout();
+    frames(3);
+    expect(reveal).not.toHaveBeenCalled();
+    stop();
   });
 });
 
