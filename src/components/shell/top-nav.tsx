@@ -47,8 +47,10 @@ export function TopNav() {
           larger (200%) is not: then the nav folds into the menu, and the masthead keeps its one row, the height every
           pinned piece sticks under. Not the sticky header itself: WebKit then read the header's box stale in the task
           a scroll changed (by the header's old place), and the run's unpin landed a reader 402px off (J6 nightly).
-          One row, 64px. Should even the menu's row not fit (a phone, text at 200%), it reflows as the last resort: the
-          controls drop to a row of their own, as tall as the first, so nothing is pushed past the window's edge. */}
+          One row, 64px. The menu's row compacts before it wraps: below 16.5rem of this container SIGN IN keeps only its
+          icon (user-menu.tsx), so a 390px phone at 200% text keeps one row. Should even that not fit (a narrower phone,
+          text at 200%), it reflows as the last resort: the controls drop to a row of their own, as tall as the first,
+          so nothing is pushed past the window's edge. */}
       <div className="@container">
         <div className="page-frame flex min-h-16 flex-wrap items-center gap-x-3 lg:gap-x-5">
           {minimal ? null : (

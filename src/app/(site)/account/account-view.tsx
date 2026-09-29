@@ -7,6 +7,7 @@ import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { Avatar } from "@/components/ui/avatar";
 import { Button, buttonClassName } from "@/components/ui/button";
 import { Corners } from "@/components/ui/corners";
+import { EmailText } from "@/components/ui/email-text";
 import { Plate } from "@/components/ui/plate";
 import { notify } from "@/components/ui/toast";
 import { messages } from "@/messages";
@@ -90,11 +91,17 @@ export function AccountView({ user, savedCount, passkeys = false }: { readonly u
       <TitleBlock title={m.title} />
 
       <Plate className="mt-8" title={m.profile.legend} titleId="account-profile" headingLevel={2} cells="tight">
+        {/* The name and address wrap, never cut short. They grow from their own width, so a pair too long for the line
+            beside the photo and Sign out takes a line of its own before any of it wraps. */}
         <div className="flex flex-wrap items-center gap-4">
           <Avatar name={name} src={user.avatarUrl} size="md" />
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-body font-medium">{name}</p>
-            {user.email && user.name ? <p className="truncate text-sm text-ink-1/74">{user.email}</p> : null}
+          <div className="min-w-0 flex-[1_1_auto]">
+            <p className="wrap-break-word text-body font-medium">{name}</p>
+            {user.email && user.name ? (
+              <p className="text-sm text-ink-1/74">
+                <EmailText email={user.email} />
+              </p>
+            ) : null}
           </div>
           <Button variant="secondary" onClick={signOut}>
             {m.profile.signOut}

@@ -386,6 +386,22 @@ Found while building J6 (2026-09-28):
 - Motion off relays the drawn train's columns inside the rebuild's own task, so 02's place guard never reads a
   half-built page; before this, WebKit moved the reader 304 px.
 
+Found after J6, finishing 200% text (2026-09-29; 100% text unchanged throughout):
+- the masthead keeps one row at 390×844 with 200% text: below 16.5rem of its inner query container SIGN IN keeps only
+  its icon (its name stays, visually hidden), as it already does below xs; 16.5rem is 264px at 100% text, inside xs.
+  A narrower phone at 200% (360px, 280px) still takes the last-resort second row;
+- section headings (`heading-fit`) grow with larger text only while the column holds their longest word whole,
+  CONSTRUCTION, and never below the drawn 32px: no word breaks from 280px up at 200% text; `wrap-anywhere` breaks a
+  word only in a column narrower than that word at 32px (a window under about 260px at 200%);
+- nothing is cut short with an ellipsis: the route popover's station names, and the account view's and account menu's
+  name and email, wrap; an email breaks after its @ and before a dot (`EmailText`), and inside a word only when that
+  word is wider than the whole line. The route popover holds to the room its row gives it, never below the drawn
+  256px; menus hold to the window, never below 192px;
+- the nightly's 200% text checks also fail on text cut at its foot (overflow hidden or clipped, or a line clamp), on
+  a heading's word broken across lines, and on a masthead taller than its one row; and they open the route popover,
+  the account view and the account menu (`/e2e/signed-in`: a fixture traveller, only on Playwright's own server with
+  no accounts configured, a 404 and never indexed anywhere else).
+
 Each PR brings the dependency, copy, tokens and DESIGN.md rules its own code first uses, so nothing lands
 unused, and nothing a traveller can see is inert (a Sound switch with no sound). Each runs `npm run check`
 and the e2e suite, ships behind nothing (every PR leaves the landing whole), and merges only with the user's
