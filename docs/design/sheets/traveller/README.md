@@ -69,5 +69,5 @@ Every state was rendered at the board's own viewport width and measured: board o
 
 ### Found while drawing (not changed in these sheets)
 
-- On `/pre-booking` at phone widths, the availability chart's stacked layout draws **overlapping column labels**: "Reservation service estimate" renders 276px wide in a 146px cell and runs across the Fare column. It is a defect in the shipped page, reproduced faithfully here because the board transcribes it.
+- On `/pre-booking` at phone widths, the availability chart's stacked layout drew **overlapping column labels**: the estimate column's name was painted across the fare column's, and the two read as one run-together word. A cell carries `whitespace-nowrap` for its value, and the name — generated from `data-label` — inherited it. Fixed separately in `src/components/ui/stacked-table.ts`; this board still draws the collision, because it links a stylesheet captured before that fix.
 - The consent line's "Privacy notice" link is 13px tall on a phone, under the 44px floor — the same finding B2 recorded for outline tags and text links.
