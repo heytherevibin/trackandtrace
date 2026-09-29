@@ -1,4 +1,4 @@
-import { placeAfter } from "./drawing-mode";
+import { placeAfter, placeInProportion, readerPlace, type Shape } from "./drawing-mode";
 import { JUMP_EVENT, emit } from "./journey-events";
 
 // The one way a pinned piece changes its own height (J5-3): the change runs, then the reader lands where placeAfter
@@ -19,9 +19,28 @@ export function jumpTo(top: number): void {
   emit(JUMP_EVENT);
 }
 
+/** Where the reader last read a piece, kept by its caller: its box in the page, their scroll, and the window's height. */
+export interface ReadPlace {
+  readonly top: number;
+  readonly bottom: number;
+  readonly y: number;
+  readonly vh: number;
+}
+
+export interface KeepOptions {
+  /** Whether the change kept the piece's shape (a relayout: a reader inside it stays the same fraction through it) or
+   * changed it (the default: they land on its start). A function is asked once the change has run, for a caller that
+   * learns it only then (the run: does it still fit?). */
+  readonly shape?: Shape | (() => Shape);
+  /** Where the reader last read the piece, for a change the page has already laid out before its caller heard of it (a
+   * resize: the window, and the pieces above, have moved by then). The reader is judged by it, and a reader inside is
+   * kept the same fraction through from it; a reader past is still moved by the change from where they stand now. */
+  readonly from?: ReadPlace;
+}
+
 /** Runs a change to the piece, then puts the reader where placeAfter says. A piece already gone from the document (a
  * client navigation away) just changes. */
-export function keepPlace(section: HTMLElement | null, change: () => void): void {
+export function keepPlace(section: HTMLElement | null, change: () => void, { shape = "changed", from }: KeepOptions = {}): void {
   if (!section?.isConnected) {
     change();
     return;
@@ -30,9 +49,21 @@ export function keepPlace(section: HTMLElement | null, change: () => void): void
   const scrollY = window.scrollY;
   change();
   const after = section.getBoundingClientRect();
+  const kept = typeof shape === "function" ? shape() : shape;
+  const masthead = mastheadBottom();
+  if (from && readerPlace({ top: from.top - from.y, bottom: from.bottom - from.y }, from.vh) === "inside") {
+    const top = after.top + window.scrollY;
+    jumpTo(
+      kept === "same"
+        ? placeInProportion({ top: from.top, bottom: from.bottom, landing: masthead, viewport: from.vh }, { top, bottom: top + after.height, landing: masthead, viewport: window.innerHeight }, from.y)
+        : Math.round(top - masthead),
+    );
+    return;
+  }
+  if (from && readerPlace({ top: from.top - from.y, bottom: from.bottom - from.y }, from.vh) === "above") return;
   // A shrink near the page's foot clamps the scroll as the change lays out: its box is then read against the clamped
   // scroll, and put back against the one before, so a reader inside it still lands on its start.
   const drift = window.scrollY - scrollY;
-  const to = placeAfter(before, { top: after.top + drift, height: after.height }, { scrollY, viewport: window.innerHeight, masthead: mastheadBottom() });
+  const to = placeAfter(before, { top: after.top + drift, height: after.height }, { scrollY, viewport: window.innerHeight, masthead }, kept);
   if (to !== null) jumpTo(to);
 }

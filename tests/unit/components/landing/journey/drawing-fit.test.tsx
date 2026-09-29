@@ -262,7 +262,7 @@ describe("a scene that arrives too late builds nothing (J5 final review, minor 2
 });
 
 describe("a resize under the pinned chapter is judged by the window the reader saw (Task 3 review, carried)", () => {
-  it("puts a reader over half a short window into the chapter at its start, though the tall window it turned into shows its foot in the top half", async () => {
+  it("keeps a reader over half a short window into the chapter the same fraction through it, though the tall window it turned into shows its foot in the top half", async () => {
     const vh = { now: 400 };
     vi.spyOn(window, "innerHeight", "get").mockImplementation(() => vh.now);
     document.body.innerHTML = `<header></header><section id="anatomy"></section>`;
@@ -273,13 +273,14 @@ describe("a resize under the pinned chapter is judged by the window the reader s
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(section.classList.contains("is-live")).toBe(true);
     const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
-    box.top = -1780; // its foot 300px down a 400px window: over half the window still in it, so inside
+    box.top = -1630; // its foot 450px down a 400px window: the window wholly in it, so inside
     window.dispatchEvent(new Event("scroll"));
-    vh.now = 1000; // the window turns tall: 300px is now in its top half, which would read as past it
+    vh.now = 1000; // the window turns tall: 450px is now in its top half, which would read as past it
     box.height = 5200;
     window.dispatchEvent(new Event("resize"));
-    // inside: the chapter's start, under the masthead (0 here); judged by the new window, it was scrollY + 3120
-    expect(scrollTo).toHaveBeenCalledWith({ top: -1780 + window.scrollY, behavior: "instant" });
+    // inside, a resize: the same fraction through it (1,630 of its 1,680 px range, then of 4,200; the masthead 0 here);
+    // judged by the new window, it was scrollY + 3120, by exactly the change
+    expect(scrollTo).toHaveBeenCalledWith({ top: Math.round(-1630 + (1630 / 1680) * 4200) + window.scrollY, behavior: "instant" });
     stop();
   });
 

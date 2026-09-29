@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "../fixtures";
 import { REBUILD_EVENT } from "@/components/landing/journey/journey-events";
-import { drawStill, frames, noAnchoring, scrollToId, waitForJourney, waitForLive } from "./journey-helpers";
+import { atRest, drawStill, frames, noAnchoring, scrollToId, waitForJourney, waitForLive } from "./journey-helpers";
 
 // The places the journey keeps (J5-17, J5-19): a change of height above 02 (the live drawing pinning, J5) must never
 // throw a reader inside 02 when Motion then goes off; and Back, Forward, Back finds the reader's place each time.
@@ -205,6 +205,61 @@ test.describe("the reader's place", () => {
         await frames(page, 6); // the collapse, its padding a frame later, the guard's and the still's settles
         const after = await recordTop(page);
         expect(Math.abs(after - before), `#record ${before} -> ${after}`).toBeLessThanOrEqual(4);
+      });
+    }
+  }
+});
+
+// A resize keeps a reader inside a pinned 02 the same fraction of the way through it (the owner, 2026-09-29), where its
+// start once took them back up to 2,472 px: the same chapter, and the scroll within a few px of where that fraction
+// stands in the new window. Each size is judged against the one before it, and back again, scroll anchoring or not.
+// The drawing above is held to the still: its own resizes are drawing.ts's, and live-drawing.spec.ts holds them.
+/** 02's range as its place guard reads it: from its landing (its scroll-margin-top) to its foot at the window's foot. */
+const howRange = (page: Page) =>
+  page.evaluate(() => {
+    const how = document.getElementById("how");
+    if (!how) throw new Error("#how is missing");
+    const r = how.getBoundingClientRect();
+    const start = r.top + window.scrollY - Number.parseFloat(getComputedStyle(how).scrollMarginTop);
+    return { start, end: r.bottom + window.scrollY - window.innerHeight, y: window.scrollY };
+  });
+/** A resize and everything it sets going have landed: 02's guard, its refit 200 ms on, and any late move. */
+async function resizedTo(page: Page, size: { readonly width: number; readonly height: number }): Promise<void> {
+  await page.setViewportSize(size);
+  await frames(page, 20);
+  await atRest(page);
+}
+
+test.describe("a resize keeps a reader inside a pinned 02 the same fraction through it", () => {
+  for (const anchoring of ["on", "off"] as const) {
+    for (const f of [0.25, 0.6, 0.9] as const) {
+      test(`${f * 100}% through 02 (scroll anchoring ${anchoring})`, async ({ page, isMobile }) => {
+        const base = isMobile ? { width: 390, height: 844 } : { width: 1440, height: 900 };
+        const sizes = isMobile
+          ? [{ width: 390, height: 804 }, { width: 390, height: 660 }, { width: 360, height: 844 }]
+          : [{ width: 1440, height: 860 }, { width: 1440, height: 700 }, { width: 1200, height: 900 }];
+        const chapter = page.locator(`#how li[data-chapter="${Math.floor(f * 3)}"]`);
+        await page.setViewportSize(base);
+        await drawStill(page);
+        if (anchoring === "off") await noAnchoring(page);
+        await page.goto("/");
+        await waitForJourney(page);
+        await expect(page.locator("#how")).toHaveClass(/is-pinned/);
+        const at = await howRange(page);
+        await page.evaluate((y) => window.scrollTo({ top: y, behavior: "instant" }), Math.round(at.start + f * (at.end - at.start)));
+        await expect(chapter).toHaveClass(/is-current/);
+        await frames(page, 3); // the guard has learned the reader's place
+        for (const size of sizes.flatMap((s) => [s, base])) {
+          const was = await howRange(page);
+          const through = (was.y - was.start) / (was.end - was.start);
+          await resizedTo(page, size);
+          const now = await howRange(page);
+          const target = now.start + through * (now.end - now.start);
+          const where = `${size.width}×${size.height}: ${Math.round(through * 1000) / 10}% through was ${Math.round(target)}, the reader at ${now.y}`;
+          await expect(page.locator("#how"), where).toHaveClass(/is-pinned/);
+          expect(Math.abs(now.y - target), where).toBeLessThanOrEqual(4);
+          await expect(chapter, where).toHaveClass(/is-current/);
+        }
       });
     }
   }

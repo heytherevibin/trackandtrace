@@ -57,21 +57,62 @@ export function pastShift(before: { readonly top: number; readonly bottom: numbe
   return Math.abs(change) > 1 && readerPlace(before, viewport) === "past" ? change : 0;
 }
 
+/** Whether a change to a piece keeps its shape: "same" for a resize or a relayout (a window resized or zoomed, a phone
+ * turned), "changed" for a change of what it is (Motion off or on, a pin or an unpin, the live drawing to the still, the
+ * run failing to fit). The owner's rule, 2026-09-29. */
+export type Shape = "same" | "changed";
+
 /**
- * Where the reader belongs once the chapter changed height under them (J5-3), or null to stay put:
+ * Where the reader belongs once a piece changed height under them (J5-3), or null to stay put:
  * - above it: the change lands below them;
- * - inside it: its start, under the masthead;
+ * - inside it: the same fraction through it when its shape is the same (placeInProportion; `viewportAfter` is the window
+ *   a resize made), else its start, under the masthead;
  * - past it: moved by exactly the change, so what they read stays put.
+ * Both boxes are in window coordinates against `scrollY`.
  */
 export function placeAfter(
   before: { readonly top: number; readonly bottom: number; readonly height: number },
   after: { readonly top: number; readonly height: number },
-  { scrollY, viewport, masthead }: { readonly scrollY: number; readonly viewport: number; readonly masthead: number },
+  { scrollY, viewport, viewportAfter = viewport, masthead }: { readonly scrollY: number; readonly viewport: number; readonly viewportAfter?: number; readonly masthead: number },
+  shape: Shape = "changed",
 ): number | null {
   const change = after.height - before.height;
   if (Math.abs(change) <= 1) return null;
   const where = readerPlace(before, viewport);
   if (where === "above") return null;
-  if (where === "inside") return Math.round(after.top + scrollY - masthead);
-  return Math.round(scrollY + change);
+  if (where === "past") return Math.round(scrollY + change);
+  if (shape === "changed") return Math.round(after.top + scrollY - masthead);
+  return placeInProportion(
+    { top: before.top + scrollY, bottom: before.bottom + scrollY, landing: masthead, viewport },
+    { top: after.top + scrollY, bottom: after.top + after.height + scrollY, landing: masthead, viewport: viewportAfter },
+    scrollY,
+  );
+}
+
+/** A piece as a reader scrolls through it: its box in the page (document coordinates), how far below the window's top
+ * its start lands (the masthead's foot, or its own scroll-margin-top), and the height of the window it is read in. */
+export interface Reach {
+  readonly top: number;
+  readonly bottom: number;
+  readonly landing: number;
+  readonly viewport: number;
+}
+
+/**
+ * Where a reader inside a piece lands when a resize changed it without changing its shape (the owner, 2026-09-29): the
+ * same fraction of the way through it. Its range runs from its start (its top at its landing) to its foot at the
+ * window's foot; for a pinned piece that fraction is its animation's progress, so the same chapter and frame come back.
+ * - Beyond the range's end (its foot already in the window): the same distance from that foot, never short of its start.
+ * - A piece no taller than its window, before or after, has no range to be a fraction of: its start, as a change of
+ *   shape lands a reader (placeAfter).
+ */
+export function placeInProportion(before: Reach, after: Reach, scrollY: number): number {
+  const start = before.top - before.landing;
+  const range = before.bottom - before.viewport - start;
+  const to = after.top - after.landing;
+  const reach = after.bottom - after.viewport - to;
+  if (range <= 0 || reach <= 0) return Math.round(to);
+  if (scrollY > start + range) return Math.round(Math.max(to, after.bottom - (before.bottom - scrollY)));
+  const f = Math.min(1, Math.max(0, (scrollY - start) / range));
+  return Math.round(to + f * reach);
 }

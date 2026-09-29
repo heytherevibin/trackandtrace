@@ -3,7 +3,7 @@ import { MOTION_BEFORE_EVENT, MOTION_EVENT } from "@/components/motion/use-motio
 import { messages } from "@/messages";
 import { formatPnr } from "@/utils/pnr";
 import { barWidth, chapterAt, stepLit, typedCount } from "./chapters-progress";
-import { readerPlace } from "./drawing-mode";
+import { placeInProportion, readerPlace } from "./drawing-mode";
 import { ease } from "./ease";
 import { fitsWindow, type Span } from "./fit";
 import { LAYOUT_EVENT, REBUILD_EVENT } from "./journey-events";
@@ -48,28 +48,54 @@ function docBox(section: HTMLElement): Span {
   return { top: r.top + window.scrollY, bottom: r.bottom + window.scrollY };
 }
 
-/** Where the reader was, the window they saw it in, and #how's document box then: the guard's state, kept in its
- * closure. The window is kept with the scroll: a resize is judged against the window the reader read in, never the
- * one it just made (a plain 02 on a short window is mostly what they see; on a tall one, its foot is in the top half). */
+/** Where the reader was, the window they saw it in, and #how's document box, landing and shape then: the guard's state,
+ * kept in its closure. The window is kept with the scroll: a resize is judged against the window the reader read in,
+ * never the one it just made (a plain 02 on a short window is mostly what they see; on a tall one, its foot is in the
+ * top half). */
 interface Place {
   readonly box: Span;
   readonly y: number;
   readonly vh: number;
+  /** #how's scroll-margin-top: how far below the window's top its start lands. */
+  readonly landing: number;
+  readonly shape: string;
 }
 
-/** Above 02's old start: nothing. Inside it (over half the window in it): 02's new start, at its landing under the
- * masthead. Past it (its foot within the window's top half, what follows on screen): the same distance past its new
- * end (the height's change, plus its top's when the width moved it). Judged by readerPlace, the rule every piece uses
- * (J6-4): the window's top edge alone sent a reader in 02's last lines, #record on screen, back to its start. Returns
- * the place to judge the next change from. */
+/** 02 pinned, by the very selector that pins it (journey-island.css). */
+const PINNED = 'html[data-motion="on"][data-journey="on"] .chapters.is-pinned';
+
+/** What #how is, as against how big: Motion, and whether it stands pinned. A change of either (Motion off or on, 02
+ * unpinned by a rebuild once it no longer fits) is a change of shape; a resize or a relayout of the same shape is not.
+ * Read from the page, not from the event that caused it: Motion's rewrite of <html data-motion> collapses #how by the
+ * selector alone, and a rebuild's unpin reaches this guard only as a resize. */
+function shapeOf(section: HTMLElement): string {
+  return `${document.documentElement.dataset.motion ?? ""} ${section.matches(PINNED) ? "pinned" : "plain"}`;
+}
+
+function landingOf(section: HTMLElement): number {
+  return Number.parseFloat(getComputedStyle(section).scrollMarginTop) || 0;
+}
+
+/** #how as it stands now, with the reader's scroll and window: the place a change is judged from. */
+function placeNow(section: HTMLElement): Place {
+  return { box: docBox(section), y: window.scrollY, vh: window.innerHeight, landing: landingOf(section), shape: shapeOf(section) };
+}
+
+/** Above 02's old start: nothing. Inside it (over half the window in it): the same fraction of the way through it when
+ * its shape is the same (a resize: the owner, 2026-09-29), so the same stop and frame come back; its new start, at its
+ * landing under the masthead, when its shape changed. Past it (its foot within the window's top half, what follows on
+ * screen): the same distance past its new end (the height's change, plus its top's when the width moved it). Judged by
+ * readerPlace, the rule every piece uses (J6-4): the window's top edge alone sent a reader in 02's last lines, #record
+ * on screen, back to its start. Returns the place to judge the next change from. */
 function settlePlace(section: HTMLElement, was: Place): Place {
-  const now = docBox(section);
+  const now = placeNow(section);
   const { y } = was;
   const where = readerPlace({ top: was.box.top - y, bottom: was.box.bottom - y }, was.vh);
   // through jumpTo, as every place-keeping move: announced, so a Tab stop's glide it cuts short is taken up again
-  if (where === "past") jumpTo(y + now.bottom - was.box.bottom);
-  else if (where === "inside") jumpTo(now.top - Number.parseFloat(getComputedStyle(section).scrollMarginTop));
-  return { box: now, y: window.scrollY, vh: window.innerHeight };
+  if (where === "past") jumpTo(y + now.box.bottom - was.box.bottom);
+  else if (where === "inside" && now.shape !== was.shape) jumpTo(now.box.top - now.landing);
+  else if (where === "inside") jumpTo(placeInProportion({ ...was.box, landing: was.landing, viewport: was.vh }, { ...now.box, landing: now.landing, viewport: now.vh }, y));
+  return placeNow(section);
 }
 
 /** #how's own border-box size, at the same precision a ResizeObserver entry reports (never offsetWidth/
@@ -84,7 +110,7 @@ function sizeOf(section: HTMLElement): { readonly width: number; readonly height
 export function startPlaceGuard(): Teardown {
   const section = document.getElementById("how");
   if (!section) return () => {};
-  let place: Place = { box: docBox(section), y: window.scrollY, vh: window.innerHeight };
+  let place: Place = placeNow(section);
   let lastSize = sizeOf(section);
   const unchanged = () => {
     const size = sizeOf(section);
@@ -105,7 +131,7 @@ export function startPlaceGuard(): Teardown {
   // run.ts) must tell tt:layout after its move, so this refresh learns the scroll it left; else 02's own resize, a
   // frame later, is judged from the scroll before that move, and undoes it.
   const refresh = () => {
-    if (unchanged()) place = { box: docBox(section), y: window.scrollY, vh: window.innerHeight };
+    if (unchanged()) place = placeNow(section);
   };
   window.addEventListener(LAYOUT_EVENT, refresh);
   // A freshly observed target always delivers one initial notification, even when nothing has actually
@@ -121,7 +147,7 @@ export function startPlaceGuard(): Teardown {
     const resized = !unchanged();
     lastSize = sizeOf(section);
     if (resized) place = settlePlace(section, place);
-    else place = { ...place, box: docBox(section) };
+    else place = { ...place, box: docBox(section), landing: landingOf(section), shape: shapeOf(section) };
   };
   const observer = new ResizeObserver(settle);
   observer.observe(section, { box: "border-box" });
