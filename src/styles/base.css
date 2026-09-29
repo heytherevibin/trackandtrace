@@ -6,6 +6,27 @@
     background: var(--surface-0);
   }
 
+  /* The traveller site's ground: film grain on the page colour (--grain, theme.css). On the canvas itself, so it
+     repeats across the whole page and scrolls with it like paper, never fixed to the window (a repaint per scroll
+     frame on phones, and ignored on iOS). The console's document never carries the mark, so it stays flat. The
+     grain steps aside where the reader asked for plainer colours, and on paper. */
+  :root {
+    --page-grain: none;
+  }
+  html[data-ground="grain"] {
+    --page-grain: var(--grain);
+    background-image: var(--page-grain);
+  }
+  /* The body is clear there, so the canvas shows through it; without the mark it paints the flat face as before. */
+  html[data-ground="grain"] body {
+    background: none;
+  }
+  @media (forced-colors: active), (prefers-contrast: more), print {
+    html[data-ground="grain"] {
+      --page-grain: none;
+    }
+  }
+
   /* Anchor targets stop below the sticky masthead. This lives on the targets, not as scroll-padding on
      <html>: with padding, focusing any control inside the masthead (every mouse press on a link) made
      the browser smooth-scroll to "reveal" it, which read as a jitter on press and a lurch on navigation.

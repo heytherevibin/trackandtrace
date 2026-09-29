@@ -25,7 +25,7 @@ export function HowItWorks({ trace }: { readonly trace: ChapterTrace | null }) {
           <div aria-hidden="true" className="chapters-rail relative mt-[44px] h-6">
             <div className="rail absolute inset-x-0 top-1.5 h-3" />
             {STOPS.map((left) => (
-              <span key={left} className={`absolute top-1 flex size-4 items-center justify-center rounded-full border border-accent-text bg-surface-0 ${left}`}>
+              <span key={left} className={`absolute top-1 flex size-4 items-center justify-center rounded-full border border-accent-text ground ${left}`}>
                 <span className="size-1.5 rounded-full bg-accent" />
               </span>
             ))}

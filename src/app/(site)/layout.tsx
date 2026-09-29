@@ -40,12 +40,12 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   // Un-awaited on purpose: the shell streams and loading boundaries still show.
   const userPromise = currentUser();
   return (
-    <html lang="en" className={fontVars} data-scroll-behavior="smooth" suppressHydrationWarning>
+    <html lang="en" className={fontVars} data-ground="grain" data-scroll-behavior="smooth" suppressHydrationWarning>
       <head>
         {/* Motion, before first paint: html[data-motion] (motion-boot.ts). Inline, as the traveller CSP allows. */}
         <script dangerouslySetInnerHTML={{ __html: MOTION_BOOT_SCRIPT }} />
       </head>
-      <body className="bg-surface-0 text-ink-1">
+      <body className="text-ink-1">
         {/*
 DIRECTION CONTRACT — Industry (Claude Design "Landing Redesign B")
 THESIS: A PNR check is a drawing of a record: square hairline plates, registration marks, condensed capitals, one steel accent.
