@@ -1,6 +1,8 @@
-# Traveller sheets: B1 and B2 Notices
+# Traveller sheets: B1, B2 Notices and B4 sign-ups
 
 Traveller pages drawn on the Design canvas and approved on 19 Sep 2026. They're drawn in the app's own markup and stylesheet (`app.css`, captured from the running app), so they render like the site.
+
+**Two stylesheets.** `app.css` is the 19 Sep capture and is what B1 and B2 link. The B4 boards link `app-2026-09-29.css` instead, built from the app on 29 Sep: the older capture predates the availability chart, so it carries no `bg-open-soft`, `bg-queued-soft` or `tnum`, and a board drawn against it would render those chips unstyled. Nothing about B1 or B2 changes. A sheet drawn from here on should link the newer one.
 
 ## B1: traveller pages as built
 
@@ -39,3 +41,33 @@ What travellers see when the console changes something. These boards are built o
 
 - Outline tags and ghost links use the locked steel for text (about 3.7:1 by day and 3.4:1 by night), below AA. The console uses the readable steel; the app's fix is a separate PR.
 - On phones, several live controls are under 44px: the 36px masthead boxes, 32px buttons and text links.
+
+## B4: sign-ups
+
+Email sign-ups with double opt-in, for `docs/superpowers/specs/2026-09-28-subscriptions-core-design.md` §5. Drawn before any of it is built (decision 1 of that spec), to be transcribed 1:1 once approved. These are the only traveller sheets not captured from a running page — the surfaces do not exist yet — so they are assembled from the app's own markup: the footers come verbatim from `Notices.dc.html` and `Legal.dc.html`, and the field, button, message and plate classes from `src/components` and `src/app/(site)`.
+
+| File | Sheet | States (props) |
+|---|---|---|
+| `SignupCapture.dc.html`, `SignupCapturePhone.dc.html` | The capture form, in each place it appears | place: landing footer, one-line footer, pre-booking · state: idle, invalid, sending, sent, too many, daily limit, error |
+| `Subscription.dc.html`, `SubscriptionPhone.dc.html` | Confirm (/subscribe/confirm) and Unsubscribe (/unsubscribe) | page: confirm, unsubscribe · list: news, availability · state: before, after, already done, expired, invalid link, error |
+
+Every state was rendered at the board's own viewport width and measured: board overflow, horizontal scroll, clipped text, field width, and the generated column labels in the stacked chart. 71 renders, and the report is reproducible from the boards alone.
+
+### Decided while drawing
+
+- **The message is a sibling of the field's row, not of the field.** Inside the row it stretched the field's column and left the button hanging beside a three-line sentence at 390px. Below the row, the field and its button keep their pairing at every width, and `aria-describedby` still binds the message to the field.
+- **Only `invalid` marks the field `aria-invalid`.** Too many, daily limit and error are the site's trouble, not the address's, and flagging an address the traveller typed correctly would say otherwise. All four still describe the field, so all four are read out with it.
+- **The one-line footer's new row carries a real minimum width, and so does the consent line.** `flex-1` alone sets a basis of zero, so at 390px the form collapsed to 3px beside the consent sentence instead of dropping below it. Measured, not guessed.
+- **The unsubscribe page has nothing to expire.** Its link is an HMAC over the person and the list, not a stored token, so the board draws `expired` on the confirm page only; asked for it on unsubscribe, it shows the invalid link a bad signature really produces.
+- **The lead sentence belongs to the state before the press, and only to it.** Left standing it told a traveller who had just unsubscribed to "press Unsubscribe and it stops".
+- **The sign-up column is sized like the brand column** (`max-w-[30rem] flex-[1.4_1_240px]`), not like the link columns: a 130px column cannot hold a field and a button, and both of those widths are ones the footer already uses, so the stylesheet really carries them.
+
+### Open for the review
+
+- **"Subscribed by mistake? Resubscribe"** is the spec's wording, drawn as a sentence and a one-word button. Someone reading it has just *un*subscribed, so the question asks about the wrong press.
+- **The news list's promise** is the one piece of copy the spec does not fix. Drawn as "News about Trakline: what has shipped, and what is being built." — it claims nothing about how often, on purpose. The availability promise is the spec's own: one email.
+
+### Found while drawing (not changed in these sheets)
+
+- On `/pre-booking` at phone widths, the availability chart's stacked layout draws **overlapping column labels**: "Reservation service estimate" renders 276px wide in a 146px cell and runs across the Fare column. It is a defect in the shipped page, reproduced faithfully here because the board transcribes it.
+- The consent line's "Privacy notice" link is 13px tall on a phone, under the 44px floor — the same finding B2 recorded for outline tags and text links.
