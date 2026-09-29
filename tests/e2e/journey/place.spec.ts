@@ -144,6 +144,16 @@ test.describe("the reader's place", () => {
     expect(Math.abs((await recordTop(page)) - before)).toBeLessThanOrEqual(4);
   });
 
+  test("Back, then Space on a focused link: it scrolls the page, so the restore is cancelled", async ({ page }) => {
+    const before = await backHeld(page);
+    const link = page.getByLabel("Primary").getByRole("link", { name: "Watchlist" });
+    await link.evaluate((el) => el.focus({ preventScroll: true }));
+    await page.keyboard.press("Space"); // the page scrolls a screen; the link is not followed
+    await expect(page).toHaveURL(/\/$/);
+    await release(page);
+    expect(Math.abs((await recordTop(page)) - before)).toBeGreaterThan(4); // not restored
+  });
+
   test("Back, then Tab: the restore is cancelled, and focus stays in view", async ({ page }) => {
     const before = await backHeld(page);
     await pressTab(page);

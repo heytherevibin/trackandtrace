@@ -68,18 +68,18 @@ export const HAND = ["wheel", "touchmove", "keydown"] as const;
 const SCROLL_KEYS: ReadonlySet<string> = new Set(["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "]);
 /** Where a key types or picks rather than scrolls. */
 const TEXT_FIELD = "input, textarea, select, [contenteditable]:not([contenteditable='false'])";
-/** Where Space acts rather than scrolls, as the browser has it: a button, a link, a summary, a media control, a field,
- * and the roles a page gives a control of its own (a Base UI switch is a role=switch). */
+/** Where Space acts rather than scrolls, as the browser has it: a button, a summary, a media control, a field, and the
+ * roles a page gives a control of its own (a Base UI switch is a role=switch). Not a link: Space on a focused link
+ * scrolls the page and never follows it. */
 const TAKES_SPACE = [
   TEXT_FIELD,
   "button",
-  "a[href]",
   "summary",
   "audio[controls]",
   "video[controls]",
   "[role='button'], [role='switch'], [role='checkbox'], [role='radio'], [role='tab'], [role='option']",
   "[role='menuitem'], [role='menuitemcheckbox'], [role='menuitemradio'], [role='combobox'], [role='slider']",
-  "[role='spinbutton'], [role='textbox'], [role='searchbox'], [role='link']",
+  "[role='spinbutton'], [role='textbox'], [role='searchbox']",
 ].join(", ");
 
 /**
@@ -89,8 +89,8 @@ const TAKES_SPACE = [
  *   its momentum as the page returns;
  * - a finger dragging (touchmove). A tap (touchstart alone) is not a scroll;
  * - a scroll key, with focus outside a text field and no Alt, Ctrl or Meta: Alt+← and Cmd+[ are Back and Forward. Space
- *   counts only where it would scroll the page: on a control that takes Space (a button, a link, a switch, a checkbox,
- *   a summary ...) it acts, and the restore goes on;
+ *   counts only where it would scroll the page: on a control that takes Space (a button, a switch, a checkbox, a
+ *   summary ...; not a link, which Space scrolls past) it acts, and the restore goes on;
  * - Tab and Shift+Tab, and Alt+Tab (Safari moves to links with Option-Tab): a reader who starts tabbing is moving on,
  *   and the restore must not pull them from their focus. Not Ctrl+Tab or Meta+Tab, which are the browser's own tabs.
  * A swipe back, a tap and every other key leave the restore pending.

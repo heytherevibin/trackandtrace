@@ -200,7 +200,7 @@ describe("startPlaceMemory", () => {
   // What cancels the restore is the reader taking over (J6-9; the owner, 2026-09-28, amending J5-17's "any key", and
   // again on 2026-09-29): a mostly vertical wheel that is not a pinch-zoom, a finger dragging, a scroll key outside a
   // text field with no Alt, Ctrl or Meta, and Space only where it would scroll the page (a control that takes Space
-  // acts instead), and Tab and Shift+Tab, and Alt+Tab (Safari's Option-Tab), but never Ctrl+Tab or Meta+Tab (the
+  // acts instead: a button, a switch, a checkbox, a radio, a summary, a select, a field; a link does not, it scrolls), and Tab and Shift+Tab, and Alt+Tab (Safari's Option-Tab), but never Ctrl+Tab or Meta+Tab (the
   // browser's own tabs). A swipe back, Back and Forward's own keys, a tap and every other key leave it pending.
   type Act = [name: string, act: () => void];
   const wheel =
@@ -245,6 +245,9 @@ describe("startPlaceMemory", () => {
     ["Shift+Space", key(" ", { shiftKey: true })],
     ["Space on a focused element that takes no Space (a plain div)", onEl("<div tabindex='0'></div>", " ")],
     ["Space on a heading that is not a control", onEl("<h2 tabindex='-1'>x</h2>", " ")],
+    ["Space on a focused link (it scrolls the page, and does not follow the link)", onEl("<a href='/x'>x</a>", " ")],
+    ["Shift+Space on a focused link", onEl("<a href='/x'>x</a>", " ", { shiftKey: true })],
+    ["Space on a role=link", onEl("<span role='link' tabindex='0'></span>", " ")],
     ["Tab", key("Tab")],
     ["Shift+Tab", key("Tab", { shiftKey: true })],
     ["Alt+Tab (Safari's Option-Tab)", key("Tab", { altKey: true })],
@@ -263,7 +266,6 @@ describe("startPlaceMemory", () => {
     ["Ctrl+Shift+Tab", key("Tab", { ctrlKey: true, shiftKey: true })],
     ["Space on a button", onEl("<button>x</button>", " ")],
     ["Shift+Space on a button", onEl("<button>x</button>", " ", { shiftKey: true })],
-    ["Space on a link", onEl("<a href='/x'>x</a>", " ")],
     ["Space on a switch (role=switch)", onEl("<span role='switch' tabindex='0' aria-checked='false'></span>", " ")],
     ["Space on a checkbox", onEl("<input type='checkbox'>", " ")],
     ["Space on a radio", onEl("<input type='radio'>", " ")],

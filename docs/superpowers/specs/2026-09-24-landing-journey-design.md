@@ -364,9 +364,10 @@ Decided while planning J6 (2026-09-28):
   Back restore. That is a mostly vertical wheel that is not a pinch-zoom, a finger dragging, a scroll key (the arrows,
   Page Up and Down, Home, End, Space) outside a text field with no Alt, Ctrl or Meta, and Tab or Shift+Tab, and
   Alt+Tab (Safari moves to links with Option-Tab), but not Ctrl+Tab or Meta+Tab (the browser's own tabs). Space
-  cancels only where it would scroll the page: on a control that takes Space (a button, a link, a switch, a checkbox,
-  a radio, a summary, a select, a text field, or a control with such a role) the control acts and the restore goes
-  on; Shift+Space follows the same rule. A trackpad's swipe back, a tap and every other key leave it pending (J6-9);
+  cancels only where it would scroll the page: on a control that takes Space (a button, a switch, a checkbox, a
+  radio, a summary, a select, a text field, or a control with such a role) the control acts and the restore goes
+  on; on a link it does cancel, since Space scrolls past a focused link and never follows it; Shift+Space follows the
+  same rule. A trackpad's swipe back, a tap and every other key leave it pending (J6-9);
   `focus-glide.ts` lets go of a glide by the same rule (`ownScroll`);
 - Back into the run returns the reader where they left: a section riding it is read where `run.ts` says it stands
   (`data-run-at`), so a reader who left at 07 comes back to 07 (J6-9);
