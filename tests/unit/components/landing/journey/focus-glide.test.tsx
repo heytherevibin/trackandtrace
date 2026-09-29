@@ -29,7 +29,7 @@ describe("arming: a Tab's focus that starts a glide", () => {
     tabOnto(policy()); // a glide armed for the first Tab stop
     const other = document.createElement("a"); // a second Tab stop below the window, outside the run
     other.href = "/tos";
-    other.getBoundingClientRect = () => box as DOMRect;
+    other.getBoundingClientRect = () => ({ top: at.box.top - at.y, bottom: at.box.bottom - at.y }) as DOMRect; // below the window, as the policy link
     other.scrollIntoView = reveal;
     document.getElementById("reliability")!.append(other);
     tabOnto(other); // the next Tab: its keydown lets go of the first glide, its focus arms the second
