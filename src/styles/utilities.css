@@ -108,8 +108,9 @@
 
 /* The page ground as a fill: an object that hides what is drawn behind it (a plate over the dial, a station over the
    masts) but otherwise reads as the page itself. On the traveller site it carries the canvas's grain, so it occludes
-   without reading as a flat patch; elsewhere, and wherever the grain steps aside, it is the flat page colour. Panels
-   that float over the page (the masthead, menus, sheets) keep their flat surfaces instead. */
+   without reading as a flat patch; elsewhere, and wherever the grain steps aside, it is the flat page colour. The
+   masthead wears it too (opaque, its hairline marking where its still grain meets the scrolling page); panels that
+   float over the page on a scrim (menus, sheets, dialogs) keep their flat surfaces. */
 @utility ground {
   background-color: var(--surface-0);
   background-image: var(--page-grain);
