@@ -234,19 +234,26 @@ html[data-journey="on"] .journey-hud pre { margin: 6px 0 0; font-family: ui-mono
 
 /* ---- The paper under a pinned stage (owner, 2026-09-30). While 02, the drawing or the run is pinned, the whole window's
    grain holds still with it: .pin-paper, the stage's last child, is a full-bleed sheet of the page's grain that sticks
-   exactly as the pin does. Its foot is the pin's foot, so it takes hold and lets go in the same scroll as the pin; it is
-   pulled up over the pin by its own height (a negative margin that adds nothing to the section's height, and, being
-   its top margin, leaves the sticky limit at the section's foot, the pin's). It never reaches above its section: its top
-   is the pin's in columns, and below it in the drawing's list, whose words scroll away under the masthead first. At
-   z-index 0 it lies under the live drawing's fixed canvas (1) and the pin (2). Before it pins and after it lets go it
-   moves with the page, so its grain and the page's travel together and meet in a still seam of noise on noise. The
-   pins keep the page frame's width; the sheet reaches the window's edges (100vw), and the landing's #main already clips
-   sideways (journey.css, for the hero dial), which cuts the half-scrollbar 100vw takes past a classic scrollbar. */
+   as the pin does. --paper-h is the pin's own height, in the small viewport as the pin is. The sheet is pulled up over
+   the pin by it (a negative top margin, which adds nothing to the section's height) and runs on past the pin's foot by
+   100lvh − 100svh, the room a phone's toolbar gives back when it collapses mid-pin, so that strip is paper too; an equal
+   negative bottom margin keeps its margin box the pin's height, so it takes hold and lets go in the same scroll as the
+   pin. The section clips that overhang (clip, not a scroller: the pins stay sticky), so it never shows past the stage
+   or adds scroll. Its top is the pin's in columns, and below it in the drawing's list, whose words scroll away under
+   the masthead first. At z-index 0 it lies under the live drawing's fixed canvas (1) and the pin (2), and takes no
+   pointer. Before it pins and after it lets go it moves with the page. The pins keep the page frame's width; the sheet
+   reaches the window's edges as 100vw, which past a classic scrollbar overhangs by half of it, so the journey clips
+   #main sideways itself (as the hero dial's rule also does, journey.css). */
+html[data-journey="on"] #main { overflow-x: clip; }
+html[data-journey="on"] #anatomy.is-live:has(> .pin-paper),
+html[data-motion="on"][data-journey="on"] .chapters.is-pinned:has(> .pin-paper),
+html[data-journey="on"] #run.is-running:has(> .pin-paper) { overflow-y: clip; }
 .pin-paper { display: none; }
 html[data-journey="on"] #anatomy.is-live > .pin-paper,
 html[data-motion="on"][data-journey="on"] .chapters.is-pinned > .pin-paper,
 html[data-journey="on"] #run.is-running > .pin-paper {
-  display: block; position: sticky; z-index: 0; top: var(--header-height); height: var(--paper-h); margin-top: calc(-1 * var(--paper-h));
+  display: block; position: sticky; z-index: 0; top: var(--header-height);
+  height: calc(var(--paper-h) + 100lvh - 100svh); margin-top: calc(-1 * var(--paper-h)); margin-bottom: calc(100svh - 100lvh);
   margin-left: calc(50% - 50vw); width: 100vw; background-color: var(--surface-0); background-image: var(--page-grain); pointer-events: none;
 }
 html[data-journey="on"] #anatomy.is-live > .pin-paper { --paper-h: max(520px, calc(100svh - var(--header-height))); }

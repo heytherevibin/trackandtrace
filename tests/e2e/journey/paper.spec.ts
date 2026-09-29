@@ -34,7 +34,10 @@ for (const [name, stage] of Object.entries(STAGES)) {
       expect(Math.abs(paper.right - g.vw)).toBeLessThanOrEqual(1);
       // From under the masthead to the pin's own foot: the window below the masthead is paper.
       expect(paper.top).toBeLessThanOrEqual(g.masthead + 1);
-      expect(Math.abs(paper.bottom - g.pin.bottom)).toBeLessThanOrEqual(1);
+      // To the pin's foot, and on past it by as much as a phone's toolbar can give back (100lvh − 100svh), so the strip
+      // a collapsing toolbar opens is paper too; the section clips that overhang, so it never shows past the stage.
+      expect(Math.abs(paper.bottom - g.toolbar - g.pin.bottom)).toBeLessThanOrEqual(1);
+      expect(g.section.overflowY).toBe("clip");
     }
     // Held: a little more scroll moves neither the pin nor its paper.
     await into(page, stage, 0.5);
@@ -56,9 +59,9 @@ for (const [name, stage] of Object.entries(STAGES)) {
       await into(page, stage, p, px);
       const g = await geometry(page, stage);
       const where = `${p}${px >= 0 ? "+" : ""}${px}px`;
-      expect(Math.abs(g.paper!.bottom - g.pin.bottom), `feet at ${where}`).toBeLessThanOrEqual(1);
+      expect(Math.abs(g.paper!.bottom - g.toolbar - g.pin.bottom), `feet at ${where}`).toBeLessThanOrEqual(1);
       expect(g.paper!.top, `top at ${where}`).toBeGreaterThanOrEqual(g.section.top - 1);
-      expect(g.paper!.bottom, `foot at ${where}`).toBeLessThanOrEqual(g.section.bottom + 1);
+      expect(g.paper!.bottom - g.toolbar, `foot at ${where}`).toBeLessThanOrEqual(g.section.bottom + 1);
     }
   });
 
@@ -102,3 +105,63 @@ for (const [how, arrange] of [
   });
 }
 
+
+// Short windows, where the pins' own minimum heights take over from the window's (the drawing's 520px at 1280×560, and
+// the list and the phone on its side): the sheet must end where each pin ends, whichever rule sizes the pin.
+for (const size of [{ width: 1280, height: 560 }, { width: 390, height: 560 }, { width: 844, height: 390 }] as const) {
+  test(`${size.width}×${size.height}: every stage that pins keeps its sheet's foot at the pin's`, async ({ page, isMobile }) => {
+    test.skip(isMobile, "sizes are set here");
+    await page.setViewportSize(size);
+    await gotoReady(page, "/");
+    await waitForLive(page);
+    const pinned: string[] = [];
+    for (const [name, stage] of Object.entries(STAGES)) {
+      await into(page, stage, 0.5);
+      const on = await page.locator(stage.section).evaluate((el, cls) => new RegExp(cls).test(el.className), stage.pinned.source);
+      if (!on) continue;
+      pinned.push(name);
+      const g = await geometry(page, stage);
+      expect(Math.abs(g.paper!.bottom - g.toolbar - g.pin.bottom), `${name}: feet`).toBeLessThanOrEqual(1);
+      expect(g.paper!.top, `${name}: top`).toBeLessThanOrEqual(g.masthead + 1);
+    }
+    // 02 and the drawing pin at all three; the run needs its stations to fit, which a phone on its side does not give it.
+    expect(pinned).toEqual(expect.arrayContaining(["02", "the drawing"]));
+  });
+}
+
+// The sheet takes no pointer: a press in the margin beside a pinned stage lands on the page beneath it.
+for (const [name, stage] of Object.entries(STAGES)) {
+  test(`${name}: a press through the sheet reaches what is beneath it`, async ({ page, isMobile }) => {
+    test.skip(isMobile, "the pins fill a phone's width: no margin to press in");
+    await ready(page, stage);
+    const at = await page.evaluate((sel) => {
+      const header = document.querySelector("header")!.getBoundingClientRect().bottom;
+      const x = 6;
+      const y = Math.round((header + window.innerHeight) / 2);
+      const hit = document.elementFromPoint(x, y);
+      const paper = document.querySelector(`${sel} > .pin-paper`);
+      window.addEventListener("pointerdown", (e) => Reflect.set(window, "__paperHit", (e.target as Element | null)?.getAttribute("class") ?? ""), { once: true, capture: true });
+      return { x, y, hitsPaper: !!hit && !!paper && (hit === paper || paper.contains(hit)) };
+    }, stage.section);
+    expect(at.hitsPaper).toBe(false);
+    await page.mouse.click(at.x, at.y);
+    expect(await page.evaluate(() => Reflect.get(window, "__paperHit") as string)).not.toContain("pin-paper");
+  });
+}
+
+// A phone's toolbar collapsing mid-pin makes the window taller. This browser cannot collapse one (its 100svh and 100lvh
+// are the same height), so a resize stands in for it: the window grows under a pinned stage, and the sheet still reaches
+// the window's foot, still held. The toolbar case itself rests on the sizing (100lvh, pinned by the CSS contract test).
+for (const [name, stage] of Object.entries(STAGES)) {
+  test(`${name}: when the window grows under the pin, the sheet still reaches its foot`, async ({ page, viewport }) => {
+    await ready(page, stage);
+    const base = viewport ?? { width: 1280, height: 800 };
+    await page.setViewportSize({ width: base.width, height: base.height + 90 });
+    await into(page, stage, 0.5);
+    await expect(page.locator(stage.section)).toHaveClass(stage.pinned);
+    const g = await geometry(page, stage);
+    const tall = await page.evaluate(() => window.innerHeight);
+    expect(g.paper!.bottom).toBeGreaterThanOrEqual(Math.min(tall, g.pin.bottom) - 1);
+    expect(g.paper!.top).toBeLessThanOrEqual(g.masthead + 1);
+  });
+}
