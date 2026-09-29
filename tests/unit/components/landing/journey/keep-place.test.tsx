@@ -59,6 +59,27 @@ describe("keepPlace", () => {
     expect(scrollTo).toHaveBeenCalledWith({ top: Math.round(4936 + (2064 / 2564) * 2024), behavior: "instant" });
   });
 
+  // Its timeline ends at the large viewport's foot (anime's 100lvh), not innerHeight, which a phone's toolbar shortens
+  // (review, M1): the fraction is measured to it, so it is the timeline's progress.
+  it("measures the fraction to the large viewport, a phone's toolbar shown", () => {
+    const { piece, doc, scroll } = page();
+    scroll.y = 7000;
+    scroll.vh = 800; // the toolbar takes 100 px of a large viewport 900 tall
+    const offset = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "offsetHeight")!;
+    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockImplementation(function (this: HTMLElement) {
+      return this.style.height === "100lvh" ? 900 : (offset.get?.call(this) as number);
+    });
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+    keepPlace(
+      piece,
+      () => {
+        doc.height = 2860;
+      },
+      { shape: "same" },
+    );
+    expect(scrollTo).toHaveBeenCalledWith({ top: Math.round(4936 + (2064 / 2564) * 2024), behavior: "instant" });
+  });
+
   it("asks its caller for the shape once the change has run: a relayout that no longer fits changes it", () => {
     const { piece, doc, scroll } = page();
     scroll.y = 7000;
@@ -79,7 +100,7 @@ describe("keepPlace", () => {
   // it): a reader inside is judged, and kept the same fraction through, from the place they last read it in.
   it("keeps a reader inside the same fraction through it from the place its caller kept, not the one a resize left", () => {
     const { piece, doc, scroll } = page();
-    const from = { top: 5000, bottom: 8400, y: 7000, vh: 900 }; // 2,064 px into its 2,564 px range
+    const from = { top: 5000, bottom: 8400, y: 7000, vh: 900, view: 900 }; // 2,064 px into its 2,564 px range
     scroll.vh = 700; // the window is shorter now
     doc.top = 4990; // the text above it reflowed
     scroll.y = 6800; // and a piece above moved the reader by its own change
@@ -97,7 +118,7 @@ describe("keepPlace", () => {
 
   it("moves a reader past it by the change from where they stand now, whatever place its caller kept", () => {
     const { piece, doc, scroll } = page();
-    const from = { top: 5000, bottom: 8400, y: 9000, vh: 900 }; // its foot 600 px above the window: past it
+    const from = { top: 5000, bottom: 8400, y: 9000, vh: 900, view: 900 }; // its foot 600 px above the window: past it
     scroll.y = 9100; // a piece above moved them on by its own change
     const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
     keepPlace(

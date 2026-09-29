@@ -4,7 +4,7 @@ import { readerPlace } from "./drawing-mode";
 import { keyboardFocus, watchGlide, watchTab } from "./focus-glide";
 import { anchorOf, band, fitsRun, hereAt, layers, leanStep, offsets, runLayout, trainAt, type RunLayout } from "./geometry/run";
 import { LAYOUT_EVENT, emit } from "./journey-events";
-import { keepPlace, mastheadBottom, type ReadPlace } from "./keep-place";
+import { keepPlace, mastheadBottom, viewHeight, type ReadPlace } from "./keep-place";
 import { SMOOTH } from "./motion-tokens";
 import { keepUp, refreshObserver, track } from "./observers";
 import type { JourneyContext, Teardown } from "./start-journey";
@@ -295,22 +295,38 @@ export function startRun({ motion }: JourneyContext): Teardown {
   // one lives for the journey, started before any module), it runs after it in the same frame, so the run's move is the
   // last word for its reader, where a relayout in the frame's animation callbacks, before the observers, was undone by
   // 02's move for a reader past it.
+  //
+  // Kept without a layout read on every scroll (review, nit): a scroll moves only the reader, so while the window is the
+  // size the place was measured in, the scroll alone is learned. The run's box is measured again when it can have moved:
+  // on tt:layout, on "resize", and when the page's height changes (the body's observer: a change above the run that no
+  // one announced), each only while the pin is steady.
   let read: ReadPlace | null = null;
+  let measuredIn = { w: 0, h: 0 };
   const steady = () => at !== null && pin.clientWidth === at.w && pin.clientHeight === at.h;
   const learn = () => {
     if (!steady()) return;
     const r = run.getBoundingClientRect();
-    read = { top: r.top + window.scrollY, bottom: r.bottom + window.scrollY, y: window.scrollY, vh: window.innerHeight };
+    read = { top: r.top + window.scrollY, bottom: r.bottom + window.scrollY, y: window.scrollY, vh: window.innerHeight, view: viewHeight() };
+    measuredIn = { w: window.innerWidth, h: window.innerHeight };
+  };
+  const onScrolled = () => {
+    if (!read) return;
+    if (window.innerWidth === measuredIn.w && window.innerHeight === measuredIn.h) read = { ...read, y: window.scrollY };
+    else learn(); // the window changed (a toolbar, a zoom, a resize still to land): measured afresh, if the pin is steady
   };
   const onPin = () => {
-    if (!at || steady() || !read) return; // not running, its first delivery, or nothing to judge from
+    if (!at) return; // not running
+    if (steady()) return learn(); // its first delivery, or the page's height: the run may have moved
+    if (!read) return; // nothing to judge from
     cancelAnimationFrame(layoutFrame);
     relayout(read);
   };
   const pinObserver = new ResizeObserver(onPin);
   pinObserver.observe(pin);
+  pinObserver.observe(document.body);
   const onResize = () => {
     if (!at) soon(); // unpinned, a window that grew may fit now; pinned, the pin's observer answers
+    else learn(); // a window change the pin did not follow (a toolbar): the place, measured afresh
   };
 
   // Tab onto a link in a card: bring its station to the window (the page's own scroll-behavior glides it). Only the
@@ -387,7 +403,7 @@ export function startRun({ motion }: JourneyContext): Teardown {
   decide();
   window.addEventListener(LAYOUT_EVENT, soon);
   window.addEventListener(LAYOUT_EVENT, learn); // after a piece above moved the reader by its own change
-  window.addEventListener("scroll", learn, { passive: true });
+  window.addEventListener("scroll", onScrolled, { passive: true });
   window.addEventListener("resize", onResize);
   trackEl.addEventListener("focusin", onFocus);
   document.addEventListener("click", onClick);
@@ -397,7 +413,7 @@ export function startRun({ motion }: JourneyContext): Teardown {
     wait(false);
     window.removeEventListener(LAYOUT_EVENT, soon);
     window.removeEventListener(LAYOUT_EVENT, learn);
-    window.removeEventListener("scroll", learn);
+    window.removeEventListener("scroll", onScrolled);
     window.removeEventListener("resize", onResize);
     pinObserver.disconnect();
     trackEl.removeEventListener("focusin", onFocus);

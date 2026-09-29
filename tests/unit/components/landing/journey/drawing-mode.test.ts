@@ -114,8 +114,15 @@ describe("the drawing's mode (spec §3.C)", () => {
     // 4300: the piece's foot 600 down the window (inside by readerPlace: over half the window is still in it)
     expect(placeInProportion(read, { top: 1080, bottom: 3700, landing: 80, viewport: 700 }, 4300)).toBe(3100);
     expect(placeInProportion(read, { top: 1040, bottom: 5960, landing: 80, viewport: 1000 }, 4300)).toBe(5360);
-    // never above the start it would land on: a window now shorter than the foot's distance, and a piece now short
-    expect(placeInProportion(read, { top: 1080, bottom: 1500, landing: 80, viewport: 300 }, 4300)).toBe(1000);
+    // never back inside its range: a window now shorter than the foot's distance, and a piece now short, land on its end
+    expect(placeInProportion(read, { top: 1080, bottom: 1500, landing: 80, viewport: 300 }, 4300)).toBe(1200);
+  });
+
+  it("never sends a reader beyond the range's end back inside it when the window gets shorter (review, I1)", () => {
+    // 1 px past the end of a window 900 tall; the window 700 tall: the foot's distance (899) would be 199 px short
+    const shrunk = { top: 1080, bottom: 3700, landing: 80, viewport: 700 } as const;
+    expect(placeInProportion(read, shrunk, 4001)).toBe(3000);
+    expect(placeInProportion(read, shrunk, 4000)).toBe(3000); // and continuous with the end itself
   });
 
   it("lands a reader on the piece's start when it is no taller than the window, before the resize or after it", () => {
@@ -123,5 +130,11 @@ describe("the drawing's mode (spec §3.C)", () => {
     expect(placeInProportion({ top: 1080, bottom: 1880, landing: 80, viewport: 900 }, { top: 1080, bottom: 3700, landing: 80, viewport: 700 }, 1200)).toBe(1000);
     // after: shrunk to fit its window
     expect(placeInProportion(read, { top: 1080, bottom: 1700, landing: 80, viewport: 700 }, 2800)).toBe(1000);
+  });
+
+  it("lands a reader on the piece's own start, not its timeline's, when there is no range", () => {
+    // 02: its timeline starts under the masthead (64), its start lands at its scroll margin (80)
+    const plain = { top: 1080, bottom: 1700, landing: 64, viewport: 700, start: 80 } as const;
+    expect(placeInProportion({ ...read, landing: 64, start: 80 }, plain, 2800)).toBe(1000);
   });
 });

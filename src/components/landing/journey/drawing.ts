@@ -1,6 +1,6 @@
 import { QUALITY_STORAGE_KEY, resolveDrawing, type MotionState, type SaverState } from "@/components/motion/motion-boot";
 import { modeOf, placeAfter, readerPlace, startingReasons, wantsScene, whyOf, withReason, type DrawingMode, type DrawingReason, type Reasons } from "./drawing-mode";
-import { jumpTo, keepPlace, mastheadBottom } from "./keep-place";
+import { jumpTo, keepPlace, mastheadBottom, viewHeight } from "./keep-place";
 import { DRAWING_EVENT, LAYOUT_EVENT, WEBGL_EVENT, emit, type DrawingDetail, type WebglDetail } from "./journey-events";
 import { createLiveLabels } from "./live-labels";
 import type { JourneyContext, JourneyModule, Teardown } from "./start-journey";
@@ -253,18 +253,20 @@ export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2,
     // else keeps in place (02's guard keeps only its own readers). Its box, the reader's scroll and the window they saw
     // it in are kept one step behind, as 02's are (chapters.ts): by the resize the browser has already laid the page
     // out again, in the new window, and the reader is judged by the one they read in.
-    // A window whose size has changed since the place was kept is a resize not yet answered: WebKit can tell tt:layout
+    // A pin whose height has changed since the place was kept is a resize not yet answered: WebKit can tell tt:layout
     // (the scene's own relayout) after laying the new window out and before "resize", and learning then would judge the
-    // resize from the place it left. onResize answers it, from the place before.
-    let held: { readonly top: number; readonly bottom: number; readonly y: number; readonly vh: number; readonly vw: number } | null = null;
+    // resize from the place it left. onResize answers it, from the place before. Keyed on the pin's own height (520vh),
+    // as 02's guard and the run key on theirs, never on the window's size, which moves with no "resize" too (iOS's pinch
+    // zoom, a toolbar) and would freeze the place for good (review, M2).
+    let held: { readonly top: number; readonly bottom: number; readonly y: number; readonly vh: number; readonly view: number } | null = null;
     const learn = () => {
       if (!section?.classList.contains(PINNED)) {
         held = null;
         return;
       }
-      if (held && (held.vh !== window.innerHeight || held.vw !== window.innerWidth)) return;
       const r = section.getBoundingClientRect();
-      held = { top: r.top + window.scrollY, bottom: r.bottom + window.scrollY, y: window.scrollY, vh: window.innerHeight, vw: window.innerWidth };
+      if (held && Math.abs(r.height - (held.bottom - held.top)) > 1) return;
+      held = { top: r.top + window.scrollY, bottom: r.bottom + window.scrollY, y: window.scrollY, vh: window.innerHeight, view: viewHeight() };
     };
     const onResize = () => {
       const was = held;
@@ -273,7 +275,7 @@ export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2,
       const before = { top: was.top - was.y, bottom: was.bottom - was.y, height: was.bottom - was.top };
       const after = { top: r.top + window.scrollY - was.y, height: r.height };
       // a resize keeps the pin's shape: a reader inside it stays the same fraction through it (the owner, 2026-09-29)
-      const to = placeAfter(before, after, { scrollY: was.y, viewport: was.vh, viewportAfter: window.innerHeight, masthead: mastheadBottom() }, "same");
+      const to = placeAfter(before, after, { scrollY: was.y, viewport: was.vh, viewportAfter: window.innerHeight, view: was.view, viewAfter: viewHeight(), masthead: mastheadBottom() }, "same");
       if (to !== null) jumpTo(to);
       held = null;
       learn();

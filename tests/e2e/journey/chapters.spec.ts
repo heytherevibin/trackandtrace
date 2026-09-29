@@ -418,12 +418,12 @@ test.describe("02 · the chapters, pinned", () => {
   });
 
   // A turn keeps 02's shape: the reader stays the same fraction through it, where they once landed on its start (the
-  // owner, 2026-09-29). Its range: from its landing (scroll-margin-top) to its foot at the window's foot.
+  // owner, 2026-09-29). Its range as its timeline reads it: from its top under the masthead to its foot at the window's.
   test("a phone turned upright with the reader inside a pinned 02 keeps them the same fraction through it", async ({ page }) => {
     const range = () =>
       page.locator("#how").evaluate((el) => {
         const r = el.getBoundingClientRect();
-        const start = r.top + window.scrollY - Number.parseFloat(getComputedStyle(el).scrollMarginTop);
+        const start = r.top + window.scrollY - Math.round(document.querySelector("header")?.getBoundingClientRect().height ?? 0);
         return { start, end: r.bottom + window.scrollY - window.innerHeight, y: window.scrollY };
       });
     await page.setViewportSize({ width: 844, height: 390 });

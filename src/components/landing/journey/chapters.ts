@@ -7,7 +7,7 @@ import { placeInProportion, readerPlace } from "./drawing-mode";
 import { ease } from "./ease";
 import { fitsWindow, type Span } from "./fit";
 import { LAYOUT_EVENT, REBUILD_EVENT } from "./journey-events";
-import { jumpTo } from "./keep-place";
+import { jumpTo, viewHeight } from "./keep-place";
 import { SMOOTH, STAGGER, T } from "./motion-tokens";
 import { keepUp, track } from "./observers";
 import type { JourneyContext, Teardown } from "./start-journey";
@@ -56,8 +56,13 @@ interface Place {
   readonly box: Span;
   readonly y: number;
   readonly vh: number;
-  /** #how's scroll-margin-top: how far below the window's top its start lands. */
+  /** The large viewport's height, where 02's timeline ends (viewHeight): the fraction is measured on its basis. */
+  readonly view: number;
+  /** #how's scroll-margin-top: how far below the window's top its start lands, for a change of shape. */
   readonly landing: number;
+  /** The masthead's height: how far below the window's top 02's timeline starts (startDriver), for a resize, so the
+   * fraction kept is the timeline's own progress (review, nit: its scroll margin is 1rem more). */
+  readonly lead: number;
   readonly shape: string;
 }
 
@@ -78,11 +83,12 @@ function landingOf(section: HTMLElement): number {
 
 /** #how as it stands now, with the reader's scroll and window: the place a change is judged from. */
 function placeNow(section: HTMLElement): Place {
-  return { box: docBox(section), y: window.scrollY, vh: window.innerHeight, landing: landingOf(section), shape: shapeOf(section) };
+  return { box: docBox(section), y: window.scrollY, vh: window.innerHeight, view: viewHeight(), landing: landingOf(section), lead: headerOffset(), shape: shapeOf(section) };
 }
 
 /** Above 02's old start: nothing. Inside it (over half the window in it): the same fraction of the way through it when
- * its shape is the same (a resize: the owner, 2026-09-29), so the same stop and frame come back; its new start, at its
+ * its shape is the same (a resize: the owner, 2026-09-29), measured as its timeline measures it (from under the
+ * masthead to the large viewport's foot), so the same stop and frame come back; its new start, at its
  * landing under the masthead, when its shape changed. Past it (its foot within the window's top half, what follows on
  * screen): the same distance past its new end (the height's change, plus its top's when the width moved it). Judged by
  * readerPlace, the rule every piece uses (J6-4): the window's top edge alone sent a reader in 02's last lines, #record
@@ -94,7 +100,7 @@ function settlePlace(section: HTMLElement, was: Place): Place {
   // through jumpTo, as every place-keeping move: announced, so a Tab stop's glide it cuts short is taken up again
   if (where === "past") jumpTo(y + now.box.bottom - was.box.bottom);
   else if (where === "inside" && now.shape !== was.shape) jumpTo(now.box.top - now.landing);
-  else if (where === "inside") jumpTo(placeInProportion({ ...was.box, landing: was.landing, viewport: was.vh }, { ...now.box, landing: now.landing, viewport: now.vh }, y));
+  else if (where === "inside") jumpTo(placeInProportion({ ...was.box, landing: was.lead, viewport: was.view }, { ...now.box, landing: now.lead, viewport: now.view, start: now.landing }, y));
   return placeNow(section);
 }
 
@@ -118,7 +124,7 @@ export function startPlaceGuard(): Teardown {
   };
   // The reader's place, only while #how is still the size this guard last settled.
   const learn = () => {
-    if (unchanged()) place = { ...place, y: window.scrollY, vh: window.innerHeight };
+    if (unchanged()) place = { ...place, y: window.scrollY, vh: window.innerHeight, view: viewHeight() };
   };
   window.addEventListener("scroll", learn, { passive: true });
   window.addEventListener(MOTION_BEFORE_EVENT, learn);
@@ -147,7 +153,7 @@ export function startPlaceGuard(): Teardown {
     const resized = !unchanged();
     lastSize = sizeOf(section);
     if (resized) place = settlePlace(section, place);
-    else place = { ...place, box: docBox(section), landing: landingOf(section), shape: shapeOf(section) };
+    else place = { ...place, box: docBox(section), landing: landingOf(section), lead: headerOffset(), shape: shapeOf(section) };
   };
   const observer = new ResizeObserver(settle);
   observer.observe(section, { box: "border-box" });

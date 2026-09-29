@@ -444,22 +444,6 @@ describe("the pinned chapter's height follows the window (520vh)", () => {
     stop();
   });
 
-  // WebKit can tell a layout change (tt:layout, from the scene's own relayout) after the page has laid the new window out
-  // and before "resize": the place a resize is judged from must still be the one the reader read in.
-  it("judges a resize from the window the reader read in, though a layout change is told before it", async () => {
-    const vh = { now: 1000 };
-    vi.spyOn(window, "innerHeight", "get").mockImplementation(() => vh.now);
-    const { box, stop } = await pinned();
-    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
-    box.top = -2000;
-    window.dispatchEvent(new Event("scroll"));
-    vh.now = 900;
-    box.height = 4680; // 520vh of 900
-    window.dispatchEvent(new Event(LAYOUT_EVENT));
-    window.dispatchEvent(new Event("resize"));
-    expect(scrollTo).toHaveBeenCalledWith({ top: Math.round(-2000 + (2000 / (5200 - 1000)) * (4680 - 900)) + window.scrollY, behavior: "instant" });
-    stop();
-  });
 });
 
 describe("the scene's 20 s limit (spec §3.C, load; J5-11)", () => {

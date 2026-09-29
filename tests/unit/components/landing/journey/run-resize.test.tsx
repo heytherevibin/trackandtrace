@@ -117,4 +117,22 @@ describe("a resize, with the reader inside it", () => {
     expect(run.style.getPropertyValue("--run-h")).toBe("1836px"); // left for the observer, which runs after 02's guard
     stop();
   });
+
+  // Its place is kept without a layout read on every scroll (review, nit): the scroll alone, while the window is the size
+  // it last measured the run in; the run's box on a layout change, a resize, or a change of the page's height.
+  it("learns the reader's scroll without reading the layout on each scroll", () => {
+    const { run, at, resized } = resizable();
+    const stop = startRun(testContext());
+    const rect = vi.spyOn(run, "getBoundingClientRect");
+    for (const y of [2100, 2300, 2600]) {
+      at.y = y;
+      window.dispatchEvent(new Event("scroll"));
+    }
+    expect(rect).not.toHaveBeenCalled();
+    at.vh = 700; // and still judged from the last of them: 60% through
+    at.h = 700;
+    resized();
+    expect(at.y).toBe(2000 + 0.6 * 1000);
+    stop();
+  });
 });

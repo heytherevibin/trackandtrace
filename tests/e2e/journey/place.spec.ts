@@ -214,13 +214,14 @@ test.describe("the reader's place", () => {
 // start once took them back up to 2,472 px: the same chapter, and the scroll within a few px of where that fraction
 // stands in the new window. Each size is judged against the one before it, and back again, scroll anchoring or not.
 // The drawing above is held to the still: its own resizes are drawing.ts's, and live-drawing.spec.ts holds them.
-/** 02's range as its place guard reads it: from its landing (its scroll-margin-top) to its foot at the window's foot. */
+/** 02's range as its timeline reads it: from its top under the masthead to its foot at the window's foot (the large
+ * viewport's, which Playwright's window always is). */
 const howRange = (page: Page) =>
   page.evaluate(() => {
     const how = document.getElementById("how");
     if (!how) throw new Error("#how is missing");
     const r = how.getBoundingClientRect();
-    const start = r.top + window.scrollY - Number.parseFloat(getComputedStyle(how).scrollMarginTop);
+    const start = r.top + window.scrollY - Math.round(document.querySelector("header")?.getBoundingClientRect().height ?? 0);
     return { start, end: r.bottom + window.scrollY - window.innerHeight, y: window.scrollY };
   });
 /** A resize and everything it sets going have landed: 02's guard, its refit 200 ms on, and any late move. */
@@ -263,4 +264,25 @@ test.describe("a resize keeps a reader inside a pinned 02 the same fraction thro
       });
     }
   }
+
+  // A reader just past 02's end, its foot still in the window's lower half (inside by readerPlace), on its third stop:
+  // turned on its side, the foot's distance from the window's top no longer fits the window, and keeping it sent them
+  // back into 02, 54% through, on its second stop (review, I1). They stay at its end, or beyond it.
+  test("a reader past 02's end stays at or beyond its end, on its last stop, when a phone turns on its side", async ({ page }) => {
+    const last = page.locator('#how li[data-chapter="2"]');
+    await page.setViewportSize({ width: 390, height: 844 });
+    await drawStill(page);
+    await page.goto("/");
+    await waitForJourney(page);
+    await expect(page.locator("#how")).toHaveClass(/is-pinned/);
+    const at = await howRange(page);
+    await page.evaluate((y) => window.scrollTo({ top: y, behavior: "instant" }), Math.round(at.end + 60));
+    await expect(last).toHaveClass(/is-current/);
+    await frames(page, 3); // the guard has learned the reader's place
+    await resizedTo(page, { width: 844, height: 390 });
+    await expect(page.locator("#how")).toHaveClass(/is-pinned/);
+    const now = await howRange(page);
+    expect(now.y, `02's end at ${Math.round(now.end)}`).toBeGreaterThanOrEqual(now.end - 2);
+    await expect(last).toHaveClass(/is-current/);
+  });
 });
