@@ -66,13 +66,14 @@ function navigationTarget(): EventTarget | null {
 export const HAND = ["wheel", "touchmove", "keydown"] as const;
 /** The keys that scroll the page: the arrows up and down, Page Up and Page Down, Home, End and Space (Shift+Space up). */
 const SCROLL_KEYS: ReadonlySet<string> = new Set(["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "]);
-/** Where a key types or picks rather than scrolls. */
-const TEXT_FIELD = "input, textarea, select, [contenteditable]:not([contenteditable='false'])";
-/** Where Space acts rather than scrolls, as the browser has it: a button, a summary, a media control, a field, and the
- * roles a page gives a control of its own (a Base UI switch is a role=switch). Not a link: Space on a focused link
- * scrolls the page and never follows it. */
+/** Where a key types or picks rather than scrolls: the focused element itself (below), or an editing host it sits in. */
+const TEXT_FIELD = "input, textarea, select";
+/** Where Space acts rather than scrolls, as the browser has it: a button, a summary, a field, a media control, and the
+ * roles a page gives a control of its own (a Base UI switch is a role=switch). Not a link, and not a range slider:
+ * Space on either scrolls the page. The roles are the ARIA authoring contract: a widget with one of these roles is
+ * expected to handle Space itself, so it is judged as one that does, even where a bare div with the role would not. */
 const TAKES_SPACE = [
-  TEXT_FIELD,
+  "input:not([type='range']), textarea, select",
   "button",
   "summary",
   "audio[controls]",
@@ -81,6 +82,12 @@ const TAKES_SPACE = [
   "[role='menuitem'], [role='menuitemcheckbox'], [role='menuitemradio'], [role='combobox'], [role='slider']",
   "[role='spinbutton'], [role='textbox'], [role='searchbox']",
 ].join(", ");
+
+/** Inside an editing host, by the nearest contenteditable attribute: a region made not editable inside one is not. */
+function inEditable(el: Element): boolean {
+  const host = el.closest("[contenteditable]");
+  return host !== null && host.getAttribute("contenteditable") !== "false";
+}
 
 /**
  * The reader taking over (J5-17, amended by the owner on 2026-09-28 and again on 2026-09-29; J6-9): before the
@@ -102,8 +109,10 @@ export function ownScroll(event: Event): boolean {
   if (event.ctrlKey || event.metaKey) return false;
   if (event.key === "Tab") return true;
   if (!SCROLL_KEYS.has(event.key) || event.altKey) return false;
-  const inside = event.target instanceof Element ? event.target : null;
-  return !inside?.closest(event.key === " " ? TAKES_SPACE : TEXT_FIELD);
+  // The focused element itself, never its ancestors: a link inside a role=option or a summary is a link.
+  const focused = event.target instanceof Element ? event.target : null;
+  if (!focused) return true;
+  return !(focused.matches(event.key === " " ? TAKES_SPACE : TEXT_FIELD) || inEditable(focused));
 }
 
 function mastheadFoot(): number {

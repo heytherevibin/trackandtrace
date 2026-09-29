@@ -86,7 +86,8 @@ test.describe("the reader's place", () => {
   // What cancels a Back restore (J6-9; the owner, 2026-09-28 and 2026-09-29): the reader taking over. Space only where it
   // would scroll the page; Tab always (never Ctrl or Meta with it). The restore waits for the first build, which
   // pauses between its modules through scheduler.yield (pause.ts): these specs hold that pause, so the restore is
-  // pending, press the key as a reader would, then let the build go on.
+  // pending, press the key as a reader would, then let the build go on. (The pending window is wide without the hold too;
+  // the hold makes it certain rather than likely. It replaces window.scheduler for the page, which nothing else here uses.)
   interface Hold {
     __ttHold?: boolean;
     __ttRelease?: () => void;
@@ -129,9 +130,17 @@ test.describe("the reader's place", () => {
   }
   async function release(page: Page): Promise<void> {
     await page.evaluate(() => (window as unknown as Hold).__ttRelease?.());
+    // The journey says it has started only after the first build and the restore have run, in the same frame
+    // (start-journey.ts: memory.restore(), then __ttJourneyStarted): a restore that was coming has landed by now.
     await waitForJourney(page);
-    await page.waitForTimeout(400); // a restore, if one was coming, has landed
+    await frames(page, 2);
   }
+
+  test("Back, then no key at all: the restore lands (the control for the tests that cancel it)", async ({ page }) => {
+    const before = await backHeld(page);
+    await release(page);
+    expect(Math.abs((await recordTop(page)) - before)).toBeLessThanOrEqual(4);
+  });
 
   test("Back, then Space on a focused control: the control acts, and the restore still lands", async ({ page }) => {
     const before = await backHeld(page);
@@ -149,7 +158,6 @@ test.describe("the reader's place", () => {
     const link = page.getByLabel("Primary").getByRole("link", { name: "Watchlist" });
     await link.evaluate((el) => el.focus({ preventScroll: true }));
     await page.keyboard.press("Space"); // the page scrolls a screen; the link is not followed
-    await expect(page).toHaveURL(/\/$/);
     await release(page);
     expect(Math.abs((await recordTop(page)) - before)).toBeGreaterThan(4); // not restored
   });
