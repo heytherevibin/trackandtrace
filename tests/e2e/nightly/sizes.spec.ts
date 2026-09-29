@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "../fixtures";
 import { gotoReady } from "../helpers";
-import { cutText } from "../layout";
+import { brokenWords, cutText } from "../layout";
 import { LANDING_INSTRUMENTS, collisionsInView, collisionsTopToBottom } from "../journey/collisions";
 import { waitForJourney } from "../journey/journey-helpers";
 
@@ -50,6 +50,35 @@ async function mastheadOverPins(page: Page): Promise<string[]> {
   });
 }
 
+/** The masthead is one row at every size the PR checks, text at 200% included: the menu, the mark and the controls, the
+ * height every pinned piece sticks under (--header-height) and its hairline rule. */
+async function mastheadRows(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const probe = document.createElement("div");
+    probe.style.height = "var(--header-height)";
+    document.body.append(probe);
+    const row = probe.getBoundingClientRect().height;
+    probe.remove();
+    const masthead = document.querySelector("header")?.getBoundingClientRect().height ?? 0;
+    return masthead > row + 1.5 ? [`the masthead is ${Math.round(masthead)}px tall, more than its one ${Math.round(row)}px row`] : [];
+  });
+}
+
+/** Lists the trains on a route and opens the first one's run, as a reader does (hover, focus or a tap). */
+async function openTrainRun(page: Page): Promise<void> {
+  await page.getByLabel("From", { exact: true }).fill("SBC");
+  await page.getByLabel("To", { exact: true }).fill("NDLS");
+  await page.getByLabel("To", { exact: true }).blur();
+  await page.getByLabel("Journey date").fill("2026-10-15");
+  await page.getByRole("button", { name: "Find trains" }).click();
+  await page.getByTestId("train-row").first().getByRole("button", { name: "This train's run", exact: true }).focus();
+  const run = page.getByTestId("train-run");
+  await expect(run).toBeVisible();
+  // the whole run has arrived: its stops are drawn, not the four the search carried
+  await expect(run.getByText("Reading the timetable…")).toHaveCount(0);
+  await expect(run.getByRole("listitem")).not.toHaveCount(4);
+}
+
 for (const [width, height] of SIZES) {
   const name = `${width}×${height}`;
   const phone = Math.min(width, height) < 500;
@@ -72,7 +101,9 @@ for (const [width, height] of SIZES) {
         // the drawing has decided: pinned live, or the still
         await expect(page.locator('html[data-drawing="still"], #anatomy.is-live')).not.toHaveCount(0, { timeout: 25_000 });
         expect(await mastheadOverPins(page)).toEqual([]);
+        expect(await mastheadRows(page)).toEqual([]);
         expect(await cutText(page), "text cut off").toEqual([]);
+        expect(await brokenWords(page, "main h2"), "a heading's word broken").toEqual([]);
         expect(await collisionsTopToBottom(page, { ...LANDING_INSTRUMENTS, step: 0.15 })).toEqual([]);
       });
 
@@ -80,8 +111,22 @@ for (const [width, height] of SIZES) {
         await text200(page);
         for (const path of OTHER_PAGES) {
           await gotoReady(page, path);
-          expect([...(await collisionsInView(page)), ...(await cutText(page))], path).toEqual([]);
+          expect([...(await collisionsInView(page)), ...(await cutText(page)), ...(await mastheadRows(page))], path).toEqual([]);
         }
+      });
+
+      // Text a reader opens, drawn only then: the route popover, and a signed-in traveller's account view and menu (the
+      // fixture-mode run has no accounts, so /e2e/signed-in draws them with a long name and address).
+      test("the route popover, the account view and the account menu keep every word with their text at 200%", async ({ page }) => {
+        await text200(page);
+        await gotoReady(page, "/pre-booking");
+        await openTrainRun(page);
+        expect(await cutText(page, '[data-testid="train-run"]'), "the route popover").toEqual([]);
+        await gotoReady(page, "/e2e/signed-in");
+        expect(await cutText(page, "main"), "the account view").toEqual([]);
+        await page.getByTestId("account-menu").click();
+        await expect(page.getByRole("menu")).toBeVisible();
+        expect(await cutText(page, '[role="menu"]'), "the account menu").toEqual([]);
       });
     }
   });

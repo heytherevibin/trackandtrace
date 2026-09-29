@@ -92,6 +92,9 @@ const nextConfig: NextConfig = {
           { key: "X-DNS-Prefetch-Control", value: "on" },
         ],
       },
+      // The end-to-end run's fixture pages (src/app/(site)/e2e): a 404 outside Playwright's own server, and never
+      // indexed even there.
+      { source: "/e2e/:path*", headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" }] },
       {
         // The console's nonce policy is set per request by src/proxy.ts; nothing here may send a second one.
         source: "/:path*",
