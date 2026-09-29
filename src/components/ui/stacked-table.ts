@@ -6,6 +6,13 @@
 //
 // Class strings are spelled out in full for both breakpoints: Tailwind only generates classes
 // it can read literally in the source.
+//
+// The drawn name sets its own `white-space`, and must. A cell carries `whitespace-nowrap` for its
+// VALUE — a fare or a percentage broken across two lines reads as two numbers — and the generated
+// name inherits it, which is a different claim about a different string. On /pre-booking that held
+// "Reservation service estimate" on one line in a 146px cell, and since these cells do not clip,
+// the name was painted across the Fare column rather than hidden: the two column names read as one
+// run-together word. Measured at 390px on 2026-09-29.
 
 export type StackBelow = "sm" | "lg";
 
@@ -26,7 +33,7 @@ const CLASSES: Readonly<Record<StackBelow, StackedTableClasses>> = {
     head: "max-sm:sr-only",
     body: "max-sm:block",
     row: "max-sm:grid max-sm:items-start max-sm:gap-x-4 max-sm:gap-y-3 max-sm:border-b max-sm:border-line max-sm:px-5 max-sm:py-4 max-sm:last:border-b-0",
-    cell: "max-sm:min-w-0 max-sm:border-0 max-sm:p-0 max-sm:before:legend-sm max-sm:before:mb-1 max-sm:before:block max-sm:before:text-ink-1/70 max-sm:before:content-[attr(data-label)_/_'']",
+    cell: "max-sm:min-w-0 max-sm:border-0 max-sm:p-0 max-sm:before:legend-sm max-sm:before:mb-1 max-sm:before:block max-sm:before:whitespace-normal max-sm:before:text-ink-1/70 max-sm:before:content-[attr(data-label)_/_'']",
     wide: "max-sm:col-span-full",
   },
   lg: {
@@ -34,7 +41,7 @@ const CLASSES: Readonly<Record<StackBelow, StackedTableClasses>> = {
     head: "max-lg:sr-only",
     body: "max-lg:block",
     row: "max-lg:grid max-lg:items-start max-lg:gap-x-4 max-lg:gap-y-3 max-lg:border-b max-lg:border-line max-lg:px-5 max-lg:py-4 max-lg:last:border-b-0",
-    cell: "max-lg:min-w-0 max-lg:border-0 max-lg:p-0 max-lg:before:legend-sm max-lg:before:mb-1 max-lg:before:block max-lg:before:text-ink-1/70 max-lg:before:content-[attr(data-label)_/_'']",
+    cell: "max-lg:min-w-0 max-lg:border-0 max-lg:p-0 max-lg:before:legend-sm max-lg:before:mb-1 max-lg:before:block max-lg:before:whitespace-normal max-lg:before:text-ink-1/70 max-lg:before:content-[attr(data-label)_/_'']",
     wide: "max-lg:col-span-full",
   },
 };
