@@ -431,16 +431,19 @@ describe("the pinned chapter's height follows the window (520vh)", () => {
     stop();
   });
 
-  it("puts a reader inside it at its start, as any change under them does (J5-3)", async () => {
+  // A resize keeps the pin's shape: a reader inside it stays the same fraction through it (the owner, 2026-09-29), where
+  // J5-3 sent them to its start. 2,000 px into its range (its start to its foot at the window's foot, 768 tall here).
+  it("keeps a reader inside it the same fraction through it", async () => {
     const { box, stop } = await pinned();
     const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
     box.top = -2000;
     window.dispatchEvent(new Event("scroll"));
     box.height = 4680;
     window.dispatchEvent(new Event("resize"));
-    expect(scrollTo).toHaveBeenCalledWith({ top: -2000 + window.scrollY, behavior: "instant" });
+    expect(scrollTo).toHaveBeenCalledWith({ top: Math.round(-2000 + (2000 / (5200 - 768)) * (4680 - 768)) + window.scrollY, behavior: "instant" });
     stop();
   });
+
 });
 
 describe("the scene's 20 s limit (spec §3.C, load; J5-11)", () => {

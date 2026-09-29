@@ -4,7 +4,7 @@ import { readerPlace } from "./drawing-mode";
 import { keyboardFocus, watchGlide, watchTab } from "./focus-glide";
 import { anchorOf, band, fitsRun, hereAt, layers, leanStep, offsets, runLayout, trainAt, type RunLayout } from "./geometry/run";
 import { LAYOUT_EVENT, emit } from "./journey-events";
-import { keepPlace, mastheadBottom } from "./keep-place";
+import { keepPlace, mastheadBottom, viewHeight, type ReadPlace } from "./keep-place";
 import { SMOOTH } from "./motion-tokens";
 import { keepUp, refreshObserver, track } from "./observers";
 import type { JourneyContext, Teardown } from "./start-journey";
@@ -198,17 +198,27 @@ export function startRun({ motion }: JourneyContext): Teardown {
     driver = null;
   };
 
-  /** Lays the run out and measures it, inside keepPlace; a run that cannot fit is put back. True when it fits. */
-  const settle = (): boolean => {
-    keepPlace(run, () => {
-      run.classList.add(RUNNING);
-      at = measure();
-      if (at) place(at);
-      else {
-        run.classList.remove(RUNNING);
-        clear();
-      }
-    });
+  /** Lays the run out and measures it, inside keepPlace; a run that cannot fit is put back. True when it fits. A run
+   * running before and after is a relayout, which keeps its shape: a reader inside it stays the same fraction through
+   * it, so on the same station (the owner, 2026-09-29). Its first pin, and a failure to fit, change its shape: its start.
+   * `from`: where the reader last read it, for a resize the page has already laid out (onPin, below). */
+  const settle = (from?: ReadPlace): boolean => {
+    const was = at !== null;
+    keepPlace(
+      run,
+      () => {
+        run.classList.add(RUNNING);
+        at = measure();
+        if (at) place(at);
+        else {
+          run.classList.remove(RUNNING);
+          clear();
+        }
+      },
+      { shape: () => (was && at !== null ? "same" : "changed"), from },
+    );
+    read = null;
+    learn();
     return at !== null;
   };
   const unpin = () => {
@@ -251,15 +261,18 @@ export function startRun({ motion }: JourneyContext): Teardown {
   }
 
   /** Anything that moves the page re-measures the pinned run, inside keepPlace; a run that no longer fits unpins. A
-   * run not pinned (and no reader below it) tries again: a window that grew may fit now. */
-  const relayout = () => {
+   * run not pinned (and no reader below it) tries again: a window that grew may fit now. A resize of the running run is
+   * its pin's observer's (onPin), never this frame's: `from` is the place the reader last read it in, which only that
+   * observer passes. */
+  const relayout = (from?: ReadPlace) => {
     layoutFrame = 0;
     if (!at) {
       if (!waiting) decide();
       return;
     }
+    if (!from && !steady()) return;
     const before = run.offsetHeight;
-    if (!settle()) {
+    if (!settle(from)) {
       stopDriver();
       emit(LAYOUT_EVENT);
       return;
@@ -271,7 +284,49 @@ export function startRun({ motion }: JourneyContext): Teardown {
     if (run.offsetHeight !== before) emit(LAYOUT_EVENT);
   };
   const soon = () => {
-    if (!layoutFrame) layoutFrame = requestAnimationFrame(relayout);
+    if (!layoutFrame) layoutFrame = requestAnimationFrame(() => relayout());
+  };
+
+  // A resize keeps a reader inside the running run the same fraction through it (the owner, 2026-09-29), judged from
+  // where they last read it: by the time anything hears of a resize, the page has laid the new window out, and the pieces
+  // above move the reader by their own changes (the live drawing's pin, on "resize"; 02's guard, from its observer). The
+  // run keeps its reader's place, its box and the window they read it in while its pin is the size it last laid out
+  // (steady), as 02's guard keeps its own, and answers a resize from its pin's observer: made after 02's guard's (that
+  // one lives for the journey, started before any module), it runs after it in the same frame, so the run's move is the
+  // last word for its reader, where a relayout in the frame's animation callbacks, before the observers, was undone by
+  // 02's move for a reader past it.
+  //
+  // Kept without a layout read on every scroll (review, nit): a scroll moves only the reader, so while the window is the
+  // size the place was measured in, the scroll alone is learned. The run's box is measured again when it can have moved:
+  // on tt:layout, on "resize", and when the page's height changes (the body's observer: a change above the run that no
+  // one announced), each only while the pin is steady.
+  let read: ReadPlace | null = null;
+  let measuredIn = { w: 0, h: 0 };
+  const steady = () => at !== null && pin.clientWidth === at.w && pin.clientHeight === at.h;
+  const learn = () => {
+    if (!steady()) return;
+    const r = run.getBoundingClientRect();
+    read = { top: r.top + window.scrollY, bottom: r.bottom + window.scrollY, y: window.scrollY, vh: window.innerHeight, view: viewHeight() };
+    measuredIn = { w: window.innerWidth, h: window.innerHeight };
+  };
+  const onScrolled = () => {
+    if (!read) return;
+    if (window.innerWidth === measuredIn.w && window.innerHeight === measuredIn.h) read = { ...read, y: window.scrollY };
+    else learn(); // the window changed (a toolbar, a zoom, a resize still to land): measured afresh, if the pin is steady
+  };
+  const onPin = () => {
+    if (!at) return; // not running
+    if (steady()) return learn(); // its first delivery, or the page's height: the run may have moved
+    if (!read) return; // nothing to judge from
+    cancelAnimationFrame(layoutFrame);
+    relayout(read);
+  };
+  const pinObserver = new ResizeObserver(onPin);
+  pinObserver.observe(pin);
+  pinObserver.observe(document.body);
+  const onResize = () => {
+    if (!at) soon(); // unpinned, a window that grew may fit now; pinned, the pin's observer answers
+    else learn(); // a window change the pin did not follow (a toolbar): the place, measured afresh
   };
 
   // Tab onto a link in a card: bring its station to the window (the page's own scroll-behavior glides it). Only the
@@ -347,7 +402,9 @@ export function startRun({ motion }: JourneyContext): Teardown {
 
   decide();
   window.addEventListener(LAYOUT_EVENT, soon);
-  window.addEventListener("resize", soon);
+  window.addEventListener(LAYOUT_EVENT, learn); // after a piece above moved the reader by its own change
+  window.addEventListener("scroll", onScrolled, { passive: true });
+  window.addEventListener("resize", onResize);
   trackEl.addEventListener("focusin", onFocus);
   document.addEventListener("click", onClick);
   return () => {
@@ -355,7 +412,10 @@ export function startRun({ motion }: JourneyContext): Teardown {
     cancelAnimationFrame(layoutFrame);
     wait(false);
     window.removeEventListener(LAYOUT_EVENT, soon);
-    window.removeEventListener("resize", soon);
+    window.removeEventListener(LAYOUT_EVENT, learn);
+    window.removeEventListener("scroll", onScrolled);
+    window.removeEventListener("resize", onResize);
+    pinObserver.disconnect();
     trackEl.removeEventListener("focusin", onFocus);
     document.removeEventListener("click", onClick);
     window.clearTimeout(again);

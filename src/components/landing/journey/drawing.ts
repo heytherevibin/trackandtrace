@@ -1,6 +1,6 @@
 import { QUALITY_STORAGE_KEY, resolveDrawing, type MotionState, type SaverState } from "@/components/motion/motion-boot";
 import { modeOf, placeAfter, readerPlace, startingReasons, wantsScene, whyOf, withReason, type DrawingMode, type DrawingReason, type Reasons } from "./drawing-mode";
-import { jumpTo, keepPlace, mastheadBottom } from "./keep-place";
+import { jumpTo, keepPlace, mastheadBottom, viewHeight } from "./keep-place";
 import { DRAWING_EVENT, LAYOUT_EVENT, WEBGL_EVENT, emit, type DrawingDetail, type WebglDetail } from "./journey-events";
 import { createLiveLabels } from "./live-labels";
 import type { JourneyContext, JourneyModule, Teardown } from "./start-journey";
@@ -13,7 +13,8 @@ import { webgl2 } from "./webgl-probe";
 // begun on the pinned chapter once no scroll is in flight. The pin (#anatomy.is-live) is only ever written here,
 // inside keepPlace (J5-3) but for liveFits's trial, undone in the same task (J6-5), and every pin and unpin is told
 // as tt:layout, so whatever measures the page below it (02's place guard) re-measures. A resize that changes the
-// pinned chapter's height keeps its reader in place the same way.
+// pinned chapter's height keeps its reader in place the same way, but for a reader inside it, who stays the same
+// fraction through it: a resize keeps its shape (the owner, 2026-09-29).
 
 export interface Ask {
   readonly still: (why: DrawingReason) => void;
@@ -252,14 +253,20 @@ export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2,
     // else keeps in place (02's guard keeps only its own readers). Its box, the reader's scroll and the window they saw
     // it in are kept one step behind, as 02's are (chapters.ts): by the resize the browser has already laid the page
     // out again, in the new window, and the reader is judged by the one they read in.
-    let held: { readonly top: number; readonly bottom: number; readonly y: number; readonly vh: number } | null = null;
+    // A pin whose height has changed since the place was kept is a resize not yet answered: WebKit can tell tt:layout
+    // (the scene's own relayout) after laying the new window out and before "resize", and learning then would judge the
+    // resize from the place it left. onResize answers it, from the place before. Keyed on the pin's own height (520vh),
+    // as 02's guard and the run key on theirs, never on the window's size, which moves with no "resize" too (iOS's pinch
+    // zoom, a toolbar) and would freeze the place for good (review, M2).
+    let held: { readonly top: number; readonly bottom: number; readonly y: number; readonly vh: number; readonly view: number } | null = null;
     const learn = () => {
       if (!section?.classList.contains(PINNED)) {
         held = null;
         return;
       }
       const r = section.getBoundingClientRect();
-      held = { top: r.top + window.scrollY, bottom: r.bottom + window.scrollY, y: window.scrollY, vh: window.innerHeight };
+      if (held && Math.abs(r.height - (held.bottom - held.top)) > 1) return;
+      held = { top: r.top + window.scrollY, bottom: r.bottom + window.scrollY, y: window.scrollY, vh: window.innerHeight, view: viewHeight() };
     };
     const onResize = () => {
       const was = held;
@@ -267,8 +274,10 @@ export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2,
       const r = section.getBoundingClientRect();
       const before = { top: was.top - was.y, bottom: was.bottom - was.y, height: was.bottom - was.top };
       const after = { top: r.top + window.scrollY - was.y, height: r.height };
-      const to = placeAfter(before, after, { scrollY: was.y, viewport: was.vh, masthead: mastheadBottom() });
+      // a resize keeps the pin's shape: a reader inside it stays the same fraction through it (the owner, 2026-09-29)
+      const to = placeAfter(before, after, { scrollY: was.y, viewport: was.vh, viewportAfter: window.innerHeight, view: was.view, viewAfter: viewHeight(), masthead: mastheadBottom() }, "same");
       if (to !== null) jumpTo(to);
+      held = null;
       learn();
     };
     window.addEventListener("scroll", learn, { passive: true });

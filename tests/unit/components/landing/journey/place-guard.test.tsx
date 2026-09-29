@@ -12,6 +12,8 @@ const RealResizeObserver = window.ResizeObserver;
 
 afterEach(() => {
   window.ResizeObserver = RealResizeObserver;
+  delete document.documentElement.dataset.motion;
+  delete document.documentElement.dataset.journey;
   vi.restoreAllMocks();
   document.body.replaceChildren();
 });
@@ -29,6 +31,7 @@ describe("02's place guard", () => {
       disconnect(): void {}
     };
     document.body.innerHTML = `<header></header><section id="how"></section>`;
+    document.querySelector("header")!.getBoundingClientRect = () => ({ height: 64, bottom: 64 }) as DOMRect;
     const how = document.getElementById("how")!;
     how.style.scrollMarginTop = "80px";
     const doc = { top: 1000, height: 3000 };
@@ -39,14 +42,18 @@ describe("02's place guard", () => {
     const stop = startPlaceGuard();
     y = 1060; // just inside 02
     window.dispatchEvent(new Event("scroll"));
-    // the drawing above settles on the still, 254px taller, and its keepPlace moves the reader with it
+    // the drawing above settles on the still, 254px taller, and its keepPlace moves the reader with it; then that move's
+    // own "scroll" event lands, which the guard learns the scroll from, never the box
     doc.top += 254;
     y += 254;
     window.dispatchEvent(new Event(LAYOUT_EVENT));
-    // a phone turned before any scroll event lands: 02 refits
+    window.dispatchEvent(new Event("scroll"));
+    // a phone turned: 02 refits, and a resize keeps its reader the same fraction through it: 124 px of its 2,296 px
+    // range (a window 768 tall), from where its timeline starts, 1,254 less the masthead's 64. Judged from the box before
+    // the drawing's move and the scroll after it, they were 378 px in, and would land at 1,502.
     doc.height = 2600;
     observed([], {} as ResizeObserver);
-    expect(scrollTo).toHaveBeenCalledWith({ top: 1254 - 80, behavior: "instant" });
+    expect(scrollTo).toHaveBeenCalledWith({ top: Math.round(1190 + (124 / 2296) * 1896), behavior: "instant" });
     stop();
   });
 
@@ -102,7 +109,11 @@ describe("02's place guard", () => {
     y = 1060; // 60px into a plain 02 on a window 320px tall: most of that window is 02, so they are inside it
     window.dispatchEvent(new Event("scroll"));
     vh = 1000; // the window turns tall: judged by it, 02's foot (354px down) would sit within its top half
-    doc.height = 3300; // and 02 pins
+    // and 02 pins: a change of shape, which lands a reader inside it on its start
+    document.documentElement.dataset.motion = "on";
+    document.documentElement.dataset.journey = "on";
+    how.classList.add("is-pinned");
+    doc.height = 3300;
     observed([], {} as ResizeObserver);
     expect(scrollTo).toHaveBeenCalledWith({ top: 1000 - 80, behavior: "instant" }); // 02's start, as they were inside it
     stop();
@@ -172,5 +183,99 @@ describe("02's place guard", () => {
     expect(jumps).toHaveBeenCalledTimes(1);
     window.removeEventListener(JUMP_EVENT, jumps);
     stop();
+  });
+
+  // A resize keeps a reader inside 02 the same fraction through it; a change of its shape (Motion off, or its pin let go
+  // in a rebuild once it no longer fits) still lands them on its start (the owner, 2026-09-29).
+  describe("a reader inside a pinned 02", () => {
+    function pinned02(): { readonly how: HTMLElement; readonly doc: { top: number; height: number }; readonly at: { y: number; vh: number }; readonly resized: () => void } {
+      let observed: ResizeObserverCallback = () => undefined;
+      window.ResizeObserver = class {
+        constructor(callback: ResizeObserverCallback) {
+          observed = callback;
+        }
+        observe(): void {}
+        unobserve(): void {}
+        disconnect(): void {}
+      };
+      document.documentElement.dataset.motion = "on";
+      document.documentElement.dataset.journey = "on";
+      document.body.innerHTML = `<header></header><section id="how" class="chapters is-pinned"></section>`;
+      document.querySelector("header")!.getBoundingClientRect = () => ({ height: 64, bottom: 64 }) as DOMRect;
+      const how = document.getElementById("how")!;
+      how.style.scrollMarginTop = "80px";
+      const doc = { top: 1000, height: 2970 }; // 330vh of a window 900 tall
+      const at = { y: 0, vh: 900 };
+      vi.spyOn(window, "scrollY", "get").mockImplementation(() => at.y);
+      vi.spyOn(window, "innerHeight", "get").mockImplementation(() => at.vh);
+      how.getBoundingClientRect = () => ({ top: doc.top - at.y, bottom: doc.top - at.y + doc.height, width: 1440, height: doc.height }) as DOMRect;
+      vi.spyOn(window, "scrollTo").mockImplementation(((opts: ScrollToOptions) => {
+        at.y = opts.top ?? at.y;
+      }) as typeof window.scrollTo);
+      return { how, doc, at, resized: () => observed([], {} as ResizeObserver) };
+    }
+
+    // Its range as its timeline reads it (review, nit): from where the timeline starts (its top under the masthead's
+    // 64 px, not its 80 px scroll margin) to its foot at the large viewport's foot.
+    it("stays the same fraction through it when the window is resized", () => {
+      const { doc, at, resized } = pinned02();
+      const stop = startPlaceGuard();
+      const y = Math.round(936 + 0.6 * 2134); // 60% of its range: 936 (its timeline's start) to 3070 (its foot at the window's)
+      at.y = y;
+      window.dispatchEvent(new Event("scroll"));
+      at.vh = 700;
+      doc.height = 2310; // 330vh of the new window: its range 936 to 2610
+      resized();
+      expect(at.y).toBe(Math.round(936 + ((y - 936) / 2134) * 1674));
+      stop();
+    });
+
+    // A phone with its toolbar shown: innerHeight is the large viewport less the toolbar, but every scroll timeline ends
+    // at the large viewport's foot (anime's 100lvh), so the fraction is measured to it (review, M1).
+    it("measures its range to the large viewport, as its timeline does, a toolbar shown", () => {
+      const { doc, at, resized } = pinned02();
+      const lvh = { now: 900 };
+      at.vh = 800; // the toolbar takes 100 px
+      const offset = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "offsetHeight")!;
+      vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockImplementation(function (this: HTMLElement) {
+        return this.style.height === "100lvh" ? lvh.now : (offset.get?.call(this) as number);
+      });
+      const stop = startPlaceGuard();
+      const y = Math.round(936 + 0.6 * 2134);
+      at.y = y;
+      window.dispatchEvent(new Event("scroll"));
+      lvh.now = 700;
+      at.vh = 600;
+      window.dispatchEvent(new Event("resize"));
+      doc.height = 2310;
+      resized();
+      expect(at.y).toBe(Math.round(936 + ((y - 936) / 2134) * 1674));
+      stop();
+    });
+
+    it("lands on its start when Motion goes off: a change of shape", () => {
+      const { doc, at } = pinned02();
+      const stop = startPlaceGuard();
+      at.y = 920 + 0.6 * 2150;
+      window.dispatchEvent(new Event("scroll"));
+      window.dispatchEvent(new Event(MOTION_BEFORE_EVENT));
+      document.documentElement.dataset.motion = "off";
+      doc.height = 1400; // the plain section
+      window.dispatchEvent(new Event(MOTION_EVENT));
+      expect(at.y).toBe(920);
+      stop();
+    });
+
+    it("lands on its start when its pin is let go (a rebuild once it no longer fits): a change of shape", () => {
+      const { how, doc, at, resized } = pinned02();
+      const stop = startPlaceGuard();
+      at.y = 920 + 0.6 * 2150;
+      window.dispatchEvent(new Event("scroll"));
+      how.classList.remove("is-pinned");
+      doc.height = 1400;
+      resized();
+      expect(at.y).toBe(920);
+      stop();
+    });
   });
 });

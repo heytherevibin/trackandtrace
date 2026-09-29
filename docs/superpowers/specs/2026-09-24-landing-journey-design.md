@@ -342,7 +342,9 @@ Decided while planning J4 (2026-09-26):
 Decided while planning J5 (2026-09-27):
 - the rail is gone, so the departure hands over to nothing: the train leaves the frame (J5-1);
 - a seventh reason, `place`, keeps a reader below the chapter on the still until they come back above it (J5-2);
-- one owner, `drawing.ts`, for the live pin's height changes and the reader's place around them (J5-3);
+- one owner, `drawing.ts`, for the live pin's height changes and the reader's place around them (J5-3); a reader inside
+  the pin when its height changes lands on its start, and since J6 only when it changes shape: a resize keeps them the
+  same fraction through it (decided after J6, below);
 - the engine lives for the journey and is reused across rebuilds and restores (J5-4);
 - labels while live wipe in and rise, never fade, with their own writers (J5-5);
 - the palette reads four tokens (J5-8);
@@ -355,7 +357,12 @@ Decided while planning J6 (2026-09-28):
   credential, with an offline guard in the server (J6-2);
 - the nightly measures what a GPU-less runner can; frame times and long tasks are measured by hand on a real GPU
   (J6-3);
-- one rule for where the reader goes, `readerPlace`, for every piece that changes height (J6-4);
+- one rule for where the reader goes, `readerPlace`, for every piece that changes height (J6-4): above it (its top in
+  the window, or within 8px above), nothing moves them; inside it (over half the window still in it), a change of shape
+  (Motion off or on, a pin or an unpin, live to still, the run failing to fit) lands them on its start, under the
+  masthead, and a resize or relayout of the same shape keeps them the same fraction through it, measured as its timeline
+  measures it (`placeInProportion`; decided after J6, below); past it (its foot within the window's top half), they
+  move by exactly the change;
 - `fit` judged before the scene is fetched, by a trial layout (J6-5);
 - the run's frame is server markup, its lines drawn by `run.ts` (J6-6; a departure from §3.B, accepted at J6's
   pre-flight); it pins by `#run.is-running` inside `keepPlace`, only while the reader is not below it (J6-7); links
@@ -399,6 +406,19 @@ Found while building J6 (2026-09-28):
   text clipped inside the page;
 - Motion off relays the drawn train's columns inside the rebuild's own task, so 02's place guard never reads a
   half-built page; before this, WebKit moved the reader 304 px.
+
+Decided after J6 (the owner, 2026-09-29): a resize keeps a reader inside a piece the same fraction through it; a change
+of shape still lands on its start.
+- The fraction runs as each timeline's range does, from its top under the masthead to its foot at the large viewport's
+  foot (100lvh, as anime's scroll observers measure it, a phone's toolbar shown or not). The timelines are linear, so it
+  is their progress: the same stop and frame come back. "Its start", for a change of shape, is where it always was (02's
+  scroll margin, 1rem lower than its timeline's start).
+- A reader beyond that range's end, its foot still in the window, keeps their distance from the foot, but never goes
+  back inside the range when the window gets shorter (the review, I1).
+- 02's guard tells a resize from a change of shape by #how's shape as the page shows it (Motion, and pinned or plain),
+  compared with the shape it last settled; the Motion switch reaches it as a change of shape.
+- The run answers a resize from its pin's own observer, after 02's guard in the same frame, and from the place the reader
+  last read it in: the page has laid the new window out, and moved the reader for the pieces above, by then.
 
 Found after J6, finishing 200% text (2026-09-29; 100% text unchanged throughout):
 - the masthead keeps one row at 390×844 with 200% text: below 16.5rem of its inner query container SIGN IN keeps only

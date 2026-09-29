@@ -273,6 +273,66 @@ test.describe("the window-seat run (spec §3.A)", () => {
       expect(Math.abs(top! - foot!)).toBeLessThanOrEqual(4);
     });
   }
+
+  // A resize keeps a reader inside the running run the same fraction through it (the owner, 2026-09-29), where its start
+  // once sent them back to 06: the same station at the window, at 06, mid-run or at 07, scroll anchoring or not, and
+  // whether 02 above stands pinned (the reader scrolled down to the run) or plain (a link brought them here). A height
+  // alone leaves the run's range as it was (its travel), so a station stays exactly at the window; a width re-lays it.
+  /** The run's range as keepPlace reads it, from its start (its top under the masthead) to its foot at the window's foot. */
+  const runThrough = (page: Page) =>
+    page.evaluate(() => {
+      const run = document.getElementById("run");
+      if (!run) throw new Error("#run is missing");
+      const r = run.getBoundingClientRect();
+      const start = r.top + window.scrollY - (document.querySelector("header")?.getBoundingClientRect().bottom ?? 0);
+      return (window.scrollY - start) / (r.bottom + window.scrollY - window.innerHeight - start);
+    });
+  /** How far the reader stands from where `id`'s first station is at the window (data-run-at, less the masthead). */
+  const offStation = (page: Page, id: string) =>
+    page.evaluate((target) => {
+      const head = document.querySelector("header")?.getBoundingClientRect().bottom ?? 0;
+      return Math.abs(Number(document.getElementById(target)?.dataset.runAt) - head - window.scrollY);
+    }, id);
+  const places = [
+    { where: "at 06", to: (page: Page) => page.evaluate(() => window.scrollTo({ top: Number(document.getElementById("features")?.dataset.runAt) - (document.querySelector("header")?.getBoundingClientRect().bottom ?? 0), behavior: "instant" })), station: "features" },
+    { where: "mid-run", to: (page: Page) => scrollIntoRun(page, 0.5), station: null },
+    { where: "at 07", to: (page: Page) => page.evaluate(() => window.scrollTo({ top: Number(document.getElementById("use")?.dataset.runAt) - (document.querySelector("header")?.getBoundingClientRect().bottom ?? 0), behavior: "instant" })), station: "use" },
+  ] as const;
+  for (const anchoring of ["on", "off"] as const) {
+    for (const arrival of ["scrolled", "linked"] as const) {
+      for (const { where, to, station } of places) {
+        test(`a reader ${where} stays on the same station through a resize (${arrival} there; scroll anchoring ${anchoring})`, async ({ page, isMobile }) => {
+          test.setTimeout(90_000); // the rest wait's own limit (REST_MS) per resize, and the page's loads
+          const base = isMobile ? { width: 390, height: 844 } : { width: 1440, height: 900 };
+          const sizes = isMobile ? [{ width: 390, height: 804 }, { width: 360, height: 844 }] : [{ width: 1440, height: 860 }, { width: 1200, height: 900 }];
+          await page.setViewportSize(base);
+          if (anchoring === "off") await noAnchoring(page);
+          await page.goto(arrival === "linked" ? "/#features" : "/");
+          await waitForJourney(page);
+          await dismissInstall(page);
+          await running(page);
+          // 02 pinned above a reader who scrolled down to the run; left plain (pending) above one a link brought here
+          if (arrival === "linked") await expect(page.locator("#how")).not.toHaveClass(/is-pinned/);
+          else await expect(page.locator("#how")).toHaveClass(/is-pinned/);
+          await to(page);
+          await trackAtRest(page);
+          for (const size of sizes.flatMap((s) => [s, base])) {
+            const [f, i] = [await runThrough(page), await here(page)];
+            await page.setViewportSize(size);
+            await frames(page, 20); // the run's relayout, 02's guard, and anything they set going
+            await atRest(page);
+            const said = `${size.width}×${size.height}, ${Math.round(f * 1000) / 10}% through at station ${i}`;
+            await running(page);
+            // at 06 the run's top stands at the masthead's foot: above it by readerPlace (left where they are, the
+            // change landing below them), so held only to its station
+            if (where !== "at 06") expect(Math.abs((await runThrough(page)) - f), said).toBeLessThanOrEqual(0.002);
+            await expect.poll(() => here(page), { message: said, timeout: REST_MS }).toBe(i);
+            if (station && size.width === base.width) expect(await offStation(page, station), said).toBeLessThanOrEqual(4);
+          }
+        });
+      }
+    }
+  }
 });
 
 // A Tab stop's glide to the window, cut short (Task 6 review): the drawing above fell to the still mid-glide, and the

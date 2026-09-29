@@ -417,15 +417,27 @@ test.describe("02 · the chapters, pinned", () => {
     expect(await howOffLanding(page)).toBeLessThanOrEqual(4);
   });
 
-  test("a phone turned upright with the reader inside a pinned 02 lands them at its start", async ({ page }) => {
+  // A turn keeps 02's shape: the reader stays the same fraction through it, where they once landed on its start (the
+  // owner, 2026-09-29). Its range as its timeline reads it: from its top under the masthead to its foot at the window's.
+  test("a phone turned upright with the reader inside a pinned 02 keeps them the same fraction through it", async ({ page }) => {
+    const range = () =>
+      page.locator("#how").evaluate((el) => {
+        const r = el.getBoundingClientRect();
+        const start = r.top + window.scrollY - Math.round(document.querySelector("header")?.getBoundingClientRect().height ?? 0);
+        return { start, end: r.bottom + window.scrollY - window.innerHeight, y: window.scrollY };
+      });
     await page.setViewportSize({ width: 844, height: 390 });
     await page.goto("/");
     await waitForJourney(page);
     await expect(page.locator("#how")).toHaveClass(/is-pinned/);
     await intoHow(page, 60);
+    const was = await range();
+    const through = (was.y - was.start) / (was.end - was.start);
     await page.setViewportSize({ width: 390, height: 844 });
     await page.waitForTimeout(600);
-    expect(await howOffLanding(page)).toBeLessThanOrEqual(4);
+    await expect(page.locator("#how")).toHaveClass(/is-pinned/);
+    const now = await range();
+    expect(Math.abs(now.y - (now.start + through * (now.end - now.start)))).toBeLessThanOrEqual(4);
   });
 });
 

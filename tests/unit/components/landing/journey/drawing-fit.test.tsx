@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FONT_WAIT_MS, LOAD_LIMIT_MS, drawingModule, liveFits, sceneLoader, type Begin, type LoadLive } from "@/components/landing/journey/drawing";
+import { LAYOUT_EVENT } from "@/components/landing/journey/journey-events";
 import { testContext } from "./journey-context";
 
 // drawing.ts's J6 additions, apart from drawing.test.tsx (at its line limit): fit judged before the scene is fetched
@@ -262,7 +263,7 @@ describe("a scene that arrives too late builds nothing (J5 final review, minor 2
 });
 
 describe("a resize under the pinned chapter is judged by the window the reader saw (Task 3 review, carried)", () => {
-  it("puts a reader over half a short window into the chapter at its start, though the tall window it turned into shows its foot in the top half", async () => {
+  it("keeps a reader over half a short window into the chapter the same fraction through it, though the tall window it turned into shows its foot in the top half", async () => {
     const vh = { now: 400 };
     vi.spyOn(window, "innerHeight", "get").mockImplementation(() => vh.now);
     document.body.innerHTML = `<header></header><section id="anatomy"></section>`;
@@ -273,13 +274,14 @@ describe("a resize under the pinned chapter is judged by the window the reader s
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(section.classList.contains("is-live")).toBe(true);
     const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
-    box.top = -1780; // its foot 300px down a 400px window: over half the window still in it, so inside
+    box.top = -1630; // its foot 450px down a 400px window: the window wholly in it, so inside
     window.dispatchEvent(new Event("scroll"));
-    vh.now = 1000; // the window turns tall: 300px is now in its top half, which would read as past it
+    vh.now = 1000; // the window turns tall: 450px is now in its top half, which would read as past it
     box.height = 5200;
     window.dispatchEvent(new Event("resize"));
-    // inside: the chapter's start, under the masthead (0 here); judged by the new window, it was scrollY + 3120
-    expect(scrollTo).toHaveBeenCalledWith({ top: -1780 + window.scrollY, behavior: "instant" });
+    // inside, a resize: the same fraction through it (1,630 of its 1,680 px range, then of 4,200; the masthead 0 here);
+    // judged by the new window, it was scrollY + 3120, by exactly the change
+    expect(scrollTo).toHaveBeenCalledWith({ top: Math.round(-1630 + (1630 / 1680) * 4200) + window.scrollY, behavior: "instant" });
     stop();
   });
 
@@ -300,6 +302,61 @@ describe("a resize under the pinned chapter is judged by the window the reader s
     scroll.y = 2100 - 280;
     window.dispatchEvent(new Event("resize"));
     expect(scrollTo).not.toHaveBeenCalled();
+    stop();
+  });
+});
+
+// When the live pin learns the reader's place, and when it holds it for a resize still to be answered (J6's follow-ups:
+// a WebKit ordering, and the review's M2).
+describe("the place a resize under the pinned chapter is judged from", () => {
+  const pinned = async () => {
+    document.body.innerHTML = `<header></header><section id="anatomy"></section>`;
+    const section = document.getElementById("anatomy")!;
+    const box = { top: 200, height: 5200 };
+    section.getBoundingClientRect = () => ({ top: box.top, bottom: box.top + box.height, height: box.height }) as DOMRect;
+    const stop = drawingModule(() => Promise.resolve(() => () => undefined), () => true, () => true)(testContext());
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(section.classList.contains("is-live")).toBe(true);
+    return { box, stop };
+  };
+
+  // WebKit can tell a layout change (tt:layout, from the scene's own relayout) after the page has laid the new window out
+  // and before "resize": the place a resize is judged from must still be the one the reader read in.
+  it("judges a resize from the window the reader read in, though a layout change is told before it", async () => {
+    const vh = { now: 1000 };
+    vi.spyOn(window, "innerHeight", "get").mockImplementation(() => vh.now);
+    const { box, stop } = await pinned();
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+    box.top = -2000;
+    window.dispatchEvent(new Event("scroll"));
+    vh.now = 900;
+    box.height = 4680; // 520vh of 900
+    window.dispatchEvent(new Event(LAYOUT_EVENT));
+    window.dispatchEvent(new Event("resize"));
+    expect(scrollTo).toHaveBeenCalledWith({ top: Math.round(-2000 + (2000 / (5200 - 1000)) * (4680 - 900)) + window.scrollY, behavior: "instant" });
+    stop();
+  });
+
+  // A window whose size changes with no "resize" (iOS's pinch zoom moves innerWidth and innerHeight with the visual
+  // viewport) must not freeze the place a later resize is judged from: the pin's own height says whether a resize is
+  // still to be answered (review, M2).
+  it("keeps learning the reader's place through a size change no resize announced: the pin's own height decides", async () => {
+    const vw = { w: 1440, h: 1000 };
+    vi.spyOn(window, "innerHeight", "get").mockImplementation(() => vw.h);
+    vi.spyOn(window, "innerWidth", "get").mockImplementation(() => vw.w);
+    const { box, stop } = await pinned();
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+    box.top = -1000;
+    window.dispatchEvent(new Event("scroll"));
+    vw.w = 600; // a pinch zoom: the visual viewport, no "resize"
+    vw.h = 700;
+    box.top = -2000; // the reader reads on
+    window.dispatchEvent(new Event("scroll"));
+    vw.h = 900; // a real resize, later: 520vh of 900
+    box.height = 4680;
+    window.dispatchEvent(new Event("resize"));
+    // from where they read on: 2,000 px into its 4,500 px range (a window 700 tall), then of 3,780
+    expect(scrollTo).toHaveBeenCalledWith({ top: Math.round(-2000 + (2000 / 4500) * 3780) + window.scrollY, behavior: "instant" });
     stop();
   });
 });

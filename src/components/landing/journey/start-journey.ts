@@ -11,6 +11,7 @@ import { startHero } from "./hero";
 import { introWanted, startIntro } from "./intro";
 import { LAYOUT_EVENT, REBUILD_EVENT, type ResultDetail } from "./journey-events";
 import { JOURNEY_CHUNK_MARK } from "./journey-mark";
+import { forgetViewHeight } from "./keep-place";
 import { refreshAll, untrackAll } from "./observers";
 import { pause } from "./pause";
 import { startPlaceMemory } from "./place-memory";
@@ -166,6 +167,7 @@ export function startJourney(options: JourneyOptions = {}): Teardown {
     });
   };
   const onResize = () => {
+    forgetViewHeight(); // the large viewport, measured again once the new window is laid out (keep-place.ts)
     window.clearTimeout(resizeTimer);
     resizeTimer = window.setTimeout(() => window.dispatchEvent(new Event(LAYOUT_EVENT)), 150);
   };

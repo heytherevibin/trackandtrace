@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { modeOf, pastShift, placeAfter, readerPlace, startingReasons, wantsScene, whyOf, withReason, type Reasons } from "@/components/landing/journey/drawing-mode";
+import { modeOf, pastShift, placeAfter, placeInProportion, readerPlace, startingReasons, wantsScene, whyOf, withReason, type Reasons } from "@/components/landing/journey/drawing-mode";
 
 const none: Reasons = new Set();
 
@@ -50,6 +50,16 @@ describe("the drawing's mode (spec §3.C)", () => {
     expect(placeAfter({ top: -2000, bottom: 2160, height: 4160 }, { top: -2000, height: 4160.5 }, at)).toBeNull();
   });
 
+  it("with the piece's shape unchanged (a resize), keeps a reader inside it the same fraction through it", () => {
+    // the live pin, 520vh: 2,064 px into its 3,424 px range in a window 800 tall, then 2,584 px in one 600 tall
+    const at = { scrollY: 5000, viewport: 800, viewportAfter: 600, masthead: 64 };
+    expect(placeAfter({ top: -2000, bottom: 2160, height: 4160 }, { top: -2000, height: 3120 }, at, "same")).toBe(Math.round(2936 + (2064 / 3424) * 2584));
+    // a change of shape still lands them on its start; and above and past it are the same either way
+    expect(placeAfter({ top: -2000, bottom: 2160, height: 4160 }, { top: -2000, height: 3120 }, at)).toBe(2936);
+    expect(placeAfter({ top: 100, bottom: 4260, height: 4160 }, { top: 100, height: 3120 }, at, "same")).toBeNull();
+    expect(placeAfter({ top: -5000, bottom: -840, height: 4160 }, { top: -5000, height: 3120 }, at, "same")).toBe(5000 - 1040);
+  });
+
   it("judges the reader against a piece of the page by one rule (J5-3, shared by J6-4)", () => {
     // its top visible, or within 8px above: above it, and a change lands below them
     expect(readerPlace({ top: 0, bottom: 4000 }, 900)).toBe("above");
@@ -68,5 +78,63 @@ describe("the drawing's mode (spec §3.C)", () => {
     expect(pastShift({ top: -900, bottom: 16 }, 0.5, 900)).toBe(0); // no change worth a move
     expect(pastShift({ top: -900, bottom: 600 }, -77, 900)).toBe(0); // inside: the piece's own business
     expect(pastShift({ top: 40, bottom: 900 }, -77, 900)).toBe(0); // above: the change lands below
+  });
+
+  // A resize keeps a reader inside a piece the same fraction of the way through it (the owner, 2026-09-29). Its range
+  // runs from its start (its top under the masthead) to its foot at the window's foot: 1000 to 4000 here, in a window
+  // 900 tall, the piece's top 1080 in the page and its landing 80.
+  const read = { top: 1080, bottom: 4900, landing: 80, viewport: 900 } as const;
+
+  it("keeps a reader the same fraction through a piece a resize shrank", () => {
+    // the window 700 tall: the piece's range 1000 to 3000
+    const shrunk = { top: 1080, bottom: 3700, landing: 80, viewport: 700 } as const;
+    expect(placeInProportion(read, shrunk, 1000)).toBe(1000); // 0: its start
+    expect(placeInProportion(read, shrunk, 1750)).toBe(1500); // 0.25
+    expect(placeInProportion(read, shrunk, 2800)).toBe(2200); // 0.6
+    expect(placeInProportion(read, shrunk, 3700)).toBe(2800); // 0.9
+    expect(placeInProportion(read, shrunk, 4000)).toBe(3000); // 1: its foot at the window's
+  });
+
+  it("keeps a reader the same fraction through a piece a resize grew, wherever its top now stands", () => {
+    // wider and taller: the text above it reflowed (its top 40 higher) and its range 4000 long, from 960 to 4960
+    const grown = { top: 1040, bottom: 5960, landing: 80, viewport: 1000 } as const;
+    expect(placeInProportion(read, grown, 1000)).toBe(960);
+    expect(placeInProportion(read, grown, 1750)).toBe(1960);
+    expect(placeInProportion(read, grown, 2800)).toBe(3360);
+    expect(placeInProportion(read, grown, 3700)).toBe(4560);
+    expect(placeInProportion(read, grown, 4000)).toBe(4960);
+  });
+
+  it("never lands a reader short of the piece's start", () => {
+    // not a place readerPlace calls inside (its top would still be in the window), so only ever a clamp
+    expect(placeInProportion(read, { top: 1080, bottom: 3700, landing: 80, viewport: 700 }, 990)).toBe(1000);
+  });
+
+  it("keeps a reader beyond the range's end, its foot in the window, the same distance from that foot", () => {
+    // 4300: the piece's foot 600 down the window (inside by readerPlace: over half the window is still in it)
+    expect(placeInProportion(read, { top: 1080, bottom: 3700, landing: 80, viewport: 700 }, 4300)).toBe(3100);
+    expect(placeInProportion(read, { top: 1040, bottom: 5960, landing: 80, viewport: 1000 }, 4300)).toBe(5360);
+    // never back inside its range: a window now shorter than the foot's distance, and a piece now short, land on its end
+    expect(placeInProportion(read, { top: 1080, bottom: 1500, landing: 80, viewport: 300 }, 4300)).toBe(1200);
+  });
+
+  it("never sends a reader beyond the range's end back inside it when the window gets shorter (review, I1)", () => {
+    // 1 px past the end of a window 900 tall; the window 700 tall: the foot's distance (899) would be 199 px short
+    const shrunk = { top: 1080, bottom: 3700, landing: 80, viewport: 700 } as const;
+    expect(placeInProportion(read, shrunk, 4001)).toBe(3000);
+    expect(placeInProportion(read, shrunk, 4000)).toBe(3000); // and continuous with the end itself
+  });
+
+  it("lands a reader on the piece's start when it is no taller than the window, before the resize or after it", () => {
+    // before: a piece 800 tall in a window 900 tall has no range to be a fraction of
+    expect(placeInProportion({ top: 1080, bottom: 1880, landing: 80, viewport: 900 }, { top: 1080, bottom: 3700, landing: 80, viewport: 700 }, 1200)).toBe(1000);
+    // after: shrunk to fit its window
+    expect(placeInProportion(read, { top: 1080, bottom: 1700, landing: 80, viewport: 700 }, 2800)).toBe(1000);
+  });
+
+  it("lands a reader on the piece's own start, not its timeline's, when there is no range", () => {
+    // 02: its timeline starts under the masthead (64), its start lands at its scroll margin (80)
+    const plain = { top: 1080, bottom: 1700, landing: 64, viewport: 700, start: 80 } as const;
+    expect(placeInProportion({ ...read, landing: 64, start: 80 }, plain, 2800)).toBe(1000);
   });
 });

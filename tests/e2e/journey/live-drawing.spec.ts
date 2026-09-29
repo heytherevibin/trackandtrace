@@ -227,6 +227,33 @@ test.describe("the live drawing at its edges", () => {
     expect(await page.evaluate(() => window.__ttJourney?.inked("#terminus > :last-child") ?? -1)).toBe(0);
   });
 
+  // A resize keeps the live pin's shape: a reader inside it stays the same fraction through it, so the same frame of the
+  // drawing (the owner, 2026-09-29), where they once landed on its start. Its range: from its top under the masthead
+  // (the pin's sticky top) to its foot at the window's foot, as scrollIntoChapter reads it.
+  test("a reader inside the chapter stays the same fraction through it when the window is resized", async ({ page, isMobile }) => {
+    const through = () =>
+      page.evaluate(() => {
+        const section = document.getElementById("anatomy");
+        const pin = section?.querySelector(".anatomy-pin");
+        if (!section || !pin) throw new Error("#anatomy is missing");
+        const stick = Number.parseFloat(getComputedStyle(pin).top) || 0;
+        const start = section.getBoundingClientRect().top + window.scrollY - stick;
+        return (window.scrollY - start) / (section.offsetHeight - window.innerHeight + stick);
+      });
+    const size = page.viewportSize() ?? { width: 1280, height: 800 };
+    await page.goto("/");
+    await waitForLive(page);
+    await dismissInstall(page);
+    await scrollIntoChapter(page, 0.5);
+    for (const to of [{ width: size.width, height: size.height - (isMobile ? 40 : 60) }, size]) {
+      const f = await through();
+      await page.setViewportSize(to);
+      await frames(page, 20); // the pin's height follows the window (520vh); its resize answer, then anything it set going
+      await expect(page.locator("#anatomy")).toHaveClass(/is-live/);
+      expect(Math.abs((await through()) - f), `${to.width}×${to.height}`).toBeLessThanOrEqual(0.002);
+    }
+  });
+
   test("a reader inside the chapter when it falls back to the still lands on its start, under the masthead", async ({ page }) => {
     await page.goto("/");
     await waitForLive(page);
