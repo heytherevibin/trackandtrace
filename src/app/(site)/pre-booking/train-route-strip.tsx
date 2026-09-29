@@ -27,6 +27,14 @@ const FOLD_ABOVE = 8;
 /** How many to keep at each end when folded. */
 const KEEP = 3;
 
+/**
+ * The popover's width: as wide as its stops, from 16rem to 24rem, and never wider than the room its row gives it, from
+ * the row's left edge to the icon's right edge (100cqw, the row's content, which ends at the icon, and the row's 1.25rem
+ * left padding; the row is the query container, train-row.tsx). So with text made larger it stays inside the window,
+ * and its stops wrap. It never narrows below the drawn 256px; at 100% text the drawn 16rem to 24rem is untouched.
+ */
+const POPOVER_WIDTH = "w-max min-w-[min(16rem,max(256px,100cqw_+_1.25rem))] max-w-[min(24rem,max(256px,100cqw_+_1.25rem))]";
+
 interface Point {
   readonly code: string;
   readonly name: string;
@@ -176,7 +184,7 @@ export function TrainRoutePopover({ train, className }: { readonly train: TrainR
         <div
           id={id}
           data-testid="train-run"
-          className="popup-motion absolute right-0 top-full z-popover mt-1 w-max min-w-64 max-w-sm border border-line bg-surface-2 p-3 shadow-2"
+          className={cn("popup-motion absolute right-0 top-full z-popover mt-1 border border-line bg-surface-2 p-3 shadow-2", POPOVER_WIDTH)}
         >
           <div className="flex items-baseline justify-between gap-3">
             <span className="legend-sm text-ink-1/70">{run ? m.scheduled : m.label}</span>
@@ -203,12 +211,14 @@ export function TrainRoutePopover({ train, className }: { readonly train: TrainR
                     <span className={cn("size-2 shrink-0 rounded-full border", point.mine ? "border-accent bg-accent" : "border-line-strong bg-surface-2")} />
                     <span className={cn("w-px flex-1", i === shown.length - 1 ? "bg-transparent" : "bg-line")} />
                   </span>
-                  <span className={cn("flex min-w-0 flex-1 items-baseline gap-2 pb-2.5", point.mine ? "text-ink-1" : "text-ink-1/60")}>
+                  <span className={cn("flex min-w-0 flex-1 flex-wrap items-baseline gap-2 pb-2.5", point.mine ? "text-ink-1" : "text-ink-1/60")}>
                     <span className="font-data text-xs">{point.code}</span>
                     {/* Set in caps like the codes beside them and every other label on the sheet.
                         `uppercase` is CSS, so a screen reader still says "Mgr Chennai Ctr". */}
+                    {/* Never cut short: a name too long for the line beside its code takes a line of its own and wraps
+                        between its words (a word breaks only if it is wider than the whole popover). */}
                     {point.name && point.name.toUpperCase() !== point.code.toUpperCase() ? (
-                      <span className="truncate text-label uppercase tracking-caps">{point.name}</span>
+                      <span className="wrap-break-word text-label uppercase tracking-caps">{point.name}</span>
                     ) : null}
                     {/* The time a traveller reads is the one they act on: departure where there is
                         one, arrival at the terminus where there is not. */}

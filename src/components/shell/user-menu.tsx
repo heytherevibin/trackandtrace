@@ -8,6 +8,7 @@ import { messages } from "@/messages";
 import { useUser } from "@/components/session/session-provider";
 import { Avatar } from "@/components/ui/avatar";
 import { buttonClassName } from "@/components/ui/button";
+import { EmailText } from "@/components/ui/email-text";
 import { MenuContent, MenuItem, MenuLinkItem, MenuRoot, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
 import { signOutEverywhere } from "@/services/auth-client";
 import { cn } from "@/utils/cn";
@@ -43,9 +44,14 @@ function UserMenuInner() {
         <Avatar name={name} src={user.avatarUrl} size="sm" />
       </MenuTrigger>
       <MenuContent>
+        {/* Wrapped, never cut short: the popup holds to the window (menu.tsx), and these lines wrap inside it. */}
         <div className="px-3 py-2">
-          <p className="truncate text-sm font-medium text-ink-1">{name}</p>
-          {user.email && user.name ? <p className="truncate text-label text-ink-3">{user.email}</p> : null}
+          <p className="wrap-break-word text-sm font-medium text-ink-1">{name}</p>
+          {user.email && user.name ? (
+            <p className="text-label text-ink-3">
+              <EmailText email={user.email} />
+            </p>
+          ) : null}
         </div>
         <MenuSeparator />
         <MenuLinkItem render={<Link href="/account" />}>{messages.shell.nav.account}</MenuLinkItem>
