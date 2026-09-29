@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { PinPaper } from "./pin-paper";
 import { TrainGlyph } from "./train-glyph";
 
 /**
@@ -24,6 +25,7 @@ export function WindowRun({ children }: { readonly children: ReactNode }) {
         </span>
         <div className="run-track">{children}</div>
       </div>
+      <PinPaper />
     </div>
   );
 }

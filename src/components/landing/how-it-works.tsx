@@ -1,6 +1,7 @@
 import type { ChapterTrace } from "@/components/landing/specimen-data";
 import { messages } from "@/messages";
 import { ChaptersInstrument } from "./journey/chapters-instrument";
+import { PinPaper } from "./journey/pin-paper";
 import { TrainGlyph } from "./journey/train-glyph";
 import { BODY, H2, H3, SectionKicker } from "./sheet-type";
 
@@ -45,6 +46,7 @@ export function HowItWorks({ trace }: { readonly trace: ChapterTrace | null }) {
         </div>
         {trace ? <ChaptersInstrument trace={trace} /> : null}
       </div>
+      <PinPaper />
     </section>
   );
 }

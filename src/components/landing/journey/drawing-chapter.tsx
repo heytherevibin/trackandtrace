@@ -1,6 +1,7 @@
 import { Corners } from "@/components/ui/corners";
 import { messages } from "@/messages";
 import { BODY, H2, SectionKicker } from "../sheet-type";
+import { PinPaper } from "./pin-paper";
 import { StillDrawing } from "./still-drawing";
 import { StillNoscript } from "./still-svg";
 import { partSide } from "./train-parts";
@@ -70,6 +71,7 @@ export function DrawingChapter() {
         </span>
         <p className="anatomy-caption legend-sm">{m.caption}</p>
       </div>
+      <PinPaper />
     </section>
   );
 }
