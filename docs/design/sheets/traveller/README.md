@@ -69,5 +69,6 @@ Every state was rendered at the board's own viewport width and measured: board o
 
 ### Found while drawing (not changed in these sheets)
 
-- On `/pre-booking` at phone widths, the availability chart's stacked layout drew **overlapping column labels**: the estimate column's name was painted across the fare column's, and the two read as one run-together word. A cell carries `whitespace-nowrap` for its value, and the name — generated from `data-label` — inherited it. Fixed separately in `src/components/ui/stacked-table.ts`; this board still draws the collision, because it links a stylesheet captured before that fix.
+- On `/pre-booking` at phone widths, the availability chart's stacked layout drew **overlapping column labels**: the estimate column's name was painted across the fare column's, and the two read as one run-together word. A cell carries `whitespace-nowrap` for its value, and the name — generated from `data-label` — inherited it. Fixed in `src/components/ui/stacked-table.ts` (#96) before these boards were finished, so they draw the corrected chart: the name wraps to two lines and the value stays under it.
+- Where one column's name wraps and its neighbour's does not, the two values no longer sit on the same line. Left as it is: aligning them means giving every stacked label a fixed height in every table in the app.
 - The consent line's "Privacy notice" link is 13px tall on a phone, under the 44px floor — the same finding B2 recorded for outline tags and text links.
