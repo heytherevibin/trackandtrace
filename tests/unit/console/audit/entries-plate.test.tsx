@@ -157,6 +157,18 @@ describe("the Entries table", () => {
     for (const row of screen.getAllByRole("row").slice(1)) expect(within(row).getByText("production")).toBeInTheDocument();
   });
 
+  it("lets the address hash break, so a phone card cannot be dragged sideways by it", () => {
+    // 43 opaque characters with nothing to break on. Below sm every row is a card 390px wide, and
+    // without a break rule the hash ran to 528px and took the page's sideways scroll with it —
+    // live on the console since module 14, and invisible to the phone test because
+    // `consoleAddressHash` returns the word "local" when there is no DATA_KEY, which is what the
+    // end-to-end environment had until 06-A gave it one.
+    render(plate());
+    const cells = screen.getAllByText("a3f9c2c1");
+    expect(cells.length).toBeGreaterThan(0);
+    for (const cell of cells) expect(cell.className).toContain("break-all");
+  });
+
   it("names the table for a screen reader in the sheet's own words", () => {
     render(plate());
     expect(screen.getByRole("region", { name: m.entries.caption.today })).toBeInTheDocument();

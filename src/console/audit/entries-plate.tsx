@@ -95,7 +95,19 @@ function columns(onOpen: (row: AuditEntry) => void): readonly Column<AuditEntry>
     { key: "target", header: m.entries.columns.target, cell: (row) => row.target ?? m.entries.none },
     { key: "reason", header: m.entries.columns.reason, cell: (row) => (row.reason ? m.entries.quoted(row.reason) : m.entries.none) },
     { key: "result", header: m.entries.columns.result, cell: (row) => <Badge variant={row.result === "done" ? "outline" : "neutral"}>{m.results[row.result]}</Badge> },
-    { key: "address", header: m.entries.columns.address, cell: (row) => <span className="tnum">{row.addressHash ?? m.entries.none}</span> },
+    // `break-all`, as the drawer's id already carries: the address hash is 43 opaque characters
+    // with nothing to break on, and below sm each row is a card 390px wide. Without it the hash ran
+    // to 528px and took the page's sideways scroll with it.
+    //
+    // Nothing caught this until 06-A set a DATA_KEY for the console end-to-end run.
+    // `consoleAddressHash` returns the five-character word "local" when there is no DATA_KEY, and
+    // the test environment had none — so every row the phone test measured carried a value no
+    // deployment ever shows.
+    {
+      key: "address",
+      header: m.entries.columns.address,
+      cell: (row) => <span className="tnum break-all">{row.addressHash ?? m.entries.none}</span>,
+    },
     // The sheet's ninth column (:160): the header lives in a visually-hidden span, because every
     // cell under it says the same word, and each control carries the sheet's own accessible name --
     // "Open the entry: Paused PNR checks at 14:02 IST". The row's time to the minute, as the
