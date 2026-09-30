@@ -50,6 +50,10 @@ export default defineConfig({
       SUPABASE_SECRET_KEY: process.env.SUPABASE_SECRET_KEY ?? "",
       E2E: "1",
       E2E_NOW: process.env.E2E_NOW ?? "2026-09-17T06:30:00.000Z",
+      // Fixed, so a spec can sign an unsubscribe link with the same key the server derives from it
+      // (tests/e2e/console-auth/subscribe.spec.ts). The same test key the unit tests use — 32 bytes
+      // of 7 — and never a real one: the environment check requires a real DATA_KEY in production.
+      DATA_KEY: Buffer.alloc(32, 7).toString("base64"),
     },
   },
 });

@@ -98,7 +98,10 @@ function EntryCard({ row, onOpen }: { readonly row: AuditEntry; readonly onOpen:
           too: one value, one treatment, and no drift between the two halves of this module.
         */}
         <Cell label={m.entries.columns.address}>
-          <span className="tnum">{row.addressHash ?? m.entries.none}</span>
+          {/* `break-all` with it, and this is the half that needed it: 43 opaque characters in a
+              390px card ran to 528px and took the page's sideways scroll with them. The table gets
+              the same rule, so the two halves still agree. */}
+          <span className="tnum break-all">{row.addressHash ?? m.entries.none}</span>
         </Cell>
       </span>
     </button>

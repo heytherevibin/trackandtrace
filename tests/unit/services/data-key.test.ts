@@ -3,19 +3,26 @@ import { deriveDataKeys, keyedHash } from "@/services/data-key";
 
 const DATA_KEY = Buffer.alloc(32, 7).toString("base64");
 
+// Read off the returned object rather than listed by hand. Listed, these tests said "three
+// distinct subkeys" and went on passing when a fourth was added for 06-A's unsubscribe links —
+// covering neither its independence nor its rotation. Whatever `deriveDataKeys` returns is what
+// gets checked.
+const subkeys = (keys: ReturnType<typeof deriveDataKeys>) => Object.values(keys);
+
 describe("deriveDataKeys", () => {
-  it("derives three distinct 32-byte subkeys, the same every time", () => {
+  it("derives distinct 32-byte subkeys, the same every time", () => {
     const keys = deriveDataKeys(DATA_KEY);
-    const all = [keys.cacheName, keys.cacheValue, keys.clientId];
+    const all = subkeys(keys);
+    expect(all.length).toBeGreaterThanOrEqual(4);
     for (const key of all) expect(key.length).toBe(32);
-    expect(new Set(all.map((k) => k.toString("hex"))).size).toBe(3);
+    expect(new Set(all.map((k) => k.toString("hex"))).size).toBe(all.length);
     expect(deriveDataKeys(DATA_KEY).cacheName.equals(keys.cacheName)).toBe(true);
   });
 
   it("changes every subkey when DATA_KEY rotates", () => {
-    const a = deriveDataKeys(DATA_KEY);
-    const b = deriveDataKeys(Buffer.alloc(32, 8).toString("base64"));
-    expect(a.cacheName.equals(b.cacheName) || a.cacheValue.equals(b.cacheValue) || a.clientId.equals(b.clientId)).toBe(false);
+    const a = subkeys(deriveDataKeys(DATA_KEY));
+    const b = subkeys(deriveDataKeys(Buffer.alloc(32, 8).toString("base64")));
+    expect(a.some((key, i) => key.equals(b[i] as Buffer))).toBe(false);
   });
 
   it("refuses a key that is not 32 bytes", () => {

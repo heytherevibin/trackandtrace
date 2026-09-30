@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { outbox } from "@/console/email/outbox";
 
-const letter = (to: string) => ({ to, subject: "Sign in", text: "link" });
+// `from` since the outbox moved to services and holds a `Letter`: one store now takes the
+// console's letters and the traveller side's, which send as different addresses.
+const letter = (to: string) => ({ from: "Trakline Console <console@trakline.in>", to, subject: "Sign in", text: "link" });
 
 beforeEach(() => outbox.clear());
 

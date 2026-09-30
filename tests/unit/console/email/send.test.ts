@@ -2,6 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { outbox } from "@/console/email/outbox";
 import { sendConsoleEmail } from "@/console/email/send";
 import { env, resetEnvCache } from "@/services/env";
+import { MemoryKv } from "@/services/kv";
+
+// The store console mail is counted against. A real one talks to Upstash; this one is read back
+// below to prove a console letter takes from the same daily allowance a sign-up confirmation does.
+const counter = new MemoryKv();
+vi.mock("@/services/shared-store", () => ({ publicStoreForReading: () => ({ kv: counter, prefix: "tt:test" }) }));
 
 // `env` becomes a spy that calls straight through to the real implementation, so every test below
 // keeps behaving exactly as it did against the unmocked module (env() still driven by vi.stubEnv).
@@ -14,8 +20,11 @@ vi.mock("@/services/env", async (importOriginal) => {
 
 const letter = { to: "asha@trakline.in", subject: "Your Trakline console sign-in link", text: "Open this once: https://admin.trakline.in/auth/confirm?token_hash=x&type=magiclink" };
 
-beforeEach(() => {
+beforeEach(async () => {
   outbox.clear();
+  // The counter is one module-scope store shared by every test here, so a count left by the test
+  // before would be read as this one's.
+  await counter.del("tt:test:email:2026-09-28");
   resetEnvCache();
 });
 
@@ -35,7 +44,10 @@ describe("sendConsoleEmail", () => {
 
     await expect(sendConsoleEmail(letter)).resolves.toBe("captured");
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(outbox.take()).toEqual([letter]);
+    // The captured letter carries the From the console sends as. It gained that field when the
+    // sender moved to `@/services/email/send`, shared with the traveller side, which sends as a
+    // different address — so a run reading one outbox can tell the two apart.
+    expect(outbox.take()).toEqual([{ ...letter, from: env().CONSOLE_EMAIL_FROM }]);
   });
 
   it("posts to Resend with the configured sender", async () => {
@@ -58,6 +70,28 @@ describe("sendConsoleEmail", () => {
       text: letter.text,
     });
     expect((init.headers as Record<string, string>).Authorization).toBe("Bearer re_aaaaaaaaaaaaaaaaaaaaaaaa");
+  });
+
+  it("counts a sent letter against the day's email allowance, on Resend's UTC day", async () => {
+    vi.stubEnv("RESEND_API_KEY", "re_aaaaaaaaaaaaaaaaaaaaaaaa");
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(new Response('{"id":"1"}', { status: 200 }))));
+    vi.setSystemTime(new Date("2026-09-28T20:00:00Z")); // 01:30 IST on the 29th, still the 28th for Resend
+    resetEnvCache();
+
+    await expect(sendConsoleEmail(letter)).resolves.toBe("sent");
+    expect(await counter.get("tt:test:email:2026-09-28")).toBe("1");
+    vi.useRealTimers();
+  });
+
+  it("does not count a letter that never reached Resend", async () => {
+    vi.stubEnv("E2E", "1");
+    vi.stubGlobal("fetch", vi.fn());
+    vi.setSystemTime(new Date("2026-09-28T20:00:00Z"));
+    resetEnvCache();
+
+    await expect(sendConsoleEmail(letter)).resolves.toBe("captured");
+    expect(await counter.get("tt:test:email:2026-09-28")).toBeNull();
+    vi.useRealTimers();
   });
 
   it("reports a failure rather than throwing, so sign-in answers the same either way", async () => {

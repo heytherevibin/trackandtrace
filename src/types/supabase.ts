@@ -132,6 +132,10 @@ export type Database = {
         Args: { p_id?: string }
         Returns: number
       }
+      availability_outcome_label: {
+        Args: { p_can_book: boolean; p_raw_status: string }
+        Returns: string
+      }
       console_audit: {
         Args: {
           p_category?: string
@@ -362,6 +366,28 @@ export type Database = {
           p_value: string
         }
         Returns: undefined
+      }
+      subscriptions_confirm: { Args: { p_token_hash: string }; Returns: Json }
+      subscriptions_peek: { Args: { p_token_hash: string }; Returns: Json }
+      subscriptions_person_id: { Args: { p_email: string }; Returns: string }
+      subscriptions_rejoin: {
+        Args: { p_list: string; p_person: string }
+        Returns: string
+      }
+      subscriptions_sign_up: {
+        Args: {
+          p_campaign: Json
+          p_email: string
+          p_list: string
+          p_notice_version: string
+          p_source: string
+          p_token_hash: string
+        }
+        Returns: string
+      }
+      subscriptions_withdraw: {
+        Args: { p_list: string; p_person: string; p_reason: string }
+        Returns: string
       }
     }
     Enums: {

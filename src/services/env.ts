@@ -131,6 +131,8 @@ const envSchema = z
     RESEND_API_KEY: z.string().min(20).optional(),
     /** Who console email comes from. One default, so no deployment has to set it. */
     CONSOLE_EMAIL_FROM: z.string().min(5).max(120).default("Trakline Console <console@trakline.in>"),
+    /** Who a traveller's sign-up confirmation comes from. A different address from the console's, on the same verified domain. */
+    SUBSCRIBE_EMAIL_FROM: z.string().min(5).max(120).default("Trakline <updates@trakline.in>"),
   })
   .superRefine((v, ctx) => {
     if ((v.PNR_SOURCE === "railkit" || v.PNR_FALLBACK === "railkit") && !v.RAILKIT_API_KEY) {
