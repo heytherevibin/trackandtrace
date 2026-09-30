@@ -2,6 +2,7 @@
 
 import { useId, useState } from "react";
 import { z } from "zod";
+import { Button, NOTE, Status, TEXT } from "@/components/subscribe/plate-parts";
 import { SubscriptionPage } from "@/components/subscribe/subscription-page";
 import { signUp, type SignupState } from "@/components/subscribe/use-signup";
 import { messages } from "@/messages";
@@ -12,28 +13,8 @@ const EMAIL = z.email().max(254);
 
 const LABEL = "font-display text-xs font-semibold uppercase leading-normal tracking-caps text-accent-text";
 const FIELD = "well h-11 min-h-9 w-full px-2.5 py-1.5 placeholder:text-ink-3";
-const BUTTON =
-  "press relative inline-flex cursor-pointer select-none items-center justify-center gap-1.5 whitespace-nowrap border font-display font-semibold no-underline disabled:cursor-not-allowed disabled:opacity-45 aria-disabled:cursor-not-allowed aria-disabled:opacity-45 px-[12.24px] py-[6.8px] text-sm leading-[1.2] border-accent-strong bg-accent-strong text-accent-ink hover:bg-accent-strong-hover active:bg-accent-strong-active w-full mt-[6.8px] h-11";
-const TEXT = "m-0 text-base text-ink-1/78";
-const NOTE = "mt-3 m-0 text-sm text-ink-1/70";
 
 const answer = z.object({ ok: z.literal(true), state: z.string() });
-
-function Status({ children }: { readonly children: string }) {
-  return (
-    <div role="status" className="flex flex-col gap-3">
-      <p className={TEXT}>{children}</p>
-    </div>
-  );
-}
-
-function Button({ label, busy }: { readonly label: string; readonly busy: boolean }) {
-  return (
-    <button type="submit" aria-busy={busy} className={BUTTON}>
-      <span className="inline-flex items-center gap-1.5">{label}</span>
-    </button>
-  );
-}
 
 type Pressed = "idle" | "pressing" | "subscribed" | "already" | "error";
 
