@@ -96,15 +96,18 @@ export const home = {
     kicker: "05 · On the roadmap",
     title: "Extensions under construction",
     lead: "Each ships only when a verified source stands behind it — the same rule the check follows.",
-    planned: "Planned",
+    /** Each row says which it is. A single hard-coded "Planned" outlived the work it described. */
+    status: { planned: "Planned", live: "Live" },
     items: [
-      { num: "01", title: "Live train running status", note: "Where the train is right now, from a verified running-status feed." },
-      { num: "02", title: "Coach position", note: "Where your coach halts on the platform, so you stand at the right spot." },
-      { num: "03", title: "Seat availability", note: "Open berths by class and date, straight from inventory." },
-      { num: "04", title: "Platform locator", note: "The announced platform for your train at major stations." },
-      { num: "05", title: "Fare enquiry", note: "The published fare table for a route and class — no markups, no bundling." },
-      { num: "06", title: "Train schedule search", note: "Timetables by train number or station pair." },
-      { num: "07", title: "Chart preparation alerts", note: "A notification when the chart for a watched PNR is prepared." },
+      { num: "01", title: "Live train running status", note: "Where the train is right now, from a verified running-status feed.", status: "planned" },
+      { num: "02", title: "Coach position", note: "Where your coach halts on the platform, so you stand at the right spot.", status: "planned" },
+      /** Live: `/api/route-availability` answers a pre-booking search through the same provider seam the check uses. */
+      { num: "03", title: "Seat availability", note: "Open berths by class and date, straight from inventory.", status: "live" },
+      { num: "04", title: "Platform locator", note: "The announced platform for your train at major stations.", status: "planned" },
+      /** Live inside 03: the availability plate draws a fare per class and date. A fare table of its own is still to come. */
+      { num: "05", title: "Fare enquiry", note: "The published fare table for a route and class — no markups, no bundling.", status: "live" },
+      { num: "06", title: "Train schedule search", note: "Timetables by train number or station pair.", status: "planned" },
+      { num: "07", title: "Chart preparation alerts", note: "A notification when the chart for a watched PNR is prepared.", status: "planned" },
     ],
   },
   features: {
