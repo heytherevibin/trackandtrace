@@ -1,7 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
-import { drawStill, frames, motionOff, scrollToId, waitForJourney } from "./journey-helpers";
+import { messages } from "@/messages";
+import { drawStill, frames, motionOff, movedFrames, resetMoved, scrollToId, waitForJourney, watchMotion } from "./journey-helpers";
 
 const statuses = (page: Page) => page.locator("#departures tbody td.board-status").allTextContents();
+/** The board's destinations, top to bottom: every station but the platform itself. */
+const DESTINATIONS = Object.entries(messages.journey.stations)
+  .filter(([id]) => id !== "top")
+  .map(([, name]) => name);
 const nameFlaps = (page: Page) => page.locator("#departures .board-name .flap-char").count();
 
 test.describe("the departure board's status", () => {
@@ -52,43 +57,48 @@ test.describe("the departure board's status", () => {
     expect(new Set(seen)).toEqual(new Set([0]));
   });
 
-  // Loaded at the top of a desktop window, the board only peeks in at the window's foot (609 of 800 px, 637 of 900):
-  // not properly in the band, so it is armed there, and its rows flip in once the reader scrolls it into the band (the
-  // owner, 2026-09-30). Held to the still drawing: the live one, loading just below the board, can stall a busy runner's
-  // page for seconds mid-flip, which is the harness's, not the board's.
+  // Loaded at the top of a desktop window, the board shows at the window's foot (609 of 800 px, 637 of 900): visible
+  // when the journey starts, so its rows flip in right then, at load, like the headline (the owner, 2026-09-30), and
+  // are never blank once they settle; then scrolled away and back, they never flip in again. Held to the still
+  // drawing: the live one, loading just below the board, can stall a busy runner's page for seconds mid-flip, which is
+  // the harness's, not the board's.
   for (const [width, height] of [
     [1280, 800],
     [1440, 900],
   ] as const) {
-    test(`at ${width}×${height}, loaded at the top, its rows flip in when the reader scrolls to it`, async ({ page, isMobile }) => {
+    test(`at ${width}×${height}, loaded at the top, its rows flip in at load, once`, async ({ page, isMobile }) => {
       test.skip(isMobile, "desktop windows");
       await drawStill(page);
+      await watchMotion(page, "#departures .board-name .flap-char");
       await page.setViewportSize({ width, height });
       await page.goto("/");
       await waitForJourney(page);
-      await expect.poll(() => nameFlaps(page)).toBeGreaterThan(0);
-      await scrollToId(page, "departures");
+      await expect.poll(() => movedFrames(page), { timeout: 6_000 }).toBeGreaterThan(0);
       await expect.poll(() => page.locator("#departures .flap-char").count(), { timeout: 6_000 }).toBe(0);
-      await expect(page.locator("#departures .board-name a").first()).toHaveText("The train, drawn");
+      await expect(page.locator("#departures .board-name a")).toHaveText(DESTINATIONS);
+      await resetMoved(page);
+      await scrollToId(page, "terminus");
+      await frames(page, 3);
+      await scrollToId(page, "departures");
+      await frames(page, 30);
+      expect(await movedFrames(page)).toBe(0);
+      await expect(page.locator("#departures .board-name a")).toHaveText(DESTINATIONS);
     });
   }
 
-  test("loaded with the board well inside the band, it stays at rest, as the server drew it", async ({ page }) => {
+  test("loaded on the board, its rows flip in at load, once", async ({ page }) => {
+    await drawStill(page);
+    await watchMotion(page, "#departures .board-name .flap-char");
     await page.goto("/#departures");
     await waitForJourney(page);
-    const seen = await page.evaluate(
-      () =>
-        new Promise<number[]>((done) => {
-          const counts: number[] = [];
-          const start = performance.now();
-          const look = () => {
-            counts.push(document.querySelectorAll("#departures .board-name .flap-char").length);
-            if (performance.now() - start < 1_200) requestAnimationFrame(look);
-            else done(counts);
-          };
-          look();
-        }),
-    );
-    expect(new Set(seen)).toEqual(new Set([0]));
+    await expect.poll(() => movedFrames(page), { timeout: 6_000 }).toBeGreaterThan(0);
+    await expect.poll(() => page.locator("#departures .flap-char").count(), { timeout: 6_000 }).toBe(0);
+    await expect(page.locator("#departures .board-name a")).toHaveText(DESTINATIONS);
+    await resetMoved(page);
+    await scrollToId(page, "terminus");
+    await frames(page, 3);
+    await scrollToId(page, "departures");
+    await frames(page, 30);
+    expect(await movedFrames(page)).toBe(0);
   });
 });

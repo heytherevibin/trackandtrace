@@ -128,7 +128,7 @@ describe("watchEntrances: every entrance plays once per load", () => {
     vi.advanceTimersToNextFrame();
   };
 
-  it("plays an entrance the first time it is properly in the band, never again, and remembers it in the played set", () => {
+  it("plays an entrance out of sight at start the first time it enters the band, never again, and remembers it in the played set", () => {
     let top = 2000;
     const { e, calls } = entrance(() => top, "rows:#record");
     const played = keep<ReadonlySet<string>>(new Set());
@@ -147,29 +147,25 @@ describe("watchEntrances: every entrance plays once per load", () => {
     expect(calls).toEqual(["arm", "play", "settle"]);
   });
 
-  it("counts an entrance properly in the band at start as seen: it stays as the server drew it, for good", () => {
+  it("plays an entrance visible when the journey starts right then, arming and playing it at once, and never again", () => {
     let top = 100;
     const { e, calls } = entrance(() => top, "kicker:0");
     const played = keep<ReadonlySet<string>>(new Set());
     const stop = watchEntrances([e], played);
+    expect(calls).toEqual(["arm", "play"]);
     expect([...played.get()]).toEqual(["kicker:0"]);
     for (const at of [2000, 300]) {
       top = at;
       scroll();
     }
-    expect(calls).toEqual([]);
+    expect(calls).toEqual(["arm", "play"]);
     stop();
   });
 
-  it("arms an entrance that only peeks in at start, and plays it once it is properly in the band", () => {
-    let top = 650;
-    const { e, calls } = entrance(() => top, "board");
+  it("plays one only peeking in at the window's foot at start, at start too", () => {
+    const { e, calls } = entrance(() => 750, "board");
     const played = keep<ReadonlySet<string>>(new Set());
     const stop = watchEntrances([e], played);
-    expect(calls).toEqual(["arm"]);
-    expect(played.get().size).toBe(0);
-    top = 300;
-    scroll();
     expect(calls).toEqual(["arm", "play"]);
     stop();
   });

@@ -96,7 +96,7 @@ export interface JourneyContext {
   readonly still: Kept<StillPlace>;
   /** The live drawing's engine, kept for this startJourney's whole lifetime and reused by every rebuild (J5-4). */
   readonly scene: Kept<Promise<Engine> | null>;
-  /** The section entrances already played (or seen at rest) in this page load, by key (observers.ts's
+  /** The entrances already played in this page load (the section entrances and the berth plan), by key (observers.ts's
    * watchEntrances): kept here, across every rebuild, so a Motion toggle never plays one again; a teardown never
    * clears it. It dies with this startJourney, so a reload, or a fresh client navigation back to "/" (a new page from
    * the server), plays them again. */

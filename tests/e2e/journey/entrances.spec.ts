@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { frames, motionOff, scrollToId, transformOf, waitForJourney } from "./journey-helpers";
+import { frames, motionOff, movedFrames, scrollToId, transformOf, waitForJourney, watchMotion } from "./journey-helpers";
 
 // Section entrances play once per section per page load (the owner, 2026-09-30, reverting 2026-09-25's replay): the
 // first time the reader reaches a section, never again when they scroll back; a reload plays them again, and a rebuild
@@ -106,12 +106,13 @@ test.describe("section entrances", () => {
     await expectNoReplay(page);
   });
 
-  test("a section properly in view at start stays at rest, as the server drew it, and never plays", async ({ page }) => {
+  test("a section in view at start plays once, at start, then never again", async ({ page }) => {
+    await watchMotion(page, "#record .blueprint, #record [data-flap] > *");
     await page.goto("/#record");
     await waitForJourney(page);
-    const atLoad = await watchRecord(page, 600);
-    expect(new Set(atLoad.transforms)).toEqual(new Set([RISEN]));
-    expect(new Set(atLoad.split)).toEqual(new Set([0]));
+    await expect.poll(() => movedFrames(page), { timeout: 5_000 }).toBeGreaterThan(0);
+    await expect.poll(() => transformOf(recordRow(page)), { timeout: 5_000 }).toBe(RISEN);
+    await expect.poll(() => recordKicker(page).evaluate((el) => el.children.length), { timeout: 5_000 }).toBe(0);
     await expectNoReplay(page);
   });
 

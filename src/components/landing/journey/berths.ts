@@ -5,9 +5,9 @@ import { T } from "./motion-tokens";
 import { watchEntrances } from "./observers";
 import type { JourneyContext, Teardown } from "./start-journey";
 
-// 03 · the berth plan while the journey runs (spec §3.A): once per load (the owner, 2026-09-30), the first time it
-// is properly in view, it draws itself, line by line, then the sample passenger's berth lights with one bright pulse;
-// then it stays. Until then, out of sight, it waits undrawn and unlit; in view at start, it stays as the server drew it.
+// 03 · the berth plan while the journey runs (spec §3.A): once per load (the owner, 2026-09-30), at load if it is in
+// view then, else the first time it enters the band, it draws itself, line by line, then the sample passenger's berth
+// lights with one bright pulse; then it stays. Until then, out of sight, it waits undrawn and unlit.
 // It shares the journey's played set with the section entrances, so a rebuild never draws it again.
 // Motion off: drawn and lit, as the server made it.
 //

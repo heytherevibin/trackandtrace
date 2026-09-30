@@ -103,8 +103,9 @@ export interface Entrance {
 }
 
 /** Checks every entrance against its trigger's live box on scroll and layout, one frame at a time. `played` is the
- * journey's own (JourneyContext.played), kept across every rebuild: an entrance already played or seen in this load
- * starts played, so a rebuild (Motion off, then on) never plays it again. */
+ * journey's own (JourneyContext.played), kept across every rebuild: an entrance already played in this load starts
+ * played, so a rebuild (Motion off, then on) never plays it again. One visible as the watch starts is armed and played
+ * at once. */
 export function watchEntrances(entrances: readonly Entrance[], played: Kept<ReadonlySet<string>>): () => void {
   const phases = new Map<Entrance, EntrancePhase>(entrances.map((e) => [e, played.get().has(e.key) ? "played" : "rest"]));
   let frame = 0;
@@ -114,8 +115,8 @@ export function watchEntrances(entrances: readonly Entrance[], played: Kept<Read
     for (const e of entrances) {
       const step = entranceStep(phases.get(e) ?? "rest", e.trigger.getBoundingClientRect(), vh, e.at);
       if (!step) continue;
-      if (step === "arm") e.arm();
-      else if (step === "play") e.play();
+      if (step === "arm" || step === "start") e.arm();
+      if (step === "play" || step === "start") e.play();
       const next = phaseAfter(step);
       phases.set(e, next);
       if (next === "played") played.set(new Set([...played.get(), e.key]));
