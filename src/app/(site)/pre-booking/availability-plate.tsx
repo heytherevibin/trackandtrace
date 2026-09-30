@@ -170,7 +170,13 @@ export function AvailabilityPlate({
                 <td role={R.cell} data-label={m.columns.availability} className={cn(CELL, S.wide)}>
                   <Day day={day} />
                 </td>
-                <td role={R.cell} data-label={m.columns.estimate} className={cn(CELL, "font-data whitespace-nowrap")}>
+                {/* The whole width below sm, because this column's name is a phrase and the others
+                    are words. Sharing a half-width band with Fare, it took two lines where Fare's
+                    took one, and the two figures then sat on different lines with nothing to say
+                    which belonged to which name. The name is not shortened: on a phone the real
+                    column header is `sr-only`, so this drawn name is the only place a sighted
+                    reader is told whose estimate it is. */}
+                <td role={R.cell} data-label={m.columns.estimate} className={cn(CELL, S.wide, "font-data whitespace-nowrap")}>
                   {estimateOf(day)}
                 </td>
                 <td role={R.cell} data-label={m.columns.fare} className={cn(CELL, "font-data whitespace-nowrap")}>
