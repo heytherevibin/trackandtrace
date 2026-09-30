@@ -10,6 +10,7 @@ export function testContext(overrides: Partial<JourneyContext> = {}): JourneyCon
     result: keep<ResultDetail | null>(null),
     still: keep<StillPlace>({ columns: false, height: null }),
     scene: keep<Promise<Engine> | null>(null),
+    played: keep<ReadonlySet<string>>(new Set()),
     atEnd: () => undefined,
     ...overrides,
   };

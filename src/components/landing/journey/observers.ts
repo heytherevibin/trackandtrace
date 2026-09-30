@@ -1,6 +1,7 @@
 import type { ScrollObserver } from "animejs";
 import { LAYOUT_EVENT } from "./journey-events";
-import { entranceStep, type EntrancePhase } from "./entrances";
+import { entranceStep, phaseAfter, type EntrancePhase } from "./entrances";
+import type { Kept } from "./start-journey";
 
 // Every scroll observer the journey creates, so a layout change refreshes them all in one frame and a rebuild
 // starts from none (v3's observers.js, as a module singleton instead of a window global).
@@ -90,32 +91,36 @@ export function keepUp(observer: ScrollObserver, drawn: () => number): () => voi
   };
 }
 
-/** One replaying entrance: its trigger's box decides; arm puts the start state on, play animates to rest,
- * settle puts the server's state back (on teardown). */
+/** One entrance: its trigger's box decides; arm puts the start state on, play animates to rest, settle puts the
+ * server's state back (on teardown). With `once` (a section entrance) it plays once per load, remembered under that key
+ * in the journey's played set; without (the berth plan), it replays each time its trigger comes back. */
 export interface Entrance {
   readonly trigger: Element;
   readonly at: number;
+  readonly once?: string;
   arm(): void;
   play(): void;
   settle(): void;
 }
 
-/** Checks every entrance against its trigger's live box on scroll and layout, one frame at a time. */
-export function watchEntrances(entrances: readonly Entrance[]): () => void {
-  const phases = new Map<Entrance, EntrancePhase>(entrances.map((e) => [e, "rest"]));
+/** Checks every entrance against its trigger's live box on scroll and layout, one frame at a time. `played` is the
+ * journey's own (JourneyContext.played), kept across every rebuild: a once entrance already played or seen in this
+ * load starts played, so a rebuild (Motion off, then on) never plays it again. */
+export function watchEntrances(entrances: readonly Entrance[], played: Kept<ReadonlySet<string>>): () => void {
+  const phases = new Map<Entrance, EntrancePhase>(entrances.map((e) => [e, e.once !== undefined && played.get().has(e.once) ? "played" : "rest"]));
   let frame = 0;
   const check = () => {
     frame = 0;
     const vh = window.innerHeight;
     for (const e of entrances) {
-      const step = entranceStep(phases.get(e) ?? "rest", e.trigger.getBoundingClientRect(), vh, e.at);
-      if (step === "arm") {
-        e.arm();
-        phases.set(e, "armed");
-      } else if (step === "play") {
-        e.play();
-        phases.set(e, "rest");
-      }
+      const once = e.once !== undefined;
+      const step = entranceStep(phases.get(e) ?? "rest", e.trigger.getBoundingClientRect(), vh, e.at, once);
+      if (!step) continue;
+      if (step === "arm") e.arm();
+      else if (step === "play") e.play();
+      const next = phaseAfter(step, once);
+      phases.set(e, next);
+      if (next === "played" && e.once !== undefined) played.set(new Set([...played.get(), e.once]));
     }
   };
   const queue = () => {

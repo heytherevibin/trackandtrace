@@ -13,7 +13,7 @@ import type { JourneyContext, Teardown } from "./start-journey";
 // reverted. The timer and the berth's strokeWidth pulse are ordinary (non-draw) tweens, so they go through
 // `running` and are reverted normally.
 
-export function startBerths({ motion }: JourneyContext): Teardown {
+export function startBerths({ motion, played }: JourneyContext): Teardown {
   const drawing = document.querySelector<SVGSVGElement>(".berth-plan svg");
   if (!drawing || !motion) return () => {};
   const strokes = [...drawing.querySelectorAll<SVGGeometryElement>(".plan-line, .plan-berth")];
@@ -27,24 +27,28 @@ export function startBerths({ motion }: JourneyContext): Teardown {
     plan.clear();
   };
   const light = (on: boolean) => lit.forEach((el) => el.classList.toggle("is-lit", on));
-  return watchEntrances([
-    {
-      trigger: drawing,
-      at: 0.9,
-      arm: () => {
-        stop();
-        light(false);
-        plan.hold("0 0");
+  // No `once`: unlike the section entrances, the plan still replays each time it comes back into view (§3.A).
+  return watchEntrances(
+    [
+      {
+        trigger: drawing,
+        at: 0.9,
+        arm: () => {
+          stop();
+          light(false);
+          plan.hold("0 0");
+        },
+        play: () => {
+          plan.play({ draw: ["0 0", "0 1"], duration: T.draw, delay: stagger(10), ease: ease.inOut() });
+          running.push(createTimer({ duration: T.draw + 300, onComplete: () => light(true) }));
+          if (berth) running.push(animate(berth, { strokeWidth: [{ to: 3, duration: 200, delay: T.draw + 320 }, { to: 1.5, duration: 500 }], ease: ease.out() }));
+        },
+        settle: () => {
+          stop();
+          light(true);
+        },
       },
-      play: () => {
-        plan.play({ draw: ["0 0", "0 1"], duration: T.draw, delay: stagger(10), ease: ease.inOut() });
-        running.push(createTimer({ duration: T.draw + 300, onComplete: () => light(true) }));
-        if (berth) running.push(animate(berth, { strokeWidth: [{ to: 3, duration: 200, delay: T.draw + 320 }, { to: 1.5, duration: 500 }], ease: ease.out() }));
-      },
-      settle: () => {
-        stop();
-        light(true);
-      },
-    },
-  ]);
+    ],
+    played,
+  );
 }

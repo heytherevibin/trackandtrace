@@ -8,7 +8,8 @@ import { watchEntrances } from "./observers";
 import type { JourneyContext, Teardown } from "./start-journey";
 
 // The departure board while the journey runs (spec §3.A): the status column follows the page's station (station-progress.ts), and
-// changed statuses flip in; the rows' names and statuses flip in again whenever the board comes back into view.
+// changed statuses flip in; the rows' names and statuses flip in once per load, the first time the reader reaches the
+// board (a section entrance, the owner 2026-09-30).
 // Flaps are characters on their own axis, turned by transform only, then written back as plain text.
 
 const LABELS = messages.journey.board.statuses;
@@ -50,7 +51,7 @@ function turn(chars: readonly HTMLElement[], el: HTMLElement, text: string, dela
   });
 }
 
-export function startBoard({ motion }: JourneyContext): Teardown {
+export function startBoard({ motion, played }: JourneyContext): Teardown {
   const board = document.querySelector<HTMLElement>("#departures .board");
   if (!board) return () => {};
   const rows = [...board.querySelectorAll<HTMLTableRowElement>("tbody tr[data-stop]")];
@@ -97,6 +98,7 @@ export function startBoard({ motion }: JourneyContext): Teardown {
         {
           trigger: board,
           at: 0.9,
+          once: "board",
           arm: () => {
             settleWords();
             const nameChars = names.flatMap((a) => {
@@ -121,7 +123,7 @@ export function startBoard({ motion }: JourneyContext): Teardown {
           },
           settle: settleWords,
         },
-      ])
+      ], played)
     : () => {};
 
   return () => {

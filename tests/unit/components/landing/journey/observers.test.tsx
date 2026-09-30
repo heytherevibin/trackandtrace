@@ -1,7 +1,8 @@
 import type { ScrollObserver } from "animejs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LAYOUT_EVENT } from "@/components/landing/journey/journey-events";
-import { keepUp } from "@/components/landing/journey/observers";
+import { keepUp, watchEntrances, type Entrance } from "@/components/landing/journey/observers";
+import { keep } from "@/components/landing/journey/start-journey";
 
 // Anime's smoothed scroll sync eases a drawn progress toward the scroll's only while its 500 ms wake timer runs; one frame
 // longer than that (a slow device's stall) ends it short, and nothing wakes it until the next scroll event (Linux WebKit:
@@ -95,5 +96,100 @@ describe("keepUp: anime's scroll sync, woken until the drawing catches up with t
     vi.advanceTimersToNextFrame();
     expect(reverted.wakes()).toBe(0);
     stopReverted();
+  });
+});
+
+/** An entrance whose trigger stands wherever `top` says (400 px tall), counting what the watcher asks of it. */
+function entrance(top: () => number, once?: string) {
+  const calls: string[] = [];
+  const trigger = document.createElement("section");
+  trigger.getBoundingClientRect = () => ({ top: top(), bottom: top() + 400 }) as DOMRect;
+  const e: Entrance = {
+    trigger,
+    at: 0.88,
+    ...(once ? { once } : {}),
+    arm: () => calls.push("arm"),
+    play: () => calls.push("play"),
+    settle: () => calls.push("settle"),
+  };
+  return { e, calls };
+}
+
+describe("watchEntrances: section entrances play once per load", () => {
+  beforeEach(() => {
+    vi.spyOn(window, "innerHeight", "get").mockReturnValue(800);
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const scroll = () => {
+    window.dispatchEvent(new Event("scroll"));
+    vi.advanceTimersToNextFrame();
+  };
+
+  it("plays a once entrance the first time it reaches the band, never again, and remembers it in the played set", () => {
+    let top = 2000;
+    const { e, calls } = entrance(() => top, "rows:#record");
+    const played = keep<ReadonlySet<string>>(new Set());
+    const stop = watchEntrances([e], played);
+    expect(calls).toEqual(["arm"]);
+    top = 300;
+    scroll();
+    expect(calls).toEqual(["arm", "play"]);
+    expect([...played.get()]).toEqual(["rows:#record"]);
+    for (const at of [2000, 300, -2000, -300]) {
+      top = at;
+      scroll();
+    }
+    expect(calls).toEqual(["arm", "play"]);
+    stop();
+    expect(calls).toEqual(["arm", "play", "settle"]);
+  });
+
+  it("counts a once entrance in the window at start as seen: it stays as the server drew it, for good", () => {
+    let top = 100;
+    const { e, calls } = entrance(() => top, "kicker:0");
+    const played = keep<ReadonlySet<string>>(new Set());
+    const stop = watchEntrances([e], played);
+    expect([...played.get()]).toEqual(["kicker:0"]);
+    for (const at of [2000, 300]) {
+      top = at;
+      scroll();
+    }
+    expect(calls).toEqual([]);
+    stop();
+  });
+
+  it("never replays, after a rebuild (Motion off, then on), an entrance already played in this load", () => {
+    let top = 2000;
+    const played = keep<ReadonlySet<string>>(new Set());
+    const first = entrance(() => top, "board");
+    const stop = watchEntrances([first.e], played);
+    top = 300;
+    scroll();
+    top = 2000;
+    scroll();
+    stop();
+    const rebuilt = entrance(() => top, "board");
+    const stopRebuilt = watchEntrances([rebuilt.e], played);
+    top = 300;
+    scroll();
+    expect(rebuilt.calls).toEqual([]);
+    stopRebuilt();
+  });
+
+  it("still replays an entrance with no once key (the berth plan) every time it comes back", () => {
+    let top = 2000;
+    const { e, calls } = entrance(() => top);
+    const played = keep<ReadonlySet<string>>(new Set());
+    const stop = watchEntrances([e], played);
+    for (const at of [300, 2000, 300]) {
+      top = at;
+      scroll();
+    }
+    expect(calls).toEqual(["arm", "play", "arm", "play"]);
+    expect(played.get().size).toBe(0);
+    stop();
   });
 });
