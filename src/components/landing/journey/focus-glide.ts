@@ -88,6 +88,13 @@ export function keyboardFocus(el: Element): boolean {
   }
 }
 
+/** Outside the window, where the browser glides a Tab stop in: one already in view scrolls nothing. The drawing holds its
+ * pin through that glide by the same rule (drawing.ts). */
+export function glidesTo(el: Element): boolean {
+  const r = el.getBoundingClientRect();
+  return r.top < 0 || r.bottom > window.innerHeight;
+}
+
 /** Wholly in the window, below the masthead's foot. */
 function seen(el: Element): boolean {
   const r = el.getBoundingClientRect();
@@ -254,8 +261,7 @@ export function startFocusGlide({ motion }: JourneyContext): Teardown {
     target = null;
     const el = event.target instanceof Element ? event.target : null;
     if (!el || !tab.down() || !keyboardFocus(el) || el.closest(RUNNING)) return;
-    const r = el.getBoundingClientRect();
-    if (r.top >= 0 && r.bottom <= window.innerHeight) return; // in the viewport: the browser glides nowhere
+    if (!glidesTo(el)) return; // in the viewport: the browser glides nowhere
     target = el;
     aim(el);
     watch.arm(); // at the focus: a jump before the glide's first scroll is a cut too

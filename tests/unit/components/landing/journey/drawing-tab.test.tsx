@@ -106,6 +106,15 @@ describe("a Tab's glide holds the pin, as an in-page link's does", () => {
     d.stop();
   });
 
+  it("does not wait for a focus after a Tab that the keyboard did not give (not :focus-visible: a script's, in the keydown)", async () => {
+    const d = pending();
+    focusBy(link(1400), { tab: true, keyboard: false });
+    d.arrive();
+    await flush();
+    expect(d.begin).toHaveBeenCalledTimes(1);
+    d.stop();
+  });
+
   it("does not wait for keyboard focus that no Tab moved (focus returning to the window)", async () => {
     const d = pending();
     focusBy(link(1400), { tab: false, keyboard: true });
@@ -127,11 +136,18 @@ describe("a Tab's glide holds the pin, as an in-page link's does", () => {
     }
   });
 
-  it("stops listening for the Tab and its focus on teardown", () => {
-    const onWindow = vi.spyOn(window, "removeEventListener");
-    const onDocument = vi.spyOn(document, "removeEventListener");
-    pending().stop();
-    expect(onWindow.mock.calls.some(([type]) => type === "keydown")).toBe(true);
-    expect(onDocument.mock.calls.some(([type]) => type === "focusin")).toBe(true);
+  it("hears no Tab and no focus once torn down: nothing it left behind holds a pin", () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    // a listener comes off only as it went on, capture and all: one removed without its capture flag stays on
+    const capture = (options?: boolean | EventListenerOptions) => (typeof options === "boolean" ? options : (options?.capture ?? false));
+    const added = vi.spyOn(document, "addEventListener");
+    const removed = vi.spyOn(document, "removeEventListener");
+    const d = pending();
+    d.stop();
+    const left = added.mock.calls.filter((on) => !removed.mock.calls.some((off) => off[0] === on[0] && off[1] === on[1] && capture(off[2]) === capture(on[2])));
+    expect(left.map(([type, , options]) => `${type}, capture ${String(capture(options))}`)).toEqual([]);
+    expect(vi.getTimerCount()).toBe(0);
+    focusBy(link(1400), { tab: true, keyboard: true }); // a real Tab onto something below the window
+    expect(vi.getTimerCount()).toBe(0); // no quiet time started, and no Tab remembered: every listener went with it
   });
 });

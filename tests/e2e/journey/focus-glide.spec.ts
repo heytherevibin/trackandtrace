@@ -61,14 +61,26 @@ async function relayoutOnFocus(page: Page, scope: string, name: string, before: 
 /** The live drawing about to pin as a Tab lands (the #94 review's root cause): from before the page's first script, the
  * engine's build (scene/engine.ts, createEngine) is held at its last yield, the one after its upload, whose end resolves
  * the scene and begins the drawing; `window.__ttPinHold.release()` lets it go, and the pin follows in the same task. Each
- * Tab stop's glide taken up (focus-glide.ts's scrollIntoView, centred) is counted in `window.__ttTakeUps`. */
+ * Tab stop's glide taken up (focus-glide.ts's scrollIntoView, centred) is counted in `window.__ttTakeUps`.
+ * Held by the count, not at the scene's first yield with every later one let through at once: the engine's shader compile
+ * (three's compileAsync) polls on a 10 ms timer, so a build let go from its start could never finish in the release's own
+ * task. The names it finds (pause, createEngine) are a dev build's: a minified one never holds (see the test's skip). */
 async function holdThePin(page: Page): Promise<void> {
   await page.addInitScript(() => {
     /** createEngine's yields: the sixth follows the upload, and nothing but the build's end follows it (engine.ts). */
     const LAST = 6;
     let release = () => {};
     const held = new Promise<void>((resolve) => (release = resolve));
-    const hold = { steps: 0, held: false, after: 0, release: () => release() };
+    const hold = {
+      steps: 0,
+      held: false,
+      after: 0,
+      released: false,
+      release: () => {
+        hold.released = true;
+        release();
+      },
+    };
     Reflect.set(window, "__ttPinHold", hold);
     const native: unknown = Reflect.get(window, "scheduler");
     const own = native !== null && typeof native === "object" ? Reflect.get(native, "yield") : undefined;
@@ -111,6 +123,7 @@ test.describe("a Tab stop's glide (spec §3.G; WCAG 2.4.11)", () => {
       // glide's first scroll, under a glide whose end the browser set at the focus. The drawing waits for a Tab's glide as
       // it waits for an in-page link's (drawing.ts), so the glide lands at the link with nothing to take up.
       test('the drawing does not pin under a Tab\'s glide to "Read the data policy": it lands with nothing taken up', async ({ page }) => {
+        test.skip(!!process.env.E2E_BASE_URL, "holds the engine's build by a dev build's function names: a deployed, minified build never holds");
         await holdThePin(page);
         await page.goto("/");
         await waitForJourney(page);
@@ -125,13 +138,14 @@ test.describe("a Tab stop's glide (spec §3.G; WCAG 2.4.11)", () => {
           const link = [...document.querySelectorAll<HTMLElement>("#reliability a")].find((a) => a.textContent?.includes(name));
           const anatomy = document.getElementById("anatomy");
           if (!link || !anatomy) throw new Error("no data policy link, or no #anatomy");
-          const log = { pins: 0, glide: [] as number[] };
+          const log = { pins: 0, glide: [] as number[], releasedBeforeGlide: null as boolean | null };
           Reflect.set(window, "__ttGlideLog", log);
           new MutationObserver(() => {
             if (anatomy.classList.contains("is-live")) log.pins += 1;
           }).observe(anatomy, { attributes: true, attributeFilter: ["class"] });
           // each step of the glide, while the drawing has yet to decide where it landed
           document.addEventListener("scroll", () => {
+            log.releasedBeforeGlide ??= Reflect.get(window, "__ttPinHold").released === true; // at the glide's first scroll
             if (document.documentElement.dataset.drawing === "live") log.glide.push(anatomy.getBoundingClientRect().height);
           }, { capture: true, passive: true });
           // the scene arrives a task after the Tab's focus, before the glide's first scroll
@@ -145,10 +159,13 @@ test.describe("a Tab stop's glide (spec §3.G; WCAG 2.4.11)", () => {
         await frames(page, 30);
         await atRest(page, 15);
         const after = await page.evaluate(() => ({
-          log: Reflect.get(window, "__ttGlideLog") as { pins: number; glide: number[] },
+          log: Reflect.get(window, "__ttGlideLog") as { pins: number; glide: number[]; releasedBeforeGlide: boolean | null },
           takeUps: Number(Reflect.get(window, "__ttTakeUps")),
           after: Number(Reflect.get(window, "__ttPinHold").after),
         }));
+        // the race itself, or the test proves nothing: the scene let go before the glide's first scroll, its build ended in
+        // that task (no engine yield after the held one), so the pin was ready while the glide had yet to move the page
+        expect(after.log.releasedBeforeGlide, "the scene was let go before the glide's first scroll").toBe(true);
         expect(after.after, "the held yield was the engine's last (scene/engine.ts): the pin followed its release at once").toBe(0);
         expect.soft(after.log.glide.length, "the glide scrolled").toBeGreaterThan(0);
         expect.soft(after.log.glide.filter((h) => Math.abs(h - before.height) > 1), "#anatomy's height held through the glide").toEqual([]);

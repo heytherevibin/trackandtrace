@@ -1,7 +1,7 @@
 import { QUALITY_STORAGE_KEY, resolveDrawing, type MotionState, type SaverState } from "@/components/motion/motion-boot";
 import { modeOf, placeAfter, readerPlace, startingReasons, wantsScene, whyOf, withReason, type DrawingMode, type DrawingReason, type Reasons } from "./drawing-mode";
 import { jumpTo, keepPlace, mastheadBottom, viewHeight } from "./keep-place";
-import { keyboardFocus, watchTab } from "./focus-glide";
+import { glidesTo, keyboardFocus, watchTab } from "./focus-glide";
 import { DRAWING_EVENT, LAYOUT_EVENT, WEBGL_EVENT, emit, type DrawingDetail, type WebglDetail } from "./journey-events";
 import { createLiveLabels } from "./live-labels";
 import type { JourneyContext, JourneyModule, Teardown } from "./start-journey";
@@ -252,9 +252,7 @@ export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2,
     const tab = watchTab();
     const onFocus = (event: FocusEvent) => {
       const el = event.target instanceof Element ? event.target : null;
-      if (!el || !tab.down() || !keyboardFocus(el)) return;
-      const r = el.getBoundingClientRect();
-      if (r.top < 0 || r.bottom > window.innerHeight) onScroll();
+      if (el && tab.down() && keyboardFocus(el) && glidesTo(el)) onScroll();
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("scrollend", settle);
