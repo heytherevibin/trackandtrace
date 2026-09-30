@@ -19,4 +19,55 @@ export const subscribe = {
     body: (promise: string, link: string) =>
       `You asked for Trakline updates by email.\n\n${promise}\n\nConfirm here:\n${link}\n\nThe link works for 48 hours. If you didn't ask for this, ignore it — we delete the address in 7 days.\n`,
   },
+  form: {
+    label: "Email",
+    placeholder: "you@example.com",
+    subscribe: "Subscribe",
+    notify: "Notify me",
+    sending: "Sending…",
+    /** Split so the last two words can be a link without a component assembling a sentence. */
+    consent: { text: "One email to confirm. Unsubscribe in one click. We never sell your address. ", link: "Privacy notice" },
+  },
+  places: {
+    footerColumn: "Updates by email",
+    /** The plate's own heading under the pre-booking result — NOT `booking.availability.title`, which is the chart's "Availability". */
+    preBookingTitle: "Availability checks",
+    preBooking: "Tell me once when availability checks open. One email, nothing else.",
+  },
+  page: {
+    closing: "Checking a PNR never needs an account, and never needs an email address.",
+    confirm: {
+      headline: "Confirm your subscription",
+      lead: "Opening this link changed nothing. Press Confirm and the list is yours.",
+      button: "Confirm",
+      after: "You're subscribed. Every email has a one-click unsubscribe.",
+      already: "You're already subscribed.",
+      expired: "This link has expired.",
+      sendAgain: "Send a new link",
+      sendAgainNote: "A new link goes through the same checks as the first one.",
+    },
+    unsubscribe: {
+      headline: "Unsubscribe",
+      lead: "Opening this link changed nothing. Press Unsubscribe and it stops.",
+      button: "Unsubscribe",
+      after: "You're unsubscribed. Sign-in emails and the alerts you set up aren't affected.",
+      already: "You're already unsubscribed.",
+      changedMind: "Changed your mind?",
+      resubscribe: "Resubscribe",
+      whyLegend: "Tell us why (optional)",
+      /** Label and value differ: the label reads as a sentence, the value is what the route's enum takes. */
+      reasons: [
+        { label: "Too many emails", value: "too many" },
+        { label: "Not relevant", value: "not relevant" },
+        { label: "I didn't sign up", value: "did not sign up" },
+        { label: "Other", value: "other" },
+      ],
+    },
+    invalid: {
+      title: "That link isn't valid.",
+      note: "Links break when an email client rewrites them. Open the one in your inbox again, or ask for a new one from the form you signed up on.",
+    },
+    /** The board draws the unsubscribe promises in the second person, because the reader is leaving. */
+    leaving: { news: "You are unsubscribing from news about Trakline.", availability: "You are unsubscribing from the availability list." },
+  },
 } as const satisfies MessageTree;
