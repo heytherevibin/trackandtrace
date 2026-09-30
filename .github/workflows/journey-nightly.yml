@@ -4,7 +4,8 @@
 #   (scripts/serve-local-production.mjs, an offline guard in the server): the chunk budgets, the production-build smoke
 #   (the security policy scrolled end to end, no other host, a sample check), and the throttled runs at 4×, 6× and 10×.
 # - journey: the fixture-mode `next dev` every PR runs on. Collisions at fifteen sizes and at 200% text, every chapter
-#   photographed in Day, Night and on a phone (kept as an artifact), and the journey's specs in WebKit.
+#   photographed in Day, Night and on a phone (kept as an artifact), the journey's specs in WebKit, and a device too slow
+#   to draw (60× CPU) stepping quality down to the still.
 # What it does NOT measure: §3.H's frame times and long tasks. GitHub's runners have no GPU (Chromium draws WebGL through
 # SwiftShader, on the CPU), so the throttled runs judge only what holds on any machine and print the rest. Those budgets
 # are measured by hand on a real GPU, before each journey PR merges: `npm run build:local && node scripts/journey-perf.mjs`.
