@@ -135,4 +135,79 @@ describe("a resize, with the reader inside it", () => {
     expect(at.y).toBe(2000 + 0.6 * 1000);
     stop();
   });
+
+  // WebKit lays a resize out in two steps, a frame or more apart and in either order: 100vh (02's 330vh, above the run) in
+  // one, 100svh (the run's pin) and 100lvh in the other, innerHeight the new window's throughout (keep-place.ts, laidOut).
+  function twoSteps(): { vh: number; lvh: number } {
+    const units = { vh: 836, lvh: 836 };
+    const offset = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "offsetHeight")!;
+    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockImplementation(function (this: HTMLElement) {
+      if (this.style.height === "100vh") return units.vh;
+      if (this.style.height === "100lvh") return units.lvh;
+      return offset.get?.call(this) as number;
+    });
+    return units;
+  }
+
+  // Answered at its pin's step, on a page 02 had yet to refit, the run's move was undone by 02's guard answering the next.
+  it("answers the step that completes the resize, from the place before both, its pin's step first", () => {
+    const { run, at, resized } = resizable();
+    const units = twoSteps();
+    const stop = startRun(testContext());
+    at.y = 2000 + 600; // 60% through
+    window.dispatchEvent(new Event("scroll"));
+    at.h = 700; // the first step: the pin (100svh), the large viewport and innerHeight
+    at.vh = 700;
+    units.lvh = 700;
+    resized();
+    expect(window.scrollTo).not.toHaveBeenCalled();
+    expect(run.style.getPropertyValue("--run-h")).toBe("1836px");
+    units.vh = 700; // the second: 02 above refits, and its guard moves the reader by its change
+    at.top = 1950;
+    at.y = 2550;
+    resized(); // heard through the page's measures of the window
+    expect(run.style.getPropertyValue("--run-h")).toBe("1700px");
+    expect(at.y).toBe(1950 + 0.6 * 1000);
+    stop();
+  });
+
+  // 02 above refit in the first step, and its guard waits for the second to move the reader: learned between them, the
+  // run's box had moved and the reader not yet, and the run then kept the wrong fraction.
+  it("learns no place between the steps, 02's step first", () => {
+    const { at, resized } = resizable();
+    const units = twoSteps();
+    const stop = startRun(testContext());
+    at.y = 2000 + 600; // 60% through
+    window.dispatchEvent(new Event("scroll"));
+    units.vh = 700; // the first step: 02's 330vh above, and innerHeight
+    at.vh = 700;
+    at.top = 1950;
+    window.dispatchEvent(new Event("resize"));
+    window.dispatchEvent(new Event("scroll"));
+    units.lvh = 700; // the second: the pin, and 02's guard moves the reader by 02's change
+    at.h = 700;
+    at.y = 2550;
+    resized();
+    expect(at.y).toBe(1950 + 0.6 * 1000);
+    stop();
+  });
+
+  it("owes a relayout a layout change asks for between the steps until the page is laid out for one window", () => {
+    vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
+    const { run, at, resized } = resizable();
+    const units = twoSteps();
+    const stop = startRun(testContext());
+    units.vh = 700; // the first step
+    at.vh = 700;
+    at.gap = 400; // and something in the run laid out afresh
+    window.dispatchEvent(new Event(LAYOUT_EVENT));
+    vi.advanceTimersToNextFrame();
+    expect(run.style.getPropertyValue("--run-h")).toBe("1836px"); // not measured on a page between two windows
+    units.lvh = 700; // the second, the pin as it was (its floor)
+    resized();
+    vi.advanceTimersToNextFrame();
+    expect(run.style.getPropertyValue("--run-h")).toBe("1636px"); // the travel 800
+    stop();
+  });
 });
+

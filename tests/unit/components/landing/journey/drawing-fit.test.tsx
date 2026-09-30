@@ -359,4 +359,47 @@ describe("the place a resize under the pinned chapter is judged from", () => {
     expect(scrollTo).toHaveBeenCalledWith({ top: Math.round(-2000 + (2000 / 4500) * 3780) + window.scrollY, behavior: "instant" });
     stop();
   });
+
+  // WebKit lays a resize out in two steps, a frame or more apart and in either order, with "resize" between them: the pin
+  // (520vh) in one, the large viewport its timeline ends at (100lvh) in the other (keep-place.ts, laidOut). Answered at
+  // "resize", the reader landed up to 14% off, and the pin's step, landing after, went unanswered.
+  it("answers a resize at the step that completes it, when \"resize\" finds the page between the two", async () => {
+    const units = { vh: 1000, lvh: 1000 };
+    const offset = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "offsetHeight")!;
+    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockImplementation(function (this: HTMLElement) {
+      if (this.style.height === "100vh") return units.vh;
+      if (this.style.height === "100lvh") return units.lvh;
+      return offset.get?.call(this) as number;
+    });
+    const observers: ResizeObserverCallback[] = [];
+    const RealResizeObserver = window.ResizeObserver;
+    window.ResizeObserver = class {
+      constructor(callback: ResizeObserverCallback) {
+        observers.push(callback);
+      }
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
+    };
+    try {
+      const vh = { now: 1000 };
+      vi.spyOn(window, "innerHeight", "get").mockImplementation(() => vh.now);
+      const { box, stop } = await pinned();
+      const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+      box.top = -2000;
+      window.dispatchEvent(new Event("scroll"));
+      vh.now = 900; // the first step: the large viewport, and innerHeight
+      units.lvh = 900;
+      window.dispatchEvent(new Event("resize"));
+      window.dispatchEvent(new Event("scroll"));
+      expect(scrollTo).not.toHaveBeenCalled();
+      units.vh = 900; // the second: 520vh of 900
+      box.height = 4680;
+      for (const observed of observers) observed([], {} as ResizeObserver);
+      expect(scrollTo).toHaveBeenCalledWith({ top: Math.round(-2000 + (2000 / (5200 - 1000)) * (4680 - 900)) + window.scrollY, behavior: "instant" });
+      stop();
+    } finally {
+      window.ResizeObserver = RealResizeObserver;
+    }
+  });
 });

@@ -253,6 +253,76 @@ describe("02's place guard", () => {
       stop();
     });
 
+    // WebKit lays a resize out in two steps, a frame or more apart and in either order: 100vh (02's 330vh) in one, 100lvh
+    // (where its timeline ends) and 100svh in the other, innerHeight the new window's throughout (keep-place.ts, laidOut).
+    function twoSteps(): { vh: number; lvh: number } {
+      const units = { vh: 900, lvh: 900 };
+      const offset = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "offsetHeight")!;
+      vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockImplementation(function (this: HTMLElement) {
+        if (this.style.height === "100vh") return units.vh;
+        if (this.style.height === "100lvh") return units.lvh;
+        return offset.get?.call(this) as number;
+      });
+      return units;
+    }
+
+    it("learns no window between the steps: the new one with #how's box still the old one's (review, M3)", () => {
+      const { doc, at, resized } = pinned02();
+      const units = twoSteps();
+      const stop = startPlaceGuard();
+      const y = Math.round(936 + 0.6 * 2134);
+      at.y = y;
+      window.dispatchEvent(new Event("scroll"));
+      units.lvh = 700; // the first step: the large viewport, and innerHeight
+      at.vh = 700;
+      window.dispatchEvent(new Event(LAYOUT_EVENT)); // a piece below told the page it changed (the run, its 100svh pin)
+      window.dispatchEvent(new Event("scroll"));
+      units.vh = 700; // the second: 02's 330vh
+      doc.height = 2310;
+      resized();
+      expect(at.y).toBe(Math.round(936 + ((y - 936) / 2134) * 1674));
+      stop();
+    });
+
+    it("settles once the page is laid out for one window, from the step that completes it (open concern 3)", () => {
+      const { doc, at, resized } = pinned02();
+      const units = twoSteps();
+      const stop = startPlaceGuard();
+      const y = Math.round(936 + 0.6 * 2134);
+      at.y = y;
+      window.dispatchEvent(new Event("scroll"));
+      units.vh = 700; // the first step: 02's 330vh, and innerHeight
+      at.vh = 700;
+      doc.height = 2310;
+      resized();
+      expect(window.scrollTo).not.toHaveBeenCalled(); // the large viewport, and the still's columns above, still the old window's
+      window.dispatchEvent(new Event("scroll"));
+      units.lvh = 700; // the second: what moved above #how moves it now
+      doc.top -= 40;
+      resized(); // heard through the page's measures of the window
+      expect(at.y).toBe(Math.round(896 + ((y - 936) / 2134) * 1674));
+      stop();
+    });
+
+    // A piece below that moves the reader tells tt:layout after its move (the run's contract): between the steps too, the
+    // guard learns where it left them, or its own move, at the second step, undoes it.
+    it("learns a move a piece below made between the steps, and moves the reader past 02 on from it", () => {
+      const { doc, at, resized } = pinned02();
+      const units = twoSteps();
+      const stop = startPlaceGuard();
+      at.y = 1000 + 2970 - 120; // 02's foot 120 px down the window: past it
+      window.dispatchEvent(new Event("scroll"));
+      units.lvh = 700; // the first step
+      at.vh = 700;
+      at.y -= 300; // a piece below moved the reader by its own change
+      window.dispatchEvent(new Event(LAYOUT_EVENT));
+      units.vh = 700; // the second: 02's 330vh
+      doc.height = 2310;
+      resized();
+      expect(at.y).toBe(1000 + 2970 - 120 - 300 - 660);
+      stop();
+    });
+
     it("lands on its start when Motion goes off: a change of shape", () => {
       const { doc, at } = pinned02();
       const stop = startPlaceGuard();

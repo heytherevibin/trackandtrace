@@ -7,7 +7,7 @@ import { placeInProportion, readerPlace } from "./drawing-mode";
 import { ease } from "./ease";
 import { fitsWindow, type Span } from "./fit";
 import { LAYOUT_EVENT, REBUILD_EVENT } from "./journey-events";
-import { jumpTo, viewHeight } from "./keep-place";
+import { jumpTo, laidOut, viewHeight, watchView } from "./keep-place";
 import { SMOOTH, STAGGER, T } from "./motion-tokens";
 import { keepUp, track } from "./observers";
 import type { JourneyContext, Teardown } from "./start-journey";
@@ -122,9 +122,12 @@ export function startPlaceGuard(): Teardown {
     const size = sizeOf(section);
     return size.width === lastSize.width && size.height === lastSize.height;
   };
-  // The reader's place, only while #how is still the size this guard last settled.
+  // The reader's place, only while #how is still the size this guard last settled; and the window they read it in only
+  // while the page is laid out for one (laidOut): between WebKit's steps of a resize, the new window's size with
+  // #how's box still the old one's put the fraction off by 33 px (review, M3).
   const learn = () => {
-    if (unchanged()) place = { ...place, y: window.scrollY, vh: window.innerHeight, view: viewHeight() };
+    if (!unchanged()) return;
+    place = laidOut() ? { ...place, y: window.scrollY, vh: window.innerHeight, view: viewHeight() } : { ...place, y: window.scrollY };
   };
   window.addEventListener("scroll", learn, { passive: true });
   window.addEventListener(MOTION_BEFORE_EVENT, learn);
@@ -137,7 +140,9 @@ export function startPlaceGuard(): Teardown {
   // run.ts) must tell tt:layout after its move, so this refresh learns the scroll it left; else 02's own resize, a
   // frame later, is judged from the scroll before that move, and undoes it.
   const refresh = () => {
-    if (unchanged()) place = placeNow(section);
+    if (!unchanged()) return;
+    const now = placeNow(section);
+    place = laidOut() ? now : { ...now, vh: place.vh, view: place.view };
   };
   window.addEventListener(LAYOUT_EVENT, refresh);
   // A freshly observed target always delivers one initial notification, even when nothing has actually
@@ -149,7 +154,11 @@ export function startPlaceGuard(): Teardown {
   // reader who never left where they were reading. The box this guard compares against still refreshes every
   // time (so a later, real resize is judged from here, never a stale one) — only the relocation itself waits
   // for #how's own box to actually change size.
+  // Settled only once the page is laid out for one window: WebKit's first step of a resize (laidOut) is answered with the
+  // second, which the observer hears through the page's measures of the window (watchView) whichever step it is, so the
+  // move covers every change above #how's foot, the still's columns included (still.ts counts on that).
   const settle = () => {
+    if (!laidOut()) return;
     const resized = !unchanged();
     lastSize = sizeOf(section);
     if (resized) place = settlePlace(section, place);
@@ -157,6 +166,7 @@ export function startPlaceGuard(): Teardown {
   };
   const observer = new ResizeObserver(settle);
   observer.observe(section, { box: "border-box" });
+  watchView(observer);
   // Motion's rewrite collapses 02 at once, and the journey's rebuild then tears down the pieces below it: the run's
   // unpin moves the reader by its own change (keepPlace), from wherever they stand by then. Settled here, as Motion
   // changes and before the rebuild (this listener is added first), 02's move is made first and the run's lands on it;

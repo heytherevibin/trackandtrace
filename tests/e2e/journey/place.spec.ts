@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "../fixtures";
 import { REBUILD_EVENT } from "@/components/landing/journey/journey-events";
-import { atRest, drawStill, frames, noAnchoring, pressTab, scrollToId, waitForJourney, waitForLive } from "./journey-helpers";
+import { atRest, drawStill, frames, holdLate, noAnchoring, pressTab, release, scrollIntoRun, scrollToId, waitForJourney, waitForLive } from "./journey-helpers";
 
 // The places the journey keeps (J5-17, J5-19): a change of height above 02 (the live drawing pinning, J5) must never
 // throw a reader inside 02 when Motion then goes off; and Back, Forward, Back finds the reader's place each time.
@@ -388,4 +388,105 @@ test.describe("a resize keeps a reader inside a pinned 02 the same fraction thro
     expect(now.y, `02's end at ${Math.round(now.end)}`).toBeGreaterThanOrEqual(now.end - 2);
     await expect(last).toHaveClass(/is-current/);
   });
+});
+
+test.describe("a resize WebKit lays out in two steps keeps a reader inside a pinned 02 the same fraction through it", () => {
+  for (const anchoring of ["on", "off"] as const) {
+    // 02's guard answered the first step, with the still's columns (100svh) above it and the large viewport (where its
+    // timeline ends) still the old window's: the columns' change then landed unanswered, 40 px (open concern 3). 100svh
+    // has landed in a step of its own too, apart from 100lvh (once in 576 resizes).
+    for (const late of ["small and large", "small"] as const) {
+      test(`the ${late} viewport${late === "small" ? "" : "s"} a frame late (scroll anchoring ${anchoring})`, async ({ page, isMobile }) => {
+        const base = isMobile ? { width: 390, height: 844 } : { width: 1440, height: 900 };
+        const size = isMobile ? { width: 390, height: 804 } : { width: 1440, height: 860 };
+        await page.setViewportSize(base);
+        await drawStill(page);
+        if (anchoring === "off") await noAnchoring(page);
+        await page.goto("/");
+        await waitForJourney(page);
+        await expect(page.locator("#how")).toHaveClass(/is-pinned/);
+        if (!isMobile) await expect(page.locator(".anatomy-pin")).toHaveClass(/is-columns/);
+        const at = await howRange(page);
+        await page.evaluate((y) => window.scrollTo({ top: y, behavior: "instant" }), Math.round(at.start + 0.25 * (at.end - at.start)));
+        await frames(page, 3); // the guard has learned the reader's place
+        const was = await howRange(page);
+        const through = (was.y - was.start) / (was.end - was.start);
+        await holdLate(page, late);
+        await page.setViewportSize(size);
+        await frames(page, 8); // the first step, and whatever answers it
+        await release(page);
+        await frames(page, 20);
+        await atRest(page);
+        const now = await howRange(page);
+        const target = now.start + through * (now.end - now.start);
+        expect(Math.abs(now.y - target), `${Math.round(through * 1000) / 10}% through was ${Math.round(target)}, the reader at ${now.y}`).toBeLessThanOrEqual(4);
+      });
+    }
+
+    // A layout change told (the run's relayout for its pin, 100svh) or a scroll, between the steps: 02's guard learned
+    // the new window with its own box still the old one's, and kept the wrong fraction (review, M3; 33 px on a phone).
+    test(`the default viewport a frame late (scroll anchoring ${anchoring})`, async ({ page, isMobile }) => {
+      const base = isMobile ? { width: 390, height: 844 } : { width: 1440, height: 900 };
+      const size = isMobile ? { width: 390, height: 660 } : { width: 1440, height: 700 };
+      await page.setViewportSize(base);
+      await drawStill(page);
+      if (anchoring === "off") await noAnchoring(page);
+      await page.goto("/");
+      await waitForJourney(page);
+      await expect(page.locator("#how")).toHaveClass(/is-pinned/);
+      const at = await howRange(page);
+      await page.evaluate((y) => window.scrollTo({ top: y, behavior: "instant" }), Math.round(at.start + 0.6 * (at.end - at.start)));
+      await frames(page, 3); // the guard has learned the reader's place
+      const was = await howRange(page);
+      const through = (was.y - was.start) / (was.end - was.start);
+      await holdLate(page, "default");
+      await page.setViewportSize(size);
+      await frames(page, 3); // the first step
+      await page.evaluate(() => {
+        window.dispatchEvent(new Event("tt:layout"));
+        window.dispatchEvent(new Event("scroll"));
+      });
+      await release(page);
+      await frames(page, 20);
+      await atRest(page);
+      const now = await howRange(page);
+      const target = now.start + through * (now.end - now.start);
+      expect(Math.abs(now.y - target), `${Math.round(through * 1000) / 10}% through was ${Math.round(target)}, the reader at ${now.y}`).toBeLessThanOrEqual(4);
+    });
+  }
+
+  // The run answers the step that completes a resize, after 02's guard, as it answers every resize, from the place it
+  // learned while the page was laid out for one window. With the default viewport late, it answered its pin (100svh) on
+  // a page 02 had yet to refit, and 02's guard, answering the second step, undid its move; with the small and large
+  // late, it learned the new window with the old large viewport, and kept it.
+  for (const [late, anchoring] of [["default", "on"], ["default", "off"], ["small and large", "on"], ["small and large", "off"]] as const) {
+    test(`a reader mid-run stays the same fraction through it, the ${late} viewport${late === "default" ? "" : "s"} a frame late (scroll anchoring ${anchoring})`, async ({ page, isMobile }) => {
+      const base = isMobile ? { width: 390, height: 844 } : { width: 1440, height: 900 };
+      await page.setViewportSize(base);
+      await drawStill(page);
+      if (anchoring === "off") await noAnchoring(page);
+      await page.goto("/");
+      await waitForJourney(page);
+      await expect(page.locator("#how")).toHaveClass(/is-pinned/);
+      await expect(page.locator("#run")).toHaveClass(/is-running/);
+      await scrollIntoRun(page, 0.5);
+      await frames(page, 3); // the run and 02's guard have learned the reader's place
+      const through = () =>
+        page.evaluate(() => {
+          const r = document.getElementById("run")?.getBoundingClientRect();
+          if (!r) throw new Error("#run is missing");
+          const start = r.top + window.scrollY - (document.querySelector("header")?.getBoundingClientRect().bottom ?? 0);
+          return (window.scrollY - start) / (r.bottom + window.scrollY - window.innerHeight - start);
+        });
+      const f = await through();
+      await holdLate(page, late);
+      await page.setViewportSize(isMobile ? { width: 390, height: 660 } : { width: 1440, height: 700 });
+      await frames(page, 8); // the first step, and whatever answers it
+      await release(page);
+      await frames(page, 20);
+      await atRest(page);
+      await expect(page.locator("#run")).toHaveClass(/is-running/);
+      expect(Math.abs((await through()) - f), `${Math.round(f * 1000) / 10}% through the run`).toBeLessThanOrEqual(0.002);
+    });
+  }
 });

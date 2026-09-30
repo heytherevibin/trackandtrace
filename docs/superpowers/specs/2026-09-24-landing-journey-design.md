@@ -419,6 +419,15 @@ of shape still lands on its start.
   compared with the shape it last settled; the Motion switch reaches it as a change of shape.
 - The run answers a resize from its pin's own observer, after 02's guard in the same frame, and from the place the reader
   last read it in: the page has laid the new window out, and moved the reader for the pieces above, by then.
+- WebKit lays a resize out in steps, a frame or more apart and in any order, `innerHeight` the new window's throughout:
+  what 100vh sizes (02's 330vh, the live pin's 520vh), and what 100svh and 100lvh size (the still's columns, the run's
+  pin, every timeline's end), mostly those two together, with "resize" between the steps or after them (found
+  2026-09-30). Every piece that keeps a place across a resize (02's guard, the live pin, the run) learns the window the
+  reader read in, and answers a resize, only while the page is laid out for one window (`laidOut`: the page's own
+  measures of 100vh, 100svh and 100lvh have all moved since it last was, or none has; a phone's toolbar moves none); a
+  change that lands between the steps is answered at the step that completes it, which each hears through those
+  measures (`watchView`). So 02's guard, settling once for every step, covers the still's columns above it, as
+  `still.ts` assumes. `viewHeight` reads the large viewport from the layout each time, never kept by the window's size.
 
 Found after J6, finishing 200% text (2026-09-29; 100% text unchanged throughout):
 - the masthead keeps one row at 390×844 with 200% text: below 16.5rem of its inner query container SIGN IN keeps only

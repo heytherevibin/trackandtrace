@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { keepPlace } from "@/components/landing/journey/keep-place";
+import { APART_MS, keepPlace, laidOut, viewHeight } from "@/components/landing/journey/keep-place";
 
 // keepPlace (J5-3): a pinned piece changes its height, then the reader lands where placeAfter says. The piece's
 // box after the change is read against whatever scroll the browser holds by then.
@@ -153,5 +153,72 @@ describe("keepPlace", () => {
       scroll.y = 8200 - 2540 + 0.5; // the browser's anchoring answered the change as it laid out
     });
     expect(scrollTo).not.toHaveBeenCalled();
+  });
+});
+
+// The page's measures of the window (100vh, 100svh, 100lvh), read from the layout: WebKit lays a resize out in steps, a
+// frame or more apart and in any order, innerHeight the new window's throughout (the nightly config's WebKit, 2026-09-30).
+describe("the window as the page has laid it out", () => {
+  function units(): { vh: number; svh: number; lvh: number } {
+    const at = { vh: 900, svh: 900, lvh: 900 };
+    const offset = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "offsetHeight")!;
+    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockImplementation(function (this: HTMLElement) {
+      if (this.style.height === "100vh") return at.vh;
+      if (this.style.height === "100svh") return at.svh;
+      if (this.style.height === "100lvh") return at.lvh;
+      return offset.get?.call(this) as number;
+    });
+    return at;
+  }
+
+  it("is laid out for one window while its measures have all moved since it last was, or none has", () => {
+    const at = units();
+    expect(laidOut()).toBe(true);
+    at.svh = 700; // the small and large viewports laid out for the new window, 100vh not yet
+    at.lvh = 700;
+    expect(laidOut()).toBe(false);
+    at.vh = 700;
+    expect(laidOut()).toBe(true);
+    at.vh = 500; // or 100vh first
+    expect(laidOut()).toBe(false);
+    at.lvh = 500; // and 100svh in a step of its own
+    expect(laidOut()).toBe(false);
+    at.svh = 500;
+    expect(laidOut()).toBe(true);
+  });
+
+  it("leaves out a unit the page lacks", () => {
+    const at = units();
+    expect(laidOut()).toBe(true);
+    at.svh = 0;
+    at.lvh = 0;
+    at.vh = 700;
+    expect(laidOut()).toBe(true);
+  });
+
+  // A browser that resizes one unit alone would otherwise keep no place at all.
+  it("counts as laid out once its measures have stood apart longer than WebKit's steps ever do", () => {
+    const at = units();
+    const clock = { now: 1000 };
+    vi.spyOn(performance, "now").mockImplementation(() => clock.now);
+    expect(laidOut()).toBe(true);
+    at.vh = 800;
+    expect(laidOut()).toBe(false);
+    clock.now += APART_MS / 2;
+    expect(laidOut()).toBe(false);
+    clock.now += APART_MS;
+    expect(laidOut()).toBe(true);
+    at.vh = 900; // apart again: timed afresh
+    expect(laidOut()).toBe(false);
+  });
+
+  // Kept by the window's size, a large viewport read between the steps stayed the old window's until the next "resize".
+  it("reads the large viewport from the layout each time, though the window's size has not changed", () => {
+    const at = units();
+    vi.spyOn(window, "innerHeight", "get").mockReturnValue(900);
+    at.lvh = 860;
+    expect(viewHeight()).toBe(860);
+    at.lvh = 900;
+    expect(viewHeight()).toBe(900);
   });
 });

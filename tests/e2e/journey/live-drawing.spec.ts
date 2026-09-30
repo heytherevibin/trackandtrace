@@ -3,7 +3,7 @@ import { expect, test } from "../fixtures";
 import { SCENE_CHUNK_MARK } from "@/components/landing/journey/scene/scene-mark";
 import { collisionsInView } from "./collisions";
 import { drawingCollisions } from "./drawing-checks";
-import { dismissInstall, frames, scrollIntoChapter, scrollToId, skipWithoutWebgl2, waitForJourney, waitForLive } from "./journey-helpers";
+import { dismissInstall, frames, holdLate, release, scrollIntoChapter, scrollToId, skipWithoutWebgl2, waitForJourney, waitForLive } from "./journey-helpers";
 
 // Every test here needs the live drawing: in a WebKit with no WebGL 2 (J6-12) each skips before it starts, saying so,
 // by the same check waitForLive makes.
@@ -253,6 +253,41 @@ test.describe("the live drawing at its edges", () => {
       expect(Math.abs((await through()) - f), `${to.width}×${to.height}`).toBeLessThanOrEqual(0.002);
     }
   });
+
+  // WebKit lays a resize out in two steps, in either order (journey-helpers.ts, holdLate): the pin (520vh) in one, the
+  // large viewport its timeline ends at in the other. Answered at "resize", between them, the reader landed 14% off with
+  // the default viewport late, and the place then kept put the next resize off too; 3% with the small and large late.
+  for (const late of ["default", "small and large"] as const) {
+    test(`a reader inside the chapter stays the same fraction through a resize, the ${late} viewport${late === "default" ? "" : "s"} a frame late`, async ({ page, isMobile }) => {
+      const through = () =>
+        page.evaluate(() => {
+          const section = document.getElementById("anatomy");
+          const pin = section?.querySelector(".anatomy-pin");
+          if (!section || !pin) throw new Error("#anatomy is missing");
+          const stick = Number.parseFloat(getComputedStyle(pin).top) || 0;
+          const start = section.getBoundingClientRect().top + window.scrollY - stick;
+          return (window.scrollY - start) / (section.offsetHeight - window.innerHeight + stick);
+        });
+      const base = isMobile ? { width: 390, height: 844 } : { width: 1440, height: 900 };
+      await page.setViewportSize(base);
+      await page.goto("/");
+      await waitForLive(page);
+      await dismissInstall(page);
+      await scrollIntoChapter(page, 0.5);
+      await frames(page, 3); // the pin has learned the reader's place
+      const f = await through();
+      await holdLate(page, late);
+      await page.setViewportSize(isMobile ? { width: 390, height: 804 } : { width: 1440, height: 700 });
+      await frames(page, 8); // the first step, and "resize"
+      await release(page);
+      await frames(page, 20);
+      await expect(page.locator("#anatomy")).toHaveClass(/is-live/);
+      expect(Math.abs((await through()) - f), "through the two steps").toBeLessThanOrEqual(0.002);
+      await page.setViewportSize(base); // and the next resize, judged from the place kept since
+      await frames(page, 20);
+      expect(Math.abs((await through()) - f), "the next resize").toBeLessThanOrEqual(0.002);
+    });
+  }
 
   test("a reader inside the chapter when it falls back to the still lands on its start, under the masthead", async ({ page }) => {
     await page.goto("/");

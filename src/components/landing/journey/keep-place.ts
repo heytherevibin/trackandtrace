@@ -9,30 +9,89 @@ export function mastheadBottom(): number {
   return Math.round(document.querySelector("header")?.getBoundingClientRect().bottom ?? 0);
 }
 
-let measuredView: { readonly w: number; readonly h: number; readonly view: number } | null = null;
+/** The page's own measures of the window as laid out now, 100vh, 100svh and 100lvh: kept in the page, hidden and out of
+ * flow, for the journey's life (dropViewProbes), so reading them costs no more than the layout the caller has already
+ * read. */
+const UNITS = ["vh", "svh", "lvh"] as const;
+type Unit = (typeof UNITS)[number];
+let probes: Readonly<Record<Unit, HTMLElement>> | null = null;
+
+function probe(unit: Unit): HTMLElement {
+  const el = document.createElement("div");
+  el.setAttribute("aria-hidden", "true");
+  el.style.cssText = "position:absolute;top:0;left:0;width:0;visibility:hidden;pointer-events:none;overflow-anchor:none";
+  el.style.height = `100${unit}`;
+  document.body.append(el);
+  return el;
+}
+
+function viewProbes(): Readonly<Record<Unit, HTMLElement>> {
+  if (probes && UNITS.every((unit) => probes?.[unit].isConnected)) return probes;
+  dropViewProbes();
+  probes = { vh: probe("vh"), svh: probe("svh"), lvh: probe("lvh") };
+  return probes;
+}
 
 /** The large viewport's height (100lvh): the window every scroll timeline here ends at, as anime's scroll observers
  * measure it (a 100lvh probe), a phone's toolbar shown or not; the window's own where the page has no lvh. A place kept
- * in proportion is measured on the same basis, so its fraction is the timeline's progress (review, M1). Measured again
- * when the window's size changes, and after every "resize" (forgetViewHeight: WebKit can tell the new window's size
- * before laying it out, and a probe then would keep the old one). */
+ * in proportion is measured on the same basis, so its fraction is the timeline's progress (review, M1). Read from the
+ * layout each time, never kept by the window's size: WebKit tells the new size before it lays out the large viewport for
+ * it, and a value kept then was the old window's until the next "resize". */
 export function viewHeight(): number {
-  const { innerWidth: w, innerHeight: h } = window;
-  if (measuredView?.w === w && measuredView.h === h) return measuredView.view;
-  const probe = document.createElement("div");
-  probe.setAttribute("aria-hidden", "true");
-  probe.style.cssText = "position:absolute;top:0;left:0;width:0;visibility:hidden;pointer-events:none";
-  probe.style.height = "100lvh";
-  document.body.append(probe);
-  const view = probe.offsetHeight || h;
-  probe.remove();
-  measuredView = { w, h, view };
-  return view;
+  return viewProbes().lvh.offsetHeight || window.innerHeight;
 }
 
-/** Forgets the large viewport's height measured so far: the journey calls it on every "resize" (start-journey.ts). */
-export function forgetViewHeight(): void {
-  measuredView = null;
+/** How long the page's measures of the window may stay apart (laidOut) before that is the page's own shape, not WebKit
+ * between its steps: those land a frame or more apart, about 60 ms at most in the nightly config's WebKit under load
+ * (2026-09-30). */
+export const APART_MS = 1000;
+/** The measures as the page last stood laid out for one window, and since when they have stood apart from it. */
+let whole: Readonly<Partial<Record<Unit, number>>> | null = null;
+let apartSince: number | null = null;
+
+/** Whether the page is laid out for one window. WebKit lays a resize out in steps, a frame or more apart and in any
+ * order, innerHeight the new window's throughout: what 100vh sizes (02's 330vh, the live drawing's 520vh), what 100svh
+ * sizes (the still's columns, the run's pin) and 100lvh (where every timeline ends), mostly the last two together (the
+ * nightly config's WebKit, 2026-09-30: split in 7 of 2,448 resizes under load). A place learned or a change answered
+ * between them mixes two windows: 02's guard kept a fraction off by 33 px (review, M3), and answered a step alone while
+ * the still's columns moved 40 px after it (open concern 3). A window's change moves all three measures, and a phone's
+ * toolbar none, so the page is laid out while they have all moved since it last was, or none has. A unit the page lacks
+ * is left out, and measures that stay apart past APART_MS are the page's own (a browser that resizes one unit alone):
+ * waiting for them then would keep no place at all. */
+export function laidOut(): boolean {
+  const all = viewProbes();
+  const now: Partial<Record<Unit, number>> = {};
+  for (const unit of UNITS) {
+    const px = all[unit].offsetHeight;
+    if (px > 0) now[unit] = px;
+  }
+  const was = whole;
+  const moved = UNITS.filter((unit) => {
+    const [px, then] = [now[unit], was?.[unit]];
+    return px !== undefined && then !== undefined && Math.abs(px - then) > 1;
+  });
+  const kept = UNITS.filter((unit) => now[unit] !== undefined && !moved.includes(unit));
+  if (!was || moved.length === 0 || kept.length === 0 || (apartSince !== null && performance.now() - apartSince > APART_MS)) {
+    whole = now;
+    apartSince = null;
+    return true;
+  }
+  apartSince ??= performance.now();
+  return false;
+}
+
+/** Has `observer` watch the page's measures of the window: it hears the step that completes a resize (laidOut), whichever
+ * it is, though nothing it watches itself changed size then. */
+export function watchView(observer: ResizeObserver): void {
+  for (const el of Object.values(viewProbes())) observer.observe(el);
+}
+
+/** Takes the page's measures of the window out of it: the journey calls it as it ends (start-journey.ts). */
+export function dropViewProbes(): void {
+  for (const el of Object.values(probes ?? {})) el.remove();
+  probes = null;
+  whole = null;
+  apartSince = null;
 }
 
 /** An instant scroll to `top`, unless the reader already stands within a pixel of it. Any instant scroll, even to where

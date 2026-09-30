@@ -220,3 +220,43 @@ export async function frames(page: Page, n = 2): Promise<void> {
     n,
   );
 }
+
+// WebKit lays a resize out in steps, a frame or more apart and in any order: what 100vh sizes (02's 330vh), and what
+// 100svh and 100lvh size (the still's columns, the run's pin, the window every timeline ends at), mostly those two
+// together, innerHeight the new window's throughout (the nightly config's WebKit, 2026-09-30: split in 7 of 2,448
+// resizes under load). Held here, deterministically in every engine: the step named stays at the old window's size
+// until released.
+/** Holds what the `late` step sizes at the size it has now. "small and large": the still's columns and the run's pin
+ * (100svh), and every probe of the window that asks for 100lvh or 100svh; "small" (100svh has landed a step of its own
+ * too): the same less the 100lvh probes; each let go by the first place-keeping jump (the step lands just after a piece
+ * answered the first, before that jump's own "scroll" event), or by `release`. "default": 02's pinned height, the live
+ * drawing's, and every probe that asks for 100vh; let go by `release`. */
+export async function holdLate(page: Page, late: "small and large" | "small" | "default"): Promise<void> {
+  await page.evaluate((which) => {
+    const px = (el: Element | null) => (el ? `${el.getBoundingClientRect().height}px` : "auto");
+    const h = `${window.innerHeight}px`;
+    const rules =
+      which === "default"
+        ? [
+            `#how.is-pinned { height: ${px(document.getElementById("how"))} !important; }`,
+            `#anatomy.is-live { height: ${px(document.getElementById("anatomy"))} !important; }`,
+            `div[style*="height: 100vh"] { height: ${h} !important; }`,
+          ]
+        : [
+            `.anatomy-pin.is-columns { height: ${px(document.querySelector(".anatomy-pin"))} !important; }`,
+            `#run.is-running .run-pin { height: ${px(document.querySelector("#run .run-pin"))} !important; }`,
+            `div[style*="height: 100svh"] { height: ${h} !important; }`,
+            ...(which === "small" ? [] : [`div[style*="height: 100lvh"] { height: ${h} !important; }`]),
+          ];
+    const sheet = new CSSStyleSheet();
+    sheet.replaceSync(rules.join("\n"));
+    document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+    const release = () => {
+      document.adoptedStyleSheets = document.adoptedStyleSheets.filter((s) => s !== sheet);
+      window.removeEventListener("tt:jump", release);
+    };
+    Reflect.set(window, "__ttRelease", release);
+    if (which !== "default") window.addEventListener("tt:jump", release);
+  }, late);
+}
+export const release = (page: Page): Promise<void> => page.evaluate(() => (Reflect.get(window, "__ttRelease") as () => void)());
