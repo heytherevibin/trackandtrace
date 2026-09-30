@@ -120,7 +120,9 @@ export function SignupCapture({
           {m.sent}
         </p>
       ) : (
-        <form noValidate onSubmit={submit} className={layout.form}>
+        // The row has no heading of its own, and on /login and a searched /pre-booking a second field is
+        // also called "Email": the row is named for what it subscribes to. The column already has its heading.
+        <form noValidate onSubmit={submit} className={layout.form} {...(place === "footer-row" ? { "aria-label": m.places.footerColumn } : {})}>
           {layout.stacked ? (
             <>
               {labelled}

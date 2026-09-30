@@ -28,6 +28,17 @@ describe("the sign-up capture", () => {
     expect(screen.queryByText(m.places.preBooking)).not.toBeInTheDocument();
   });
 
+  it("names only the compact row's form: the column has a heading of its own, the plate has its intro", () => {
+    const { container, unmount } = render(<SignupCapture place="footer-row" list="news" source="footer" />);
+    expect(container.querySelector("form")).toHaveAttribute("aria-label", m.places.footerColumn);
+    unmount();
+    for (const place of ["footer-column", "pre-booking"] as const) {
+      const drawn = render(<SignupCapture place={place} list="news" source="footer" />);
+      expect(drawn.container.querySelector("form")).not.toHaveAttribute("aria-label");
+      drawn.unmount();
+    }
+  });
+
   it("carries the consent line, with the privacy notice as a link", () => {
     draw();
     expect(screen.getByText(/We never sell your address/)).toBeInTheDocument();

@@ -19,6 +19,12 @@ describe("the app pages' compact footer", () => {
     expect(screen.queryByText(m.places.footerColumn)).not.toBeInTheDocument();
   });
 
+  it("names the row for what it subscribes to, since a bare Email field says nothing on /login or /pre-booking", () => {
+    render(<Footer />);
+    const row = screen.getByRole("form", { name: m.places.footerColumn });
+    expect(row).toContainElement(screen.getByLabelText(m.form.label));
+  });
+
   it("keeps the disclaimer and the clock, which the row must never push out", () => {
     render(<Footer />);
     expect(screen.getByText(messages.common.notAffiliated, { exact: false })).toBeInTheDocument();
