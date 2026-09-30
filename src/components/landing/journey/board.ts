@@ -98,7 +98,7 @@ export function startBoard({ motion, played }: JourneyContext): Teardown {
         {
           trigger: board,
           at: 0.9,
-          once: "board",
+          key: "board",
           arm: () => {
             settleWords();
             const nameChars = names.flatMap((a) => {

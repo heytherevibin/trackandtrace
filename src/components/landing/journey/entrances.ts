@@ -1,12 +1,8 @@
-// Entrances, decided from the trigger's live box on every check, so a jump or a reload never strands anything: rest
-// (the server's still state) → armed only once the trigger has wholly left the window → played when it comes into the
-// band, from either side.
-//
-// Two kinds (spec §3.A):
-// - The section entrances play once per load (the owner, 2026-09-30, reverting 2026-09-25's replay): a trigger in
-//   the window when the watch starts is "seen", left as the server drew it; one out of sight arms and plays the first
-//   time it reaches the band. Either way it ends "played", which never arms again.
-// - The berth plan replays: after it plays it goes back to rest, and arms again once it has wholly left the window.
+// Entrances play once per load (the owner, 2026-09-30, reverting 2026-09-25's replay): the section entrances and the
+// berth plan. Each is decided from its trigger's live box on every check, so a jump or a reload never strands anything:
+// rest (the server's still state, before the first check) → "seen" if the trigger is properly in the band then, left as
+// the server drew it; otherwise armed → played the first time it is properly in the band, from either side. Played
+// never arms again.
 
 export type EntrancePhase = "rest" | "armed" | "played";
 export type EntranceStep = "arm" | "play" | "seen" | null;
@@ -16,18 +12,27 @@ export interface EntranceBox {
   readonly bottom: number;
 }
 
-export function entranceStep(phase: EntrancePhase, box: EntranceBox, viewportHeight: number, at: number, once = false): EntranceStep {
-  if (phase === "played") return null;
-  if (phase === "rest") {
-    if (box.bottom <= 0 || box.top >= viewportHeight) return "arm";
-    return once ? "seen" : null;
-  }
-  return box.top < viewportHeight * at && box.bottom > viewportHeight * (1 - at) ? "play" : null;
+/**
+ * Properly in the band (the middle of the window, from 1 − at to at of its height): at least half the trigger lies in
+ * it, or half the band for a trigger taller than that. A trigger that only peeks in at the window's edge is not (the
+ * owner, 2026-09-30: the departure board at a desktop window's foot, loaded at the top, plays when it is scrolled in).
+ */
+export function inBand(box: EntranceBox, viewportHeight: number, at: number): boolean {
+  const low = viewportHeight * (1 - at);
+  const high = viewportHeight * at;
+  if (box.bottom < low || box.top > high) return false;
+  const overlap = Math.min(box.bottom, high) - Math.max(box.top, low);
+  return overlap >= Math.min(box.bottom - box.top, high - low) / 2;
 }
 
-/** Where a step leaves an entrance: armed after "arm"; after "play" or "seen", played for good if it plays once,
- * else back at rest. */
-export function phaseAfter(step: NonNullable<EntranceStep>, once: boolean): EntrancePhase {
-  if (step === "arm") return "armed";
-  return once ? "played" : "rest";
+export function entranceStep(phase: EntrancePhase, box: EntranceBox, viewportHeight: number, at: number): EntranceStep {
+  if (phase === "played") return null;
+  const inside = inBand(box, viewportHeight, at);
+  if (phase === "rest") return inside ? "seen" : "arm";
+  return inside ? "play" : null;
+}
+
+/** Where a step leaves an entrance: armed after "arm"; played for good after "play" or "seen". */
+export function phaseAfter(step: NonNullable<EntranceStep>): EntrancePhase {
+  return step === "arm" ? "armed" : "played";
 }

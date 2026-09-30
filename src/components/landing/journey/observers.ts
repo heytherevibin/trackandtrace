@@ -91,36 +91,34 @@ export function keepUp(observer: ScrollObserver, drawn: () => number): () => voi
   };
 }
 
-/** One entrance: its trigger's box decides; arm puts the start state on, play animates to rest, settle puts the
- * server's state back (on teardown). With `once` (a section entrance) it plays once per load, remembered under that key
- * in the journey's played set; without (the berth plan), it replays each time its trigger comes back. */
+/** One entrance, played once per load: its trigger's box decides; arm puts the start state on, play animates to rest,
+ * settle puts the server's state back (on teardown). `key` names it in the journey's played set. */
 export interface Entrance {
   readonly trigger: Element;
   readonly at: number;
-  readonly once?: string;
+  readonly key: string;
   arm(): void;
   play(): void;
   settle(): void;
 }
 
 /** Checks every entrance against its trigger's live box on scroll and layout, one frame at a time. `played` is the
- * journey's own (JourneyContext.played), kept across every rebuild: a once entrance already played or seen in this
- * load starts played, so a rebuild (Motion off, then on) never plays it again. */
+ * journey's own (JourneyContext.played), kept across every rebuild: an entrance already played or seen in this load
+ * starts played, so a rebuild (Motion off, then on) never plays it again. */
 export function watchEntrances(entrances: readonly Entrance[], played: Kept<ReadonlySet<string>>): () => void {
-  const phases = new Map<Entrance, EntrancePhase>(entrances.map((e) => [e, e.once !== undefined && played.get().has(e.once) ? "played" : "rest"]));
+  const phases = new Map<Entrance, EntrancePhase>(entrances.map((e) => [e, played.get().has(e.key) ? "played" : "rest"]));
   let frame = 0;
   const check = () => {
     frame = 0;
     const vh = window.innerHeight;
     for (const e of entrances) {
-      const once = e.once !== undefined;
-      const step = entranceStep(phases.get(e) ?? "rest", e.trigger.getBoundingClientRect(), vh, e.at, once);
+      const step = entranceStep(phases.get(e) ?? "rest", e.trigger.getBoundingClientRect(), vh, e.at);
       if (!step) continue;
       if (step === "arm") e.arm();
       else if (step === "play") e.play();
-      const next = phaseAfter(step, once);
+      const next = phaseAfter(step);
       phases.set(e, next);
-      if (next === "played" && e.once !== undefined) played.set(new Set([...played.get(), e.once]));
+      if (next === "played") played.set(new Set([...played.get(), e.key]));
     }
   };
   const queue = () => {

@@ -5,8 +5,10 @@ import { T } from "./motion-tokens";
 import { watchEntrances } from "./observers";
 import type { JourneyContext, Teardown } from "./start-journey";
 
-// 03 · the berth plan while the journey runs (spec §3.A): whenever it comes into view it draws itself, line by
-// line, then the sample passenger's berth lights with one bright pulse. Out of sight it waits undrawn and unlit.
+// 03 · the berth plan while the journey runs (spec §3.A): once per load (the owner, 2026-09-30), the first time it
+// is properly in view, it draws itself, line by line, then the sample passenger's berth lights with one bright pulse;
+// then it stays. Until then, out of sight, it waits undrawn and unlit; in view at start, it stays as the server drew it.
+// It shares the journey's played set with the section entrances, so a rebuild never draws it again.
 // Motion off: drawn and lit, as the server made it.
 //
 // The strokes are a Drawing (drawing.ts): drawn and hidden by one kept handle, cancelled and cleared on stop, never
@@ -27,12 +29,12 @@ export function startBerths({ motion, played }: JourneyContext): Teardown {
     plan.clear();
   };
   const light = (on: boolean) => lit.forEach((el) => el.classList.toggle("is-lit", on));
-  // No `once`: unlike the section entrances, the plan still replays each time it comes back into view (§3.A).
   return watchEntrances(
     [
       {
         trigger: drawing,
         at: 0.9,
+        key: "berths",
         arm: () => {
           stop();
           light(false);

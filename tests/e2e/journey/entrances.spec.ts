@@ -106,6 +106,27 @@ test.describe("section entrances", () => {
     await expectNoReplay(page);
   });
 
+  test("a section properly in view at start stays at rest, as the server drew it, and never plays", async ({ page }) => {
+    await page.goto("/#record");
+    await waitForJourney(page);
+    const atLoad = await watchRecord(page, 600);
+    expect(new Set(atLoad.transforms)).toEqual(new Set([RISEN]));
+    expect(new Set(atLoad.split)).toEqual(new Set([0]));
+    await expectNoReplay(page);
+  });
+
+  test("a jump past a section still plays it the first time it is seen, coming back up", async ({ page }) => {
+    await page.goto("/");
+    await waitForJourney(page);
+    await expect.poll(() => transformOf(recordRow(page))).toBe(ARMED);
+    await scrollToId(page, "faq");
+    await frames(page, 3);
+    expect(await transformOf(recordRow(page))).toBe(ARMED);
+    await scrollToId(page, "record", 120);
+    await expect.poll(() => transformOf(recordRow(page)), { timeout: 3_000 }).toBe(RISEN);
+    await expect.poll(() => recordKicker(page).evaluate((el) => el.children.length), { timeout: 3_000 }).toBe(0);
+  });
+
   test("a jump straight to a section never strands its rows", async ({ page }) => {
     await page.goto("/#faq");
     await waitForJourney(page);

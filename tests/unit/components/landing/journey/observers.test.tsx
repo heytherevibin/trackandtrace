@@ -100,14 +100,14 @@ describe("keepUp: anime's scroll sync, woken until the drawing catches up with t
 });
 
 /** An entrance whose trigger stands wherever `top` says (400 px tall), counting what the watcher asks of it. */
-function entrance(top: () => number, once?: string) {
+function entrance(top: () => number, key: string) {
   const calls: string[] = [];
   const trigger = document.createElement("section");
   trigger.getBoundingClientRect = () => ({ top: top(), bottom: top() + 400 }) as DOMRect;
   const e: Entrance = {
     trigger,
     at: 0.88,
-    ...(once ? { once } : {}),
+    key,
     arm: () => calls.push("arm"),
     play: () => calls.push("play"),
     settle: () => calls.push("settle"),
@@ -115,7 +115,7 @@ function entrance(top: () => number, once?: string) {
   return { e, calls };
 }
 
-describe("watchEntrances: section entrances play once per load", () => {
+describe("watchEntrances: every entrance plays once per load", () => {
   beforeEach(() => {
     vi.spyOn(window, "innerHeight", "get").mockReturnValue(800);
   });
@@ -128,7 +128,7 @@ describe("watchEntrances: section entrances play once per load", () => {
     vi.advanceTimersToNextFrame();
   };
 
-  it("plays a once entrance the first time it reaches the band, never again, and remembers it in the played set", () => {
+  it("plays an entrance the first time it is properly in the band, never again, and remembers it in the played set", () => {
     let top = 2000;
     const { e, calls } = entrance(() => top, "rows:#record");
     const played = keep<ReadonlySet<string>>(new Set());
@@ -147,7 +147,7 @@ describe("watchEntrances: section entrances play once per load", () => {
     expect(calls).toEqual(["arm", "play", "settle"]);
   });
 
-  it("counts a once entrance in the window at start as seen: it stays as the server drew it, for good", () => {
+  it("counts an entrance properly in the band at start as seen: it stays as the server drew it, for good", () => {
     let top = 100;
     const { e, calls } = entrance(() => top, "kicker:0");
     const played = keep<ReadonlySet<string>>(new Set());
@@ -161,35 +161,35 @@ describe("watchEntrances: section entrances play once per load", () => {
     stop();
   });
 
-  it("never replays, after a rebuild (Motion off, then on), an entrance already played in this load", () => {
+  it("arms an entrance that only peeks in at start, and plays it once it is properly in the band", () => {
+    let top = 650;
+    const { e, calls } = entrance(() => top, "board");
+    const played = keep<ReadonlySet<string>>(new Set());
+    const stop = watchEntrances([e], played);
+    expect(calls).toEqual(["arm"]);
+    expect(played.get().size).toBe(0);
+    top = 300;
+    scroll();
+    expect(calls).toEqual(["arm", "play"]);
+    stop();
+  });
+
+  it("never replays, after a rebuild (Motion off, then on), an entrance already played in this load: the berth plan too", () => {
     let top = 2000;
     const played = keep<ReadonlySet<string>>(new Set());
-    const first = entrance(() => top, "board");
+    const first = entrance(() => top, "berths");
     const stop = watchEntrances([first.e], played);
     top = 300;
     scroll();
     top = 2000;
     scroll();
     stop();
-    const rebuilt = entrance(() => top, "board");
+    const rebuilt = entrance(() => top, "berths");
     const stopRebuilt = watchEntrances([rebuilt.e], played);
     top = 300;
     scroll();
+    expect(first.calls).toEqual(["arm", "play", "settle"]);
     expect(rebuilt.calls).toEqual([]);
     stopRebuilt();
-  });
-
-  it("still replays an entrance with no once key (the berth plan) every time it comes back", () => {
-    let top = 2000;
-    const { e, calls } = entrance(() => top);
-    const played = keep<ReadonlySet<string>>(new Set());
-    const stop = watchEntrances([e], played);
-    for (const at of [300, 2000, 300]) {
-      top = at;
-      scroll();
-    }
-    expect(calls).toEqual(["arm", "play", "arm", "play"]);
-    expect(played.get().size).toBe(0);
-    stop();
   });
 });

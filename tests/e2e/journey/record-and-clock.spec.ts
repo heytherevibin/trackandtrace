@@ -1,5 +1,56 @@
-import { expect, test } from "@playwright/test";
-import { motionOff, scrollToId, waitForJourney } from "./journey-helpers";
+import { expect, test, type Page } from "@playwright/test";
+import { frames, motionOff, scrollToId, waitForJourney } from "./journey-helpers";
+
+const lit = (page: Page) => page.locator(".berth-plan .plan-berth.is-lit");
+
+/** Brings the plan into the window and waits for it to have drawn itself and lit the berth. */
+async function drawPlan(page: Page): Promise<void> {
+  await scrollToId(page, "record", 40);
+  await page.locator(".berth-plan").scrollIntoViewIfNeeded();
+  await expect(lit(page)).toHaveCount(1, { timeout: 4_000 });
+  await expect.poll(() => page.evaluate(heldStrokes), { timeout: 4_000 }).toBe(0);
+}
+
+/** How many of the plan's strokes are not wholly drawn: anime's `draw` attribute on them is anything but "0 1" (none:
+ * the server's own stroke). */
+function heldStrokes(): number {
+  return [...document.querySelectorAll(".berth-plan .plan-line, .berth-plan .plan-berth")].filter((el) => {
+    const draw = el.getAttribute("draw");
+    return draw !== null && draw !== "0 1";
+  }).length;
+}
+
+/** Away from 03 and back: at every frame, there and back, the plan stays drawn (no stroke held back) and lit. */
+async function expectNoRedraw(page: Page): Promise<void> {
+  await scrollToId(page, "terminus");
+  await frames(page, 3);
+  await expect(lit(page)).toHaveCount(1);
+  await scrollToId(page, "record", 40);
+  await page.locator(".berth-plan").scrollIntoViewIfNeeded();
+  const seen = await page.evaluate(
+    () =>
+      new Promise<string[]>((done) => {
+        const states: string[] = [];
+        const start = performance.now();
+        const look = () => {
+          const held = [...document.querySelectorAll(".berth-plan .plan-line, .berth-plan .plan-berth")].filter((el) => {
+            const draw = el.getAttribute("draw");
+            return draw !== null && draw !== "0 1";
+          }).length;
+          states.push(`lit ${document.querySelectorAll(".berth-plan .plan-berth.is-lit").length}, held ${held}`);
+          if (performance.now() - start < 1_500) requestAnimationFrame(look);
+          else done(states);
+        };
+        look();
+      }),
+  );
+  expect(new Set(seen)).toEqual(new Set(["lit 1, held 0"]));
+}
+
+/** Flips Motion the way a reader does, through the footer's own switch, clicked in the DOM so the page never scrolls. */
+async function clickMotion(page: Page): Promise<void> {
+  await page.getByRole("contentinfo").getByRole("switch", { name: "Motion" }).evaluate((el) => (el as HTMLElement).click());
+}
 
 test.describe("03 and 04, moving", () => {
   test("the berth plan draws itself on arrival, then lights the berth", async ({ page }) => {
@@ -11,6 +62,39 @@ test.describe("03 and 04, moving", () => {
     await page.locator(".berth-plan").scrollIntoViewIfNeeded();
     await expect(page.locator(".berth-plan .plan-berth.is-lit")).toHaveCount(1, { timeout: 4_000 });
     await expect(page.locator(".berth-cap")).toContainText("12 LB");
+  });
+
+  // The berth plan plays once per load too (the owner, 2026-09-30): it draws the first time 03 is reached, then stays.
+  test("the berth plan draws once: scrolled away and back, it never draws again", async ({ page }) => {
+    await page.goto("/");
+    await waitForJourney(page);
+    await drawPlan(page);
+    await expectNoRedraw(page);
+  });
+
+  test("a reload draws the berth plan again", async ({ page }) => {
+    await page.goto("/");
+    await waitForJourney(page);
+    await drawPlan(page);
+    await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+    await page.reload();
+    await waitForJourney(page);
+    await expect(lit(page)).toHaveCount(0);
+    await drawPlan(page);
+  });
+
+  test("Motion off, then on: the berth plan already drawn does not draw again", async ({ page }) => {
+    await page.goto("/");
+    await waitForJourney(page);
+    await drawPlan(page);
+    await scrollToId(page, "terminus");
+    await clickMotion(page);
+    await expect(page.locator("html")).toHaveAttribute("data-motion", "off");
+    await frames(page, 3);
+    await clickMotion(page);
+    await expect(page.locator("html")).toHaveAttribute("data-motion", "on");
+    await frames(page, 3);
+    await expectNoRedraw(page);
   });
 
   test("the second hand sweeps while the clock is on screen", async ({ page }) => {

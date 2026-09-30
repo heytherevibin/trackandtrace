@@ -42,7 +42,7 @@ function kickers(): Entrance[] {
     return {
       trigger: kicker.closest("section") ?? kicker,
       at: 0.88,
-      once: `kicker:${k}`,
+      key: `kicker:${k}`,
       arm: () => {
         unsplit();
         split = splitText(kicker, { chars: true });
@@ -74,7 +74,7 @@ function rows(): Entrance[] {
       {
         trigger,
         at: 0.88,
-        once: `rows:${section}`,
+        key: `rows:${section}`,
         arm: () => {
           release(targets);
           utils.set(targets, { translateY: 16 });
@@ -96,7 +96,7 @@ function marks(): Entrance[] {
       {
         trigger: plate,
         at: 0.92,
-        once: `marks:${k}`,
+        key: `marks:${k}`,
         arm: () => {
           release(corners);
           utils.set(corners, { scale: 2.2, opacity: 0 });
