@@ -102,6 +102,10 @@ describe("MODULES", () => {
   it("no longer starts the route strip: the owner removed it, on the phone and the desktop rail alike", () => {
     expect(MODULES.map((m) => m.name)).not.toContain("startStrip");
   });
+
+  it("no longer starts the registration-mark cursor: the owner removed it, so the reader keeps their own pointer", () => {
+    expect(MODULES.map((m) => m.name)).not.toContain("startCursor");
+  });
 });
 
 describe("a journey's lifetime (J5-4)", () => {

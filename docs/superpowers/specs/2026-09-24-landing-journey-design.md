@@ -48,7 +48,7 @@ Settled with the user between 2026-09-24 rounds 1–4, A–E, and the v3 approva
 - **v2 features (all 14):** kinetic headline, living dial, chart countdown ring, plotter intro once per visit,
   label↔part highlight, dimensions and title block, berth plan (03), station clock (04), track-laying
   roadmap (05), departure board under the hero, ~~route strip (a left rail since 2026-09-27)~~ (removed by the owner, 2026-09-27), plate morph, registration-mark
-  cursor (desktop, motion on), sound off by default (rail clack, departure horn) behind a footer switch.
+  sound off by default (rail clack, departure horn) behind a footer switch.
 - **v3 additions:** the window-seat run through 06–07, Night falls (theme sweep), line side passing at the
   departure, headlight beam at Night, scan reveal, adaptive quality, Data Saver, and the frame meter (a review
   tool: preview deployments and development only, §3.J; J5-10).
@@ -92,7 +92,7 @@ Top to bottom, as in v3:
 | 08 FAQ | Arrivals. | Static |
 | Terminus | The full train arrives above the closing plate; Night: headlight beam. | The still terminus drawing |
 | Footer (landing) | Motion switch (on; off and disabled with a note under reduced motion) and Sound switch (off). | — |
-| Page-wide | Registration-mark cursor (fine pointer, motion on). Night falls: the theme switch sweeps the new theme out from the button in a circle (same-document View Transition). | Instant theme switch |
+| Page-wide | ~~Registration-mark cursor (fine pointer, motion on)~~ (removed by the owner, 2026-09-30: it hid the native pointer page-wide and framed every control it rested on). Night falls: the theme switch sweeps the new theme out from the button in a circle (same-document View Transition). | Instant theme switch |
 
 **Section entrances replay** (decided 2026-09-25). Four entrances play every time their section scrolls
 back into view, not once per load: the section kickers flipping in, rows rising into place (01, 03, 04, 05,
@@ -157,7 +157,7 @@ reduced-motion rules (motion.css) to every traveller page, so the switch means t
 |---|---|
 | Server markup | ~~`route-strip.tsx`~~ (removed by the owner, 2026-09-27), `departure-board.tsx`, `hero-dial.tsx`, `drawing-chapter.tsx`, `chapters-instrument.tsx`, `berth-plan.tsx`, `route-map.tsx`, `window-run.tsx`, `terminus-stage.tsx`, `journey-switches.tsx` |
 | Pure geometry and logic (unit-tested) | `geometry/dial.ts`, `geometry/clock.ts`, `geometry/berths.ts`, `geometry/route.ts`, `geometry/run.ts`, `pose.ts` (anatomy and terminus poses), `governor.ts`, `labels-layout.ts`, ~~`strip-position.ts`~~ (removed by the owner, 2026-09-27), `drawing-mode.ts`, `fit.ts`, `chart-countdown.ts` |
-| Client island | `journey-loader.tsx`, `start-journey.ts`, `observers.ts`, `motion-tokens.ts`, `intro.ts`, ~~`strip.ts`~~ (removed by the owner, 2026-09-27), `board.ts`, `hero.ts`, `chapters.ts`, `berths.ts`, `station-clock.tsx`, `clock.ts`, `route.ts`, `run.ts`, `arrivals.ts`, `cursor.ts`, `sound.ts`, `drawing.ts`, `still.ts`, `keep-place.ts`, `live-labels.ts`, `webgl-probe.ts`, `hud.ts`, `hud-gate.ts` |
+| Client island | `journey-loader.tsx`, `start-journey.ts`, `observers.ts`, `motion-tokens.ts`, `intro.ts`, ~~`strip.ts`~~ (removed by the owner, 2026-09-27), `board.ts`, `hero.ts`, `chapters.ts`, `berths.ts`, `station-clock.tsx`, `clock.ts`, `route.ts`, `run.ts`, `arrivals.ts`, ~~`cursor.ts`~~ (removed by the owner, 2026-09-30), `sound.ts`, `drawing.ts`, `still.ts`, `keep-place.ts`, `live-labels.ts`, `webgl-probe.ts`, `hud.ts`, `hud-gate.ts` |
 | Scene (three.js) | `scene/engine.ts`, `scene/rig.ts`, `scene/rig-parts.ts`, `scene/lines.ts`, `scene/line-world.ts`, `scene/departure.ts`, `scene/beam.ts`, `scene/scan.ts`, `scene/fit.ts`, `scene/apply-pose.ts`, `scene/palette.ts`, `scene/live.ts`, `scene/glow.ts`, `scene/scene-mark.ts` |
 | Build-time | `scripts/bake-train-stills.mjs`, generated `still-manifest.ts` |
 

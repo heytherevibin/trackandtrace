@@ -4,7 +4,6 @@ import { startBerths } from "./berths";
 import { startBoard } from "./board";
 import { startChapters, startPlaceGuard } from "./chapters";
 import { startClock } from "./clock";
-import { startCursor } from "./cursor";
 import { startDrawing } from "./drawing";
 import { startFocusGlide } from "./focus-glide";
 import { startHero } from "./hero";
@@ -111,7 +110,7 @@ export interface JourneyOptions {
 /** In start order; a rebuild tears them down in reverse. The run (06–07) is last, so it is torn down first: its unpin
  * is measured on the page the reader sees, before the still's and the drawing's teardowns change the layout above it
  * for a moment (J6-7). Later tasks append their modules before it. */
-export const MODULES: readonly JourneyModule[] = [startArrivals, startBoard, startStationProgress, startHero, startChapters, startBerths, startClock, startRoute, startCursor, startSound, startDrawing, startStill, startFocusGlide, startRun];
+export const MODULES: readonly JourneyModule[] = [startArrivals, startBoard, startStationProgress, startHero, startChapters, startBerths, startClock, startRoute, startSound, startDrawing, startStill, startFocusGlide, startRun];
 
 export function startJourney(options: JourneyOptions = {}): Teardown {
   const html = document.documentElement;
