@@ -213,3 +213,43 @@ describe("searching a route", () => {
     expect(lifecycle()[2]).toHaveAttribute("data-state", "done");
   });
 });
+
+describe("the availability list, offered under the result", () => {
+  const offered = () => screen.queryByText(messages.subscribe.places.preBooking);
+
+  it("is not offered before a search: there is nothing yet to be told about", async () => {
+    stubFetch();
+    render(<PreBookingForm />);
+    // Not on load, and not once the route and date are in either: only a submit that answered.
+    expect(offered()).not.toBeInTheDocument();
+    await enterPair();
+    fireEvent.change(dateInput(), { target: { value: "2026-10-16" } });
+    expect(offered()).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: messages.subscribe.form.notify })).not.toBeInTheDocument();
+  });
+
+  it("is offered under the result once a search has answered", async () => {
+    stubFetch();
+    render(<PreBookingForm />);
+    await enterPair();
+    fireEvent.change(dateInput(), { target: { value: "2026-10-16" } });
+    fireEvent.click(searchButton());
+
+    await waitFor(() => expect(screen.getByTestId("train-row")).toBeInTheDocument());
+    expect(screen.getByRole("heading", { name: messages.subscribe.places.preBookingTitle })).toBeInTheDocument();
+    expect(screen.getByText(messages.subscribe.places.preBooking)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: messages.subscribe.form.notify })).toBeInTheDocument();
+  });
+
+  it("is offered after a refusal too, when the traveller has just failed to get an answer", async () => {
+    stubFetch({ search: { status: 503, body: { ok: false, code: "SOURCE_UNAVAILABLE", message: "Trakline has used today's live checks." } } });
+    render(<PreBookingForm />);
+    await enterPair();
+    fireEvent.change(dateInput(), { target: { value: "2026-10-16" } });
+    fireEvent.click(searchButton());
+
+    await waitFor(() => expect(screen.getByText("Trakline has used today's live checks.")).toBeInTheDocument());
+    expect(screen.getByText(messages.subscribe.places.preBooking)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: messages.subscribe.form.notify })).toBeInTheDocument();
+  });
+});
