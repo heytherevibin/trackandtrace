@@ -1,12 +1,13 @@
 import { expect, test } from "./fixtures";
 import { PNR, gotoReady } from "./helpers";
 import { layoutBreaks } from "./layout";
+import { UNSUBSCRIBE } from "./subscribe-link";
 
 // Every route fits a phone: no sideways page scroll, nothing drawn past the screen edge, and no
 // container that hides part of its content (a clipped nav strip, a table wider than its plate).
 
 const WIDTHS = [320, 360, 390, 768] as const;
-const ROUTES = ["/", "/watchlist", "/pre-booking", "/accuracy", "/login", "/account", `/pnr#${PNR.mixed}`, `/pnr#${PNR.notFound}`, "/pnr/abc", "/check", "/privacy", "/tos", "/offline", "/nowhere"] as const;
+const ROUTES = ["/", "/watchlist", "/pre-booking", "/accuracy", "/login", "/account", `/pnr#${PNR.mixed}`, `/pnr#${PNR.notFound}`, "/pnr/abc", "/check", "/privacy", "/tos", "/offline", "/nowhere", "/subscribe/confirm", "/unsubscribe", UNSUBSCRIBE.valid] as const;
 
 const SAVED = [
   {
