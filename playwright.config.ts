@@ -65,6 +65,12 @@ export default defineConfig({
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "",
       E2E: "1",
       E2E_NOW: process.env.E2E_NOW ?? "2026-09-17T06:30:00.000Z",
+      // Fixed, so a spec can sign an unsubscribe link with the key the server derives from it. Without
+      // DATA_KEY the server's key is randomBytes(32) per process, a link minted by the runner never
+      // verifies, and the /unsubscribe sweeps would only ever measure the invalid-link page. The test
+      // key the unit tests use, 32 bytes of 7: never a real one (the environment check requires a real
+      // DATA_KEY in production).
+      DATA_KEY: Buffer.alloc(32, 7).toString("base64"),
     },
   },
 });
