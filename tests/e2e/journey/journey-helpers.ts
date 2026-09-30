@@ -262,3 +262,28 @@ export async function holdLate(page: Page, late: "small and large" | "small" | "
   }, late);
 }
 export const release = (page: Page): Promise<void> => page.evaluate(() => (Reflect.get(window, "__ttRelease") as () => void)());
+
+/** From before the page's first script: every frame, whether anything matching `selector` stands off its rest (any
+ * transform but none), counted in window.__ttMoved, so a spec can tell whether an entrance played while it could not
+ * be watching (at load, as the journey starts). Read it with movedFrames; zero it with resetMoved. */
+export async function watchMotion(page: Page, selector: string): Promise<void> {
+  await page.addInitScript((sel) => {
+    const w = window as unknown as { __ttMoved: number };
+    w.__ttMoved = 0;
+    const look = () => {
+      const moved = [...document.querySelectorAll(sel)].some((el) => {
+        const t = getComputedStyle(el).transform;
+        return t !== "none" && t !== "matrix(1, 0, 0, 1, 0, 0)";
+      });
+      if (moved) w.__ttMoved += 1;
+      requestAnimationFrame(look);
+    };
+    requestAnimationFrame(look);
+  }, selector);
+}
+
+/** How many frames watchMotion has seen something off its rest in, since the load or the last resetMoved. */
+export const movedFrames = (page: Page): Promise<number> => page.evaluate(() => Reflect.get(window, "__ttMoved") as number);
+
+/** Zeroes watchMotion's count. */
+export const resetMoved = (page: Page): Promise<void> => page.evaluate(() => void Reflect.set(window, "__ttMoved", 0));

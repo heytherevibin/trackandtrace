@@ -145,12 +145,14 @@ these rules.
   takes it over only while it runs, under `html[data-journey="on"]`. If the journey never starts (offline,
   blocked, the 15 s watchdog), the page stays as drawn. It never changes the reader's Motion choice.
 - **Text moves by transform only, never opacity**, so contrast holds at every frame. Drawings may fade.
-- **Section entrances replay.** Kickers flip in, rows rise, registration marks snap on, and the board's rows
-  flip in. Each resets only once its section has wholly left the window, and plays again when it comes back.
+- **Section entrances play once per load** (the owner, 2026-09-30, reverting 2026-09-25's replay). Kickers flip
+  in, rows rise, registration marks snap on, the board's rows flip in, and 03's berth plan draws itself: at load, like
+  the headline, for any visible when the journey starts; else the first time each enters the middle of the window.
+  Never again that load, not after a Motion toggle either. A reload plays them again.
 - **The headline's letters rise once per load, and the plotter once per visit.** The headline is the server's
   `<h1>` before and after; the split exists only while the letters move.
-- **Scroll-driven pieces follow the scroll both ways:** the strip, the board's status, the chapters, the berths
-  and the route. Pinned pieces pin only while their content fits the window.
+- **Scroll-driven pieces follow the scroll both ways:** the strip, the board's status, the chapters and the
+  route. Pinned pieces pin only while their content fits the window.
 - **Nothing moves under the reader.** A piece that grows or shrinks (the drawing's pin, 02's dial, the still's
   columns, the run) judges the reader by one rule (`readerPlace`). Above it, its top in view, the change lands below
   them. Inside it, with over half the window in it, they go to its start. Past it, its foot within the window's top

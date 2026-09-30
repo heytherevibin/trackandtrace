@@ -96,6 +96,11 @@ export interface JourneyContext {
   readonly still: Kept<StillPlace>;
   /** The live drawing's engine, kept for this startJourney's whole lifetime and reused by every rebuild (J5-4). */
   readonly scene: Kept<Promise<Engine> | null>;
+  /** The entrances already played in this page load (the section entrances and the berth plan), by key (observers.ts's
+   * watchEntrances): kept here, across every rebuild, so a Motion toggle never plays one again; a teardown never
+   * clears it. It dies with this startJourney, so a reload, or a fresh client navigation back to "/" (a new page from
+   * the server), plays them again. */
+  readonly played: Kept<ReadonlySet<string>>;
   /** Runs `stop` once when this startJourney ends, never on a rebuild; at once if it has already ended. */
   readonly atEnd: (stop: Teardown) => void;
 }
@@ -123,6 +128,7 @@ export function startJourney(options: JourneyOptions = {}): Teardown {
   const still = keep<StillPlace>({ columns: false, height: null });
   const life = lifetime();
   const scene = keep<Promise<Engine> | null>(null);
+  const played = keep<ReadonlySet<string>>(new Set());
 
   const stopAll = () => {
     stops += 1;
@@ -139,7 +145,7 @@ export function startJourney(options: JourneyOptions = {}): Teardown {
     const motion = html.getAttribute("data-motion") !== "off";
     const intro = !introPlayed && introWanted(motion);
     introPlayed = true;
-    const ctx: JourneyContext = { motion, intro, result, still, scene, atEnd: life.atEnd };
+    const ctx: JourneyContext = { motion, intro, result, still, scene, played, atEnd: life.atEnd };
     const starts: ReadonlyArray<() => Teardown> = [...(intro ? [startIntro] : []), ...MODULES.map((start) => () => start(ctx))];
     try {
       for (const [i, start] of starts.entries()) {
