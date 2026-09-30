@@ -22,7 +22,9 @@ export function Roadmap() {
             <span className={`min-w-8 ${ROW_NUM}`}>{item.num}</span>
             <span className="min-w-[200px] font-display text-lg font-semibold uppercase leading-normal tracking-head">{item.title}</span>
             <span className="min-w-[220px] flex-1 text-sm leading-normal text-ink-1/74">{item.note}</span>
-            <SheetTag variant="outline">{m.planned}</SheetTag>
+            {/* Accent for what a reader can go and use today, outline for what is still to come:
+                the difference is visible down the column without reading each chip. */}
+            <SheetTag variant={item.status === "live" ? "accent" : "outline"}>{m.status[item.status]}</SheetTag>
           </li>
         ))}
       </ul>
