@@ -4,10 +4,11 @@ import base from "./playwright.config";
 // The journey's nightly e2e (spec 2026-09-24 §5, §8; J6-3), on the same fixture-mode `next dev` as every PR:
 // - sizes: the landing at fifteen sizes, and at 200% text at the PR's three;
 // - screens: every chapter photographed in Day, Night and on a phone;
-// - webkit and webkit-phone: the journey's place, run, Night falls and drawing specs in WebKit, Safari's engine (§8).
+// - webkit and webkit-phone: the journey's place (and place-steps), run, Night falls and drawing specs in WebKit,
+//   Safari's engine (§8).
 // .github/workflows/journey-nightly.yml runs it in three shards:
 //   npx playwright test -c playwright.nightly.config.ts
-const JOURNEY_IN_WEBKIT = /journey\/(place|run|night-falls|drawing-modes|live-drawing)\.spec\.ts$/;
+const JOURNEY_IN_WEBKIT = /journey\/(place|place-steps|run|night-falls|drawing-modes|live-drawing)\.spec\.ts$/;
 
 export default defineConfig({
   ...base,

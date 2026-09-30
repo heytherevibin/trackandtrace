@@ -302,10 +302,12 @@ export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2,
     window.addEventListener("scroll", learn, { passive: true });
     window.addEventListener(LAYOUT_EVENT, learn);
     window.addEventListener("resize", onResize);
-    const completed = new ResizeObserver(() => {
-      if (owed) onResize();
-    });
-    watchView(completed);
+    // heard in document order with 02's guard and the run: the pin above answers before 02's guard (the review, H1)
+    const stopView = section
+      ? watchView(section, () => {
+          if (owed) onResize();
+        })
+      : () => undefined;
 
     function apply(): void {
       if (!alive) return;
@@ -362,7 +364,7 @@ export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2,
       window.removeEventListener("scroll", learn);
       window.removeEventListener(LAYOUT_EVENT, learn);
       window.removeEventListener("resize", onResize);
-      completed.disconnect();
+      stopView();
       window.clearTimeout(quiet);
       window.clearTimeout(typeWait);
       const pinned = section?.classList.contains(PINNED) ?? false;

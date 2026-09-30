@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LAYOUT_EVENT } from "@/components/landing/journey/journey-events";
+import { APART_MS } from "@/components/landing/journey/keep-place";
 import { startRun } from "@/components/landing/journey/run";
 import { testContext } from "./journey-context";
 
@@ -207,6 +208,25 @@ describe("a resize, with the reader inside it", () => {
     resized();
     vi.advanceTimersToNextFrame();
     expect(run.style.getPropertyValue("--run-h")).toBe("1636px"); // the travel 800
+    stop();
+  });
+
+  // A browser that moves one unit alone, for good, its pin with it: the page is adopted as laid out after APART_MS, and
+  // the run, told, refits then; waiting, it never did (the review, M2).
+  it("refits once the page's measures have stood apart for APART_MS", () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const { run, at, resized } = resizable();
+    const units = twoSteps();
+    const stop = startRun(testContext());
+    at.y = 2000 + 600;
+    window.dispatchEvent(new Event("scroll"));
+    units.lvh = 736; // one unit alone, and the pin with it
+    at.h = 736;
+    resized();
+    expect(run.style.getPropertyValue("--run-h")).toBe("1836px");
+    vi.advanceTimersByTime(APART_MS);
+    expect(run.style.getPropertyValue("--run-h")).toBe("1736px");
+    expect(at.y).toBe(2000 + 600); // the same fraction of the same travel
     stop();
   });
 });

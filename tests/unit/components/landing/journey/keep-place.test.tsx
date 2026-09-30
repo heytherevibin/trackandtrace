@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { APART_MS, keepPlace, laidOut, viewHeight } from "@/components/landing/journey/keep-place";
+import { APART_MS, keepPlace, laidOut, viewHeight, watchView } from "@/components/landing/journey/keep-place";
 
 // keepPlace (J5-3): a pinned piece changes its height, then the reader lands where placeAfter says. The piece's
 // box after the change is read against whatever scroll the browser holds by then.
@@ -196,20 +196,80 @@ describe("the window as the page has laid it out", () => {
     expect(laidOut()).toBe(true);
   });
 
-  // A browser that resizes one unit alone would otherwise keep no place at all.
-  it("counts as laid out once its measures have stood apart longer than WebKit's steps ever do", () => {
+  // Checked on the page as it stands, not only against where it last stood: a step that lags a whole resize behind
+  // through a drag moves every unit since then, and was taken for a page laid out (the review, L1).
+  it("is not laid out while 100vh and 100lvh disagree, though every unit has moved", () => {
     const at = units();
-    const clock = { now: 1000 };
-    vi.spyOn(performance, "now").mockImplementation(() => clock.now);
     expect(laidOut()).toBe(true);
-    at.vh = 800;
+    Object.assign(at, { vh: 850, svh: 900, lvh: 900 }); // the drag's first resize: 100vh only
     expect(laidOut()).toBe(false);
-    clock.now += APART_MS / 2;
+    Object.assign(at, { vh: 800, svh: 850, lvh: 850 }); // its second: the small and large one resize behind
     expect(laidOut()).toBe(false);
-    clock.now += APART_MS;
+    Object.assign(at, { svh: 800, lvh: 800 });
     expect(laidOut()).toBe(true);
-    at.vh = 900; // apart again: timed afresh
-    expect(laidOut()).toBe(false);
+  });
+
+  // A browser that moves one unit alone would otherwise keep no place at all, and what waited for it would wait for good.
+  it("adopts measures that have stood apart for APART_MS, and tells every piece that waited", () => {
+    vi.useFakeTimers();
+    try {
+      const at = units();
+      document.body.innerHTML = `<div id="piece"></div>`;
+      const heard = vi.fn();
+      const stop = watchView(document.getElementById("piece")!, heard);
+      expect(laidOut()).toBe(true);
+      at.svh = 800; // 100svh alone, for good
+      expect(laidOut()).toBe(false);
+      vi.advanceTimersByTime(APART_MS - 1);
+      expect(heard).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(1);
+      expect(heard).toHaveBeenCalledTimes(1);
+      expect(laidOut()).toBe(true);
+      at.svh = 900; // apart again: timed afresh
+      expect(laidOut()).toBe(false);
+      stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("adopts the gap between 100vh and 100lvh of a browser whose default viewport is not its large one", () => {
+    vi.useFakeTimers();
+    try {
+      const at = units();
+      at.vh = 850; // from the first read
+      expect(laidOut()).toBe(true);
+      Object.assign(at, { vh: 650, svh: 700, lvh: 700 }); // a resize there keeps the gap
+      expect(laidOut()).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // The live pin (above 02) answers a resize "resize" found half laid out before 02's guard does, as "resize" itself
+  // came before any observer: after it, its move past it from the place held before both undid 02's (the review, H1).
+  it("tells the pieces in document order, whatever order they asked in", () => {
+    const callbacks: ResizeObserverCallback[] = [];
+    const Real = window.ResizeObserver;
+    window.ResizeObserver = class {
+      constructor(callback: ResizeObserverCallback) {
+        callbacks.push(callback);
+      }
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
+    };
+    try {
+      document.body.innerHTML = `<section id="above"></section><section id="below"></section>`;
+      const told: string[] = [];
+      const stops = [watchView(document.getElementById("below")!, () => told.push("below")), watchView(document.getElementById("above")!, () => told.push("above"))];
+      expect(callbacks).toHaveLength(1); // one observer for every piece
+      callbacks[0]!([], {} as ResizeObserver);
+      expect(told).toEqual(["above", "below"]);
+      for (const stop of stops) stop();
+    } finally {
+      window.ResizeObserver = Real;
+    }
   });
 
   // Kept by the window's size, a large viewport read between the steps stayed the old window's until the next "resize".

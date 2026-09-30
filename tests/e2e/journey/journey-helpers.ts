@@ -230,17 +230,19 @@ export async function frames(page: Page, n = 2): Promise<void> {
  * (100svh), and every probe of the window that asks for 100lvh or 100svh; "small" (100svh has landed a step of its own
  * too): the same less the 100lvh probes; each let go by the first place-keeping jump (the step lands just after a piece
  * answered the first, before that jump's own "scroll" event), or by `release`. "default": 02's pinned height, the live
- * drawing's, and every probe that asks for 100vh; let go by `release`. */
-export async function holdLate(page: Page, late: "small and large" | "small" | "default"): Promise<void> {
+ * drawing's, and every probe that asks for 100vh; "default and large": the same and the 100lvh probes, 100svh moving
+ * alone (a browser that resizes one unit by itself); each let go by `release`. */
+export async function holdLate(page: Page, late: "small and large" | "small" | "default" | "default and large"): Promise<void> {
   await page.evaluate((which) => {
     const px = (el: Element | null) => (el ? `${el.getBoundingClientRect().height}px` : "auto");
     const h = `${window.innerHeight}px`;
     const rules =
-      which === "default"
+      which === "default" || which === "default and large"
         ? [
             `#how.is-pinned { height: ${px(document.getElementById("how"))} !important; }`,
             `#anatomy.is-live { height: ${px(document.getElementById("anatomy"))} !important; }`,
             `div[style*="height: 100vh"] { height: ${h} !important; }`,
+            ...(which === "default" ? [] : [`div[style*="height: 100lvh"] { height: ${h} !important; }`]),
           ]
         : [
             `.anatomy-pin.is-columns { height: ${px(document.querySelector(".anatomy-pin"))} !important; }`,
@@ -256,7 +258,7 @@ export async function holdLate(page: Page, late: "small and large" | "small" | "
       window.removeEventListener("tt:jump", release);
     };
     Reflect.set(window, "__ttRelease", release);
-    if (which !== "default") window.addEventListener("tt:jump", release);
+    if (which === "small and large" || which === "small") window.addEventListener("tt:jump", release);
   }, late);
 }
 export const release = (page: Page): Promise<void> => page.evaluate(() => (Reflect.get(window, "__ttRelease") as () => void)());

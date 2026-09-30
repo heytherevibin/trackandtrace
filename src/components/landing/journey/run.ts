@@ -336,7 +336,7 @@ export function startRun({ motion }: JourneyContext): Teardown {
   const pinObserver = new ResizeObserver(onPin);
   pinObserver.observe(pin);
   pinObserver.observe(document.body);
-  watchView(pinObserver);
+  const stopView = watchView(run, onPin); // the step that completes a resize, after 02's guard (document order)
   const onResize = () => {
     if (!at) soon(); // unpinned, a window that grew may fit now; pinned, the pin's observer answers
     else learn(); // a window change the pin did not follow (a toolbar): the place, measured afresh
@@ -429,6 +429,7 @@ export function startRun({ motion }: JourneyContext): Teardown {
     window.removeEventListener("scroll", onScrolled);
     window.removeEventListener("resize", onResize);
     pinObserver.disconnect();
+    stopView();
     trackEl.removeEventListener("focusin", onFocus);
     document.removeEventListener("click", onClick);
     window.clearTimeout(again);

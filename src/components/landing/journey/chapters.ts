@@ -157,28 +157,33 @@ export function startPlaceGuard(): Teardown {
   // Settled only once the page is laid out for one window: WebKit's first step of a resize (laidOut) is answered with the
   // second, which the observer hears through the page's measures of the window (watchView) whichever step it is, so the
   // move covers every change above #how's foot, the still's columns included (still.ts counts on that).
-  const settle = () => {
-    if (!laidOut()) return;
+  // A change of shape (Motion's switch) settles at once, laid out or not: its move (the start, or the change past it) uses
+  // no window height, and waiting let the run's unpin, made before, be undone by it (J6-7; the review, M1). The window
+  // learned then is the one kept before.
+  const settle = (shape = false) => {
+    const whole = laidOut();
+    if (!whole && !shape) return;
     const resized = !unchanged();
     lastSize = sizeOf(section);
-    if (resized) place = settlePlace(section, place);
-    else place = { ...place, box: docBox(section), landing: landingOf(section), lead: headerOffset(), shape: shapeOf(section) };
+    const next = resized ? settlePlace(section, place) : { ...place, box: docBox(section), landing: landingOf(section), lead: headerOffset(), shape: shapeOf(section) };
+    place = whole ? next : { ...next, vh: place.vh, view: place.view };
   };
-  const observer = new ResizeObserver(settle);
-  observer.observe(section, { box: "border-box" });
-  watchView(observer);
+  // #how's own size and the page's measures of the window, through the journey's one observer of them, in document
+  // order with the pieces above and below (keep-place.ts): the live pin above answers first, the run below last.
+  const stopView = watchView(section, () => settle(), { own: true });
   // Motion's rewrite collapses 02 at once, and the journey's rebuild then tears down the pieces below it: the run's
   // unpin moves the reader by its own change (keepPlace), from wherever they stand by then. Settled here, as Motion
   // changes and before the rebuild (this listener is added first), 02's move is made first and the run's lands on it;
   // settled by the observer a frame later, from the place kept before both, it would undo the run's (J6-7). That
   // holds only while the run tells tt:layout after its move (refresh, above).
-  window.addEventListener(MOTION_EVENT, settle);
+  const settleShape = () => settle(true);
+  window.addEventListener(MOTION_EVENT, settleShape);
   return () => {
     window.removeEventListener("scroll", learn);
     window.removeEventListener(MOTION_BEFORE_EVENT, learn);
-    window.removeEventListener(MOTION_EVENT, settle);
+    window.removeEventListener(MOTION_EVENT, settleShape);
     window.removeEventListener(LAYOUT_EVENT, refresh);
-    observer.disconnect();
+    stopView();
   };
 }
 

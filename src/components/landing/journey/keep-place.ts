@@ -27,9 +27,21 @@ function probe(unit: Unit): HTMLElement {
 
 function viewProbes(): Readonly<Record<Unit, HTMLElement>> {
   if (probes && UNITS.every((unit) => probes?.[unit].isConnected)) return probes;
-  dropViewProbes();
+  removeProbes();
   probes = { vh: probe("vh"), svh: probe("svh"), lvh: probe("lvh") };
+  if (listeners.size > 0) connect(probes); // made again (something outside the journey took them): watched again
   return probes;
+}
+
+function removeProbes(): void {
+  for (const el of Object.values(probes ?? {})) el.remove();
+  probes = null;
+  channel?.disconnect();
+  channel = null;
+  whole = null;
+  ownGap = 0;
+  window.clearTimeout(apartTimer);
+  apartTimer = 0;
 }
 
 /** The large viewport's height (100lvh): the window every scroll timeline here ends at, as anime's scroll observers
@@ -45,53 +57,119 @@ export function viewHeight(): number {
  * between its steps: those land a frame or more apart, about 60 ms at most in the nightly config's WebKit under load
  * (2026-09-30). */
 export const APART_MS = 1000;
-/** The measures as the page last stood laid out for one window, and since when they have stood apart from it. */
+/** The measures as the page last stood laid out for one window; its own 100vh less 100lvh (0 in every engine measured,
+ * or what a browser whose default viewport is not its large one showed for APART_MS); and the timer that adopts measures
+ * that have stood apart that long. */
 let whole: Readonly<Partial<Record<Unit, number>>> | null = null;
-let apartSince: number | null = null;
+let ownGap = 0;
+let apartTimer = 0;
 
-/** Whether the page is laid out for one window. WebKit lays a resize out in steps, a frame or more apart and in any
- * order, innerHeight the new window's throughout: what 100vh sizes (02's 330vh, the live drawing's 520vh), what 100svh
- * sizes (the still's columns, the run's pin) and 100lvh (where every timeline ends), mostly the last two together (the
- * nightly config's WebKit, 2026-09-30: split in 7 of 2,448 resizes under load). A place learned or a change answered
- * between them mixes two windows: 02's guard kept a fraction off by 33 px (review, M3), and answered a step alone while
- * the still's columns moved 40 px after it (open concern 3). A window's change moves all three measures, and a phone's
- * toolbar none, so the page is laid out while they have all moved since it last was, or none has. A unit the page lacks
- * is left out, and measures that stay apart past APART_MS are the page's own (a browser that resizes one unit alone):
- * waiting for them then would keep no place at all. */
-export function laidOut(): boolean {
+function measures(): Partial<Record<Unit, number>> {
   const all = viewProbes();
   const now: Partial<Record<Unit, number>> = {};
   for (const unit of UNITS) {
     const px = all[unit].offsetHeight;
     if (px > 0) now[unit] = px;
   }
+  return now;
+}
+
+function adopt(now: Partial<Record<Unit, number>>): true {
+  whole = now;
+  if (now.vh !== undefined && now.lvh !== undefined) ownGap = now.vh - now.lvh;
+  window.clearTimeout(apartTimer);
+  apartTimer = 0;
+  return true;
+}
+
+/** Whether the page is laid out for one window. WebKit lays a resize out in steps, a frame or more apart and in any
+ * order, innerHeight the new window's throughout: what 100vh sizes (02's 330vh, the live drawing's 520vh), what 100svh
+ * sizes (the still's columns, the run's pin) and 100lvh (where every timeline ends), mostly the last two together (the
+ * nightly config's WebKit, 2026-09-30: split in 7 of 2,448 resizes under load). A place learned or a change answered
+ * between them mixes two windows: 02's guard kept a fraction off by 33 px (review, M3), and answered a step alone while
+ * the still's columns moved 40 px after it (open concern 3).
+ *
+ * The rule, over the units the page has (a probe that reads 0 is left out):
+ * - 100vh less 100lvh is the page's own gap, within 1 px: 0 in every engine, whose default viewport is the large one.
+ *   Checked on the page as it stands, so a step that lags a whole resize behind through a drag is still caught;
+ * - and all of 100vh, 100svh and 100lvh have moved (more than 1 px) since the page was last laid out, or none has: a
+ *   window's change moves all three, a phone's toolbar none. This catches 100svh landing in a step of its own.
+ * Measures that stand apart for APART_MS are the page's own (a browser that moves one unit alone, or whose default
+ * viewport is not its large one): adopted then, and every piece that waited is told (watchView), so no place waits for
+ * good. */
+export function laidOut(): boolean {
+  const now = measures();
   const was = whole;
+  if (!was) return adopt(now);
+  const gapKept = now.vh === undefined || now.lvh === undefined || Math.abs(now.vh - now.lvh - ownGap) <= 1;
   const moved = UNITS.filter((unit) => {
-    const [px, then] = [now[unit], was?.[unit]];
+    const [px, then] = [now[unit], was[unit]];
     return px !== undefined && then !== undefined && Math.abs(px - then) > 1;
   });
   const kept = UNITS.filter((unit) => now[unit] !== undefined && !moved.includes(unit));
-  if (!was || moved.length === 0 || kept.length === 0 || (apartSince !== null && performance.now() - apartSince > APART_MS)) {
-    whole = now;
-    apartSince = null;
-    return true;
-  }
-  apartSince ??= performance.now();
+  if (gapKept && (moved.length === 0 || kept.length === 0)) return adopt(now);
+  if (!apartTimer)
+    apartTimer = window.setTimeout(() => {
+      apartTimer = 0;
+      if (!probes) return;
+      adopt(measures());
+      tell();
+    }, APART_MS);
   return false;
 }
 
-/** Has `observer` watch the page's measures of the window: it hears the step that completes a resize (laidOut), whichever
- * it is, though nothing it watches itself changed size then. */
-export function watchView(observer: ResizeObserver): void {
-  for (const el of Object.values(viewProbes())) observer.observe(el);
+/** The pieces that keep a place across a resize, each with the element it keeps (its place in the document), what it
+ * does when the page's measures of the window change, and whether that element's own size is watched too. */
+interface Listener {
+  readonly el: Element;
+  readonly heard: () => void;
+  readonly own: boolean;
+}
+const listeners = new Set<Listener>();
+let channel: ResizeObserver | null = null;
+
+/** Every listener, in document order: a piece above answers a change before a piece below it, as "resize" (heard before
+ * any observer) let the live pin answer before 02's guard. 02's guard moves its reader to an absolute place; the live
+ * pin moves a reader past it by its own change, so after 02's move it undid it (the review, H1). */
+function tell(): void {
+  laidOut(); // whether the page stands apart: its timer armed, or dropped
+  const order = [...listeners].sort((a, b) => (a.el.compareDocumentPosition(b.el) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
+  for (const listener of order) if (listeners.has(listener)) listener.heard();
+}
+
+/** One observer for every listener: the page's measures of the window, and each element whose own size is watched. */
+function connect(all: Readonly<Record<Unit, HTMLElement>>): ResizeObserver {
+  channel?.disconnect();
+  channel = new ResizeObserver(tell);
+  for (const unit of UNITS) channel.observe(all[unit]);
+  for (const listener of listeners) if (listener.own) channel.observe(listener.el, { box: "border-box" });
+  return channel;
+}
+
+/** Has `heard` told, in document order with every other piece's and through one observer, whenever the page's measures
+ * of the window change size (the step that completes a resize, whichever it is, though nothing the piece watches changed
+ * then), whenever `el` does when `own` is set, and when the page adopts measures that stood apart (laidOut). 02's guard,
+ * started before any module, starts it, so its deliveries precede every module's own observer's (the run's pin,
+ * answered last). Returns the unsubscribe. */
+export function watchView(el: Element, heard: () => void, { own = false }: { readonly own?: boolean } = {}): () => void {
+  const all = viewProbes();
+  const listener: Listener = { el, heard, own };
+  listeners.add(listener);
+  const observer = channel ?? connect(all);
+  if (own) observer.observe(el, { box: "border-box" });
+  return () => {
+    listeners.delete(listener);
+    if (own && ![...listeners].some((l) => l.own && l.el === el)) channel?.unobserve(el);
+    if (listeners.size === 0) {
+      channel?.disconnect();
+      channel = null;
+    }
+  };
 }
 
 /** Takes the page's measures of the window out of it: the journey calls it as it ends (start-journey.ts). */
 export function dropViewProbes(): void {
-  for (const el of Object.values(probes ?? {})) el.remove();
-  probes = null;
-  whole = null;
-  apartSince = null;
+  removeProbes();
 }
 
 /** An instant scroll to `top`, unless the reader already stands within a pixel of it. Any instant scroll, even to where

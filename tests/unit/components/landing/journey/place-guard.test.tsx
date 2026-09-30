@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MOTION_BEFORE_EVENT, MOTION_EVENT } from "@/components/motion/use-motion";
 import { startPlaceGuard } from "@/components/landing/journey/chapters";
+import { APART_MS } from "@/components/landing/journey/keep-place";
 import { JUMP_EVENT, LAYOUT_EVENT } from "@/components/landing/journey/journey-events";
 
 // 02's place guard (chapters.ts) keeps a reader inside or past #how in place when #how changes size. The drawing
@@ -321,6 +322,53 @@ describe("02's place guard", () => {
       resized();
       expect(at.y).toBe(1000 + 2970 - 120 - 300 - 660);
       stop();
+    });
+
+    // J6-7 between the steps: Motion's switch settles at once, its move using no window height, so a move the rebuild
+    // makes below 02 after it stands (the review, M1: waiting for the page, 02's settle undid the run's unpin).
+    it("settles Motion's switch at once between the steps, so a move the rebuild makes below 02 stands (J6-7)", () => {
+      const { doc, at, resized } = pinned02();
+      const units = twoSteps();
+      const stop = startPlaceGuard();
+      at.y = 9000; // far past 02: in the run
+      window.dispatchEvent(new Event("scroll"));
+      units.lvh = 700; // the first step
+      at.vh = 700;
+      window.dispatchEvent(new Event(MOTION_BEFORE_EVENT));
+      document.documentElement.dataset.motion = "off";
+      doc.height = 1400; // the plain section
+      window.dispatchEvent(new Event(MOTION_EVENT));
+      expect(at.y).toBe(9000 - 1570);
+      at.y -= 2565; // the rebuild tears the run down: its keepPlace moves the reader by its own collapse
+      window.dispatchEvent(new Event(LAYOUT_EVENT));
+      units.vh = 700; // the second step
+      resized();
+      expect(at.y).toBe(9000 - 1570 - 2565);
+      stop();
+    });
+
+    // A browser that moves 100vh alone, for good: the page is adopted as laid out after APART_MS, and the guard, told,
+    // settles then; waiting, it froze (the review, M2).
+    it("settles a resize whose measures stay apart once they have stood apart for APART_MS", () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      try {
+        const { doc, at, resized } = pinned02();
+        const units = twoSteps();
+        const stop = startPlaceGuard();
+        const y = Math.round(936 + 0.6 * 2134);
+        at.y = y;
+        window.dispatchEvent(new Event("scroll"));
+        units.vh = 700; // 100vh alone, for good
+        at.vh = 700;
+        doc.height = 2310;
+        resized();
+        expect(window.scrollTo).not.toHaveBeenCalled();
+        vi.advanceTimersByTime(APART_MS);
+        expect(at.y).toBe(Math.round(936 + ((y - 936) / 2134) * 1474)); // its range to the large viewport, still 900
+        stop();
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it("lands on its start when Motion goes off: a change of shape", () => {
