@@ -312,7 +312,10 @@ development, behind `?journey-hud`; production never renders it.
       667×375, 280×653, 1280×600, 1180×820, 820×1180, 1920×1080, 2560×1440), and at 200% text at 1440×900,
       390×844 and 844×390;
     - screenshots of every chapter in Day, Night and on a phone;
-    - the place, run, Night falls and drawing specs in WebKit.
+    - the place, run, Night falls and drawing specs in WebKit;
+    - a device too slow to draw (Chromium at 60× CPU, once the drawing is live, scrolled once a frame): quality steps
+      down, then the still (`quality`), with its frames checked to run past the governor's 120 ms gesture gap
+      (`tests/e2e/nightly/slow-device.spec.ts`; the governor's rules are unit-tested on every PR).
 
   GitHub's runners have no GPU, so §3.H's frame-time and long-task budgets are measured by hand on a real GPU
   (`npm run build:local && node scripts/journey-perf.mjs`, the owner's Mac), and their lines go into every journey PR.
