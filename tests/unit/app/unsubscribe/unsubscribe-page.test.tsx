@@ -53,6 +53,11 @@ describe("/unsubscribe", () => {
     ["a person that is not a uuid", { p: "nope", l: "news", s: "A".repeat(43) }],
     ["no parameters at all", {}],
     ["two of a parameter", { p: PERSON, l: ["news", "availability"], s: sig() }],
+    // These are validly signed, so only the shape check refuses them: a bad signature would fail verification anyway.
+    ["a validly signed link for a person that is not a uuid", { p: "nope", l: "news", s: signUnsubscribe(unsubscribeKey(), "nope", "news") }],
+    ["a validly signed link for a list that is not one", { p: PERSON, l: "other", s: signUnsubscribe(unsubscribeKey(), PERSON, "other") }],
+    // A one-element array stringifies to the list's name inside the signature, so it would verify without the shape check.
+    ["a validly signed list given as an array", { p: PERSON, l: ["news"], s: sig() }],
   ])("is an invalid link for %s", async (_why, params) => {
     await draw(params);
     expect(screen.getByText(m.invalid.title)).toBeInTheDocument();

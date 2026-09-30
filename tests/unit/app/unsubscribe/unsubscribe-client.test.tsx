@@ -123,6 +123,28 @@ describe("the unsubscribe page's client", () => {
     await userEvent.click(screen.getByLabelText(m.unsubscribe.reasons[0]!.label));
     expect(await screen.findByText(messages.subscribe.errors.failed)).toBeInTheDocument();
     expect(screen.getByText(m.unsubscribe.after)).toBeInTheDocument();
+    // A reason that was not recorded is not shown as chosen.
+    expect(screen.getByLabelText(m.unsubscribe.reasons[0]!.label)).not.toBeChecked();
+  });
+
+  it("says already subscribed, not that something just changed, when the resubscribe finds nobody withdrawn", async () => {
+    answer(200, { ok: true, state: "done" });
+    draw();
+    await press();
+    await screen.findByText(m.unsubscribe.after);
+    // A double press or a second tab: the person is subscribed, and this press changed nothing.
+    answer(200, { ok: true, state: "already" });
+    await userEvent.click(screen.getByRole("button", { name: m.unsubscribe.resubscribe }));
+    expect(await screen.findByText(m.confirm.already)).toBeInTheDocument();
+    expect(screen.queryByText(m.confirm.after)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: m.unsubscribe.resubscribe })).not.toBeInTheDocument();
+  });
+
+  it("draws the result as a status, so a screen reader announces it", async () => {
+    answer(200, { ok: true, state: "done" });
+    draw();
+    await press();
+    expect(await screen.findByRole("status")).toHaveTextContent(m.unsubscribe.after);
   });
 
   it("resubscribes with the same signed link and says the person is subscribed, not that an email is coming", async () => {
