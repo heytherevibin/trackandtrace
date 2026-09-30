@@ -50,5 +50,20 @@ describe("the subscription page shell", () => {
     expect(plate).toContainElement(screen.getByText("body"));
     expect(plate).not.toContainElement(screen.getByText(messages.subscribe.page.closing));
     expect(plate?.nextElementSibling).toBe(screen.getByText(messages.subscribe.page.closing));
+    // The plate's four registration marks are part of the plate.
+    expect(plate?.querySelectorAll("i.corner")).toHaveLength(4);
+  });
+
+  it("frames the page with the mark first, in the 520px column", () => {
+    const { container } = render(
+      <SubscriptionPage headline="Unsubscribe">
+        <p>body</p>
+      </SubscriptionPage>,
+    );
+    const section = container.querySelector("section");
+    expect(section).toHaveClass("max-w-[520px]");
+    const mark = container.querySelector("section > svg[aria-hidden='true']");
+    expect(mark).not.toBeNull();
+    expect(section?.firstElementChild).toBe(mark);
   });
 });
