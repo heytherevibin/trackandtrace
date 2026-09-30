@@ -94,22 +94,33 @@ Top to bottom, as in v3:
 | Footer (landing) | Motion switch (on; off and disabled with a note under reduced motion) and Sound switch (off). | — |
 | Page-wide | ~~Registration-mark cursor (fine pointer, motion on)~~ (removed by the owner, 2026-09-30: it hid the native pointer page-wide and framed every control it rested on). Night falls: the theme switch sweeps the new theme out from the button in a circle (same-document View Transition). | Instant theme switch |
 
-**Section entrances play once per load** (the owner, 2026-09-30, reverting 2026-09-25). Four entrances play
+**Section entrances play once per load** (the owner, 2026-09-30, reverting 2026-09-25). Five entrances play
 once per section per page load, the first time the reader scrolls to that section, and never replay when they
 scroll back: the section kickers flipping in, rows rising into place (01, 03, 04, 05, 06, 08), registration
-marks snapping onto plates, and the departure board's rows flipping in. A section already in the window when
-the journey starts is left at rest, as the server drew it, and counts as seen: nothing moves while a reader can
-see it. A section out of sight at start plays when it first enters the band, from either side, so a reader who
-lands deep (an anchor, a reload) and scrolls up sees it play once. A reload plays them again. A rebuild (Motion
-off, then on) never replays a section already played: the played set lives in the journey's context, beside the
-still's place and the engine, for the whole of that startJourney (a fresh client navigation back to "/" starts
-fresh, as a new page). The hero headline's letters play once per load, and the plotter intro once per visit.
-Everything tied to the scroll position (the drawing chapter, dial, run, route and the berth plan) still follows
-the scroll both ways; the berth plan still draws itself each time it comes back. Motion off: static, as before.
+marks snapping onto plates, the departure board's rows flipping in, and 03's berth plan drawing itself and lighting
+the sample berth (the owner, 2026-09-30, after review: it draws the first time 03 is reached, then stays).
 
-*History:* from 2026-09-25 to 2026-09-30 the four entrances replayed ("Section entrances replay"): each reset
-out of sight once its section had fully left the window and played again every time it came back. The owner
-reverted that on 2026-09-30.
+*In the band.* Each entrance has a play band, the middle of the window (from 12% to 88% of its height; 10% to 90%
+for the board and the berth plan, 8% to 92% for the plates' marks). A trigger is properly in the band when at least
+half of it lies in the band, or half the band for a trigger taller than that; one that only peeks in at the window's
+edge is not. A section properly in the band when the journey starts is left at rest, as the server drew it, and
+counts as seen. Any other section (out of sight, or only peeking) is armed, and plays the first time it is properly
+in the band, from either side, so a reader who lands deep (an anchor, a reload) and scrolls up sees it play once,
+and a reader who loads a desktop window at the top, with the board peeking in at its foot, sees the board's rows
+flip in as they scroll it up (the owner, 2026-09-30, after review). A peeking section waits in its armed state
+until then.
+
+A reload plays them again. A rebuild (Motion off, then on) never replays a section already played: the played set
+lives in the journey's context, beside the still's place and the engine, for the whole of that startJourney (a fresh
+client navigation back to "/" starts fresh, as a new page). The hero headline's letters play once per load, and the
+plotter intro once per visit. Everything tied to the scroll position (the drawing chapter, dial, run and route)
+still follows the scroll both ways. Motion off: static, as before.
+
+*History:* from 2026-09-25 to 2026-09-30 the four section entrances replayed ("Section entrances replay"): each
+reset out of sight once its section had fully left the window and played again every time it came back, and the
+berth plan, counted then among the scroll-tied pieces, redrew each time it came back. The owner reverted both on
+2026-09-30; the first cut of that revert counted any section in the window at start as seen, and the owner narrowed
+it to the band the same day.
 
 Every pinned piece (drawing chapter, chapters dial, run) measures its content against the visible window and
 falls back to its static layout when it cannot fit: short windows show only the current stop's words, phones
@@ -155,9 +166,9 @@ chapter live only under `#anatomy.is-live`, which the journey writes while the l
 `html[data-drawing="live"]` (J5-3), so the no-JS default is static. The journey adds `data-journey` and
 `data-drawing-why`. Events on `window`: `tt:layout`, `tt:theme`, `tt:station`, `tt:depart`, `tt:drawing`,
 `tt:webgl`. One shared registry of scroll observers is refreshed on `tt:layout`. Section entrances are
-checked live against boxes, so jumps and reloads never strand anything. Each one arms only once its section is
-wholly out of the window and plays the first time the section comes into view, once per load; a played or seen
-entrance never arms again, across rebuilds too (§3.A, 2026-09-30). Motion off also applies the site's
+checked live against boxes, so jumps and reloads never strand anything. Each one is seen at start if its
+trigger is properly in its play band, else armed, and plays the first time it is properly in the band, once per
+load; a played or seen entrance never arms again, across rebuilds too (§3.A, 2026-09-30). Motion off also applies the site's
 reduced-motion rules (motion.css) to every traveller page, so the switch means the same thing everywhere
 (confirmed, §7; built in J1).
 
