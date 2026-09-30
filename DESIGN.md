@@ -146,10 +146,9 @@ these rules.
   blocked, the 15 s watchdog), the page stays as drawn. It never changes the reader's Motion choice.
 - **Text moves by transform only, never opacity**, so contrast holds at every frame. Drawings may fade.
 - **Section entrances play once per load** (the owner, 2026-09-30, reverting 2026-09-25's replay). Kickers flip
-  in, rows rise, registration marks snap on, the board's rows flip in, and 03's berth plan draws itself, the first
-  time each is properly in the middle of the window (at least half of it in the play band), and never again that
-  load, not after a Motion toggle either. One properly in view when the journey starts stays as the server drew it;
-  one only peeking in at the window's edge waits armed and plays when scrolled in. A reload plays them again.
+  in, rows rise, registration marks snap on, the board's rows flip in, and 03's berth plan draws itself: at load, like
+  the headline, for any visible when the journey starts; else the first time each enters the middle of the window.
+  Never again that load, not after a Motion toggle either. A reload plays them again.
 - **The headline's letters rise once per load, and the plotter once per visit.** The headline is the server's
   `<h1>` before and after; the split exists only while the letters move.
 - **Scroll-driven pieces follow the scroll both ways:** the strip, the board's status, the chapters and the
