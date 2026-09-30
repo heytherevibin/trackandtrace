@@ -189,6 +189,39 @@ test.describe("J5: every reason not to draw live (spec §3.C, §4)", () => {
     expect(three()).toEqual([]);
   });
 
+  // A device too slow to draw (spec §4): its frames run past the governor's 120 ms gesture gap, which it once took for a
+  // new gesture every frame, so it never stepped (the nightly's 10× run on Linux, J6). The CPU is slowed only once the
+  // drawing is live, so the load is not the spec's; the reader then scrolls up and down inside the chapter.
+  test("a device too slow to draw steps quality down as the reader scrolls, then draws still (quality)", async ({ page, browserName }) => {
+    test.skip(browserName !== "chromium", "CPU throttling is Chromium's (CDP)");
+    test.setTimeout(180_000);
+    await page.addInitScript(() => {
+      // the floor is this spec's subject: tests/e2e/fixtures.ts's hold is let go, whichever init script runs first
+      Object.defineProperty(window, "__ttHoldFloor", { configurable: true, get: () => false, set: () => undefined });
+      const steps: string[] = [];
+      Reflect.set(window, "__ttSteps", steps);
+      const setItem = Storage.prototype.setItem;
+      Storage.prototype.setItem = function (this: Storage, key: string, value: string) {
+        if (key === "tt.q") steps.push(value);
+        Reflect.apply(setItem, this, [key, value]);
+      };
+    });
+    await page.goto("/");
+    await waitForLive(page);
+    await scrollIntoChapter(page, 0.2);
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send("Emulation.setCPUThrottlingRate", { rate: 30 });
+    const size = page.viewportSize() ?? { width: 390, height: 844 };
+    await page.mouse.move(size.width / 2, size.height / 2);
+    const floored = page.locator("html[data-drawing-why='quality']");
+    const until = Date.now() + 120_000;
+    for (let i = 0; Date.now() < until && (await floored.count()) === 0; i += 1) await page.mouse.wheel(0, i % 16 < 8 ? 150 : -150);
+    await cdp.send("Emulation.setCPUThrottlingRate", { rate: 1 });
+    await expect(page.locator("html")).toHaveAttribute("data-drawing-why", "quality");
+    await expect(page.locator("html")).toHaveAttribute("data-drawing", "still");
+    expect(await page.evaluate(() => Reflect.get(window, "__ttSteps"))).toEqual(["1", "2", "still"]);
+  });
+
   test("words too large for the window, even as a list: still (fit), and three.js never downloaded (J6-5)", async ({ page }) => {
     const three = watchThree(page);
     // A phone with its text at 200%: the lead and the parts list leave the drawing less than its 150px (spec §3.C).

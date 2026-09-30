@@ -255,7 +255,11 @@ function startLive(engine: Engine, ask: Ask): Teardown {
       else if (observeT && behind(observeT, T.p)) observeT.container.handleScroll();
     }
     raf = onScreen.size > 0 ? requestAnimationFrame(loop) : 0;
+    if (!raf) governor.idle(); // off screen: the frame that brings the drawing back starts a new gesture
   };
+  // a long gap the page scrolled through is a slow frame of the gesture, not a new one (governor.ts)
+  const onPageScroll = () => governor.scrolled();
+  window.addEventListener("scroll", onPageScroll, { passive: true });
   const io = new IntersectionObserver(
     (entries) => {
       for (const e of entries) {
@@ -333,6 +337,7 @@ function startLive(engine: Engine, ask: Ask): Teardown {
     observeT?.revert();
     io.disconnect();
     cancelAnimationFrame(raf);
+    window.removeEventListener("scroll", onPageScroll);
     ro.disconnect();
     cancelAnimationFrame(layoutFrame);
     themeWatch.disconnect();

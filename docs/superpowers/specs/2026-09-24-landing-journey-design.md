@@ -189,9 +189,12 @@ three.js), and puts it back in the same task (J6-5). The scene's own check, on e
 behind it. Switching mid-chapter keeps the reader at the chapter's start.
 
 **Adaptive quality.** A governor watches intervals between frames the drawing actually drew within one scroll
-gesture. p90 over 26 ms for 30 frames steps down (resolution 2× → 1.5× → 1×; Night effects off; coaches 3 →
-2 → 1), waiting 45 frames after each change; p90 under 18.5 ms for 180 frames steps up (at most twice); still
-over 40 ms at the lowest step asks for the still drawing. The step is kept in sessionStorage (`tt.q`).
+gesture. An interval over 120 ms with no scroll inside it is a pause between gestures and never counts, nor does one
+across a frame with nothing to draw or the drawing leaving the screen; an interval the page scrolled through counts
+however long, so a device drawing under 8 fps still steps down and reaches the still. p90 over 26 ms for 30 frames
+steps down (resolution 2× → 1.5× → 1×; Night effects off; coaches 3 → 2 → 1), waiting 45 frames after each change;
+p90 under 18.5 ms for 180 frames steps up (at most twice); still over 40 ms at the lowest step asks for the still
+drawing. The step is kept in sessionStorage (`tt.q`).
 
 ### D. The still drawing
 
