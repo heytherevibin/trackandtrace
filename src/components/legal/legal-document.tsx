@@ -15,14 +15,28 @@ const sectionNumber = (index: number): string => String(index + 1).padStart(2, "
  * block with a legend meta line, an "On this page" plate that sticks on wide screens, and
  * numbered sections (steel kicker over a hairline, 22px capital heading, 15/24 body copy).
  */
-export function LegalDocument({ title, lead, sections }: { readonly title: string; readonly lead: string; readonly sections: readonly LegalSection[] }) {
+export function LegalDocument({
+  title,
+  lead,
+  sections,
+  version,
+}: {
+  readonly title: string;
+  readonly lead: string;
+  readonly sections: readonly LegalSection[];
+  /** The privacy notice's version, shown beside the date. Terms has none and passes nothing. */
+  readonly version?: string;
+}) {
   const m = messages.legal;
   return (
     <section className="page-frame page-body">
       <div className="max-w-[60ch]">
         <h1 className="optical-hang text-page tracking-display text-pretty">{title}</h1>
         <p className="mt-3.5 text-base text-ink-1/78">{lead}</p>
-        <p className="legend mt-3 leading-normal">{m.updatedLine(m.updated)}</p>
+        <p className="legend mt-3 leading-normal">
+          {m.updatedLine(m.updated)}
+          {version === undefined ? null : <span className="ml-3 text-ink-1/70">{m.versionLine(version)}</span>}
+        </p>
       </div>
       <div className="mt-8 grid items-start gap-8 lg:grid-cols-[minmax(0,16rem)_minmax(0,1fr)] lg:gap-x-16">
         <nav aria-label={m.onThisPage} className="blueprint lg:sticky lg:top-24">

@@ -2,15 +2,28 @@ import type { MessageTree } from "../types";
 
 export const legal = {
   updatedLine: (date: string) => `Last updated: ${date}`,
-  updated: "18 September 2026",
+  /** Only the privacy notice is versioned; Terms carries the date alone. */
+  versionLine: (version: string) => `Version ${version}`,
+  updated: "30 September 2026",
   onThisPage: "On this page",
   privacy: {
     title: "Privacy",
     lead: "What this product processes, where it keeps it, and how you remove it.",
+    /**
+     * Each email consent records the version it was given under
+     * (`subscriptions.consents.notice_version`), so this number must change whenever the notice
+     * does — otherwise a stored consent claims agreement to words nobody read.
+     */
+    version: "1.1",
     sections: [
       { id: "processing", title: "What we process", body: "A PNR is used only to request its reservation record from the data source. It never appears in our web addresses or server logs: a check sends it in the request body, and result links keep it after \"#\", which browsers do not send to servers. Passenger names are never read or stored." },
       { id: "device", title: "Recent checks and the device watchlist", body: "Recent checks and a device watchlist live in your browser's storage on this device only. You can clear them any time from the home page or the watchlist." },
       { id: "account", title: "Account data", body: "If you sign in, your email, display name, avatar, and the PNRs you save are stored with your account in Supabase, a hosted database service. Access is limited to your own records." },
+      {
+        id: "email-updates",
+        title: "Email updates",
+        body: "If you ask for updates by email, we keep your address, where and when you gave it, and a record of your consent — only to send what you asked for. We send one email to confirm; an address that is never confirmed is deleted after 7 days. A confirmed address is kept until you unsubscribe, which you can do in one click from every email we send. Having an account never subscribes you.",
+      },
       { id: "third-parties", title: "Third parties", body: "Trakline works with a third-party reservation data provider to answer each check; that provider receives the PNR you check and records its requests under its own privacy policy. Supabase hosts account data. There are no advertising or analytics trackers." },
       { id: "controls", title: "Your controls", body: "Export your account data as JSON, or delete your account and every record on it, from the Account page." },
     ],

@@ -6,5 +6,5 @@ export const metadata: Metadata = { title: messages.legal.privacy.title };
 
 export default function PrivacyPage() {
   const m = messages.legal.privacy;
-  return <LegalDocument title={m.title} lead={m.lead} sections={m.sections} />;
+  return <LegalDocument title={m.title} lead={m.lead} sections={m.sections} version={m.version} />;
 }
