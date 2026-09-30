@@ -61,6 +61,9 @@ function stubFetch(over: { readonly trains?: unknown[]; readonly search?: { stat
   const fetchMock = vi.fn(async (url: string, init?: { readonly body?: string }) => {
     void init;
     calls.push(String(url));
+    if (String(url) === "/api/subscribe") {
+      return { ok: true, json: async () => ({ ok: true, message: messages.subscribe.sent }) };
+    }
     if (String(url).startsWith("/api/trains")) {
       return { ok: true, json: async () => ({ ok: true, trains: over.trains ?? [TRAIN], sampleData: true }) };
     }
@@ -251,5 +254,39 @@ describe("the availability list, offered under the result", () => {
     await waitFor(() => expect(screen.getByText("Trakline has used today's live checks.")).toBeInTheDocument());
     expect(screen.getByText(messages.subscribe.places.preBooking)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: messages.subscribe.form.notify })).toBeInTheDocument();
+  });
+
+  it("is offered under the result and above the lifecycle, in that order", async () => {
+    stubFetch();
+    render(<PreBookingForm />);
+    await enterPair();
+    fireEvent.change(dateInput(), { target: { value: "2026-10-16" } });
+    fireEvent.click(searchButton());
+
+    await waitFor(() => expect(screen.getByTestId("train-row")).toBeInTheDocument());
+    const result = screen.getByTestId("train-row");
+    const plate = screen.getByRole("heading", { name: messages.subscribe.places.preBookingTitle });
+    const lifecycleHeading = screen.getByRole("heading", { name: m.lifecycle });
+    // "Under the result" is the whole point of where this plate sits: the offer reads as the answer's
+    // next step, and above the result or after the lifecycle it would be a box on the page.
+    expect(result.compareDocumentPosition(plate) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(plate.compareDocumentPosition(lifecycleHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("joins the availability list and records the sign-up as coming from pre-booking", async () => {
+    // `list` decides which list the person actually joins, and `source` is what 06-B's Leads list reads.
+    const { fetchMock } = stubFetch();
+    render(<PreBookingForm />);
+    await enterPair();
+    fireEvent.change(dateInput(), { target: { value: "2026-10-16" } });
+    fireEvent.click(searchButton());
+    await waitFor(() => expect(screen.getByTestId("train-row")).toBeInTheDocument());
+
+    fireEvent.change(screen.getByLabelText(messages.subscribe.form.label), { target: { value: "asha@example.in" } });
+    fireEvent.click(screen.getByRole("button", { name: messages.subscribe.form.notify }));
+
+    await waitFor(() => expect(screen.getByText(messages.subscribe.sent)).toBeInTheDocument());
+    const sent = fetchMock.mock.calls.find(([url]) => String(url) === "/api/subscribe")?.[1];
+    expect(JSON.parse(sent?.body ?? "null")).toEqual({ email: "asha@example.in", list: "availability", source: "pre-booking" });
   });
 });
