@@ -1,6 +1,7 @@
 import { QUALITY_STORAGE_KEY, resolveDrawing, type MotionState, type SaverState } from "@/components/motion/motion-boot";
 import { modeOf, placeAfter, readerPlace, startingReasons, wantsScene, whyOf, withReason, type DrawingMode, type DrawingReason, type Reasons } from "./drawing-mode";
 import { jumpTo, keepPlace, mastheadBottom, viewHeight } from "./keep-place";
+import { keyboardFocus, watchTab } from "./focus-glide";
 import { DRAWING_EVENT, LAYOUT_EVENT, WEBGL_EVENT, emit, type DrawingDetail, type WebglDetail } from "./journey-events";
 import { createLiveLabels } from "./live-labels";
 import type { JourneyContext, JourneyModule, Teardown } from "./start-journey";
@@ -245,9 +246,20 @@ export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2,
     const onClick = (event: MouseEvent) => {
       if (event.target instanceof Element && event.target.closest('a[href^="#"]')) onScroll();
     };
+    // and so does a Tab's (the #94 review's root cause): a frame after its focus, under an end the browser set at the
+    // focus, so the pin a frame after a Tab would land the glide where the link was. Only a real Tab's keyboard focus
+    // (focus-glide.ts's rule) on something outside the window, where the browser glides; one in view scrolls nothing.
+    const tab = watchTab();
+    const onFocus = (event: FocusEvent) => {
+      const el = event.target instanceof Element ? event.target : null;
+      if (!el || !tab.down() || !keyboardFocus(el)) return;
+      const r = el.getBoundingClientRect();
+      if (r.top < 0 || r.bottom > window.innerHeight) onScroll();
+    };
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("scrollend", settle);
     document.addEventListener("click", onClick, true);
+    document.addEventListener("focusin", onFocus, true);
 
     // The pinned chapter's height is the window's (520vh), so a resize changes it under a reader past it, whom nothing
     // else keeps in place (02's guard keeps only its own readers). Its box, the reader's scroll and the window they saw
@@ -334,6 +346,8 @@ export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2,
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("scrollend", settle);
       document.removeEventListener("click", onClick, true);
+      document.removeEventListener("focusin", onFocus, true);
+      tab.stop();
       window.removeEventListener("scroll", learn);
       window.removeEventListener(LAYOUT_EVENT, learn);
       window.removeEventListener("resize", onResize);
