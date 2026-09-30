@@ -25,6 +25,20 @@ describe("the app pages' compact footer", () => {
     expect(screen.getByRole("img", { name: /IST/ })).toBeInTheDocument();
   });
 
+  it("draws the sign-up row above the disclaimer line, not beneath it", () => {
+    render(<Footer />);
+    const field = screen.getByLabelText(m.form.label);
+    const disclaimer = screen.getByText(messages.common.notAffiliated, { exact: false });
+    expect(field.compareDocumentPosition(disclaimer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("uses the row layout: the button sits in a row beside the field, not directly in the form", () => {
+    render(<Footer />);
+    const button = screen.getByRole("button", { name: m.form.subscribe });
+    // footer-column stacks the button straight under the form; footer-row wraps label, field and button in one row.
+    expect(button.parentElement).not.toBe(button.closest("form"));
+  });
+
   it("records the sign-up as coming from the footer, not from the landing", async () => {
     const fetchMock = vi.fn(
       async () => new Response(JSON.stringify({ ok: true, message: m.sent }), { status: 200, headers: { "content-type": "application/json" } }),

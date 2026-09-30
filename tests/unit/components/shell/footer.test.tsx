@@ -29,6 +29,12 @@ describe("the landing footer's sign-up", () => {
     expect(screen.getByRole("img", { name: /IST/ })).toBeInTheDocument();
   });
 
+  it("uses the stacked column layout: the button sits directly in the form, under the field", () => {
+    render(<Footer />);
+    const button = screen.getByRole("button", { name: m.form.subscribe });
+    expect(button.parentElement).toBe(button.closest("form"));
+  });
+
   it("records the sign-up as coming from the landing, not from the footer", async () => {
     // first_source is what 06-B's Leads list reads: the full footer is only ever the landing.
     const fetchMock = vi.fn(
