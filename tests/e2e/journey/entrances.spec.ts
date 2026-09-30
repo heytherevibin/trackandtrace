@@ -1,9 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 import { frames, motionOff, movedFrames, scrollToId, transformOf, waitForJourney, watchMotion } from "./journey-helpers";
 
-// Section entrances play once per section per page load (the owner, 2026-09-30, reverting 2026-09-25's replay): the
-// first time the reader reaches a section, never again when they scroll back; a reload plays them again, and a rebuild
-// (Motion off, then on) never replays one already played.
+// Section entrances play once per section per page load (the owner, 2026-09-30, reverting 2026-09-25's replay): at the
+// start for a section already in the window, else the first time the reader reaches it; never again when they scroll
+// back; a reload plays them again, and a rebuild (Motion off, then on) never replays one already played.
 
 const RISEN = "none";
 const ARMED = "matrix(1, 0, 0, 1, 0, 16)";
