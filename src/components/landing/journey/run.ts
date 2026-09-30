@@ -4,7 +4,7 @@ import { readerPlace } from "./drawing-mode";
 import { keyboardFocus, watchGlide, watchTab } from "./focus-glide";
 import { anchorOf, band, fitsRun, hereAt, layers, leanStep, offsets, runLayout, trainAt, type RunLayout } from "./geometry/run";
 import { LAYOUT_EVENT, emit } from "./journey-events";
-import { keepPlace, mastheadBottom, viewHeight, type ReadPlace } from "./keep-place";
+import { keepPlace, laidOut, mastheadBottom, viewHeight, watchView, type ReadPlace } from "./keep-place";
 import { SMOOTH } from "./motion-tokens";
 import { keepUp, refreshObserver, track } from "./observers";
 import type { JourneyContext, Teardown } from "./start-journey";
@@ -264,6 +264,7 @@ export function startRun({ motion }: JourneyContext): Teardown {
    * run not pinned (and no reader below it) tries again: a window that grew may fit now. A resize of the running run is
    * its pin's observer's (onPin), never this frame's: `from` is the place the reader last read it in, which only that
    * observer passes. */
+  let deferred = false; // a relayout asked for between WebKit's steps of a resize, and still owed
   const relayout = (from?: ReadPlace) => {
     layoutFrame = 0;
     if (!at) {
@@ -271,6 +272,9 @@ export function startRun({ motion }: JourneyContext): Teardown {
       return;
     }
     if (!from && !steady()) return;
+    // between WebKit's steps of a resize (laidOut): asked again once the page is laid out for one window (onPin)
+    deferred = !laidOut();
+    if (deferred) return;
     const before = run.offsetHeight;
     if (!settle(from)) {
       stopDriver();
@@ -300,11 +304,15 @@ export function startRun({ motion }: JourneyContext): Teardown {
   // size the place was measured in, the scroll alone is learned. The run's box is measured again when it can have moved:
   // on tt:layout, on "resize", and when the page's height changes (the body's observer: a change above the run that no
   // one announced), each only while the pin is steady.
+  //
+  // Both only while the page is laid out for one window (laidOut): WebKit lays a resize out in steps, and between
+  // them the run learned the new window with the old large viewport, and answered its pin (100svh) on a page 02 had yet
+  // to refit, a move 02's guard then undid. The pin's observer hears the step that completes it (watchView).
   let read: ReadPlace | null = null;
   let measuredIn = { w: 0, h: 0 };
   const steady = () => at !== null && pin.clientWidth === at.w && pin.clientHeight === at.h;
   const learn = () => {
-    if (!steady()) return;
+    if (!steady() || !laidOut()) return;
     const r = run.getBoundingClientRect();
     read = { top: r.top + window.scrollY, bottom: r.bottom + window.scrollY, y: window.scrollY, vh: window.innerHeight, view: viewHeight() };
     measuredIn = { w: window.innerWidth, h: window.innerHeight };
@@ -312,11 +320,22 @@ export function startRun({ motion }: JourneyContext): Teardown {
   const onScrolled = () => {
     if (!read) return;
     if (window.innerWidth === measuredIn.w && window.innerHeight === measuredIn.h) read = { ...read, y: window.scrollY };
-    else learn(); // the window changed (a toolbar, a zoom, a resize still to land): measured afresh, if the pin is steady
+    else if (steady()) learn(); // the window changed (a toolbar, a zoom, a resize still to land): measured afresh
+    // A pin the window changed while the page is not yet laid out for one window, so the run's refit is owed (up to
+    // APART_MS): the reader's own place in the run carried into the one kept, measured from the run's top as it stands,
+    // so a reader who reads on meanwhile is refit from there, not put back (the re-review, R1). From the run's top, not by
+    // the scroll's change: whatever moved above it (the still's columns, and the jump that answers them) moves both. Once
+    // the page is laid out the refit is this frame's, and a scroll before it (a jump answering the step above, before the
+    // observers) is not the reader's.
+    else if (at && !laidOut()) read = { ...read, y: read.top - run.getBoundingClientRect().top };
   };
   const onPin = () => {
     if (!at) return; // not running
-    if (steady()) return learn(); // its first delivery, or the page's height: the run may have moved
+    if (steady()) {
+      learn(); // its first delivery, or the page's height: the run may have moved
+      if (deferred) soon();
+      return;
+    }
     if (!read) return; // nothing to judge from
     cancelAnimationFrame(layoutFrame);
     relayout(read);
@@ -324,6 +343,7 @@ export function startRun({ motion }: JourneyContext): Teardown {
   const pinObserver = new ResizeObserver(onPin);
   pinObserver.observe(pin);
   pinObserver.observe(document.body);
+  const stopView = watchView(run, onPin); // the step that completes a resize, after 02's guard (document order)
   const onResize = () => {
     if (!at) soon(); // unpinned, a window that grew may fit now; pinned, the pin's observer answers
     else learn(); // a window change the pin did not follow (a toolbar): the place, measured afresh
@@ -416,6 +436,7 @@ export function startRun({ motion }: JourneyContext): Teardown {
     window.removeEventListener("scroll", onScrolled);
     window.removeEventListener("resize", onResize);
     pinObserver.disconnect();
+    stopView();
     trackEl.removeEventListener("focusin", onFocus);
     document.removeEventListener("click", onClick);
     window.clearTimeout(again);

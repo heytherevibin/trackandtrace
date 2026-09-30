@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { JOURNEY_CHUNK_MARK } from "@/components/landing/journey/journey-mark";
 import { SCENE_CHUNK_MARK } from "@/components/landing/journey/scene/scene-mark";
+import { APART_MS } from "@/components/landing/journey/keep-place";
 
 /** The journey marks <html data-journey="on"> as it takes the page over, then starts its modules a turn at a time;
  * outside production it says when the last has started and the page has settled (window.__ttJourneyStarted), and
@@ -219,6 +220,79 @@ export async function frames(page: Page, n = 2): Promise<void> {
       }),
     n,
   );
+}
+
+// WebKit lays a resize out in steps, a frame or more apart and in any order: what 100vh sizes (02's 330vh), and what
+// 100svh and 100lvh size (the still's columns, the run's pin, the window every timeline ends at), mostly those two
+// together, innerHeight the new window's throughout (the nightly config's WebKit, 2026-09-30: split in 7 of 2,448
+// resizes under load). Held here, deterministically in every engine: the step named stays at the old window's size
+// until released.
+/** Holds what the `late` step sizes at the size it has now. "small and large": the still's columns and the run's pin
+ * (100svh), and every probe of the window that asks for 100lvh or 100svh; "small" (100svh has landed a step of its own
+ * too): the same less the 100lvh probes; each let go by the first place-keeping jump (the step lands just after a piece
+ * answered the first, before that jump's own "scroll" event), or by `release`. "default": 02's pinned height, the live
+ * drawing's, and every probe that asks for 100vh; "default and large": the same and the 100lvh probes, 100svh moving
+ * alone (a browser that resizes one unit by itself); each let go by `release`. */
+export async function holdLate(page: Page, late: "small and large" | "small" | "default" | "default and large"): Promise<void> {
+  await page.evaluate((which) => {
+    const px = (el: Element | null) => (el ? `${el.getBoundingClientRect().height}px` : "auto");
+    const h = `${window.innerHeight}px`;
+    const rules =
+      which === "default" || which === "default and large"
+        ? [
+            `#how.is-pinned { height: ${px(document.getElementById("how"))} !important; }`,
+            `#anatomy.is-live { height: ${px(document.getElementById("anatomy"))} !important; }`,
+            `div[style*="height: 100vh"] { height: ${h} !important; }`,
+            ...(which === "default" ? [] : [`div[style*="height: 100lvh"] { height: ${h} !important; }`]),
+          ]
+        : [
+            `.anatomy-pin.is-columns { height: ${px(document.querySelector(".anatomy-pin"))} !important; }`,
+            `#run.is-running .run-pin { height: ${px(document.querySelector("#run .run-pin"))} !important; }`,
+            `div[style*="height: 100svh"] { height: ${h} !important; }`,
+            ...(which === "small" ? [] : [`div[style*="height: 100lvh"] { height: ${h} !important; }`]),
+          ];
+    const sheet = new CSSStyleSheet();
+    sheet.replaceSync(rules.join("\n"));
+    document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+    // how long the split stood: from "resize", as the new window lays out, to the late step's landing
+    const held = { at: 0, for: -1, resized: false };
+    Reflect.set(window, "__ttHeld", held);
+    window.addEventListener(
+      "resize",
+      () => {
+        held.resized = true;
+        held.at = performance.now();
+      },
+      { once: true },
+    );
+    const release = () => {
+      if (held.for < 0) held.for = held.resized ? performance.now() - held.at : 0;
+      document.adoptedStyleSheets = document.adoptedStyleSheets.filter((s) => s !== sheet);
+      window.removeEventListener("tt:jump", release);
+    };
+    Reflect.set(window, "__ttRelease", release);
+    if (which === "small and large" || which === "small") window.addEventListener("tt:jump", release);
+  }, late);
+}
+
+/** The first step has landed: "resize" has been heard since the hold, and two frames have been drawn after it for whatever
+ * answers it. A state wait: frames counted from the resize take over a second on a slow runner (SwiftShader, CI's
+ * cores), and a split held that long is no longer one (see release). */
+export async function firstStep(page: Page): Promise<void> {
+  await page.waitForFunction(() => (Reflect.get(window, "__ttHeld") as { resized: boolean } | undefined)?.resized === true);
+  await frames(page, 2);
+}
+
+/** Lets the held step land. The split must have been held for less than APART_MS: WebKit's last well under it (about
+ * 60 ms under load), and measures that stand apart that long are taken as the page's own (keep-place.ts, laidOut), so a
+ * longer hold would test that instead. A runner too slow to keep it shorter fails here, saying so, rather than in the
+ * place it then keeps (CI run 36732137834: a hold of eight frames outlasted it on SwiftShader). */
+export async function release(page: Page): Promise<void> {
+  const held = await page.evaluate(() => {
+    (Reflect.get(window, "__ttRelease") as () => void)();
+    return (Reflect.get(window, "__ttHeld") as { for: number }).for;
+  });
+  expect(held, `the split held ${Math.round(held)} ms, APART_MS ${APART_MS}: no longer a split`).toBeLessThan(APART_MS);
 }
 
 /** From before the page's first script: every frame, whether anything matching `selector` stands off its rest (any

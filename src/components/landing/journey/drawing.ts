@@ -1,6 +1,6 @@
 import { QUALITY_STORAGE_KEY, resolveDrawing, type MotionState, type SaverState } from "@/components/motion/motion-boot";
 import { modeOf, placeAfter, readerPlace, startingReasons, wantsScene, whyOf, withReason, type DrawingMode, type DrawingReason, type Reasons } from "./drawing-mode";
-import { jumpTo, keepPlace, mastheadBottom, viewHeight } from "./keep-place";
+import { jumpTo, keepPlace, laidOut, mastheadBottom, viewHeight, watchView } from "./keep-place";
 import { glidesTo, keyboardFocus, watchTab } from "./focus-glide";
 import { DRAWING_EVENT, LAYOUT_EVENT, WEBGL_EVENT, emit, type DrawingDetail, type WebglDetail } from "./journey-events";
 import { createLiveLabels } from "./live-labels";
@@ -268,7 +268,12 @@ export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2,
     // resize from the place it left. onResize answers it, from the place before. Keyed on the pin's own height (520vh),
     // as 02's guard and the run key on theirs, never on the window's size, which moves with no "resize" too (iOS's pinch
     // zoom, a toolbar) and would freeze the place for good (review, M2).
+    // And the window the reader saw only while the page is laid out for one (laidOut): WebKit lays a resize out in
+    // steps, the pin (520vh) in one and the large viewport its timeline ends at in another, in any order, with "resize"
+    // between them. Answered then, the reader landed up to 14% off, and a place learned then put the next resize off
+    // too. A "resize" that finds the page between them is answered by the step that completes it (watchView).
     let held: { readonly top: number; readonly bottom: number; readonly y: number; readonly vh: number; readonly view: number } | null = null;
+    let owed = false;
     const learn = () => {
       if (!section?.classList.contains(PINNED)) {
         held = null;
@@ -276,9 +281,13 @@ export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2,
       }
       const r = section.getBoundingClientRect();
       if (held && Math.abs(r.height - (held.bottom - held.top)) > 1) return;
-      held = { top: r.top + window.scrollY, bottom: r.bottom + window.scrollY, y: window.scrollY, vh: window.innerHeight, view: viewHeight() };
+      const place = { top: r.top + window.scrollY, bottom: r.bottom + window.scrollY, y: window.scrollY };
+      if (laidOut()) held = { ...place, vh: window.innerHeight, view: viewHeight() };
+      else if (held) held = { ...held, ...place };
     };
     const onResize = () => {
+      owed = !laidOut();
+      if (owed) return;
       const was = held;
       if (!was || !section?.classList.contains(PINNED)) return learn();
       const r = section.getBoundingClientRect();
@@ -293,6 +302,12 @@ export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2,
     window.addEventListener("scroll", learn, { passive: true });
     window.addEventListener(LAYOUT_EVENT, learn);
     window.addEventListener("resize", onResize);
+    // heard in document order with 02's guard and the run: the pin above answers before 02's guard (the review, H1)
+    const stopView = section
+      ? watchView(section, () => {
+          if (owed) onResize();
+        })
+      : () => undefined;
 
     function apply(): void {
       if (!alive) return;
@@ -349,6 +364,7 @@ export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2,
       window.removeEventListener("scroll", learn);
       window.removeEventListener(LAYOUT_EVENT, learn);
       window.removeEventListener("resize", onResize);
+      stopView();
       window.clearTimeout(quiet);
       window.clearTimeout(typeWait);
       const pinned = section?.classList.contains(PINNED) ?? false;
