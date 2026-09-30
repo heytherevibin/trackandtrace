@@ -145,8 +145,10 @@ these rules.
   takes it over only while it runs, under `html[data-journey="on"]`. If the journey never starts (offline,
   blocked, the 15 s watchdog), the page stays as drawn. It never changes the reader's Motion choice.
 - **Text moves by transform only, never opacity**, so contrast holds at every frame. Drawings may fade.
-- **Section entrances replay.** Kickers flip in, rows rise, registration marks snap on, and the board's rows
-  flip in. Each resets only once its section has wholly left the window, and plays again when it comes back.
+- **Section entrances play once per load** (the owner, 2026-09-30, reverting 2026-09-25's replay). Kickers flip
+  in, rows rise, registration marks snap on, and the board's rows flip in, the first time the reader reaches each
+  section, and never again that load, not after a Motion toggle either. A section in the window when the journey
+  starts stays as the server drew it. A reload plays them again.
 - **The headline's letters rise once per load, and the plotter once per visit.** The headline is the server's
   `<h1>` before and after; the split exists only while the letters move.
 - **Scroll-driven pieces follow the scroll both ways:** the strip, the board's status, the chapters, the berths
