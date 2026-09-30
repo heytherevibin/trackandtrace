@@ -367,6 +367,28 @@ export type Database = {
         }
         Returns: undefined
       }
+      subscriptions_confirm: { Args: { p_token_hash: string }; Returns: Json }
+      subscriptions_peek: { Args: { p_token_hash: string }; Returns: Json }
+      subscriptions_person_id: { Args: { p_email: string }; Returns: string }
+      subscriptions_rejoin: {
+        Args: { p_list: string; p_person: string }
+        Returns: string
+      }
+      subscriptions_sign_up: {
+        Args: {
+          p_campaign: Json
+          p_email: string
+          p_list: string
+          p_notice_version: string
+          p_source: string
+          p_token_hash: string
+        }
+        Returns: string
+      }
+      subscriptions_withdraw: {
+        Args: { p_list: string; p_person: string; p_reason: string }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never
