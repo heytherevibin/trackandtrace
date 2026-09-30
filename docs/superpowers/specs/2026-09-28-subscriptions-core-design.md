@@ -81,7 +81,7 @@ Step 3 runs before step 4 so a refused request writes nothing. A send that fails
 
 - Opening changes nothing. **Unsubscribe** (`POST`) verifies the signature and sets `withdrawn_at`.
 - After that: "You're unsubscribed. Sign-in emails and the alerts you set up aren't affected."
-- "Subscribed by mistake? Resubscribe" clears `withdrawn_at`. It is one button, valid only with the same signed link.
+- "Changed your mind? Resubscribe" (the owner, at the B4 review, 2026-09-30) clears `withdrawn_at`. It is one button, valid only with the same signed link.
 - The optional "Tell us why" (Too many emails · Not relevant · I didn't sign up · Other) sets `withdraw_reason`. It is never required.
 - One-click `List-Unsubscribe` / `List-Unsubscribe-Post` headers belong on **list** emails (07), not on the confirmation email.
 
