@@ -13,6 +13,16 @@ export const test = base.extend({
     });
     await runTest(context);
   },
+  // E2E_CPU_THROTTLE=4 slows Chromium's main thread that many times (CDP), as CI's cores and SwiftShader do: a way to
+  // find, on a fast machine, what only a slow runner shows (CI run 36732137834). WebKit has no such control.
+  page: async ({ page, browserName }, runTest) => {
+    const rate = Number(process.env.E2E_CPU_THROTTLE ?? 0);
+    if (rate > 1 && browserName === "chromium") {
+      const cdp = await page.context().newCDPSession(page);
+      await cdp.send("Emulation.setCPUThrottlingRate", { rate });
+    }
+    await runTest(page);
+  },
 });
 
 export { expect };

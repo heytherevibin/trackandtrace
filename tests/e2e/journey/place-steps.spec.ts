@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "../fixtures";
-import { atRest, drawStill, frames, holdLate, noAnchoring, release, scrollIntoRun, waitForJourney } from "./journey-helpers";
+import { atRest, drawStill, firstStep, frames, holdLate, noAnchoring, release, scrollIntoRun, waitForJourney } from "./journey-helpers";
 
 // The places the journey keeps through a resize WebKit lays out in steps (journey-helpers.ts, holdLate): 02's reader and
 // the run's, with the still drawn above (live-drawing.spec.ts holds the live pin's), a Motion switch between the steps
@@ -39,7 +39,7 @@ test.describe("a resize WebKit lays out in two steps keeps a reader inside a pin
         const through = (was.y - was.start) / (was.end - was.start);
         await holdLate(page, late);
         await page.setViewportSize(size);
-        await frames(page, 8); // the first step, and whatever answers it
+        await firstStep(page); // the first step, and whatever answers it
         await release(page);
         await frames(page, 20);
         await atRest(page);
@@ -67,7 +67,7 @@ test.describe("a resize WebKit lays out in two steps keeps a reader inside a pin
       const through = (was.y - was.start) / (was.end - was.start);
       await holdLate(page, "default");
       await page.setViewportSize(size);
-      await frames(page, 3); // the first step
+      await firstStep(page);
       await page.evaluate(() => {
         window.dispatchEvent(new Event("tt:layout"));
         window.dispatchEvent(new Event("scroll"));
@@ -107,7 +107,7 @@ test.describe("a resize WebKit lays out in two steps keeps a reader inside a pin
       const f = await through();
       await holdLate(page, late);
       await page.setViewportSize(isMobile ? { width: 390, height: 660 } : { width: 1440, height: 700 });
-      await frames(page, 8); // the first step, and whatever answers it
+      await firstStep(page); // the first step, and whatever answers it
       await release(page);
       await frames(page, 20);
       await atRest(page);
@@ -132,7 +132,7 @@ test.describe("a resize WebKit lays out in two steps keeps a reader inside a pin
       await frames(page, 3);
       await holdLate(page, "small and large");
       await page.setViewportSize({ width: 1440, height: 860 });
-      await frames(page, 3); // the first step
+      await firstStep(page);
       await page.getByRole("contentinfo").getByRole("switch", { name: "Motion" }).evaluate((el) => (el as HTMLElement).click());
       await expect(page.locator("#run")).not.toHaveClass(/is-running/);
       await release(page);

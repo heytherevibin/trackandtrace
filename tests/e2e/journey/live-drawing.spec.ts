@@ -3,7 +3,7 @@ import { expect, test } from "../fixtures";
 import { SCENE_CHUNK_MARK } from "@/components/landing/journey/scene/scene-mark";
 import { collisionsInView } from "./collisions";
 import { drawingCollisions } from "./drawing-checks";
-import { dismissInstall, frames, holdLate, noAnchoring, release, scrollIntoChapter, scrollToId, skipWithoutWebgl2, waitForJourney, waitForLive } from "./journey-helpers";
+import { dismissInstall, firstStep, frames, holdLate, noAnchoring, release, scrollIntoChapter, scrollToId, skipWithoutWebgl2, waitForJourney, waitForLive } from "./journey-helpers";
 
 // Every test here needs the live drawing: in a WebKit with no WebGL 2 (J6-12) each skips before it starts, saying so,
 // by the same check waitForLive makes.
@@ -278,7 +278,7 @@ test.describe("the live drawing at its edges", () => {
       const f = await through();
       await holdLate(page, late);
       await page.setViewportSize(isMobile ? { width: 390, height: 804 } : { width: 1440, height: 700 });
-      await frames(page, 8); // the first step, and "resize"
+      await firstStep(page); // the first step, and "resize"
       await release(page);
       await frames(page, 20);
       await expect(page.locator("#anatomy")).toHaveClass(/is-live/);
@@ -316,7 +316,7 @@ test.describe("the live drawing at its edges", () => {
         const through = (was.y - was.start) / (was.end - was.start);
         await holdLate(page, late);
         await page.setViewportSize(isMobile ? { width: 390, height: 804 } : { width: 1440, height: 700 });
-        await frames(page, 8); // the first step, and "resize"
+        await firstStep(page); // the first step, and "resize"
         await release(page);
         await frames(page, 20);
         await expect(page.locator("#anatomy")).toHaveClass(/is-live/);
