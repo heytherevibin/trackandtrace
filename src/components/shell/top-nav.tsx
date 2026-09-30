@@ -37,7 +37,7 @@ export function TopNav() {
   return (
     <header
       className={cn(
-        "border-b border-line bg-surface-0",
+        "border-b border-line ground",
         !minimal && "sticky top-0 z-nav",
       )}
       style={{ viewTransitionName: "site-header" }}

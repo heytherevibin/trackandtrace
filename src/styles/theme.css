@@ -12,6 +12,12 @@
   --surface-2: #f5f5f8;
   --surface-3: #f5f5f8;
 
+  /* Film grain on the page ground (owner, 2026-09-29): fractal noise in ink, baseFrequency .85, 2 octaves, alpha .9,
+     the layer at opacity .05 (the rect's own opacity, the one number to tweak). A data URI cannot read a custom
+     property, so each face carries its own; stitchTiles makes the 256px tile seamless. Painted on the traveller
+     site's canvas only (html[data-ground="grain"], base.css). */
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256'%3E%3Cfilter id='g' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .114 0 0 0 0 .122 0 0 0 0 .125 0 0 0 .9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)' opacity='.05'/%3E%3C/svg%3E");
+
   /* Ink: 1 text · 2 body copy at 78% · 3 legends and meta at 70% · alert is the deep steel step */
   --ink-1: #1d1f20;
   --ink-2: #4c4d4e;
@@ -78,6 +84,9 @@
   --surface-2: #1a1a1a;
   --surface-3: #1a1a1a;
 
+  /* Film grain: the same noise in white, the layer at opacity .07. */
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256'%3E%3Cfilter id='g' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)' opacity='.07'/%3E%3C/svg%3E");
+
   --ink-1: #ededed;
   --ink-2: #a1a1a1;
   --ink-3: #8f8f8f;
@@ -125,9 +134,10 @@
   --elevation-3: 0 12px 32px rgba(0, 0, 0, 0.7);
 }
 
-/* Surfaces rendered outside the app tree (global-error, not-found) still get the face */
-html[data-theme="light"] body,
-html[data-theme="dark"] body {
+/* Surfaces rendered outside the app tree (global-error, not-found) still get the face. Not on the traveller site,
+   whose body is clear so the grain on its canvas shows through (base.css). */
+html[data-theme="light"]:not([data-ground="grain"]) body,
+html[data-theme="dark"]:not([data-ground="grain"]) body {
   background: var(--surface-0);
   color: var(--ink-1);
 }

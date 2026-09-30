@@ -116,7 +116,7 @@ html[data-journey="on"] .callout-lines line, html[data-journey="on"] .live-lines
 html[data-journey="on"] .callout-lines circle, html[data-journey="on"] .live-lines circle { fill: var(--surface-0); stroke: var(--accent); stroke-width: 1.5; }
 html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .anatomy-legend { display: none; }
 html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .callouts { inset: 0; width: auto; height: auto; overflow: visible; clip-path: none; z-index: 3; pointer-events: none; }
-html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .callout { position: absolute; width: 16rem; display: grid; grid-template-columns: auto 1fr; column-gap: 10px; align-items: baseline; padding: 6px 0 7px; border-top: 1px solid var(--line); background: var(--surface-0); pointer-events: auto; }
+html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .callout { position: absolute; width: 16rem; display: grid; grid-template-columns: auto 1fr; column-gap: 10px; align-items: baseline; padding: 6px 0 7px; border-top: 1px solid var(--line); background-color: var(--surface-0); background-image: var(--page-grain); pointer-events: auto; }
 html[data-journey="on"] [data-live="columns"] .callout { top: 0; }
 html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .callout[data-side="left"] { left: 0; }
 html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .callout[data-side="right"] { right: 0; }
@@ -127,7 +127,7 @@ html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-li
 html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .callout.is-hot { border-top-color: var(--accent); }
 html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .callout.is-hot .callout-title { color: var(--accent-text); }
 html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns.is-compact, [data-live="columns"][data-compact]) .callout-detail { display: none; }
-html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .title-block { display: grid; position: absolute; right: 0; bottom: 16px; z-index: 3; grid-template-columns: minmax(0, 1fr) auto; width: 22rem; background: var(--surface-0); }
+html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .title-block { display: grid; position: absolute; right: 0; bottom: 16px; z-index: 3; grid-template-columns: minmax(0, 1fr) auto; width: 22rem; background-color: var(--surface-0); background-image: var(--page-grain); }
 html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .tb-cell { padding: 4px 10px; font-family: var(--font-display); font-weight: 600; font-size: 0.6875rem; /* drawing units: no token matches v3's title-block instrument at its fixed 22rem width */ line-height: 1rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
 html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .tb-cell:nth-of-type(n + 3) { border-top: 1px solid var(--line); }
 html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .tb-cell:nth-of-type(even) { border-left: 1px solid var(--line); text-align: right; }
@@ -156,11 +156,11 @@ html[data-journey="on"] .live-lines { position: absolute; inset: 0; width: 100%;
 html[data-journey="on"] [data-live="list"] .live-lines { display: none; }
 html[data-journey="on"] [data-live="columns"] :is(.anatomy-caption, .dim-label) { display: block; }
 html[data-journey="on"] .anatomy-caption { position: absolute; left: 0; bottom: 18px; z-index: 3; margin: 0; }
-html[data-journey="on"] .dim-label { position: absolute; left: 0; top: 0; z-index: 3; padding: 1px 6px; background: var(--surface-0); font-family: var(--font-display); font-weight: 600; font-size: var(--text-xs); letter-spacing: 0.08em; color: var(--accent-text); white-space: nowrap; pointer-events: none; }
+html[data-journey="on"] .dim-label { position: absolute; left: 0; top: 0; z-index: 3; padding: 1px 6px; background-color: var(--surface-0); background-image: var(--page-grain); font-family: var(--font-display); font-weight: 600; font-size: var(--text-xs); letter-spacing: 0.08em; color: var(--accent-text); white-space: nowrap; pointer-events: none; }
 /* The list while live (below 64rem, or whenever the columns cannot fit): the words scroll away under the masthead
    first, then the drawing and its parts list hold the window. */
 html[data-journey="on"] #anatomy.is-live .anatomy-pin[data-live="list"] { top: calc(var(--header-height) - var(--anatomy-copy-h, 0px)); height: calc(100svh - var(--header-height) + var(--anatomy-copy-h, 0px)); min-height: 0; }
-html[data-journey="on"] #anatomy.is-live [data-live="list"] .anatomy-legend { position: absolute; left: 0; right: 0; bottom: 12px; z-index: 3; background: var(--surface-0); }
+html[data-journey="on"] #anatomy.is-live [data-live="list"] .anatomy-legend { position: absolute; left: 0; right: 0; bottom: 12px; z-index: 3; background-color: var(--surface-0); background-image: var(--page-grain); }
 @media (max-width: 63.99rem) {
   html[data-journey="on"] #anatomy.is-live { height: 430vh; }
 }
@@ -196,7 +196,8 @@ html[data-journey="on"] #run.is-running .run-train svg { display: block; width: 
 html[data-journey="on"] #run.is-running .run-track { position: relative; z-index: 2; display: flex; align-items: flex-end; gap: clamp(56px, 9vw, 150px); width: max-content; height: calc(100% - var(--run-band, 124px)); padding: 0; will-change: transform; }
 html[data-journey="on"] #run.is-running .run-track > section { display: flex; align-items: flex-end; gap: clamp(48px, 7vw, 120px); padding: 0; margin: 0; }
 html[data-journey="on"] #run.is-running .run-cards { display: contents; }
-html[data-journey="on"] #run.is-running [data-station] { flex: none; background: var(--surface-0); }
+html[data-journey="on"] #run.is-running [data-station] { flex: none; background-color: var(--surface-0); background-image: var(--page-grain); }
+html[data-journey="on"] #run.is-running [data-station].duotone { background-image: none; } /* a print stays flat (utilities.css) */
 html[data-journey="on"] #run.is-running .run-intro { width: min(19rem, 80vw); padding-bottom: 8px; }
 html[data-journey="on"] #run.is-running .run-intro > span { font-size: clamp(1.625rem, 2.6vw, 2.25rem); line-height: 1.12; letter-spacing: 0.04em; }
 html[data-journey="on"] #run.is-running .run-intro > hr { margin: 14px 0 0; }
@@ -230,3 +231,35 @@ html[data-journey="on"] .journey-hud > div { display: flex; gap: 8px; align-item
 html[data-journey="on"] .journey-hud > div > span { flex: 1; font-family: var(--font-display); font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
 html[data-journey="on"] .journey-hud button { min-height: 32px; padding: 0 8px; border: 1px solid var(--line); background: var(--surface-0); }
 html[data-journey="on"] .journey-hud pre { margin: 6px 0 0; font-family: ui-monospace, monospace; white-space: pre; }
+
+/* ---- The paper under a pinned stage (owner, 2026-09-30). While 02, the drawing or the run is pinned, the whole window's
+   grain holds still with it: .pin-paper, the stage's last child, is a full-bleed sheet of the page's grain that sticks
+   as the pin does. --paper-h is the pin's own height, in the small viewport as the pin is. The sheet is pulled up over
+   the pin by it (a negative top margin, which adds nothing to the section's height) and runs on past the pin's foot by
+   100lvh − 100svh, the room a phone's toolbar gives back when it collapses mid-pin, so that strip is paper too; an equal
+   negative bottom margin keeps its margin box the pin's height, so it takes hold and lets go in the same scroll as the
+   pin. The section clips that overhang (clip, not a scroller: the pins stay sticky), so it never shows past the stage
+   or adds scroll. Its top is the pin's in columns, and below it in the drawing's list, whose words scroll away under
+   the masthead first. At z-index 0 it lies under the live drawing's fixed canvas (1) and the pin (2), and takes no
+   pointer. Before it pins and after it lets go it moves with the page. The pins keep the page frame's width; the sheet
+   reaches the window's edges as 100vw, which past a classic scrollbar overhangs by half of it, so the journey clips
+   #main sideways itself (as the hero dial's rule also does, journey.css). */
+html[data-journey="on"] #main { overflow-x: clip; }
+html[data-journey="on"] #anatomy.is-live:has(> .pin-paper),
+html[data-motion="on"][data-journey="on"] .chapters.is-pinned:has(> .pin-paper),
+html[data-journey="on"] #run.is-running:has(> .pin-paper) { overflow-y: clip; }
+.pin-paper { display: none; }
+html[data-journey="on"] #anatomy.is-live > .pin-paper,
+html[data-motion="on"][data-journey="on"] .chapters.is-pinned > .pin-paper,
+html[data-journey="on"] #run.is-running > .pin-paper {
+  display: block; position: sticky; z-index: 0; top: var(--header-height);
+  height: calc(var(--paper-h) + 100lvh - 100svh); margin-top: calc(-1 * var(--paper-h)); margin-bottom: calc(100svh - 100lvh);
+  margin-left: calc(50% - 50vw); width: 100vw; background-color: var(--surface-0); background-image: var(--page-grain); pointer-events: none;
+}
+html[data-journey="on"] #anatomy.is-live > .pin-paper { --paper-h: max(520px, calc(100svh - var(--header-height))); }
+html[data-journey="on"] #anatomy.is-live > .anatomy-pin[data-live="list"] ~ .pin-paper { --paper-h: calc(100svh - var(--header-height)); }
+html[data-motion="on"][data-journey="on"] .chapters.is-pinned > .pin-paper { --paper-h: max(560px, calc(100svh - var(--header-height))); }
+@media (max-width: 63.99rem), (min-width: 64rem) and (max-height: 760px) {
+  html[data-motion="on"][data-journey="on"] .chapters.is-pinned > .pin-paper { --paper-h: calc(100svh - var(--header-height)); }
+}
+html[data-journey="on"] #run.is-running > .pin-paper { --paper-h: calc(100svh - var(--header-height)); }

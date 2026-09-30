@@ -63,6 +63,25 @@ export async function navigateFromMasthead(page: Page, name: string, isMobile: b
 }
 
 /**
+ * The axe run behind expectAxeClean. The page's film grain is switched off for the scan and back on after it: axe
+ * files text over a background image as "incomplete" (bgImage) rather than judging it, so over the grain the contrast
+ * check would pass by not looking. It judges the flat token colour instead; the grain's cost is a known margin
+ * (over its mean tone: Day ink-3 5.59:1, accent-text 5.56:1; Night ink-3 6.19:1; review 2026-09-29).
+ */
+export async function axeResults(page: Page): Promise<Awaited<ReturnType<AxeBuilder["analyze"]>>> {
+  // Park the pointer so no hover tint is mid-transition when colours are sampled.
+  await page.mouse.move(0, 0);
+  await page.evaluate(() => document.documentElement.style.setProperty("--page-grain", "none"));
+  await page.waitForTimeout(200);
+  try {
+    // @axe-core/playwright bundles a newer playwright-core type; the runtime API is identical.
+    return await new AxeBuilder({ page: page as unknown as ConstructorParameters<typeof AxeBuilder>[0]["page"] }).analyze();
+  } finally {
+    await page.evaluate(() => document.documentElement.style.removeProperty("--page-grain")).catch(() => undefined);
+  }
+}
+
+/**
  * Zero serious or critical axe findings on the current page. The steel pairing is design-locked
  * (decided 2026-09-17: the reference is matched exactly), so by default only colour-contrast nodes
  * on the steel fill (#5980a6, or its hover step) are exempt: the primary button, the skip link and
@@ -70,11 +89,7 @@ export async function navigateFromMasthead(page: Page, name: string, isMobile: b
  * Pass `allowDesignLockedAccent: false` for a strict scan.
  */
 export async function expectAxeClean(page: Page, options: { readonly allowDesignLockedAccent?: boolean } = {}): Promise<void> {
-  // Park the pointer so no hover tint is mid-transition when colours are sampled.
-  await page.mouse.move(0, 0);
-  await page.waitForTimeout(200);
-  // @axe-core/playwright bundles a newer playwright-core type; the runtime API is identical.
-  const results = await new AxeBuilder({ page: page as unknown as ConstructorParameters<typeof AxeBuilder>[0]["page"] }).analyze();
+  const results = await axeResults(page);
   const material = results.violations
     .map((v) => ((options.allowDesignLockedAccent ?? true) && v.id === "color-contrast" ? { ...v, nodes: v.nodes.filter((n) => !isDesignLockedAccent(n)) } : v))
     .filter((v) => (v.impact === "serious" || v.impact === "critical") && v.nodes.length > 0);

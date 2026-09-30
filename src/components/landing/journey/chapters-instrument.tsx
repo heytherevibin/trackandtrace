@@ -95,7 +95,7 @@ export function ChaptersInstrument({ trace }: { readonly trace: ChapterTrace }) 
           </g>
         </svg>
       </div>
-      <div className="chapter-card blueprint bg-surface-0">
+      <div className="chapter-card blueprint ground">
         <Corners />
         <div className="flex border-b border-line">
           <span className="legend flex-1 px-4 py-2">{m.trace}</span>

@@ -140,7 +140,7 @@ export function PnrTerminal({ sampleMode, connected = false }: { readonly sample
       title={m.plate.title}
       meta={[m.plate.form]}
       padding="md"
-      className={cn("bg-surface-0", plate.shaking && "shake")}
+      className={cn("ground", plate.shaking && "shake")}
       onAnimationEnd={plate.onAnimationEnd}
     >
       <PlateMorph face={plate.phase === "done" && plate.result ? "record" : "entry"}>
