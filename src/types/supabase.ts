@@ -132,6 +132,10 @@ export type Database = {
         Args: { p_id?: string }
         Returns: number
       }
+      availability_outcome_label: {
+        Args: { p_can_book: boolean; p_raw_status: string }
+        Returns: string
+      }
       console_audit: {
         Args: {
           p_category?: string
