@@ -3,6 +3,7 @@
 import { useId, useState } from "react";
 import { z } from "zod";
 import { messages } from "@/messages";
+import { ALERT, FIELD, LABEL, REFUSAL } from "./field-parts";
 import { signUp as postSignUp, type SignupAsk, type SignupState } from "./use-signup";
 
 const m = messages.subscribe;
@@ -10,17 +11,6 @@ const EMAIL = z.email().max(254);
 
 export type CapturePlace = "footer-column" | "footer-row" | "pre-booking";
 
-/** Which answers put a message under the field and leave the form standing. */
-const MESSAGE: Partial<Record<SignupState, string>> = {
-  invalid: m.errors.invalid,
-  limited: m.errors.limited,
-  dailyLimit: m.errors.dailyLimit,
-  error: m.errors.failed,
-};
-
-const LABEL = "font-display text-xs font-semibold uppercase leading-normal tracking-caps text-accent-text";
-const FIELD = "well h-11 min-h-9 w-full px-2.5 py-1.5 placeholder:text-ink-3";
-const NOTE = "mt-0.5 text-label leading-normal text-accent-soft-ink";
 const BUTTON =
   "press relative inline-flex cursor-pointer select-none items-center justify-center gap-1.5 whitespace-nowrap border font-display font-semibold no-underline disabled:cursor-not-allowed disabled:opacity-45 aria-disabled:cursor-not-allowed aria-disabled:opacity-45 px-[12.24px] py-[6.8px] text-sm leading-[1.2] border-accent-strong bg-accent-strong text-accent-ink hover:bg-accent-strong-hover active:bg-accent-strong-active";
 const LINK = "text-accent-text underline underline-offset-4 hover:text-accent-soft-ink";
@@ -88,7 +78,7 @@ export function SignupCapture({
   }
 
   const layout = PLACE[place];
-  const message = MESSAGE[state];
+  const message = REFUSAL[state];
   // Only `invalid` is the address's own fault; the rest are the site's.
   const mine = state === "invalid";
   const label = state === "sending" ? m.form.sending : place === "pre-booking" ? m.form.notify : m.form.subscribe;
@@ -113,7 +103,7 @@ export function SignupCapture({
     </>
   );
   const note = message ? (
-    <p id={messageId} role="alert" className={NOTE}>
+    <p id={messageId} role="alert" className={ALERT}>
       {message}
     </p>
   ) : null;

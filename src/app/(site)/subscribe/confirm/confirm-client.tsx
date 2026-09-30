@@ -2,6 +2,7 @@
 
 import { useId, useState } from "react";
 import { z } from "zod";
+import { ALERT, FIELD, LABEL, REFUSAL } from "@/components/subscribe/field-parts";
 import { Button, NOTE, Status, TEXT } from "@/components/subscribe/plate-parts";
 import { SubscriptionPage } from "@/components/subscribe/subscription-page";
 import { signUp, type SignupState } from "@/components/subscribe/use-signup";
@@ -10,9 +11,6 @@ import { apiRequest } from "@/services/api-client";
 
 const m = messages.subscribe.page.confirm;
 const EMAIL = z.email().max(254);
-
-const LABEL = "font-display text-xs font-semibold uppercase leading-normal tracking-caps text-accent-text";
-const FIELD = "well h-11 min-h-9 w-full px-2.5 py-1.5 placeholder:text-ink-3";
 
 const answer = z.object({ ok: z.literal(true), state: z.string() });
 
@@ -69,14 +67,6 @@ function Before({ headline, lead, token, promise }: { readonly headline: string;
   );
 }
 
-/** Which answers put a message in place of the form. Everything but a sent link leaves the form standing. */
-const REFUSAL: Partial<Record<SignupState, string>> = {
-  invalid: messages.subscribe.errors.invalid,
-  limited: messages.subscribe.errors.limited,
-  dailyLimit: messages.subscribe.errors.dailyLimit,
-  error: messages.subscribe.errors.failed,
-};
-
 /** The expired link: the page holds no address, so the person types theirs and asks again. */
 function Expired({ headline, list }: { readonly headline: string; readonly list: "news" | "availability" }) {
   const id = useId();
@@ -121,7 +111,7 @@ function Expired({ headline, list }: { readonly headline: string; readonly list:
             {...(refusal ? { "aria-invalid": state === "invalid", "aria-describedby": `${id}-message` } : {})}
           />
           {refusal ? (
-            <p id={`${id}-message`} role="alert" className="mt-0.5 text-label leading-normal text-accent-soft-ink">
+            <p id={`${id}-message`} role="alert" className={ALERT}>
               {refusal}
             </p>
           ) : null}
