@@ -82,6 +82,15 @@ export function createGovernor({ levels, start = 0, set, floor }: GovernorOption
   };
 }
 
+/** The live chapter's render loop, after each frame: the next one while a stage is on screen, else none, and the
+ * governor forgets the gesture, so the frame that brings the drawing back (however long after, scrolled or not) starts
+ * a new one. */
+export function nextFrame(onScreen: boolean, governor: Pick<Governor, "idle">, request: () => number): number {
+  if (onScreen) return request();
+  governor.idle();
+  return 0;
+}
+
 /** This session's step (tt.q, a whole number below `levels`), or full quality. "still" is the drawing's reason, not a step. */
 export function startLevel(stored: string | null, levels: number): number {
   const n = Number(stored);

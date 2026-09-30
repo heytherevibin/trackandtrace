@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createGovernor, startLevel } from "@/components/landing/journey/governor";
+import { createGovernor, nextFrame, startLevel } from "@/components/landing/journey/governor";
 
 function run(levels = 3, start = 0) {
   const sets: number[] = [];
@@ -44,7 +44,7 @@ describe("the governor (spec §3.C; v3's governor.js)", () => {
     expect(floors()).toBe(1);
   });
 
-  it("never counts a pause between gestures, or a stall that is not the drawing's", () => {
+  it("never counts a pause between gestures, or a stall with no scroll in it", () => {
     const { g, sets, feed } = run();
     feed(200, 200);
     g.drew(99_000);
@@ -79,6 +79,27 @@ describe("the governor (spec §3.C; v3's governor.js)", () => {
       g.idle(); // the gesture paused after its scroll (or the drawing went off screen)
     }
     expect(sets).toEqual([]);
+  });
+
+  it("counts a scroll for the one gap it fell in: the quiet gaps after it are still new gestures", () => {
+    const { sets, feed, floors } = run();
+    feed(2, 200, true);
+    feed(400, 200);
+    expect(sets).toEqual([]);
+    expect(floors()).toBe(0);
+  });
+
+  it("forgets the gesture when the drawing leaves the screen: the scrolled frame that brings it back starts a new one", () => {
+    const { g, sets, feed } = run();
+    let requested = 0;
+    for (let i = 0; i < 100; i += 1) {
+      feed(1, 16, true);
+      expect(nextFrame(false, g, () => (requested += 1))).toBe(0); // no stage on screen: the loop stops
+      feed(1, 5_000, true); // the reader scrolls back, seconds later
+    }
+    expect(requested).toBe(0);
+    expect(sets).toEqual([]);
+    expect(nextFrame(true, g, () => 7)).toBe(7);
   });
 
   it("steps back up after 180 good judgements, at most twice", () => {

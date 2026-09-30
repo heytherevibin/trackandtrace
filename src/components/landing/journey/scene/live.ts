@@ -3,7 +3,7 @@ import { Vector3, type PerspectiveCamera } from "three";
 import { QUALITY_STORAGE_KEY } from "@/components/motion/motion-boot";
 import { messages } from "@/messages";
 import { storedQuality, type Ask, type Begin } from "../drawing";
-import { createGovernor, startLevel } from "../governor";
+import { createGovernor, nextFrame, startLevel } from "../governor";
 import { DEPART_EVENT, LAYOUT_EVENT, THEME_EVENT, emit } from "../journey-events";
 import type { Box } from "../labels-layout";
 import { createLiveLabels, revealOf, wipe } from "../live-labels";
@@ -254,8 +254,7 @@ function startLive(engine: Engine, ask: Ask): Teardown {
       if (behind(observeA, A.p)) observeA.container.handleScroll();
       else if (observeT && behind(observeT, T.p)) observeT.container.handleScroll();
     }
-    raf = onScreen.size > 0 ? requestAnimationFrame(loop) : 0;
-    if (!raf) governor.idle(); // off screen: the frame that brings the drawing back starts a new gesture
+    raf = nextFrame(onScreen.size > 0, governor, () => requestAnimationFrame(loop));
   };
   // a long gap the page scrolled through is a slow frame of the gesture, not a new one (governor.ts)
   const onPageScroll = () => governor.scrolled();
