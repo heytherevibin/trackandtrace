@@ -101,4 +101,47 @@ test.describe("the departure board's status", () => {
     await frames(page, 30);
     expect(await movedFrames(page)).toBe(0);
   });
+
+  // Mid-flip, each character turns in its own inline-block span; a span holding an ordinary space collapsed to nothing,
+  // so "The train, drawn" ran together as "THETRAIN,DRAWN". Watched from the first frame: at every frame of the load's
+  // flip, every space in a multi-word destination keeps its width. Settled, the row is the plain words again, named
+  // with ordinary spaces: the flip is presentational.
+  test("mid-flip, a destination's spaces never collapse; settled, it is the plain words", async ({ page, isMobile }) => {
+    test.skip(isMobile, "the desktop load's flip; the mechanism is the same on a phone");
+    await drawStill(page);
+    await page.addInitScript(() => {
+      const seen = { frames: 0, spaces: 0, narrowest: Number.POSITIVE_INFINITY };
+      Reflect.set(window, "__ttSpaces", seen);
+      const look = () => {
+        for (const a of document.querySelectorAll<HTMLElement>("#departures .board-name a")) {
+          const label = a.getAttribute("aria-label");
+          const chars = a.querySelectorAll(".flap-char");
+          if (!label || chars.length !== label.length) continue;
+          seen.frames += 1;
+          [...label].forEach((c, i) => {
+            if (c !== " ") return;
+            seen.spaces += 1;
+            seen.narrowest = Math.min(seen.narrowest, chars[i]!.getBoundingClientRect().width);
+          });
+        }
+        requestAnimationFrame(look);
+      };
+      requestAnimationFrame(look);
+    });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/");
+    await waitForJourney(page);
+    await expect.poll(() => page.locator("#departures .flap-char").count(), { timeout: 6_000 }).toBe(0);
+    const seen = await page.evaluate(() => Reflect.get(window, "__ttSpaces") as { frames: number; spaces: number; narrowest: number });
+    expect(seen.frames, "frames with a destination mid-flip").toBeGreaterThan(0);
+    expect(seen.spaces, "spaces measured mid-flip").toBeGreaterThan(0);
+    expect(seen.narrowest, "the narrowest space mid-flip, px").toBeGreaterThan(2);
+
+    const names = page.locator("#departures .board-name a");
+    await expect(names).toHaveText(DESTINATIONS);
+    const settled = await names.evaluateAll((els) => els.map((el) => ({ text: el.textContent, label: el.getAttribute("aria-label") })));
+    expect(settled.map((s) => s.text)).toEqual(DESTINATIONS);
+    expect(settled.every((s) => s.label === null)).toBe(true);
+    for (const name of DESTINATIONS) await expect(page.getByRole("link", { name, exact: true }).first()).toBeAttached();
+  });
 });

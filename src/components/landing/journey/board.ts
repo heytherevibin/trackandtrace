@@ -13,18 +13,21 @@ import type { JourneyContext, Teardown } from "./start-journey";
 // Flaps are characters on their own axis, turned by transform only, then written back as plain text.
 
 const LABELS = messages.journey.board.statuses;
+/** A space turns as a non-breaking one: an inline-block span holding an ordinary space collapses to nothing, and the
+ * words would run together mid-flip. Only the aria-hidden flap shows it; names and settled text keep ordinary spaces. */
+const NBSP = "\u00a0";
 
 /** Writes text as one span per character, ready to turn; returns the spans. The whole word stays the
  * accessible name (an `aria-label`, cleared when the plain text comes back), and every span is `aria-hidden`,
  * so a link split mid-flip is still named for assistive tech, as Anime.js's own splitText names a kicker. */
-function flapChars(el: HTMLElement, text: string): HTMLElement[] {
+export function flapChars(el: HTMLElement, text: string): HTMLElement[] {
   el.setAttribute("aria-label", text);
   el.replaceChildren(
     ...[...text].map((c) => {
       const s = document.createElement("span");
       s.className = "flap-char";
       s.setAttribute("aria-hidden", "true");
-      s.textContent = c === " " ? " " : c;
+      s.textContent = c === " " ? NBSP : c;
       return s;
     }),
   );
@@ -32,9 +35,14 @@ function flapChars(el: HTMLElement, text: string): HTMLElement[] {
 }
 
 /** Writes plain text back and drops the stand-in `aria-label`, so the server's markup returns exactly. */
-function unflap(el: HTMLElement, text: string): void {
+export function unflap(el: HTMLElement, text: string): void {
   el.textContent = text;
   el.removeAttribute("aria-label");
+}
+
+/** Whether `el` is flipping in as `text`: its flap characters, read with their spaces as ordinary ones, spell it. */
+export function readsAs(el: HTMLElement, text: string): boolean {
+  return el.querySelector(".flap-char") !== null && el.textContent?.replaceAll(NBSP, " ") === text;
 }
 
 /** Turns the characters in; once they land, writes the plain text back, unless a newer status replaced them. */
@@ -46,7 +54,7 @@ function turn(chars: readonly HTMLElement[], el: HTMLElement, text: string, dela
     ease: ease.expo(),
     onComplete: () =>
       window.setTimeout(() => {
-        if (el.querySelector(".flap-char") && el.textContent?.replace(/ /g, " ") === text) unflap(el, text);
+        if (readsAs(el, text)) unflap(el, text);
       }, 0),
   });
 }
