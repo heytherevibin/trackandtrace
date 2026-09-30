@@ -9,16 +9,22 @@ import { UNSUBSCRIBE } from "./subscribe-link";
 // those, so the compact footer's width is measured here directly, as boxes.
 
 /**
- * Per-width floors for the compact footer's field, each just under what is measured (194, 234 and
- * 264px). At 320px the field sits beside the 76px button, which is why it is the narrowest; the
- * collapse this guards against leaves single digits, and a floor this close also catches a field
- * that has quietly lost a tenth of its width.
+ * The compact footer's rule is `min-w-[240px]` on the FORM (and on the consent line). A min-width is
+ * font-independent, so the form's box is what is asserted: at least FORM_MIN wide at every width.
+ * That is what collapsed to 22px at 390px when the class was removed.
  *
- * What the floors actually defend, from removing `min-w-[240px]` from the `footer-row` form: only the
- * 390px case goes red. At 320 and 360 the consent line's own min-width already forces it to wrap below,
- * so the form keeps its width without the class. A floor below about 100 would defeat the check.
+ * The field's own width is the form minus the button and the gap, and the button's width depends on how
+ * the display font draws "Subscribe", so it is only sanity-checked, against one loose floor for all
+ * widths: it guards against the button eating the row, and sits well clear of every measured width
+ * (about 190 to 265px on the two machines seen) and far above the 22px collapse. Per-width floors fitted
+ * to one machine's font metrics (194, 234, 264px) were here first; they failed on CI by 3px, where the
+ * field measured 227 and 257 at 360 and 390px, and were removed.
+ *
+ * What removing the class defends: see the fix report; at 320 and 360 the consent line's own min-width
+ * already forces the wrap, so the collapse is only visible at the widths where both fit on one row.
  */
-const FIELD_MIN = { 320: 190, 360: 230, 390: 260 } as const;
+const FORM_MIN = 240;
+const FIELD_MIN = 120;
 const PHONES = [320, 360, 390] as const;
 const m = messages.subscribe.page.unsubscribe;
 
@@ -30,13 +36,15 @@ test.describe("sign-up and unsubscribe layout on a phone", () => {
       await page.setViewportSize({ width, height: 844 });
       // Any path but "/": the landing draws the full footer, whose sign-up is a column.
       await gotoReady(page, "/accuracy");
-      const field = page.locator("footer form input[name='email']");
+      const form = page.locator("footer form").filter({ has: page.locator("input[name='email']") });
+      const field = form.locator("input[name='email']");
       const consent = page.locator("footer p", { has: page.locator("a[href='/privacy']") });
       await expect(field).toBeVisible();
-      const [f, c] = await Promise.all([field.boundingBox(), consent.boundingBox()]);
-      if (!f || !c) throw new Error("the compact footer's field or consent line is not drawn");
-      const measured = `field ${Math.round(f.width)}x${Math.round(f.height)} at y ${Math.round(f.y)}, consent ${Math.round(c.width)}x${Math.round(c.height)} at y ${Math.round(c.y)}`;
-      expect(f.width, `the email field is under its ${FIELD_MIN[width]}px floor: ${measured}`).toBeGreaterThanOrEqual(FIELD_MIN[width]);
+      const [f, c, o] = await Promise.all([field.boundingBox(), consent.boundingBox(), form.boundingBox()]);
+      if (!f || !c || !o) throw new Error("the compact footer's form, field or consent line is not drawn");
+      const measured = `form ${Math.round(o.width)}x${Math.round(o.height)}, field ${Math.round(f.width)}x${Math.round(f.height)} at y ${Math.round(f.y)}, consent ${Math.round(c.width)}x${Math.round(c.height)} at y ${Math.round(c.y)}`;
+      expect(o.width, `the form is under its ${FORM_MIN}px minimum: ${measured}`).toBeGreaterThanOrEqual(FORM_MIN);
+      expect(f.width, `the button is eating the row, the field is under ${FIELD_MIN}px: ${measured}`).toBeGreaterThanOrEqual(FIELD_MIN);
       expect(c.y, `the consent line sits beside the form, not below it: ${measured}`).toBeGreaterThanOrEqual(f.y + f.height);
     });
   }
