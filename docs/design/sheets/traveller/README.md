@@ -62,10 +62,12 @@ Every state was rendered at the board's own viewport width and measured: board o
 - **The lead sentence belongs to the state before the press, and only to it.** Left standing it told a traveller who had just unsubscribed to "press Unsubscribe and it stops".
 - **The sign-up column is sized like the brand column** (`max-w-[30rem] flex-[1.4_1_240px]`), not like the link columns: a 130px column cannot hold a field and a button, and both of those widths are ones the footer already uses, so the stylesheet really carries them.
 
-### Open for the review
+### Decided at the B4 review (30 Sep 2026)
 
-- **"Subscribed by mistake? Resubscribe"** is the spec's wording, drawn as a sentence and a one-word button. Someone reading it has just *un*subscribed, so the question asks about the wrong press.
-- **The news list's promise** is the one piece of copy the spec does not fix. Drawn as "News about Trakline: what has shipped, and what is being built." — it claims nothing about how often, on purpose. The availability promise is the spec's own: one email.
+The owner approved the four boards for PR 3, with one change:
+
+- **After unsubscribing, the page asks "Changed your mind?" above Resubscribe.** The spec's "Subscribed by mistake?" asked about the wrong press: whoever reads it has just *un*subscribed. The boards and the spec (§5) now say "Changed your mind?".
+- **The news list's promise stays as drawn:** "News about Trakline: what has shipped, and what is being built." It makes no promise about how often. The availability promise is the spec's own: one email.
 
 ### Found while drawing (not changed in these sheets)
 
