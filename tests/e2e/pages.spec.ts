@@ -1,5 +1,7 @@
+import { messages } from "@/messages";
 import { expect, test } from "./fixtures";
 import { expectAxeClean, gotoReady } from "./helpers";
+import { UNSUBSCRIBE } from "./subscribe-link";
 
 test("pre-booking searches nothing until a route answers, and labels a sample answer", async ({ page }) => {
   // The honest stub this replaced could not list a train because nothing could find one. Now a
@@ -28,7 +30,8 @@ test("accuracy, privacy, terms, login, and account render their states", async (
   await gotoReady(page, "/login");
   // A server Playwright starts has no Supabase (see playwright.config.ts); a reused dev
   // server may be connected. Either honest state passes; login-form.test.tsx pins both.
-  await expect(page.getByRole("heading", { name: "Sign-in is not connected" }).or(page.getByLabel("Email"))).toBeVisible();
+  // Scoped to main: the footer's own sign-up field is labelled "Email" too (it made this locator match twice).
+  await expect(page.getByRole("heading", { name: "Sign-in is not connected" }).or(page.getByRole("main").getByLabel("Email"))).toBeVisible();
   await gotoReady(page, "/account");
   await expect(page.getByRole("heading", { name: "Nothing to sync yet" })).toBeVisible();
   await expectAxeClean(page);
@@ -38,4 +41,17 @@ test("an unknown address offers the check", async ({ page }) => {
   await gotoReady(page, "/nowhere");
   await expect(page.getByRole("heading", { name: "There is nothing at this address." })).toBeVisible();
   await expect(page.getByLabel("PNR number")).toBeAttached();
+});
+
+test("the subscription pages draw the invalid link, and the unsubscribe page draws its own before state", async ({ page }) => {
+  // /subscribe/confirm's own before state needs the database (peekRow); the e2e server has none.
+  await gotoReady(page, "/subscribe/confirm");
+  await expect(page.getByText(messages.subscribe.page.invalid.title)).toBeVisible();
+  await gotoReady(page, "/unsubscribe");
+  await expect(page.getByText(messages.subscribe.page.invalid.title)).toBeVisible();
+  // A signature the server derives its key for: the link is accepted, and opening it writes nothing.
+  await gotoReady(page, UNSUBSCRIBE.valid);
+  await expect(page.getByText(messages.subscribe.page.unsubscribe.lead)).toBeVisible();
+  await expect(page.getByRole("button", { name: messages.subscribe.page.unsubscribe.button, exact: true })).toBeVisible();
+  await expectAxeClean(page);
 });

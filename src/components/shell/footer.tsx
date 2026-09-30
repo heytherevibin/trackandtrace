@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Mark } from "@/components/brand/mark";
 import { messages } from "@/messages";
 import { ServicePill } from "@/components/status/service-pill";
+import { SignupCapture } from "@/components/subscribe/signup-capture";
 import { serviceStatus } from "@/services/service-status";
 import { FooterSections } from "./footer-sections";
 import { COLUMN_HEAD, COLUMN_LINK, COLUMN_LIST } from "./footer-styles";
@@ -11,7 +12,7 @@ import { MotionToggle } from "./motion-toggle";
 import { PRIMARY_NAV } from "./nav-config";
 import { SoundToggle } from "./sound-toggle";
 
-/** The landing's footer: brand and disclaimer, Sections, Product, Company; then one bar with the copyright, service status, the clock, and the Motion and Sound switches. */
+/** The landing's footer: brand and disclaimer, Sections, Product, Company, and the sign-up column; then one bar with the copyright, service status, the clock, and the Motion and Sound switches. */
 function FullFooter() {
   const m = messages.shell.footer;
   const status = serviceStatus();
@@ -65,6 +66,10 @@ function FullFooter() {
             </li>
           </ul>
         </div>
+        <div className="max-w-[30rem] flex-[1.4_1_240px]">
+          <p className={COLUMN_HEAD}>{messages.subscribe.places.footerColumn}</p>
+          <SignupCapture place="footer-column" list="news" source="landing" />
+        </div>
       </div>
       <div className="border-t border-line">
         <div className="page-frame flex flex-wrap items-center justify-between gap-x-6 gap-y-3 py-4">
@@ -81,18 +86,25 @@ function FullFooter() {
   );
 }
 
-/** App pages carry one line, as drawn: the disclaimer and © at 13px, the clock on the right. */
+/** App pages carry the sign-up row above one line, as drawn: the disclaimer and © at 13px, the clock on the right. */
 function CompactFooter() {
   const year = new Date().getFullYear();
   return (
-    <div className="page-frame flex flex-wrap items-center justify-between gap-x-6 gap-y-3 py-4">
-      <p className="m-0 text-label leading-normal text-ink-1/70">
-        {messages.common.notAffiliated}
-        {"  ·  "}
-        {messages.shell.footer.copyright(year)}
-      </p>
-      <IstClock />
-    </div>
+    <>
+      <div className="page-frame flex flex-wrap items-end gap-x-6 gap-y-3 py-4">
+        <SignupCapture place="footer-row" list="news" source="footer" />
+      </div>
+      <div className="border-t border-line">
+        <div className="page-frame flex flex-wrap items-center justify-between gap-x-6 gap-y-3 py-4">
+          <p className="m-0 text-label leading-normal text-ink-1/70">
+            {messages.common.notAffiliated}
+            {"  ·  "}
+            {messages.shell.footer.copyright(year)}
+          </p>
+          <IstClock />
+        </div>
+      </div>
+    </>
   );
 }
 
