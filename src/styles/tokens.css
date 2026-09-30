@@ -148,7 +148,9 @@
   --z-dialog: 60;
   --z-popover: 70;
   --z-toast: 80;
-  --z-cursor: 90; /* the registration-mark cursor: above every overlay, since it replaces the hidden native cursor */
+  /* 90 was the registration-mark cursor's, which the owner removed on 2026-09-30. Left as a gap
+     rather than closed up: --z-skip's 100 is asserted against elsewhere, and renumbering a scale
+     to tidy a hole is how two layers end up sharing a number. */
   --z-skip: 100;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --header-height: 4rem;
