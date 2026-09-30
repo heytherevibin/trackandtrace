@@ -8,12 +8,14 @@ import { UNSUBSCRIBE } from "./subscribe-link";
 // edge and boxes that HIDE content; a form squeezed to a few pixels beside its consent line is none of
 // those, so the compact footer's width is measured here directly, as boxes.
 
-const PHONES = [320, 360, 390] as const;
 /**
- * The narrowest a working field may be drawn. At 320px the field sits beside the 76px button and
- * measures 194px, a normal phone field; the collapse this guards against leaves single digits.
+ * Per-width floors for the compact footer's field, each just under what is measured (194, 234 and
+ * 264px). At 320px the field sits beside the 76px button, which is why it is the narrowest; the
+ * collapse this guards against leaves single digits, and a floor this close also catches a field
+ * that has quietly lost a tenth of its width.
  */
-const FIELD_MIN = 180;
+const FIELD_MIN = { 320: 190, 360: 230, 390: 260 } as const;
+const PHONES = [320, 360, 390] as const;
 const m = messages.subscribe.page.unsubscribe;
 
 test.describe("sign-up and unsubscribe layout on a phone", () => {
@@ -30,7 +32,7 @@ test.describe("sign-up and unsubscribe layout on a phone", () => {
       const [f, c] = await Promise.all([field.boundingBox(), consent.boundingBox()]);
       if (!f || !c) throw new Error("the compact footer's field or consent line is not drawn");
       const measured = `field ${Math.round(f.width)}x${Math.round(f.height)} at y ${Math.round(f.y)}, consent ${Math.round(c.width)}x${Math.round(c.height)} at y ${Math.round(c.y)}`;
-      expect(f.width, `the email field collapsed: ${measured}`).toBeGreaterThanOrEqual(FIELD_MIN);
+      expect(f.width, `the email field is under its ${FIELD_MIN[width]}px floor: ${measured}`).toBeGreaterThanOrEqual(FIELD_MIN[width]);
       expect(c.y, `the consent line sits beside the form, not below it: ${measured}`).toBeGreaterThanOrEqual(f.y + f.height);
     });
   }
