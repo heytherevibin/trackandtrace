@@ -10,7 +10,7 @@ import { PNR, gotoReady } from "./helpers";
 // is still resolving: CI measured that moment and this machine did not, so the link's missing hit
 // area reached review and not the suite. The list began as the axe scan's and has
 // deliberately diverged: axe.spec.ts now also scans /subscribe/confirm, /unsubscribe and the signed
-// link, and this one does not. Their reason radios are size-4 (16px) inside min-h-11 labels, and the
+// link, and this one does not. The unsubscribe page's reason radios are size-4 (16px) inside min-h-11 labels, and the
 // hit-walk below (`hit?.closest(SELECTOR) === el`) does not credit a wrapping <label>, so adding those
 // routes would report a false failure until the harness learns `label:has(input)`. Their 44px floor is
 // asserted from the rendered rect in subscribe-layout.spec.ts instead.
