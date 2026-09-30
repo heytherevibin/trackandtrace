@@ -29,10 +29,16 @@ describe("signUp", () => {
     expect(await signUp(ASK, dead)).toBe("error");
   });
 
-  it("sends the address trimmed and lowercased, so the route is never asked to guess", async () => {
+  it("posts the whole ask, with the address trimmed and lowercased", async () => {
+    // The address is normalised here so the route is never asked to guess. The rest of the ask is
+    // pinned in the same breath: asserting `email` alone left the `...ask` spread free to be
+    // dropped without a test noticing, and `list` and `source` are what 06-B's Leads list reads.
     const fetcher = respond(200, { ok: true, message: m.sent });
     await signUp({ ...ASK, email: "  Asha@Example.IN " }, fetcher);
-    const body = JSON.parse(String((vi.mocked(fetcher).mock.calls[0] as unknown as [string, RequestInit])[1].body));
-    expect(body.email).toBe("asha@example.in");
+    const [url, init] = vi.mocked(fetcher).mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("/api/subscribe");
+    expect(init.method).toBe("POST");
+    const body: unknown = JSON.parse(String(init.body));
+    expect(body).toEqual({ email: "asha@example.in", list: "news", source: "footer" });
   });
 });
