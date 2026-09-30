@@ -320,7 +320,14 @@ export function startRun({ motion }: JourneyContext): Teardown {
   const onScrolled = () => {
     if (!read) return;
     if (window.innerWidth === measuredIn.w && window.innerHeight === measuredIn.h) read = { ...read, y: window.scrollY };
-    else learn(); // the window changed (a toolbar, a zoom, a resize still to land): measured afresh, if the pin is steady
+    else if (steady()) learn(); // the window changed (a toolbar, a zoom, a resize still to land): measured afresh
+    // A pin the window changed while the page is not yet laid out for one window, so the run's refit is owed (up to
+    // APART_MS): the reader's own place in the run carried into the one kept, measured from the run's top as it stands,
+    // so a reader who reads on meanwhile is refit from there, not put back (the re-review, R1). From the run's top, not by
+    // the scroll's change: whatever moved above it (the still's columns, and the jump that answers them) moves both. Once
+    // the page is laid out the refit is this frame's, and a scroll before it (a jump answering the step above, before the
+    // observers) is not the reader's.
+    else if (at && !laidOut()) read = { ...read, y: read.top - run.getBoundingClientRect().top };
   };
   const onPin = () => {
     if (!at) return; // not running

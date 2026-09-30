@@ -163,5 +163,46 @@ test.describe("a resize WebKit lays out in two steps keeps a reader inside a pin
     await expect.poll(runH, { timeout: 3_000, message: "the run's height, refit" }).not.toBe(before.run);
     await expect(page.locator("#run")).toHaveClass(/is-running/);
   });
+
+  // And a reader who scrolls on during that second is refit from where they scrolled to, not put back where the second
+  // began (the re-review's R1: 0.534 of the run, refit at 0.384).
+  test("a reader who scrolls on while the run waits is refit from where they scrolled to", async ({ page, isMobile }) => {
+    // a touch screen's stations are resting points: once the run refits, the page snaps to the station either way
+    test.skip(isMobile, "a fine pointer's reader holds their own place");
+    const base = isMobile ? { width: 390, height: 844 } : { width: 1440, height: 900 };
+    await page.setViewportSize(base);
+    await drawStill(page);
+    await page.goto("/");
+    await waitForJourney(page);
+    await expect(page.locator("#run")).toHaveClass(/is-running/);
+    await scrollIntoRun(page, 0.4);
+    await frames(page, 3);
+    // as the run's timeline reads it: to its foot at the large viewport's foot, which the hold keeps the old window's
+    const through = () =>
+      page.evaluate(() => {
+        const r = document.getElementById("run")?.getBoundingClientRect();
+        if (!r) throw new Error("#run is missing");
+        const probe = document.createElement("div");
+        probe.style.cssText = "position:absolute;top:0;width:0;visibility:hidden;height: 100lvh";
+        document.body.append(probe);
+        const view = probe.offsetHeight;
+        probe.remove();
+        const start = r.top + window.scrollY - (document.querySelector("header")?.getBoundingClientRect().bottom ?? 0);
+        return (window.scrollY - start) / (r.bottom + window.scrollY - view - start);
+      });
+    const runH = () => page.evaluate(() => document.getElementById("run")?.style.getPropertyValue("--run-h") ?? "");
+    const pinH = () => page.evaluate(() => document.querySelector<HTMLElement>("#run .run-pin")?.clientHeight ?? 0);
+    const before = { run: await runH(), pin: await pinH() };
+    await holdLate(page, "default and large");
+    await page.setViewportSize({ width: base.width, height: base.height - 100 });
+    await expect.poll(pinH).toBeLessThan(before.pin);
+    await page.evaluate(() => window.scrollBy({ top: 300, behavior: "instant" })); // the reader reads on
+    await atRest(page, 5);
+    const f = await through();
+    await expect.poll(runH, { timeout: 3_000, message: "the run's height, refit" }).not.toBe(before.run);
+    await frames(page, 3);
+    await atRest(page);
+    expect(Math.abs((await through()) - f), `${Math.round(f * 1000) / 10}% through the run as it waited`).toBeLessThanOrEqual(0.01);
+  });
 });
 

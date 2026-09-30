@@ -233,14 +233,45 @@ describe("the window as the page has laid it out", () => {
     }
   });
 
-  it("adopts the gap between 100vh and 100lvh of a browser whose default viewport is not its large one", () => {
+  // Its own gap is adopted only once it has stood a second: never from a single read, which may land between steps.
+  it("adopts the gap between 100vh and 100lvh of a browser whose default viewport is not its large one, once it has stood", () => {
     vi.useFakeTimers();
     try {
       const at = units();
       at.vh = 850; // from the first read
+      expect(laidOut()).toBe(false);
+      vi.advanceTimersByTime(APART_MS);
       expect(laidOut()).toBe(true);
       Object.assign(at, { vh: 650, svh: 700, lvh: 700 }); // a resize there keeps the gap
       expect(laidOut()).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // Through a drag whose small and large step lags more than a second behind, a deadline counted from the first
+  // disagreement adopted a page still changing, and its mixed gap (the re-review's R2: 36 px off). Only measures that
+  // have stood still, and apart, for APART_MS are the page's own.
+  it("counts the second afresh each time the measures move while they stand apart", () => {
+    vi.useFakeTimers();
+    try {
+      const at = units();
+      document.body.innerHTML = `<div id="piece"></div>`;
+      const heard = vi.fn();
+      const stop = watchView(document.getElementById("piece")!, heard);
+      expect(laidOut()).toBe(true);
+      at.vh = 850; // the drag's first resize: 100vh only
+      expect(laidOut()).toBe(false);
+      vi.advanceTimersByTime(APART_MS * 0.6);
+      at.vh = 800; // its next, the small and large still behind
+      expect(laidOut()).toBe(false);
+      vi.advanceTimersByTime(APART_MS * 0.6);
+      expect(heard).not.toHaveBeenCalled();
+      expect(laidOut()).toBe(false);
+      vi.advanceTimersByTime(APART_MS * 0.4);
+      expect(heard).toHaveBeenCalledTimes(1);
+      expect(laidOut()).toBe(true);
+      stop();
     } finally {
       vi.useRealTimers();
     }

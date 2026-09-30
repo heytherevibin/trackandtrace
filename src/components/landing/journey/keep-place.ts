@@ -42,6 +42,7 @@ function removeProbes(): void {
   ownGap = 0;
   window.clearTimeout(apartTimer);
   apartTimer = 0;
+  apartAt = null;
 }
 
 /** The large viewport's height (100lvh): the window every scroll timeline here ends at, as anime's scroll observers
@@ -63,6 +64,8 @@ export const APART_MS = 1000;
 let whole: Readonly<Partial<Record<Unit, number>>> | null = null;
 let ownGap = 0;
 let apartTimer = 0;
+/** The measures the timer is counting for: it starts again when they move. */
+let apartAt: Partial<Record<Unit, number>> | null = null;
 
 function measures(): Partial<Record<Unit, number>> {
   const all = viewProbes();
@@ -74,12 +77,19 @@ function measures(): Partial<Record<Unit, number>> {
   return now;
 }
 
-function adopt(now: Partial<Record<Unit, number>>): true {
+/** The page as laid out for one window from now on; with `gap`, its own 100vh less 100lvh too (only measures that stood
+ * apart for APART_MS set it: a single read may land between WebKit's steps). */
+function adopt(now: Partial<Record<Unit, number>>, { gap = false }: { readonly gap?: boolean } = {}): true {
   whole = now;
-  if (now.vh !== undefined && now.lvh !== undefined) ownGap = now.vh - now.lvh;
+  if (gap && now.vh !== undefined && now.lvh !== undefined) ownGap = now.vh - now.lvh;
   window.clearTimeout(apartTimer);
   apartTimer = 0;
+  apartAt = null;
   return true;
+}
+
+function same(a: Partial<Record<Unit, number>> | null, b: Partial<Record<Unit, number>>): boolean {
+  return a !== null && UNITS.every((unit) => a[unit] === b[unit]);
 }
 
 /** Whether the page is laid out for one window. WebKit lays a resize out in steps, a frame or more apart and in any
@@ -94,13 +104,12 @@ function adopt(now: Partial<Record<Unit, number>>): true {
  *   Checked on the page as it stands, so a step that lags a whole resize behind through a drag is still caught;
  * - and all of 100vh, 100svh and 100lvh have moved (more than 1 px) since the page was last laid out, or none has: a
  *   window's change moves all three, a phone's toolbar none. This catches 100svh landing in a step of its own.
- * Measures that stand apart for APART_MS are the page's own (a browser that moves one unit alone, or whose default
- * viewport is not its large one): adopted then, and every piece that waited is told (watchView), so no place waits for
- * good. */
+ * Measures that stand still, and apart, for APART_MS are the page's own (a browser that moves one unit alone, or whose
+ * default viewport is not its large one): adopted then, their gap with them, and every piece that waited is told
+ * (watchView), so no place waits for good. */
 export function laidOut(): boolean {
   const now = measures();
-  const was = whole;
-  if (!was) return adopt(now);
+  const was = whole ?? now;
   const gapKept = now.vh === undefined || now.lvh === undefined || Math.abs(now.vh - now.lvh - ownGap) <= 1;
   const moved = UNITS.filter((unit) => {
     const [px, then] = [now[unit], was[unit]];
@@ -108,13 +117,19 @@ export function laidOut(): boolean {
   });
   const kept = UNITS.filter((unit) => now[unit] !== undefined && !moved.includes(unit));
   if (gapKept && (moved.length === 0 || kept.length === 0)) return adopt(now);
-  if (!apartTimer)
+  whole = was;
+  // counted afresh each time they move: only measures that have stood still, and apart, for APART_MS are the page's own,
+  // never a drag's that lags behind for longer (the re-review, R2)
+  if (!apartTimer || !same(apartAt, now)) {
+    window.clearTimeout(apartTimer);
+    apartAt = now;
     apartTimer = window.setTimeout(() => {
       apartTimer = 0;
       if (!probes) return;
-      adopt(measures());
+      adopt(measures(), { gap: true });
       tell();
     }, APART_MS);
+  }
   return false;
 }
 
