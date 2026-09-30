@@ -13,6 +13,10 @@ import { UNSUBSCRIBE } from "./subscribe-link";
  * 264px). At 320px the field sits beside the 76px button, which is why it is the narrowest; the
  * collapse this guards against leaves single digits, and a floor this close also catches a field
  * that has quietly lost a tenth of its width.
+ *
+ * What the floors actually defend, from removing `min-w-[240px]` from the `footer-row` form: only the
+ * 390px case goes red. At 320 and 360 the consent line's own min-width already forces it to wrap below,
+ * so the form keeps its width without the class. A floor below about 100 would defeat the check.
  */
 const FIELD_MIN = { 320: 190, 360: 230, 390: 260 } as const;
 const PHONES = [320, 360, 390] as const;

@@ -9,9 +9,9 @@ import { signUnsubscribe } from "@/services/subscriptions/links";
 const KEY = deriveDataKeys(Buffer.alloc(32, 7).toString("base64")).unsubscribe;
 const PERSON = "8a1f2c3d-0000-4000-8000-000000000001";
 
+const SIGNATURE = signUnsubscribe(KEY, PERSON, "news");
+
 export const UNSUBSCRIBE = {
-  person: PERSON,
-  signature: signUnsubscribe(KEY, PERSON, "news"),
   /** Draws the Before state. */
-  valid: `/unsubscribe?p=${PERSON}&l=news&s=${signUnsubscribe(KEY, PERSON, "news")}`,
+  valid: `/unsubscribe?p=${PERSON}&l=news&s=${SIGNATURE}`,
 } as const;
