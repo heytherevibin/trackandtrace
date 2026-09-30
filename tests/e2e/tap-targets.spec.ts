@@ -8,7 +8,12 @@ import { PNR, gotoReady } from "./helpers";
 
 // /pnr#<notFound> settles on the PageHeader's back link, which a found record shows only while it
 // is still resolving: CI measured that moment and this machine did not, so the link's missing hit
-// area reached review and not the suite. The list is the axe scan's, so the two stay comparable.
+// area reached review and not the suite. The list began as the axe scan's and has
+// deliberately diverged: axe.spec.ts now also scans /subscribe/confirm, /unsubscribe and the signed
+// link, and this one does not. Their reason radios are size-4 (16px) inside min-h-11 labels, and the
+// hit-walk below (`hit?.closest(SELECTOR) === el`) does not credit a wrapping <label>, so adding those
+// routes would report a false failure until the harness learns `label:has(input)`. Their 44px floor is
+// asserted from the rendered rect in subscribe-layout.spec.ts instead.
 const ROUTES = ["/", "/watchlist", "/pre-booking", "/accuracy", "/privacy", "/tos", "/login", "/account", `/pnr#${PNR.mixed}`, `/pnr#${PNR.notFound}`, "/pnr/abc", "/nowhere", "/offline"] as const;
 
 const MIN = 44;
