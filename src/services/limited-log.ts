@@ -16,7 +16,7 @@ import { istDate } from "./usage";
  * sign-in are not addresses checking trains, so they are left out. A tripwire in the tests fails when
  * a service adds an address-keyed limit whose scope is not here.
  */
-export const LIMITED_SCOPES = ["pnr", "stations", "availability", "availabilityClasses", "route", "routeAvailability", "trainRoute"] as const;
+export const LIMITED_SCOPES = ["pnr", "stations", "availability", "availabilityClasses", "route", "routeAvailability", "trainRoute", "subscribe"] as const;
 
 const KEPT_MS = 2 * 24 * 60 * 60 * 1000;
 

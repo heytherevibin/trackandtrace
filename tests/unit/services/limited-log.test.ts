@@ -27,6 +27,12 @@ describe("limitedAddress", () => {
     expect(limitedAddress("routeAvailability:2001:db8:0:1::/64")).toBe("2001:db8:0:1::/64");
   });
 
+  it("counts a refused sign-up as a traveller address hitting a limit", () => {
+    // 06-A: signing up for a list is a traveller doing something from an address, so a refusal
+    // belongs in module 04's count beside a refused PNR check rather than being forgotten.
+    expect(limitedAddress("subscribe:1.2.3.4")).toBe("1.2.3.4");
+  });
+
   it("ignores keys that are not an address a traveller checks from", () => {
     // An account's writes are keyed by its user id, and console sign-in is the console's own
     // business: neither is an address hitting a traveller limit.
