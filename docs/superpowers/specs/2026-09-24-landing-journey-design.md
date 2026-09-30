@@ -209,9 +209,12 @@ three.js), and puts it back in the same task (J6-5). The scene's own check, on e
 behind it. Switching mid-chapter keeps the reader at the chapter's start.
 
 **Adaptive quality.** A governor watches intervals between frames the drawing actually drew within one scroll
-gesture. p90 over 26 ms for 30 frames steps down (resolution 2× → 1.5× → 1×; Night effects off; coaches 3 →
-2 → 1), waiting 45 frames after each change; p90 under 18.5 ms for 180 frames steps up (at most twice); still
-over 40 ms at the lowest step asks for the still drawing. The step is kept in sessionStorage (`tt.q`).
+gesture. An interval over 120 ms with no scroll inside it is a pause between gestures and never counts, nor does one
+across a frame with nothing to draw or the drawing leaving the screen; an interval the page scrolled through counts
+however long, so a device drawing under 8 fps still steps down and reaches the still. p90 over 26 ms for 30 frames
+steps down (resolution 2× → 1.5× → 1×; Night effects off; coaches 3 → 2 → 1), waiting 45 frames after each change;
+p90 under 18.5 ms for 180 frames steps up (at most twice); still over 40 ms at the lowest step asks for the still
+drawing. The step is kept in sessionStorage (`tt.q`).
 
 ### D. The still drawing
 
@@ -329,7 +332,10 @@ development, behind `?journey-hud`; production never renders it.
       667×375, 280×653, 1280×600, 1180×820, 820×1180, 1920×1080, 2560×1440), and at 200% text at 1440×900,
       390×844 and 844×390;
     - screenshots of every chapter in Day, Night and on a phone;
-    - the place, run, Night falls and drawing specs in WebKit.
+    - the place, run, Night falls and drawing specs in WebKit;
+    - a device too slow to draw (Chromium at 60× CPU, once the drawing is live, scrolled once a frame): quality steps
+      down, then the still (`quality`), with its frames checked to run past the governor's 120 ms gesture gap
+      (`tests/e2e/nightly/slow-device.spec.ts`; the governor's rules are unit-tested on every PR).
 
   GitHub's runners have no GPU, so §3.H's frame-time and long-task budgets are measured by hand on a real GPU
   (`npm run build:local && node scripts/journey-perf.mjs`, the owner's Mac), and their lines go into every journey PR.

@@ -1,9 +1,11 @@
 // Adaptive quality (spec §3.C; prototype v3's governor.js). It watches the gaps between frames the drawing actually
-// drew, only within one scroll gesture: a gap over 120 ms is a new gesture, and idle() says a frame went by with
-// nothing to draw. The p90 of the last 30–40 gaps over 26 ms steps quality down; over 40 ms at the lowest step asks
-// for the still drawing; under 18.5 ms for 180 judgements steps back up, at most twice. Each change waits 45 frames
-// before judging again (spec §3.C; v3 waited 60 after a step up). Pure: the live chapter feeds it frames and acts on
-// its answers.
+// drew, only within one scroll gesture: a gap over 120 ms is a new gesture unless the page scrolled inside it (then it
+// is one slow frame of the same gesture: a device drawing under 8 fps must still step down, spec §4), and idle() says a
+// frame went by with nothing to draw (the gesture paused, or the drawing left the screen), so the next drawn frame
+// starts a new gesture, scrolled or not. The p90 of the last 30–40 gaps over 26 ms steps quality down; over 40 ms at
+// the lowest step asks for the still drawing; under 18.5 ms for 180 judgements steps back up, at most twice. Each
+// change waits 45 frames before judging again (spec §3.C; v3 waited 60 after a step up). Pure: the live chapter feeds
+// it frames and scrolls, and acts on its answers.
 
 export const LONG_MS = 26;
 export const SLOW_MS = 40;
@@ -15,6 +17,8 @@ export interface Governor {
   drew(now: number): void;
   /** A frame went by with nothing to draw: the gesture paused. */
   idle(): void;
+  /** The page scrolled: the gap the next drawn frame closes is the gesture's, however long. */
+  scrolled(): void;
 }
 
 export interface GovernorOptions {
@@ -30,14 +34,17 @@ export function createGovernor({ levels, start = 0, set, floor }: GovernorOption
   let cool = 0;
   let good = 0;
   let ups = 0;
+  let moved = false;
   const win: number[] = [];
   const p90 = (): number => [...win].sort((a, b) => a - b)[Math.floor(win.length * 0.9)] ?? 0;
   return {
     level: () => level,
     drew(now) {
       const gap = last ? now - last : 0;
+      const scrolledIn = moved;
       last = now;
-      if (!gap || gap > 120) return;
+      moved = false;
+      if (!gap || (gap > 120 && !scrolledIn)) return;
       win.push(gap);
       if (win.length > 40) win.shift();
       if (cool > 0) {
@@ -69,7 +76,19 @@ export function createGovernor({ levels, start = 0, set, floor }: GovernorOption
     idle() {
       last = 0;
     },
+    scrolled() {
+      moved = true;
+    },
   };
+}
+
+/** The live chapter's render loop, after each frame: the next one while a stage is on screen, else none, and the
+ * governor forgets the gesture, so the frame that brings the drawing back (however long after, scrolled or not) starts
+ * a new one. */
+export function nextFrame(onScreen: boolean, governor: Pick<Governor, "idle">, request: () => number): number {
+  if (onScreen) return request();
+  governor.idle();
+  return 0;
 }
 
 /** This session's step (tt.q, a whole number below `levels`), or full quality. "still" is the drawing's reason, not a step. */

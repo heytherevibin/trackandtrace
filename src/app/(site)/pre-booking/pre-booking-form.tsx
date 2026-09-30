@@ -4,6 +4,7 @@ import { useEffect, useId, useState, useSyncExternalStore, type FormEvent } from
 import { lifecycleSteps, type ReadPhase, type RoutePhase } from "./availability-lifecycle";
 import { TrainsPlate } from "./trains-plate";
 import { ClassChips, inOrder } from "@/components/pre-booking/class-chips";
+import { SignupCapture } from "@/components/subscribe/signup-capture";
 import { Button } from "@/components/ui/button";
 import { Corners } from "@/components/ui/corners";
 import { DateField } from "@/components/ui/date-field";
@@ -265,6 +266,21 @@ export function PreBookingForm() {
       <div role="status" aria-live="polite">
         {read === "ok" || read === "error" ? <TrainsPlate answer={answer} refusal={refusal} sampleData={sampleData} quota={asked?.quota ?? quota} todayIso={minDate} /> : null}
       </div>
+
+      {read === "ok" || read === "error" ? (
+        <section className="blueprint mt-[28px]" aria-labelledby={`${ids}-notify`}>
+          <Corners />
+          <div className="flex flex-wrap items-stretch border-b border-line">
+            <h2 id={`${ids}-notify`} className={`${CELL} min-w-[14ch] flex-1 px-5 py-2.5`}>
+              {messages.subscribe.places.preBookingTitle}
+            </h2>
+          </div>
+          <div className="p-5">
+            <p className="m-0 max-w-[60ch] text-sm text-ink-1/78">{messages.subscribe.places.preBooking}</p>
+            <SignupCapture place="pre-booking" list="availability" source="pre-booking" />
+          </div>
+        </section>
+      ) : null}
 
       <section className="blueprint mt-[28px]" aria-labelledby={`${ids}-lifecycle`}>
         <Corners />

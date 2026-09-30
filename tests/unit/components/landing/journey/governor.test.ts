@@ -1,14 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { createGovernor, startLevel } from "@/components/landing/journey/governor";
+import { createGovernor, nextFrame, startLevel } from "@/components/landing/journey/governor";
 
 function run(levels = 3, start = 0) {
   const sets: number[] = [];
   let floors = 0;
   let t = 1000;
   const g = createGovernor({ levels, start, set: (l) => sets.push(l), floor: () => (floors += 1) });
-  const feed = (n: number, gap: number) => {
+  /** n frames drawn `gap` ms apart; `scrolling` puts a scroll event inside each gap, as the reader's gesture does. */
+  const feed = (n: number, gap: number, scrolling = false) => {
     for (let i = 0; i < n; i += 1) {
       t += gap;
+      if (scrolling) g.scrolled();
       g.drew(t);
     }
   };
@@ -42,13 +44,62 @@ describe("the governor (spec §3.C; v3's governor.js)", () => {
     expect(floors()).toBe(1);
   });
 
-  it("never counts a pause between gestures, or a stall that is not the drawing's", () => {
+  it("never counts a pause between gestures, or a stall with no scroll in it", () => {
     const { g, sets, feed } = run();
     feed(200, 200);
     g.drew(99_000);
     g.idle();
     g.drew(99_030);
     expect(sets).toEqual([]);
+  });
+
+  it("counts a long gap the reader scrolled through as a slow frame: under 8 fps it steps down, then asks for the still (spec §4)", () => {
+    const { sets, feed, floors } = run();
+    feed(31, 200, true);
+    expect(sets).toEqual([1]);
+    feed(46, 200, true);
+    expect(sets).toEqual([1, 2]);
+    expect(floors()).toBe(0);
+    feed(46, 200, true);
+    expect(floors()).toBe(1);
+  });
+
+  it("still calls the same long gaps a new gesture when nothing scrolled in them", () => {
+    const { sets, feed, floors } = run();
+    feed(400, 200);
+    expect(sets).toEqual([]);
+    expect(floors()).toBe(0);
+  });
+
+  it("still starts a new gesture after a frame with nothing to draw, however much the page scrolled", () => {
+    const { g, sets, feed } = run();
+    for (let i = 0; i < 100; i += 1) {
+      feed(1, 200, true);
+      g.scrolled();
+      g.idle(); // the gesture paused after its scroll (or the drawing went off screen)
+    }
+    expect(sets).toEqual([]);
+  });
+
+  it("counts a scroll for the one gap it fell in: the quiet gaps after it are still new gestures", () => {
+    const { sets, feed, floors } = run();
+    feed(2, 200, true);
+    feed(400, 200);
+    expect(sets).toEqual([]);
+    expect(floors()).toBe(0);
+  });
+
+  it("forgets the gesture when the drawing leaves the screen: the scrolled frame that brings it back starts a new one", () => {
+    const { g, sets, feed } = run();
+    let requested = 0;
+    for (let i = 0; i < 100; i += 1) {
+      feed(1, 16, true);
+      expect(nextFrame(false, g, () => (requested += 1))).toBe(0); // no stage on screen: the loop stops
+      feed(1, 5_000, true); // the reader scrolls back, seconds later
+    }
+    expect(requested).toBe(0);
+    expect(sets).toEqual([]);
+    expect(nextFrame(true, g, () => 7)).toBe(7);
   });
 
   it("steps back up after 180 good judgements, at most twice", () => {
