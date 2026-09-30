@@ -1,6 +1,8 @@
+import { countSent } from "@/services/email/allowance";
 import { sendEmail, type SendOutcome } from "@/services/email/send";
 import { env } from "@/services/env";
 import { log } from "@/services/log";
+import { publicStoreForReading } from "@/services/shared-store";
 
 export type { SendOutcome };
 
@@ -20,7 +22,16 @@ export interface ConsoleLetter {
  */
 export async function sendConsoleEmail(letter: ConsoleLetter): Promise<SendOutcome> {
   try {
-    return await sendEmail({ from: env().CONSOLE_EMAIL_FROM, ...letter });
+    const outcome = await sendEmail({ from: env().CONSOLE_EMAIL_FROM, ...letter });
+    // Counted, never gated. Console mail takes from the same daily allowance a sign-up confirmation
+    // does, so a busy console leaves fewer confirmations — but an operator locked out because
+    // travellers signed up would be the wrong failure, so nothing here can refuse a console letter.
+    // Only a real send counts: a captured one under E2E never reached Resend.
+    if (outcome === "sent") {
+      const store = publicStoreForReading();
+      await countSent(store.kv, store.prefix, new Date());
+    }
+    return outcome;
   } catch (err) {
     log.warn("[console] could not send console email", err);
     return "failed";
