@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { z } from "zod";
+import { NOTE, Status } from "@/components/subscribe/plate-parts";
 import { SubscriptionPage } from "@/components/subscribe/subscription-page";
 import { messages } from "@/messages";
 import { peekRow } from "@/services/subscriptions/store";
@@ -43,9 +44,7 @@ export default async function ConfirmPage({
   if (peeked.state === "already") {
     return (
       <SubscriptionPage headline={m.confirm.headline}>
-        <div role="status" className="flex flex-col gap-3">
-          <p className="m-0 text-base text-ink-1/78">{m.confirm.already}</p>
-        </div>
+        <Status>{m.confirm.already}</Status>
       </SubscriptionPage>
     );
   }
@@ -55,10 +54,8 @@ export default async function ConfirmPage({
   // `invalid`, and anything the database might say that this page does not know.
   return (
     <SubscriptionPage headline={m.confirm.headline}>
-      <div role="status" className="flex flex-col gap-3">
-        <p className="m-0 text-base text-ink-1/78">{m.invalid.title}</p>
-      </div>
-      <p className="mt-3 m-0 text-sm text-ink-1/70">{m.invalid.note}</p>
+      <Status>{m.invalid.title}</Status>
+      <p className={NOTE}>{m.invalid.note}</p>
     </SubscriptionPage>
   );
 }
