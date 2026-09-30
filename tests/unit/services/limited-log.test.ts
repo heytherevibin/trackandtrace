@@ -49,7 +49,10 @@ describe("limitedAddress", () => {
     const scopes = files(root)
       .filter((f) => f.endsWith(".ts"))
       .flatMap((f) => [...readFileSync(f, "utf8").matchAll(/check\(`([A-Za-z]+):\$\{addressKey\(/g)].map((m) => m[1]));
-    expect(scopes.length).toBeGreaterThanOrEqual(7);
+    // Raised to 8 when 06-A's sign-up added its own address-keyed limit. A floor, not a count: it
+    // catches a call site that disappears, which is how a limit stops being counted without anyone
+    // editing this file.
+    expect(scopes.length).toBeGreaterThanOrEqual(8);
     for (const scope of scopes) expect(LIMITED_SCOPES, scope).toContain(scope);
   });
 });

@@ -13,6 +13,7 @@ import { common } from "./en-IN/common";
 import { shell } from "./en-IN/shell";
 import { states } from "./en-IN/states";
 import { status } from "./en-IN/status";
+import { subscribe } from "./en-IN/subscribe";
 import { watchlist } from "./en-IN/watchlist";
 
 // Every UI string lives here. Components read typed keys; no literals in JSX.
@@ -20,6 +21,6 @@ import { watchlist } from "./en-IN/watchlist";
 
 export const locale = "en-IN" as const;
 
-export const messages = { common, status, check, states, shell, home, journey, source, service, result, watchlist, auth, account, booking, accuracy, legal } as const;
+export const messages = { common, status, check, states, shell, home, journey, source, service, result, watchlist, auth, account, booking, accuracy, legal, subscribe } as const;
 
 export type Messages = typeof messages;
