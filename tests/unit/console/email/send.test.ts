@@ -35,7 +35,10 @@ describe("sendConsoleEmail", () => {
 
     await expect(sendConsoleEmail(letter)).resolves.toBe("captured");
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(outbox.take()).toEqual([letter]);
+    // The captured letter carries the From the console sends as. It gained that field when the
+    // sender moved to `@/services/email/send`, shared with the traveller side, which sends as a
+    // different address — so a run reading one outbox can tell the two apart.
+    expect(outbox.take()).toEqual([{ ...letter, from: env().CONSOLE_EMAIL_FROM }]);
   });
 
   it("posts to Resend with the configured sender", async () => {
