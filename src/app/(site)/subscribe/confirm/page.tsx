@@ -31,9 +31,13 @@ export default async function ConfirmPage({
   // (The confirm route answers `confirmed` too, and there it means the opposite; the client reads that.)
   if (token.success && peeked.state === "confirmed") {
     return (
-      <SubscriptionPage headline={m.confirm.headline} lead={m.confirm.lead}>
-        <ConfirmClient view="before" token={token.data} promise={messages.subscribe.promise[list]} />
-      </SubscriptionPage>
+      <ConfirmClient
+        view="before"
+        headline={m.confirm.headline}
+        lead={m.confirm.lead}
+        token={token.data}
+        promise={messages.subscribe.promise[list]}
+      />
     );
   }
   if (peeked.state === "already") {
@@ -46,11 +50,7 @@ export default async function ConfirmPage({
     );
   }
   if (peeked.state === "expired") {
-    return (
-      <SubscriptionPage headline={m.confirm.headline}>
-        <ConfirmClient view="expired" list={list} />
-      </SubscriptionPage>
-    );
+    return <ConfirmClient view="expired" headline={m.confirm.headline} list={list} />;
   }
   // `invalid`, and anything the database might say that this page does not know.
   return (

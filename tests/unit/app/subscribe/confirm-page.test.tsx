@@ -1,15 +1,17 @@
 import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { peekRow } = vi.hoisted(() => ({ peekRow: vi.fn(async (): Promise<{ state: string; list: string | null }> => ({ state: "confirmed", list: "news" })) }));
 vi.mock("@/services/subscriptions/store", () => ({ peekRow }));
 
-import ConfirmPage from "@/app/(site)/subscribe/confirm/page";
+import ConfirmPage, { dynamic, metadata } from "@/app/(site)/subscribe/confirm/page";
 import { messages } from "@/messages";
 
 const m = messages.subscribe.page;
 
 beforeEach(() => peekRow.mockClear());
+afterEach(() => vi.unstubAllGlobals());
 
 async function draw(token?: string) {
   render(await ConfirmPage({ searchParams: Promise.resolve(token === undefined ? {} : { token }) }));
@@ -27,6 +29,12 @@ describe("/subscribe/confirm", () => {
     expect(screen.getByText(m.confirm.lead)).toBeInTheDocument();
     // Opening the link must not confirm: mail clients and scanners follow links.
     expect(peekRow).toHaveBeenCalledOnce();
+  });
+
+  it("is never indexed and never cached: a confirm link belongs to one person", () => {
+    expect(metadata.robots).toEqual({ index: false });
+    expect(metadata.title).toBe(m.confirm.headline);
+    expect(dynamic).toBe("force-dynamic");
   });
 
   it("draws the availability list's own promise", async () => {
@@ -59,8 +67,25 @@ describe("/subscribe/confirm", () => {
     expect(screen.getByText(m.invalid.note)).toBeInTheDocument();
   });
 
-  it("calls the database not at all for a token that is not one", async () => {
-    await draw("nope");
+  it("asks the new link for the list the old one was for", async () => {
+    peekRow.mockResolvedValueOnce({ state: "expired", list: "availability" });
+    const fetchMock = vi.fn(async () => Response.json({ ok: true, message: "ok" }));
+    vi.stubGlobal("fetch", fetchMock);
+    await draw("A".repeat(43));
+    await userEvent.type(screen.getByLabelText(messages.subscribe.form.label), "ada@example.com");
+    await userEvent.click(screen.getByRole("button", { name: m.confirm.sendAgain }));
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toMatchObject({ list: "availability" });
+  });
+
+  it.each([
+    ["one that is not one", "nope"],
+    ["one character too long", "A".repeat(44)],
+    ["one character too short", "A".repeat(42)],
+    ["one with a character outside the alphabet", `${"A".repeat(42)}+`],
+    ["two of them", ["A".repeat(43), "B".repeat(43)]],
+  ])("calls the database not at all for a token that is %s", async (_why, token) => {
+    render(await ConfirmPage({ searchParams: Promise.resolve({ token }) }));
     expect(screen.getByText(m.invalid.title)).toBeInTheDocument();
     expect(peekRow).not.toHaveBeenCalled();
   });
