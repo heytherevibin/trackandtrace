@@ -38,8 +38,10 @@ export function ReliabilityBand({ checks }: { readonly checks: ComponentState })
           </div>
         ))}
       </dl>
-      <div className="mt-5 flex flex-wrap items-center justify-between gap-4">
-        <p className="m-0 inline-flex items-center gap-2.5 font-display text-label font-semibold uppercase tracking-caps text-ink-1/78">
+      {/* a container in rem: the status line wraps its pieces only where text grown past the width (200% on a phone)
+          would run them past the window; at 100% it is one line, its words wrapping inside it */}
+      <div className="@container mt-5 flex flex-wrap items-center justify-between gap-4">
+        <p className="m-0 inline-flex items-center gap-2.5 @max-[11rem]:flex-wrap font-display text-label font-semibold uppercase tracking-caps text-ink-1/78">
           <Led lit={checks === "operational"} size="sm" />
           <span>{messages.service.checksLine[checks]}</span>
           <span aria-hidden="true" className="text-ink-1/40">·</span>

@@ -1,10 +1,12 @@
 import { IstClock } from "@/components/shell/ist-clock";
 import { Corners } from "@/components/ui/corners";
+import { STACKED_ROLES as R } from "@/components/ui/stacked-table";
 import { messages } from "@/messages";
 import { STATIONS, kmFigure } from "./stations";
 
 /** Departures · Platform 3, under the hero: the page's sections as departures. The status column is the
- * journey's: it shows while the journey runs, and follows the scroll. */
+ * journey's: it shows while the journey runs, and follows the scroll. With text grown past what the board's width holds
+ * (200% on a phone) its rows reflow as grids (journey.css), so the table carries explicit roles, as stacked tables do. */
 export function DepartureBoard() {
   const m = messages.journey.board;
   return (
@@ -20,31 +22,35 @@ export function DepartureBoard() {
             <IstClock />
           </span>
         </div>
-        <table className="board-table">
+        <table role={R.table} className="board-table">
           <caption className="sr-only">{m.caption}</caption>
-          <thead>
-            <tr>
-              <th scope="col">{m.stn}</th>
-              <th scope="col">{m.destination}</th>
-              <th scope="col" className="board-km">
+          <thead role={R.rowgroup}>
+            <tr role={R.row}>
+              <th role={R.columnheader} scope="col">
+                {m.stn}
+              </th>
+              <th role={R.columnheader} scope="col">
+                {m.destination}
+              </th>
+              <th role={R.columnheader} scope="col" className="board-km">
                 {m.km}
               </th>
-              <th scope="col" className="board-status">
+              <th role={R.columnheader} scope="col" className="board-status">
                 {m.status}
               </th>
             </tr>
           </thead>
-          <tbody>
+          <tbody role={R.rowgroup}>
             {STATIONS.slice(1).map((station, i) => (
-              <tr key={station.id} data-stop={i + 1}>
-                <td className="board-code">{station.code}</td>
-                <td className="board-name">
+              <tr key={station.id} role={R.row} data-stop={i + 1}>
+                <td role={R.cell} className="board-code">{station.code}</td>
+                <td role={R.cell} className="board-name">
                   <a href={`#${station.id}`} className="tap-44">
                     {station.name}
                   </a>
                 </td>
-                <td className="board-km tnum">{kmFigure(station.km)}</td>
-                <td className="board-status" />
+                <td role={R.cell} className="board-km tnum">{kmFigure(station.km)}</td>
+                <td role={R.cell} className="board-status" />
               </tr>
             ))}
           </tbody>

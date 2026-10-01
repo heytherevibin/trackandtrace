@@ -109,7 +109,7 @@ export function SyncNote({ signedIn }: { readonly signedIn: boolean }) {
   return (
     <div className="mt-10 flex flex-wrap items-center gap-x-5 gap-y-3 border border-line px-5 py-4">
       <span className={`${caps} text-accent-text`}>{m.title}</span>
-      <span className="min-w-[240px] flex-1 text-sm text-ink-1/74">{signedIn ? m.signed : m.anon}</span>
+      <span className="min-w-[min(240px,100%)] flex-1 text-sm text-ink-1/74">{signedIn ? m.signed : m.anon}</span>
       {/* A capital link, not a button: 20px of drawn height, so it takes the coarse-pointer hit area (motion.css). */}
       <Link href={signedIn ? "/account" : "/login"} className={`${caps} tap-44 no-underline`}>
         {signedIn ? m.signedAction : m.anonAction} <span aria-hidden="true">→</span>

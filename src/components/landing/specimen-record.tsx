@@ -7,6 +7,8 @@ import type { Specimen } from "./specimen-data";
 import { BODY, H2, SectionKicker, TABLE_HEAD } from "./sheet-type";
 
 const S = stackedTable("sm");
+// A stacked passenger row's three labelled values stand side by side, but in one column where the plate's body is under
+// 8rem (its own @container): only text grown against the width (200% in a 280px window), never at 100% (12rem there).
 const TH = `border-b border-line px-3 py-2 text-left ${TABLE_HEAD}`;
 const TD = `border-b border-line px-3 py-2 ${S.cell}`;
 
@@ -28,7 +30,7 @@ export function SpecimenRecord({ specimen }: { readonly specimen: Specimen | nul
           <p className={`mt-4 max-w-[48ch] ${BODY}`}>{m.bodyTwo}</p>
           <BerthPlan seats={specimen?.seats ?? null} />
         </div>
-        <Plate as="div" title={m.plateTitle} meta={[m.plateSheet]} cells="tight" padding="none" bodyClassName="flex flex-col gap-3 px-5 py-[18px]">
+        <Plate as="div" title={m.plateTitle} meta={[m.plateSheet]} cells="tight" padding="none" bodyClassName="@container flex flex-col gap-3 px-5 py-[18px]">
           {specimen ? (
             <>
               <div className="flex flex-wrap items-center gap-2.5">
@@ -59,7 +61,7 @@ export function SpecimenRecord({ specimen }: { readonly specimen: Specimen | nul
                 </thead>
                 <tbody role={R.rowgroup} className={S.body}>
                   {specimen.pax.map((row) => (
-                    <tr key={row.key} role={R.row} className={`${S.row} max-sm:grid-cols-3 max-sm:px-3.5 max-sm:py-3`}>
+                    <tr key={row.key} role={R.row} className={`${S.row} max-sm:grid-cols-3 @max-[8rem]:grid-cols-1 max-sm:px-3.5 max-sm:py-3`}>
                       <td role={R.cell} className={`${TD} ${S.wide} max-sm:font-semibold`}>
                         {row.name}
                       </td>

@@ -315,9 +315,12 @@ development, behind `?journey-hud`; production never renders it.
   quality floor); the check on every sample scenario with the journey on and off; run keyboard and station
   links; theme sweep; axe at 12 positions (top, drawing, chapters, record, Night drawing, motion off, phone
   drawing, run, Night run, phone run, Data Saver, Night terminus); focus never obscured; existing home, responsive, axe, CSP,
-  smoothness, press and tap-target specs kept green. The responsive sweep measures the landing as the journey leaves it,
-  the run pinned where it fits; the track the run's pin clips on purpose is left to its own check there, which stands each
-  station at rest wholly in the window and the page never sideways (found 2026-10-01).
+  smoothness, press and tap-target specs kept green. The responsive sweep (280, 320, 360, 390 and 768) measures the
+  landing as the journey leaves it, the run pinned where it fits; the track the run's pin clips on purpose is left to its
+  own check there (only while the pin clips, never a scroller), which stands each station at rest, every word of it,
+  wholly in the window at every width the run pins at, and nothing sideways. The landing is also swept with its text
+  at 200% at the four phone widths: the departure board then reflows its rows inside its plate, by a container query
+  in rem, so at 100% it stays the table (found 2026-10-01).
 - **Nightly** (`.github/workflows/journey-nightly.yml`, same pinning and permissions rules as CI; J6-3). It runs at
   03:00 IST, by hand, and on the pull request that changes it. It has two jobs:
   - **production**, on this checkout's production build served on the runner with sample data and nothing live

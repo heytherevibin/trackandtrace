@@ -1,13 +1,13 @@
 import { expect, test } from "./fixtures";
 import { PNR, gotoReady } from "./helpers";
 import { drawStill, waitForJourney } from "./journey/journey-helpers";
-import { layoutBreaks } from "./layout";
+import { brokenWords, cutText, layoutBreaks } from "./layout";
 import { UNSUBSCRIBE } from "./subscribe-link";
 
 // Every route fits a phone: no sideways page scroll, nothing drawn past the screen edge, and no
 // container that hides part of its content (a clipped nav strip, a table wider than its plate).
 
-const WIDTHS = [320, 360, 390, 768] as const;
+const WIDTHS = [280, 320, 360, 390, 768] as const;
 const ROUTES = ["/", "/watchlist", "/pre-booking", "/accuracy", "/login", "/account", `/pnr#${PNR.mixed}`, `/pnr#${PNR.notFound}`, "/pnr/abc", "/check", "/privacy", "/tos", "/offline", "/nowhere", "/subscribe/confirm", "/unsubscribe", UNSUBSCRIBE.valid] as const;
 
 const SAVED = [
@@ -142,4 +142,41 @@ test.describe("phone and tablet widths", () => {
       expect(failures, failures.join("\n")).toEqual([]);
     });
   }
+});
+
+// The landing with its text at 200% (the browser's own text size, set before first paint, as the nightly sets it), at the
+// phone widths the sweep checks: it fits as at 100%, and the departure board reflows inside its plate, never cut. At 100%
+// the board stays the table it always was.
+test.describe("the landing at 200% text", () => {
+  test.skip(({ isMobile }) => !isMobile, "runs once, on the phone project, across the widths");
+
+  for (const width of [280, 320, 360, 390] as const) {
+    test(`fits ${width}px, the departure board inside its plate`, async ({ page }) => {
+      await page.addInitScript(() => document.addEventListener("DOMContentLoaded", () => document.documentElement.style.setProperty("font-size", "200%")));
+      await page.setViewportSize({ width, height: 844 });
+      await gotoReady(page, "/");
+      await waitForJourney(page);
+      expect(await layoutBreaks(page)).toEqual([]);
+      const board = await page.evaluate(() => {
+        const plate = document.querySelector(".board")?.getBoundingClientRect();
+        const table = document.querySelector(".board-table")?.getBoundingClientRect();
+        if (!plate || !table) throw new Error("the departure board is missing");
+        return { plate: `[${Math.round(plate.left)}, ${Math.round(plate.right)}]`, table: `[${Math.round(table.left)}, ${Math.round(table.right)}]`, inside: table.left >= plate.left - 1 && table.right <= plate.right + 1 };
+      });
+      expect(board.inside, `the board's table ${board.table} in its plate ${board.plate}`).toBe(true);
+      expect(await cutText(page, "#departures"), "the board's words").toEqual([]);
+      expect(await brokenWords(page, "#departures"), "a word of the board broken").toEqual([]);
+    });
+  }
+
+  test("at 100% the departure board is the table it always was", async ({ page }) => {
+    for (const width of [280, 390, 768] as const) {
+      await page.setViewportSize({ width, height: 844 });
+      await gotoReady(page, "/");
+      await waitForJourney(page);
+      const displays = await page.locator(".board-table tr").evaluateAll((rows) => rows.map((r) => getComputedStyle(r).display));
+      expect(displays.length, `${width}px`).toBeGreaterThan(1);
+      expect(new Set(displays), `${width}px`).toEqual(new Set(["table-row"]));
+    }
+  });
 });
