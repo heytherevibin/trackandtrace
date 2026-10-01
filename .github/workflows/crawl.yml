@@ -102,4 +102,17 @@ jobs:
           # the store", and it had never once run. A silenced check is worse than no check.
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
-        run: npm run source:report
+        # `--since` is the date THIS workflow began running (#64, 2026-09-26; its first run is
+        # 2026-09-26T17:18Z). Coverage counts from each combo's first observation, and the original
+        # six were first seen on 2026-09-23 — three days of hand probing before anything was
+        # scheduled. Without this, 2026-09-25 is scored as six missed runs on a day nothing was
+        # meant to run, which was two thirds of the shortfall when this flag was added and would
+        # have held the verdict under the threshold for weeks.
+        #
+        # A FIXED PAST DATE, never a rolling reset. It excuses days nobody was meant to crawl and
+        # nothing else: every day since 2026-09-26 is still counted, an outage inside the window
+        # still fails, and the report prints the narrowing in its own output so a reader cannot
+        # mistake a narrowed number for a whole one. `observations-coverage.mjs`'s header is
+        # explicit that resetting the denominator on resumption would hide a real outage — this
+        # does not resume anything, it starts the clock when the clock actually started.
+        run: npm run source:report -- --since 2026-09-26

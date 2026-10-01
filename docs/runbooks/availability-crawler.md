@@ -156,6 +156,14 @@ read the crawl's own output for the refusal that caused it. Only if the hole is 
 combo off the list for on purpose, pass `--since` — and record the date you passed, because it is
 not stored anywhere.
 
+**The workflow already passes one.** `.github/workflows/crawl.yml`'s Coverage step runs with
+`--since 2026-09-26`, the date this workflow began running (#64). The six original combos were first
+seen on 2026-09-23, three days of hand probing earlier, so without it 2026-09-25 scores as six missed
+runs on a day nothing was scheduled — two thirds of the shortfall when the flag was added. Running
+`npm run source:report` by hand omits the flag and will read lower; pass it yourself to compare like
+with like, and read the "since" line the report prints either way. The date is fixed and is not to be
+moved forward: an outage after 2026-09-26 must still fail.
+
 ## The two facts an operator gets wrong
 
 **1. There are now two ceilings, and the day's is the one that will surprise you.** `crawl-plan.mjs`
