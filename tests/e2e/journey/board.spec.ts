@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "../fixtures";
 import { messages } from "@/messages";
 import { drawStill, frames, motionOff, movedFrames, resetMoved, scrollToId, waitForJourney, watchMotion } from "./journey-helpers";
 
@@ -30,7 +31,12 @@ test.describe("the departure board's status", () => {
   // A section entrance, once per load (the owner, 2026-09-30): out of sight at load (the reader landed on 03, below the
   // board), the rows' names wait turned away, flip in the first time the reader reaches the board, scrolling up to it
   // here, and never again this load. (The status column's own flips follow the station, so only the names are watched.)
+  // Held to the still drawing, as the loads below are: the reader scrolling up above the chapter is what starts the live
+  // drawing, just below the board, so its build lands inside the flip, stalling the page 1.2 s of the flip's 2 at three
+  // workers and for seconds on a busy runner, past the wait for the words to come back (the mobile run's flake). The
+  // stall is the harness's, not the board's.
   test("its rows flip in once, the first time the reader reaches it, and their words are whole again after", async ({ page }) => {
+    await drawStill(page);
     await page.goto("/#record");
     await waitForJourney(page);
     await expect.poll(() => nameFlaps(page)).toBeGreaterThan(0);
