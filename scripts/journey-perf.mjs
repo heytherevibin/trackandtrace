@@ -35,14 +35,16 @@ export const BUDGETS = { journeyTask: 120, sceneStep: 61, cls: 0.05, desktopP95:
  * after 30 s (run 36406365173), and in a Linux container at 1 CPU the 40× pin came 33 s after the decision. The governor
  * is fed frames only once the chapter is pinned and scrolled, so a wait that ends first judges nothing of it.
  *
- * About twice the slowest the nightly has printed ("settled N s after it decided", at 4×, 6×, 10× and the desktop's 1×):
+ * About three times the slowest the nightly has printed ("settled N s after it decided", at 4×, 6×, 10× and the desktop's 1×):
  *   36451581440 (pull request, 2026-09-28)  1.5, 4.6, 38.9, 0.4 s
  *   36651308147 (schedule, 2026-09-30)      2.8, 21.0, 25.6, 0.2 s
  *   36692565952 (pull request, 2026-09-30)  1.5, 3.4, 22.5, 0.2 s
  *   36797288618 (schedule, 2026-10-01)      2.7, 15.6, 52.0, 0.6 s
- * The slowest, 52.0 s at 10×, so 105 s, where #91 guessed 180. Every run waiting out both its waits (DECIDE_MS and this)
- * keeps the production job inside its 30 minutes (journey-perf.test.ts holds both). */
-export const SETTLE_MS = 105_000;
+ * The slowest, 52.0 s at 10×, of only four samples whose 10× settles spread 22.5–52.0 s: 150 s (2.9×), where #91 guessed
+ * 180, as a miss turns the nightly red for nothing. Every run waiting out both its waits (DECIDE_MS and this) and its
+ * scroll still leaves a fifth of the production job's 30 minutes spare, a ceiling of 165 s (journey-perf.test.ts holds
+ * both, and that the ceiling refuses 180). */
+export const SETTLE_MS = 150_000;
 
 /** The slowest "settled N s after it decided" the nightly has printed, in seconds. */
 export const SLOWEST_SETTLE_S = 52.0;
