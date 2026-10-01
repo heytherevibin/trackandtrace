@@ -45,8 +45,13 @@ html:has(#how):not([data-journey]) { scroll-behavior: auto; }
 /* Text made larger than the board's width holds (200% on a phone): the table, which cannot wrap a word, reflows inside
    its plate instead of running past it. Each row is a grid: the code beside the destination, the status under the
    destination; and where even the two cannot stand side by side, each on its own line. A container query in rem, so
-   only text grown against the plate's width reflows it: at 100% the board is never under 15rem, and stays the table. */
-.board { container: board / inline-size; }
+   only text grown against the plate's width reflows it: at 100% the board is never under 15rem, and stays the table.
+   The container is declared below sm only, where a phone's text can outgrow it: a size container's style and size
+   containment on the desktop page disturbed WebKit's scroll anchoring under a resize mid-glide (run.spec.ts; round 3 of
+   the fit fixes). */
+@media (max-width: 39.99rem) {
+  .board { container: board / inline-size; }
+}
 @container board (max-width: 11rem) {
   .board-table tr { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 12px; padding: 6px 12px; }
   .board-table thead tr { border-bottom: 1px solid var(--line); }

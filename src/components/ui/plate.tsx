@@ -46,8 +46,8 @@ export interface PlateProps extends Omit<HTMLAttributes<HTMLElement>, "title"> {
   readonly stack?: boolean;
   /**
    * A meta cell keeps to one line, as drawn; with `metaWraps`, where text grown past the header's width (200% on a
-   * phone) would run it past the plate, it wraps instead. Opt-in: it makes the header a size container (in rem), and a
-   * container on every plate's header moved WebKit's scroll anchoring under the run's resize (run.spec.ts, 12px).
+   * phone) would run it past the plate, it wraps instead. Opt-in, and below sm only: it makes the header a size container
+   * (in rem), and size containers on the desktop page disturbed WebKit's scroll anchoring under a resize (run.spec.ts).
    */
   readonly metaWraps?: boolean;
   readonly corners?: boolean;
@@ -68,7 +68,7 @@ export function PlateHeader({
 }: Pick<PlateProps, "title" | "titleId" | "headingLevel" | "meta" | "actions" | "cells" | "titleMinCh" | "stack" | "metaWraps">) {
   const Heading = headingLevel === 1 ? "h1" : headingLevel === 2 ? "h2" : headingLevel === 3 ? "h3" : "span";
   return (
-    <div className={cn("flex flex-wrap items-stretch border-b border-line", metaWraps && "@container")}>
+    <div className={cn("flex flex-wrap items-stretch border-b border-line", metaWraps && "max-sm:@container")}>
       <Heading id={titleId} className={cn("legend flex-1 leading-6 text-ink-1", MIN_CH[titleMinCh], CELL[cells], stack && (meta.length > 0 || actions) && PLATE_TITLE_STACK)}>
         {title}
       </Heading>
