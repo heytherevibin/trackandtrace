@@ -256,15 +256,21 @@ test.describe("the live drawing at its edges", () => {
 
   // On a phone the chapter pins in its list layout, its sticky top the copy's height above the masthead's foot, and that
   // height moves with the window (its top padding is in vh): the timeline starts where the pin takes hold, not under the
-  // masthead. Measured from the masthead, a resize from 844 to 660 left a reader 0.0106 of the range off.
-  for (const [from, to] of [
-    [{ width: 390, height: 844 }, { width: 390, height: 660 }],
-    [{ width: 390, height: 660 }, { width: 390, height: 844 }],
-    [{ width: 412, height: 915 }, { width: 412, height: 700 }],
-    [{ width: 360, height: 780 }, { width: 360, height: 640 }],
+  // masthead. Measured from the masthead, a resize from 844 to 660 left a reader 0.0106 of the range off. And measured
+  // from the sticky top as the page stands at "resize", before the labels write the words' new height, 1.3 to 2.5 px
+  // off (0.0025 of the range a seventh of the way in): so the first leg is judged in px of the new range, at most 1.5
+  // (the place is a whole px, so half of one is rounding), and off-centre too. The way back is judged from the place
+  // kept since, to 0.001.
+  for (const [from, to, at] of [
+    [{ width: 390, height: 844 }, { width: 390, height: 660 }, 0.5],
+    [{ width: 390, height: 844 }, { width: 390, height: 660 }, 0.13],
+    [{ width: 390, height: 660 }, { width: 390, height: 844 }, 0.5],
+    [{ width: 412, height: 915 }, { width: 412, height: 700 }, 0.5],
+    [{ width: 360, height: 780 }, { width: 360, height: 640 }, 0.5],
   ] as const) {
-    test(`a reader inside the chapter on a phone stays the same fraction through a resize from ${from.width}×${from.height} to ${to.width}×${to.height}`, async ({ page, isMobile }) => {
+    test(`a reader ${at} through the chapter on a phone stays there through a resize from ${from.width}×${from.height} to ${to.width}×${to.height}`, async ({ page, isMobile }) => {
       test.skip(!isMobile, "a phone's list layout");
+      /** The reader's fraction through the chapter's timeline, and the timeline's length in px. */
       const through = () =>
         page.evaluate(() => {
           const section = document.getElementById("anatomy");
@@ -272,23 +278,25 @@ test.describe("the live drawing at its edges", () => {
           if (!section || !pin) throw new Error("#anatomy is missing");
           const stick = Number.parseFloat(getComputedStyle(pin).top) || 0;
           const start = section.getBoundingClientRect().top + window.scrollY - stick;
-          return (window.scrollY - start) / (section.offsetHeight - window.innerHeight + stick);
+          const reach = section.offsetHeight - window.innerHeight + stick;
+          return { f: (window.scrollY - start) / reach, reach };
         });
       await page.setViewportSize(from);
       await page.goto("/");
       await waitForLive(page);
       await dismissInstall(page);
       await expect(page.locator('#anatomy .anatomy-pin[data-live="list"]')).toHaveCount(1);
-      await scrollIntoChapter(page, 0.5);
+      await scrollIntoChapter(page, at);
       await frames(page, 3); // the pin has learned the reader's place
-      const f = await through();
+      const { f } = await through();
       await page.setViewportSize(to);
       await frames(page, 20); // the pin's height follows the window (520vh); its resize answer, then anything it set going
       await expect(page.locator("#anatomy")).toHaveClass(/is-live/);
-      expect(Math.abs((await through()) - f), `${from.height} to ${to.height}`).toBeLessThanOrEqual(0.002);
+      const after = await through();
+      expect(Math.abs(after.f - f) * after.reach, `${from.height} to ${to.height}: px off in a range ${Math.round(after.reach)} long`).toBeLessThanOrEqual(1.5);
       await page.setViewportSize(from); // and back, judged from the place kept since
       await frames(page, 20);
-      expect(Math.abs((await through()) - f), `${to.height} back to ${from.height}`).toBeLessThanOrEqual(0.002);
+      expect(Math.abs((await through()).f - f), `${to.height} back to ${from.height}`).toBeLessThanOrEqual(0.001);
     });
   }
 
