@@ -68,6 +68,17 @@ export function trainAt(w: number, phone: boolean): number {
   return Math.round(w * (phone ? 0.5 : 0.3));
 }
 
+/** Where the train holds so that every station, centred on it at its resting point, stands wholly inside the pin
+ * (`halves`: each station's half-width): a third in on a wide window, the middle on a phone (trainAt), moved in only as
+ * far as the widest station needs. Null when no place holds it: a station wider than the window, so the run does not pin
+ * (its fit rule, as every pinned piece's: the words are read whole, or the sections read as ever). */
+export function trainFor(w: number, phone: boolean, halves: readonly number[]): number | null {
+  const half = Math.max(0, ...halves);
+  const lo = Math.ceil(half);
+  const hi = Math.floor(w - half);
+  return lo > hi ? null : clamp(trainAt(w, phone), lo, hi);
+}
+
 export function runLayout(boxes: readonly StationBox[], pin: { readonly w: number; readonly h: number; readonly trainX: number }): RunLayout {
   const centers = boxes.map((b) => (b.x0 + b.x1) / 2);
   const halves = boxes.map((b) => (b.x1 - b.x0) / 2);

@@ -2,7 +2,7 @@ import { animate, onScroll, type JSAnimation, type ScrollObserver } from "animej
 import { messages } from "@/messages";
 import { readerPlace } from "./drawing-mode";
 import { keyboardFocus, watchGlide, watchTab } from "./focus-glide";
-import { anchorOf, band, fitsRun, hereAt, layers, leanStep, offsets, runLayout, trainAt, type RunLayout } from "./geometry/run";
+import { anchorOf, band, fitsRun, hereAt, layers, leanStep, offsets, runLayout, trainFor, type RunLayout } from "./geometry/run";
 import { LAYOUT_EVENT, emit } from "./journey-events";
 import { keepPlace, laidOut, mastheadBottom, viewHeight, watchView, type ReadPlace } from "./keep-place";
 import { SMOOTH } from "./motion-tokens";
@@ -79,7 +79,9 @@ export function startRun({ motion }: JourneyContext): Teardown {
       const r = s.getBoundingClientRect();
       return { x0: r.left - origin, x1: r.right - origin };
     });
-    return runLayout(boxes, { w, h, trainX: trainAt(w, window.matchMedia(PHONE).matches) });
+    // the train holds where every station at the window stands wholly in it, or the run does not pin
+    const trainX = trainFor(w, window.matchMedia(PHONE).matches, boxes.map((b) => (b.x1 - b.x0) / 2));
+    return trainX === null ? null : runLayout(boxes, { w, h, trainX });
   };
 
   const draw = (layout: RunLayout) => {

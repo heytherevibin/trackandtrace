@@ -394,7 +394,10 @@ Decided while planning J6 (2026-09-28):
 - `fit` judged before the scene is fetched, by a trial layout (J6-5);
 - the run's frame is server markup, its lines drawn by `run.ts` (J6-6; a departure from §3.B, accepted at J6's
   pre-flight); it pins by `#run.is-running` inside `keepPlace`, only while the reader is not below it (J6-7); links
-  to 06 and 07 bring their stations to the window (J6-8);
+  to 06 and 07 bring their stations to the window (J6-8). Its fit (found 2026-10-01): every station stands above the
+  line diagram, and every station at its resting point, centred on the train, stands wholly inside the pin. The train
+  holds a third in (the middle on a phone), moved in only as far as the widest station needs (`trainFor`; at 768 wide,
+  07's figure ran 96 px past the pin's left side a third in); where no place holds it, the run does not pin;
 - J5-17 amended (the owner, 2026-09-28), amended again (the owner, 2026-09-29): the reader taking over cancels the
   Back restore. That is a mostly vertical wheel that is not a pinch-zoom, a finger dragging, a scroll key (the arrows,
   Page Up and Down, Home, End, Space) outside a text field with no Alt, Ctrl or Meta, and Tab or Shift+Tab, and

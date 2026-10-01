@@ -3,8 +3,8 @@ import type { Page } from "@playwright/test";
 /** Boxes that clip, on purpose, a track the scroll carries sideways through them, each proven elsewhere to bring every
  * part of it to the window: the window-seat run's pin (overflow: clip, inside the window), whose track runs on past the
  * window's side by design, never scrolls the page, and stands each station at rest wholly inside the pin (responsive.spec.ts).
- * What such a box clips is not "past the edge", nor is it content the box "hides", while the box itself lies inside the
- * window; everything else in and around it is measured as ever. */
+ * What such a box clips is not "past the edge", nor is it content the box "hides", while the box itself clips sideways
+ * (overflow-x: clip, never a scroller) and lies inside the window; everything else in and around it is measured as ever. */
 const CARRIED = ["#run.is-running > .run-pin"] as const;
 
 /** Describes everything that breaks the phone layout on the current page; empty when it fits. */
@@ -32,10 +32,11 @@ export async function layoutBreaks(page: Page): Promise<string[]> {
       const box = el.getBoundingClientRect();
       return box.width > 1 && box.height > 1 && !visuallyHidden(el);
     };
-    /** The carrying box `el` is, or lies inside, when that box stands inside the window. */
+    /** The carrying box `el` is, or lies inside, while that box clips sideways (never a scroller a reader could move)
+     * and stands inside the window. */
     const stageOf = (el: Element) => {
       const stage = carried.length > 0 ? el.closest(carried.join(", ")) : null;
-      if (!stage) return null;
+      if (!stage || getComputedStyle(stage).overflowX !== "clip") return null;
       const box = stage.getBoundingClientRect();
       return box.left >= -1 && box.right <= vw + 1 ? stage : null;
     };

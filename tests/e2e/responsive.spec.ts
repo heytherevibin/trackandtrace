@@ -23,12 +23,15 @@ const SAVED = [
   { pnr: PNR.cnf, label: "12951 · BCT→NDLS · 21 Sept", addedAt: "2026-09-16T04:30:00.000Z", checks: [] },
 ];
 
-// layoutBreaks leaves alone only what the run's pin clips (layout.ts, CARRIED): a box that clips its content, and content
-// past the window's side, are still found everywhere else.
-test("layoutBreaks still finds a box that hides its content, and a box past the window's side", async ({ page, isMobile }) => {
+// layoutBreaks leaves alone only what the run's pin clips (layout.ts, CARRIED), and only while it clips: a box that clips
+// its content, content past the window's side, and the run's pin made a sideways scroller are still found.
+test("layoutBreaks still finds a box that hides its content, a box past the window's side, and a pin that scrolls", async ({ page, isMobile }) => {
   test.skip(!isMobile, "a phone's width");
+  await drawStill(page);
   await page.setViewportSize({ width: 360, height: 844 });
-  await gotoReady(page, "/privacy");
+  await gotoReady(page, "/");
+  await waitForJourney(page);
+  await expect(page.locator("#run")).toHaveClass(/is-running/);
   await page.evaluate(() => {
     const strip = document.createElement("div");
     strip.id = "clipped-strip";
@@ -42,15 +45,20 @@ test("layoutBreaks still finds a box that hides its content, and a box past the 
   const breaks = await layoutBreaks(page);
   expect(breaks).toContainEqual(expect.stringMatching(/^hides \d+px of its content: div#clipped-strip/));
   expect(breaks).toContainEqual(expect.stringMatching(/^past the edge \[300, 500\]: div#too-wide/));
+  expect(breaks.filter((b) => /KM \d{3}/.test(b)), "the run's pin, clipping as designed").toEqual([]);
+  // the same pin, made a sideways scroller: a reader could scroll what it holds, so it is measured as any box is
+  await page.addStyleTag({ content: "html[data-journey='on'] #run.is-running .run-pin { overflow-x: auto !important; overflow-y: hidden !important; }" });
+  expect(await layoutBreaks(page)).toContainEqual(expect.stringMatching(/^hides \d+px of its content: div "KM \d{3}/));
 });
 
 // The run's track runs on past the window's side by design, clipped by its pin: layoutBreaks leaves what the pin clips
-// alone (layout.ts, CARRIED) on the strength of this. At every phone width it pins at, each station at its resting point
-// stands wholly inside the pin and the window, and the page never scrolls sideways. (At 280 and 320, and at 200% text,
-// its stations do not fit the window: it stays the two sections, measured by the sweep below.)
-for (const width of [360, 390] as const) {
-  test(`on a phone ${width}px wide, each station of the run at rest stands wholly in the window, and the page never scrolls sideways`, async ({ page, isMobile }) => {
-    test.skip(!isMobile, "a phone's widths, and its resting points");
+// alone (layout.ts, CARRIED) on the strength of this. At every width the sweep checks where the run pins (360, 390 and
+// 768), each station at its resting point stands wholly inside the pin and the window, every word of it included, the
+// pin clips (it never scrolls), and the page never scrolls sideways. At 280 and 320 its stations are too tall for the
+// window, and at 200% text too: it stays the two sections, which the sweep below measures as any page.
+for (const width of [360, 390, 768] as const) {
+  test(`at ${width}px, each station of the run at rest stands wholly in the window, every word of it, and nothing scrolls sideways`, async ({ page, isMobile }) => {
+    test.skip(!isMobile, "the sweep's widths, and a touch screen's resting points");
     test.setTimeout(90_000);
     await drawStill(page); // the run is what is measured; the live drawing would only slow the software GPU
     await page.setViewportSize({ width, height: 844 });
@@ -68,24 +76,44 @@ for (const width of [360, 390] as const) {
       await page.evaluate((to) => window.scrollTo({ top: to, behavior: "instant" }), y);
       const fit = () =>
         page.evaluate((k) => {
-          const station = document.querySelectorAll("#run [data-station]")[k]?.getBoundingClientRect();
-          const pin = document.querySelector("#run .run-pin")?.getBoundingClientRect();
+          const el = document.querySelectorAll("#run [data-station]")[k];
+          const pinEl = document.querySelector<HTMLElement>("#run .run-pin");
+          const station = el?.getBoundingClientRect();
+          const pin = pinEl?.getBoundingClientRect();
           const train = document.querySelector("#run .run-train")?.getBoundingClientRect();
-          if (!station || !pin || !train) throw new Error("no such station, or no pin");
+          if (!el || !station || !pinEl || !pin || !train) throw new Error("no such station, or no pin");
           const vw = document.documentElement.clientWidth;
+          const lo = Math.max(pin.left, 0) - 1;
+          const hi = Math.min(pin.right, vw) + 1;
+          // every line of its words, as the reader sees them: each text node's own boxes
+          const cut: string[] = [];
+          const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+          for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+            if ((node.textContent ?? "").trim() === "" || !node.parentElement?.checkVisibility()) continue;
+            const range = document.createRange();
+            range.selectNodeContents(node);
+            for (const r of range.getClientRects()) {
+              if (r.width > 0 && (r.left < lo || r.right > hi)) cut.push(`"${(node.textContent ?? "").trim().slice(0, 24)}" [${Math.round(r.left)}, ${Math.round(r.right)}]`);
+            }
+          }
           window.scrollBy({ left: 400, behavior: "instant" });
+          pinEl.scrollBy({ left: 400, behavior: "instant" });
           return {
             off: Math.abs(Math.round(station.left + station.width / 2 - (train.left + train.width / 2))),
-            inside: station.left >= Math.max(pin.left, 0) - 1 && station.right <= Math.min(pin.right, vw) + 1,
+            inside: station.left >= lo && station.right <= hi,
             box: `[${Math.round(station.left)}, ${Math.round(station.right)}] in [${Math.round(pin.left)}, ${Math.round(pin.right)}]`,
-            sideways: [document.documentElement.scrollWidth - vw, window.scrollX],
+            cut,
+            clips: getComputedStyle(pinEl).overflowX,
+            sideways: [document.documentElement.scrollWidth - vw, window.scrollX, pinEl.scrollLeft],
           };
         }, i);
       // the track eases to the station: at rest once it stands at the train (within 3px, as run.spec.ts judges it)
       await expect.poll(async () => (await fit()).off, { timeout: 20_000 }).toBeLessThanOrEqual(3);
       const at = await fit();
       expect(at.inside, `station ${i} ${at.box}`).toBe(true);
-      expect(at.sideways, `station ${i}: the page's sideways overflow, and its scroll after a sideways scroll`).toEqual([0, 0]);
+      expect(at.cut, `station ${i}: its words past the pin or the window`).toEqual([]);
+      expect(at.clips, "the run's pin clips; it is never a scroller").toBe("clip");
+      expect(at.sideways, `station ${i}: the page's sideways overflow, its scroll and the pin's after a sideways scroll`).toEqual([0, 0, 0]);
     }
   });
 }
