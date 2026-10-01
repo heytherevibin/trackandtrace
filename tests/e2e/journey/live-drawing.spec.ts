@@ -254,6 +254,44 @@ test.describe("the live drawing at its edges", () => {
     }
   });
 
+  // On a phone the chapter pins in its list layout, its sticky top the copy's height above the masthead's foot, and that
+  // height moves with the window (its top padding is in vh): the timeline starts where the pin takes hold, not under the
+  // masthead. Measured from the masthead, a resize from 844 to 660 left a reader 0.0106 of the range off.
+  for (const [from, to] of [
+    [{ width: 390, height: 844 }, { width: 390, height: 660 }],
+    [{ width: 390, height: 660 }, { width: 390, height: 844 }],
+    [{ width: 412, height: 915 }, { width: 412, height: 700 }],
+    [{ width: 360, height: 780 }, { width: 360, height: 640 }],
+  ] as const) {
+    test(`a reader inside the chapter on a phone stays the same fraction through a resize from ${from.width}×${from.height} to ${to.width}×${to.height}`, async ({ page, isMobile }) => {
+      test.skip(!isMobile, "a phone's list layout");
+      const through = () =>
+        page.evaluate(() => {
+          const section = document.getElementById("anatomy");
+          const pin = section?.querySelector(".anatomy-pin");
+          if (!section || !pin) throw new Error("#anatomy is missing");
+          const stick = Number.parseFloat(getComputedStyle(pin).top) || 0;
+          const start = section.getBoundingClientRect().top + window.scrollY - stick;
+          return (window.scrollY - start) / (section.offsetHeight - window.innerHeight + stick);
+        });
+      await page.setViewportSize(from);
+      await page.goto("/");
+      await waitForLive(page);
+      await dismissInstall(page);
+      await expect(page.locator('#anatomy .anatomy-pin[data-live="list"]')).toHaveCount(1);
+      await scrollIntoChapter(page, 0.5);
+      await frames(page, 3); // the pin has learned the reader's place
+      const f = await through();
+      await page.setViewportSize(to);
+      await frames(page, 20); // the pin's height follows the window (520vh); its resize answer, then anything it set going
+      await expect(page.locator("#anatomy")).toHaveClass(/is-live/);
+      expect(Math.abs((await through()) - f), `${from.height} to ${to.height}`).toBeLessThanOrEqual(0.002);
+      await page.setViewportSize(from); // and back, judged from the place kept since
+      await frames(page, 20);
+      expect(Math.abs((await through()) - f), `${to.height} back to ${from.height}`).toBeLessThanOrEqual(0.002);
+    });
+  }
+
   // WebKit lays a resize out in two steps, in either order (journey-helpers.ts, holdLate): the pin (520vh) in one, the
   // large viewport its timeline ends at in the other. Answered at "resize", between them, the reader landed 14% off with
   // the default viewport late, and the place then kept put the next resize off too; 3% with the small and large late.

@@ -35,6 +35,24 @@ export interface LiveLabels {
   clear(): void;
 }
 
+/** The chapter's words' height in the list layout: the pin sticks that far above the masthead's foot (CSS), so they
+ * scroll away under it first. */
+const copyHeight = (copy: HTMLElement): number => Math.round(copy.offsetTop + copy.offsetHeight);
+
+/**
+ * Where the live pin takes hold, below the window's top, for the page as it is laid out now: its sticky top, where its
+ * scroll timeline starts (scene/live.ts's enterAt). In the list layout that is the words' height above the masthead's
+ * foot, which moves with the window (their top padding is in vh) but is written only when the labels are laid out
+ * again, after a resize's other answers have run: measured here afresh, as layout() will write it.
+ */
+export function pinTop(pin: HTMLElement): number {
+  const top = Math.round(Number.parseFloat(getComputedStyle(pin).top)) || 0;
+  const copy = pin.querySelector<HTMLElement>(".anatomy-copy");
+  const written = pin.style.getPropertyValue("--anatomy-copy-h");
+  if (pin.dataset.live !== "list" || !copy || written === "") return top;
+  return top + Math.round(Number.parseFloat(written)) - copyHeight(copy);
+}
+
 export function createLiveLabels(section: HTMLElement): LiveLabels | null {
   const pin = section.querySelector<HTMLElement>(".anatomy-pin");
   const copy = pin?.querySelector<HTMLElement>(".anatomy-copy");
@@ -108,7 +126,7 @@ export function createLiveLabels(section: HTMLElement): LiveLabels | null {
     tops = new Map();
     resetLabels();
     // the words scroll away under the masthead first; then the drawing and its list hold the window (CSS)
-    pin.style.setProperty("--anatomy-copy-h", `${Math.round(copy.offsetTop + copy.offsetHeight)}px`);
+    pin.style.setProperty("--anatomy-copy-h", `${copyHeight(copy)}px`);
     const pr = pin.getBoundingClientRect();
     const t = rel(copy, pr).bottom + 16;
     const lr = legend.getBoundingClientRect();

@@ -66,8 +66,9 @@ export type Shape = "same" | "changed";
  * Where the reader belongs once a piece changed height under them (J5-3), or null to stay put:
  * - above it: the change lands below them;
  * - inside it: the same fraction through it when its shape is the same (placeInProportion; `viewportAfter` is the window
- *   a resize made, and `view`/`viewAfter` the large viewport's height its timeline ends at, the window's by default), else
- *   its start, under the masthead;
+ *   a resize made, `view`/`viewAfter` the large viewport's height its timeline ends at, the window's by default, and
+ *   `landing`/`landingAfter` how far below the window's top its timeline starts, the pin's sticky top, the masthead's
+ *   foot by default), else its start, under the masthead;
  * - past it: moved by exactly the change, so what they read stays put.
  * Both boxes are in window coordinates against `scrollY`.
  */
@@ -81,7 +82,18 @@ export function placeAfter(
     view = viewport,
     viewAfter = viewportAfter,
     masthead,
-  }: { readonly scrollY: number; readonly viewport: number; readonly viewportAfter?: number; readonly view?: number; readonly viewAfter?: number; readonly masthead: number },
+    landing = masthead,
+    landingAfter = landing,
+  }: {
+    readonly scrollY: number;
+    readonly viewport: number;
+    readonly viewportAfter?: number;
+    readonly view?: number;
+    readonly viewAfter?: number;
+    readonly masthead: number;
+    readonly landing?: number;
+    readonly landingAfter?: number;
+  },
   shape: Shape = "changed",
 ): number | null {
   const change = after.height - before.height;
@@ -91,8 +103,8 @@ export function placeAfter(
   if (where === "past") return Math.round(scrollY + change);
   if (shape === "changed") return Math.round(after.top + scrollY - masthead);
   return placeInProportion(
-    { top: before.top + scrollY, bottom: before.bottom + scrollY, landing: masthead, viewport: view },
-    { top: after.top + scrollY, bottom: after.top + after.height + scrollY, landing: masthead, viewport: viewAfter },
+    { top: before.top + scrollY, bottom: before.bottom + scrollY, landing, viewport: view },
+    { top: after.top + scrollY, bottom: after.top + after.height + scrollY, landing: landingAfter, viewport: viewAfter, start: masthead },
     scrollY,
   );
 }

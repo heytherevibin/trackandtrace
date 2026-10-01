@@ -437,8 +437,12 @@ Found while building J6 (2026-09-28):
 
 Decided after J6 (the owner, 2026-09-29): a resize keeps a reader inside a piece the same fraction through it; a change
 of shape still lands on its start.
-- The fraction runs as each timeline's range does, from its top under the masthead to its foot at the large viewport's
-  foot (100lvh, as anime's scroll observers measure it, a phone's toolbar shown or not). The timelines are linear, so it
+- The fraction runs as each timeline's range does, from its top where the timeline starts to its foot at the large
+  viewport's foot (100lvh, as anime's scroll observers measure it, a phone's toolbar shown or not). The timeline starts
+  under the masthead, but for the live pin it starts where the pin takes hold, its sticky top (`pinTop`): in the list
+  layout on a phone that is the words' height above the masthead's foot, which moves with the window (their top padding
+  is in vh), so it is kept with the place in the window the reader read in and measured afresh after the resize, before
+  the labels write it (found 2026-10-01: from the masthead, 844 to 660 left the reader 0.0106 of the range off). The timelines are linear, so it
   is their progress: the same stop and frame come back. "Its start", for a change of shape, is where it always was (02's
   scroll margin, 1rem lower than its timeline's start).
 - A reader beyond that range's end, its foot still in the window, keeps their distance from the foot, but never goes

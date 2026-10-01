@@ -60,6 +60,19 @@ describe("the drawing's mode (spec §3.C)", () => {
     expect(placeAfter({ top: -5000, bottom: -840, height: 4160 }, { top: -5000, height: 3120 }, at, "same")).toBe(5000 - 1040);
   });
 
+  it("measures the range from where the pin takes hold, before and after, when that is not under the masthead", () => {
+    // the live pin in its list layout on a phone: its sticky top the copy's height above the masthead's foot, -168 in a
+    // window 844 tall and -162 in one 660 tall (the copy's top padding is in vh). Its range 1,816 to 4,433 (2,617 long),
+    // the reader 1,309 into it; then 1,810 to 3,826 (2,016 long). From the masthead (65) it ran 1,583 to 4,433 and landed
+    // them at 2,797: 0.0106 of the range short.
+    const at = { scrollY: 3125, viewport: 844, viewportAfter: 660, masthead: 65, landing: -168, landingAfter: -162 };
+    const before = { top: 1648 - 3125, bottom: 5277 - 3125, height: 3629 };
+    const after = { top: 1648 - 3125, height: 2838 };
+    expect(placeAfter(before, after, at, "same")).toBe(Math.round(1810 + (1309 / 2617) * 2016));
+    // a change of shape still lands them on its start, under the masthead
+    expect(placeAfter(before, after, at)).toBe(1648 - 65);
+  });
+
   it("judges the reader against a piece of the page by one rule (J5-3, shared by J6-4)", () => {
     // its top visible, or within 8px above: above it, and a change lands below them
     expect(readerPlace({ top: 0, bottom: 4000 }, 900)).toBe("above");

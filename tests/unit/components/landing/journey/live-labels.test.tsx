@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createLiveLabels, revealOf, wipe } from "@/components/landing/journey/live-labels";
+import { createLiveLabels, pinTop, revealOf, wipe } from "@/components/landing/journey/live-labels";
 
 describe("the labels while the drawing is live (J5-5)", () => {
   afterEach(() => {
@@ -74,6 +74,28 @@ describe("the labels while the drawing is live (J5-5)", () => {
     expect(labels.layout()).toEqual({ l: 8, r: 528, t: 56, b: 378 });
     sized(434, 242); // the parts run past their box, over the chapter's words and the section below
     expect(labels.layout()).toBeNull();
+  });
+
+  it("say where the pin takes hold for the page as laid out now: its sticky top, the list's words measured afresh", () => {
+    document.body.innerHTML = `<div class="anatomy-pin"><div class="anatomy-copy"></div></div>`;
+    const pin = document.querySelector<HTMLElement>(".anatomy-pin")!;
+    const copy = document.querySelector<HTMLElement>(".anatomy-copy")!;
+    const measured = (top: number, height: number) => {
+      Object.defineProperty(copy, "offsetTop", { configurable: true, get: () => top });
+      Object.defineProperty(copy, "offsetHeight", { configurable: true, get: () => height });
+    };
+    // in columns, or before the labels are laid out: its sticky top as it stands
+    pin.style.top = "64px";
+    expect(pinTop(pin)).toBe(64);
+    // the list in a window 844 tall: its words 232 tall, the pin 168 above the window's top
+    pin.dataset.live = "list";
+    pin.style.setProperty("--anatomy-copy-h", "232px");
+    pin.style.top = "-168px";
+    measured(0, 232);
+    expect(pinTop(pin)).toBe(-168);
+    // a resize to 660 laid the words out 6 shorter (their top padding is in vh) before the labels wrote it: -162
+    measured(0, 226);
+    expect(pinTop(pin)).toBe(-162);
   });
 
   it("are nothing without the chapter's markup", () => {
