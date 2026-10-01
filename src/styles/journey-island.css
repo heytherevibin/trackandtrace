@@ -95,6 +95,12 @@ html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-li
 html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .callouts { inset: 0; width: auto; height: auto; overflow: visible; clip-path: none; z-index: 3; pointer-events: none; }
 html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .callout { position: absolute; width: 16rem; display: grid; grid-template-columns: auto 1fr; column-gap: 10px; align-items: baseline; padding: 6px 0 7px; border-top: 1px solid var(--line); background-color: var(--surface-0); background-image: var(--page-grain); pointer-events: auto; }
 html[data-journey="on"] [data-live="columns"] .callout { top: 0; }
+/* Placed only by the scene's frames (live-labels.ts's draw, which marks the pin data-drawn): until the first frame after a
+   layout, the labels and the dimension figures stand unplaced at the pin's top, so they are wiped (never faded: the
+   labels are the page's list) and their leaders hidden. After a jump into the chapter that first frame waits for the
+   stage to be seen on screen (the upkeep's 1b: WebKit painted them stacked over the masthead meanwhile). */
+html[data-journey="on"] [data-live="columns"]:not([data-drawn]) :is(.callout, .dim-label) { clip-path: inset(0 100% 0 0); }
+html[data-journey="on"] [data-live="columns"]:not([data-drawn]) .live-lines { visibility: hidden; }
 html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .callout[data-side="left"] { left: 0; }
 html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .callout[data-side="right"] { right: 0; }
 html[data-journey="on"] :is(:where(#anatomy:not(.is-live)) .is-columns, [data-live="columns"]) .callout-num { font-family: var(--font-display); font-weight: 600; font-size: var(--text-label); letter-spacing: 0.08em; color: var(--accent-text); }

@@ -141,6 +141,8 @@ export function createLiveLabels(section: HTMLElement): LiveLabels | null {
     labels,
     layout() {
       beside = false;
+      // the labels' boxes are reset, so they stand unplaced until a frame draws them: wiped till then (journey-island.css)
+      pin.removeAttribute("data-drawn");
       pin.style.removeProperty("--anatomy-copy-h");
       const zone = (!narrow.matches ? columns() : null) ?? list();
       return zone && zone.b - zone.t >= 150 && zone.r - zone.l >= 200 ? zone : null;
@@ -179,11 +181,13 @@ export function createLiveLabels(section: HTMLElement): LiveLabels | null {
         leader.dot.setAttribute("cy", seg.y2.toFixed(1));
         leader.dot.style.opacity = t > 0.95 ? "1" : "0";
       });
+      pin.setAttribute("data-drawn", "");
     },
     clear() {
       lines.remove();
       delete pin.dataset.live;
       pin.removeAttribute("data-compact");
+      pin.removeAttribute("data-drawn");
       pin.style.removeProperty("--anatomy-copy-h");
       resetLabels(); // .is-hot is scene/live.ts's: its teardown's setHot(null) clears it
     },

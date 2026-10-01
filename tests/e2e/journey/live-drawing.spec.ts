@@ -126,6 +126,38 @@ test.describe("the live labels (J5-5)", () => {
     await expect(page.locator("#anatomy .live-lines line")).toHaveCount(10);
   });
 
+  // Placed only by the scene's frames, which start once the stage is seen on screen: after a jump into the chapter the
+  // page painted every label unplaced and unwiped, stacked at the pin's top over the masthead, until that first frame
+  // (WebKit, a cold server; the upkeep's 1b). Held here: the stage is not observed until released, so no frame comes.
+  test("after a jump into the chapter, no label shows until the first frame places it", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.addInitScript(() => {
+      const Native = window.IntersectionObserver;
+      const held: Array<() => void> = [];
+      window.IntersectionObserver = class extends Native {
+        override observe(target: Element): void {
+          if (target.matches(".anatomy-stage")) held.push(() => super.observe(target));
+          else super.observe(target);
+        }
+      };
+      Reflect.set(window, "__ttReleaseStage", () => held.splice(0).forEach((go) => go()));
+    });
+    await page.goto("/");
+    await waitForLive(page);
+    // laid out afresh with the stage off screen, as a cold load lays it out: no frame can place the labels there
+    await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+    await frames(page, 2);
+    await page.evaluate(() => window.dispatchEvent(new Event("tt:layout")));
+    await scrollIntoChapter(page, 0.3);
+    await frames(page, 4);
+    const labels = page.locator("#anatomy .callout");
+    expect(await collisionsInView(page), "held before the first frame").toEqual([]);
+    expect(await labels.evaluateAll((els) => els.filter((el) => el.getBoundingClientRect().top < (document.querySelector("header")?.getBoundingClientRect().bottom ?? 0) && getComputedStyle(el).clipPath === "none").length)).toBe(0);
+    await page.evaluate(() => (Reflect.get(window, "__ttReleaseStage") as () => void)());
+    await expect(page.locator("#anatomy .anatomy-pin")).toHaveAttribute("data-drawn", ""); // the first frame placed them
+    expect(await collisionsInView(page), "placed").toEqual([]);
+  });
+
   test("a label under a fine pointer lights its part, and the part lights its label", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/");

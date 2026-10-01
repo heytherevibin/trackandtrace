@@ -98,6 +98,22 @@ describe("the labels while the drawing is live (J5-5)", () => {
     expect(pinTop(pin)).toBe(-162);
   });
 
+  it("are drawn only once a frame has placed them: each layout takes that back, until the next draw (the upkeep's 1b)", () => {
+    vi.stubGlobal("matchMedia", () => ({ matches: false }));
+    document.body.innerHTML = `<section id="anatomy"><div class="anatomy-pin"><div class="anatomy-copy"></div><ol class="callouts"><li class="callout" data-part="shell" data-side="right"></li></ol><ol class="anatomy-legend"></ol><div class="title-block"></div><p class="anatomy-caption"></p></div></section>`;
+    const labels = createLiveLabels(document.getElementById("anatomy")!);
+    const pin = labels!.pin;
+    labels?.layout();
+    expect(pin.hasAttribute("data-drawn")).toBe(false);
+    labels?.draw(() => null, () => 0);
+    expect(pin.hasAttribute("data-drawn")).toBe(true);
+    labels?.layout(); // unplaced again (the labels' boxes reset), so not drawn until the next frame
+    expect(pin.hasAttribute("data-drawn")).toBe(false);
+    labels?.draw(() => null, () => 0);
+    labels?.clear();
+    expect(pin.hasAttribute("data-drawn")).toBe(false);
+  });
+
   it("are nothing without the chapter's markup", () => {
     document.body.innerHTML = `<section id="anatomy"></section>`;
     expect(createLiveLabels(document.getElementById("anatomy")!)).toBeNull();

@@ -377,7 +377,9 @@ Decided while planning J5 (2026-09-27):
   the pin when its height changes lands on its start, and since J6 only when it changes shape: a resize keeps them the
   same fraction through it (decided after J6, below);
 - the engine lives for the journey and is reused across rebuilds and restores (J5-4);
-- labels while live wipe in and rise, never fade, with their own writers (J5-5);
+- labels while live wipe in and rise, never fade, with their own writers (J5-5); until a frame has placed them after a
+  layout (the pin's `data-drawn`), they and the dimension figures stay wiped and the leaders hidden, so a jump into the
+  chapter never shows them unplaced over the masthead before the stage's first frame (found 2026-10-01);
 - the palette reads four tokens (J5-8);
 - the frame meter ships with J5, for the owner's real-device check (J5-10).
 
