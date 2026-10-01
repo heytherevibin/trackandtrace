@@ -3,7 +3,6 @@ import type { MessageTree } from "../types";
 export const common = {
   productName: "Trakline",
   descriptor: "PNR status, checked live",
-  notAffiliated: "Not affiliated with IRCTC or Indian Railways.",
   footerDisclaimer: "An independent service, not affiliated with IRCTC or Indian Railways. Every result shows only what the reservation service returned, with the time it was retrieved.",
   ist: "IST",
   retry: "Retry",

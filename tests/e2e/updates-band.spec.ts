@@ -67,6 +67,31 @@ for (const path of HIDDEN) {
   });
 }
 
+// The legal pages used to close on a line of their own, "Not affiliated with IRCTC or Indian Railways.", under a
+// hairline. With the full footer on every page that line stood a screen above the footer's own disclaimer, so it was
+// dropped (the owner, 2026-10-01): the page ends on its last section, and the footer says it once.
+for (const path of ["/privacy", "/tos"] as const) {
+  test(`${path} does not repeat the disclaimer: the footer says it, the page does not`, async ({ page }) => {
+    await gotoReady(page, path);
+    const main = page.getByRole("main");
+    await expect(main.getByText("Not affiliated with IRCTC or Indian Railways.", { exact: true })).toHaveCount(0);
+    await expect(footer(page).getByText(messages.common.footerDisclaimer)).toBeVisible();
+    // The article ends on its last section, and the band's rule is the next line down the page: no rule of the
+    // page's own between them.
+    const end = await page.evaluate(() => {
+      const article = document.querySelector("main article");
+      const last = article?.lastElementChild;
+      const rule = document.querySelector("#updates hr");
+      if (!article || !last || !rule) throw new Error("the page's end is not drawn");
+      return { lastTag: last.tagName, gap: Math.round(rule.getBoundingClientRect().top - article.getBoundingClientRect().bottom) };
+    });
+    expect(end.lastTag).toBe("SECTION");
+    // page-body's 5rem run-out, and nothing else, between the last words and the band's rule (the index plate can be
+    // the taller column on a wide screen, so at least).
+    expect(end.gap).toBeGreaterThanOrEqual(80);
+  });
+}
+
 test("on the landing the band stands between the terminus and the footer, at the sheet's width", async ({ page }) => {
   await gotoReady(page, "/");
   const boxes = await page.evaluate(() => {
@@ -202,8 +227,10 @@ test.describe("the band fits", () => {
     const floor = Math.min(7.5 * rem, form.width) - 1;
     const measured = `field ${Math.round(field.width)}px, button ${Math.round(button.width)}px at y ${Math.round(button.y)}, form ${Math.round(form.width)}px, 1rem = ${rem}px`;
     expect(field.width, `${label}: the field is under its floor (${Math.round(floor)}px): ${measured}`).toBeGreaterThanOrEqual(floor);
-    expect(field.height, `${label}: the field's height`).toBeGreaterThanOrEqual(44);
-    expect(button.height, `${label}: the button's height`).toBeGreaterThanOrEqual(44);
+    // Half a pixel of grace on the 44px floors: a box read while the band is mid-rise on the landing comes back as
+    // 43.99997 (a transformed box's own arithmetic), which is 44 drawn.
+    expect(field.height, `${label}: the field's height`).toBeGreaterThanOrEqual(43.5);
+    expect(button.height, `${label}: the button's height`).toBeGreaterThanOrEqual(43.5);
     expect(button.x, `${label}: the button starts inside the window`).toBeGreaterThanOrEqual(0);
     expect(button.x + button.width, `${label}: the button ends inside the window`).toBeLessThanOrEqual(vw);
     const wrapped = button.y >= field.y + field.height - 1;
@@ -221,7 +248,10 @@ test.describe("the band fits", () => {
     for (const path of ["/", "/accuracy"] as const) {
       test(`${path} at ${width}px: nothing of the band breaks the layout, is cut or runs past the window`, async ({ page }) => {
         await page.setViewportSize({ width, height: 844 });
-        // the still page: a started journey's run reads as hidden content to layoutBreaks (helpers.ts)
+        // The still page: a started journey's run reads as hidden content to layoutBreaks (helpers.ts), and the band
+        // read mid-rise gives sub-pixel boxes. The floors below take half a pixel either way, so they do not lean on
+        // this hold alone. Once the route sweep waits for the journey and measures with the run pinned (PR #110), this
+        // should do the same, and wait for the band's rise to finish, instead of holding the journey off.
         await holdJourney(page);
         await gotoReady(page, path);
         await page.locator("#updates").scrollIntoViewIfNeeded();
@@ -258,7 +288,8 @@ test.describe("the band fits", () => {
 
   // A window between the phone's and the desk's: the footer's columns wrap. The brand may take a row of its own; the
   // three link columns then share one. A link column never sits alone on a row.
-  for (const width of [640, 700, 768, 800, 834, 900, 1024, 1100] as const) {
+  // 640 to 800px: the widths where the row cannot hold all four, and Company used to wrap alone.
+  for (const width of [640, 700, 768, 800] as const) {
     test(`at ${width}px no link column of the footer sits alone on a row`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
       await gotoReady(page, "/watchlist");
@@ -275,6 +306,16 @@ test.describe("the band fits", () => {
       expect(rows.filter((row) => row.linkColumns > 0).map((row) => row.linkColumns), `rows: ${JSON.stringify(rows)}`).toEqual([3]);
     });
   }
+
+  // The other side of that fix: the three columns are one flex item now, and its basis is the three columns' own, so
+  // the narrowest window that held all four on one row before (834px) still does. A basis any wider wraps them early.
+  test("at 834px the brand and the three link columns still share one row", async ({ page }) => {
+    await page.setViewportSize({ width: 834, height: 900 });
+    await gotoReady(page, "/watchlist");
+    const tops = await page.locator("footer [data-footer-column]").evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().top)));
+    expect(tops).toHaveLength(4);
+    expect(new Set(tops).size, `column tops: ${tops.join(", ")}`).toBe(1);
+  });
 });
 
 // The same form in its other place, /pre-booking's "Notify me" plate (shown once a search has answered): the same row,
@@ -282,8 +323,9 @@ test.describe("the band fits", () => {
 test.describe("the pre-booking plate's form keeps the same floor", () => {
   test.skip(({ isMobile }) => isMobile, "each test sets its own window");
 
+  // Not 280px at 200%: there the plate's form is 118px, under the floor, so the field has the whole row with or
+  // without the floor, and the case passed with the fix taken out.
   for (const [width, percent] of [
-    [280, 200],
     [320, 200],
     [390, 200],
     [390, 100],
@@ -309,9 +351,7 @@ test.describe("the pre-booking plate's form keeps the same floor", () => {
       expect(f.width, `the field is under its floor (${Math.round(floor)}px): ${measured}`).toBeGreaterThanOrEqual(floor);
       const wrapped = b.y >= f.y + f.height - 1;
       if (percent === 100) expect(wrapped, `at 100% the button stays beside the field: ${measured}`).toBe(false);
-      // At least: at 280px and 200% the plate's form is 118px and "Notify me" cannot be drawn narrower than 122px, as
-      // before this floor (it spills 4px into the plate's own padding, never past the window).
-      if (wrapped) expect(Math.round(b.width), `a button under the field is the form wide: ${measured}`).toBeGreaterThanOrEqual(Math.round(o.width));
+      if (wrapped) expect(Math.round(b.width), `a button under the field is the form wide: ${measured}`).toBe(Math.round(o.width));
       if (wrapped) expect(Math.round(f.width), `a field with the row to itself is the form wide: ${measured}`).toBe(Math.round(o.width));
     });
   }

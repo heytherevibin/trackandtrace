@@ -26,7 +26,7 @@ test("accuracy, privacy, terms, login, and account render their states", async (
   await gotoReady(page, "/privacy");
   await expect(page.getByRole("heading", { name: "What we process" })).toBeVisible();
   await gotoReady(page, "/tos");
-  await expect(page.getByText("Not affiliated with IRCTC or Indian Railways.").first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "What this is" })).toBeVisible();
   await gotoReady(page, "/login");
   // A server Playwright starts has no Supabase (see playwright.config.ts); a reused dev
   // server may be connected. Either honest state passes; login-form.test.tsx pins both.

@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { PNR, gotoReady, holdJourney } from "./helpers";
+import { PNR, gotoReady } from "./helpers";
 import { layoutBreaks } from "./layout";
 import { UNSUBSCRIBE } from "./subscribe-link";
 
@@ -30,11 +30,6 @@ test.describe("phone and tablet widths", () => {
       test.setTimeout(120_000);
       await page.setViewportSize({ width, height: 844 });
       await page.addInitScript((saved) => window.localStorage.setItem("tt.watchlist.v2", JSON.stringify(saved)), SAVED);
-      // The landing is measured as the server drew it: once its journey has started, the window-seat run's scenery
-      // reads as hidden content, and this sweep passed or failed by whether it measured first (at 360px it lost that
-      // race twice in a row in the full run of 2026-10-01). The running journey's own fit is collisions.spec.ts's and
-      // the nightly's.
-      await holdJourney(page);
       const failures: string[] = [];
       for (const route of ROUTES) {
         await gotoReady(page, route);

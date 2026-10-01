@@ -36,8 +36,12 @@ describe("LegalDocument", () => {
     });
   });
 
-  it("closes with the disclaimer", () => {
-    render(<LegalDocument title={privacy.title} lead={privacy.lead} sections={privacy.sections} />);
-    expect(screen.getByText("Not affiliated with IRCTC or Indian Railways.")).toBeInTheDocument();
+  it("ends on its last section: the disclaimer is the footer's to say, once, not the page's as well", () => {
+    // The owner, 2026-10-01: every page now ends on the full footer, whose first column carries the disclaimer.
+    const { container } = render(<LegalDocument title={privacy.title} lead={privacy.lead} sections={privacy.sections} />);
+    expect(screen.queryByText("Not affiliated with IRCTC or Indian Railways.")).not.toBeInTheDocument();
+    const article = container.querySelector("article") as HTMLElement;
+    expect(article.lastElementChild?.tagName).toBe("SECTION");
+    expect(article.lastElementChild?.id).toBe(privacy.sections.at(-1)?.id);
   });
 });

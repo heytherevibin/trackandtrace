@@ -13,7 +13,8 @@ const sectionNumber = (index: number): string => String(index + 1).padStart(2, "
 /**
  * Privacy and Terms, built from the B sheets' grammar (neither page is drawn): the 60ch title
  * block with a legend meta line, an "On this page" plate that sticks on wide screens, and
- * numbered sections (steel kicker over a hairline, 22px capital heading, 15/24 body copy).
+ * numbered sections (steel kicker over a hairline, 22px capital heading, 15/24 body copy). The page ends on its last
+ * section: the "not affiliated" line it used to close on is the footer's, on every page (the owner, 2026-10-01).
  */
 export function LegalDocument({
   title,
@@ -70,7 +71,6 @@ export function LegalDocument({
               <p className="mt-2.5 max-w-[64ch] text-body text-ink-1/78">{s.body}</p>
             </section>
           ))}
-          <p className="mt-12 border-t border-line pt-3 text-label leading-6 text-ink-1/70">{messages.common.notAffiliated}</p>
         </article>
       </div>
     </section>
