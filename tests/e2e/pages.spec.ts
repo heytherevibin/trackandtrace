@@ -30,7 +30,8 @@ test("accuracy, privacy, terms, login, and account render their states", async (
   await gotoReady(page, "/login");
   // A server Playwright starts has no Supabase (see playwright.config.ts); a reused dev
   // server may be connected. Either honest state passes; login-form.test.tsx pins both.
-  // Scoped to main: the footer's own sign-up field is labelled "Email" too (it made this locator match twice).
+  // Scoped to main: where a page carries the Updates by email band, its field is labelled "Email" too (the footer's
+  // old sign-up made this locator match twice; /login has no band now, and the scope stays as the guard).
   await expect(page.getByRole("heading", { name: "Sign-in is not connected" }).or(page.getByRole("main").getByLabel("Email"))).toBeVisible();
   await gotoReady(page, "/account");
   await expect(page.getByRole("heading", { name: "Nothing to sync yet" })).toBeVisible();

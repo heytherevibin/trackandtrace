@@ -106,6 +106,8 @@ The same flow; its promise is one email. The list closes after 07 sends it (07's
 
 Drawn first (decision 1), in `docs/design/sheets/traveller/`: `SignupCapture.dc.html` and `SignupCapturePhone.dc.html`, and `Subscription.dc.html` and `SubscriptionPhone.dc.html`. They are built from the app's own markup and `app.css`, as B1 and B2 were.
 
+> **Decided 2026-10-01 (the owner):** the sign-up left both footers. It is its own "Updates by email" band between the page and the footer (`src/components/shell/updates-band.tsx`): full on `/`, slim on app pages, and absent on `/subscribe/confirm`, `/unsubscribe`, `/login`, `/pre-booking` and `/offline`. Every traveller page now has the full footer, with no sign-up column, and the one-line footer is gone. The stored `source` values are unchanged (`landing` on `/`, `footer` elsewhere). The two bullets below, and "each with the one-line footer" further down, describe what was built first; DESIGN.md's Shell section is the current contract.
+
 - **The one-line footer:** a compact row above the line. On phones it never pushes the disclaimer, status line or clock out of view.
 - **The full footer:** an "Updates by email" column.
 - **Pre-booking:** under the result, after a submit: "Tell me once when availability checks open. One email, nothing else." with "Notify me". This is the availability list.

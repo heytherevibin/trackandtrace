@@ -125,11 +125,24 @@ test.describe("Motion's own animations follow Motion", () => {
 test.describe("the footer's Motion switch", () => {
   const motionSwitch = (page: Page) => page.getByRole("contentinfo").getByRole("switch", { name: "Motion" });
 
-  test("sits in the landing's footer, on; app pages' one-line footer has none", async ({ page }) => {
+  test("sits in every traveller page's footer, on", async ({ page }) => {
+    // Every page carries the full footer since 2026-10-01; the app pages' one-line footer, which had no switch, is gone.
     await gotoReady(page, "/");
     await expect(motionSwitch(page)).toBeChecked();
     await gotoReady(page, "/watchlist");
-    await expect(motionSwitch(page)).toHaveCount(0);
+    await expect(motionSwitch(page)).toBeChecked();
+    await gotoReady(page, "/login");
+    await expect(motionSwitch(page)).toBeChecked();
+  });
+
+  test("works from an app page too: off there stills the site, and the landing reads it", async ({ page }) => {
+    await gotoReady(page, "/watchlist");
+    await motionSwitch(page).click();
+    await expect(motionSwitch(page)).not.toBeChecked();
+    await expect(page.locator("html")).toHaveAttribute("data-motion", "off");
+    await gotoReady(page, "/");
+    await expect(motionSwitch(page)).not.toBeChecked();
+    await expect(page.locator("html")).toHaveAttribute("data-motion", "off");
   });
 
   test("off stills the site and holds across pages and visits; on again forgets it", async ({ page }) => {

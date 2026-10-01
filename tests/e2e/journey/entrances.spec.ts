@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { frames, motionOff, movedFrames, scrollToId, transformOf, waitForJourney, watchMotion } from "./journey-helpers";
+import { frames, motionOff, movedFrames, resetMoved, scrollToId, transformOf, waitForJourney, watchMotion } from "./journey-helpers";
 
 // Section entrances play once per section per page load (the owner, 2026-09-30, reverting 2026-09-25's replay): at the
 // start for a section already in the window, else the first time the reader reaches it; never again when they scroll
@@ -62,7 +62,7 @@ test.describe("section entrances", () => {
 
   test("every row group the journey names exists", async ({ page }) => {
     await page.goto("/");
-    for (const sel of ["#principles [role=row]", "#record .blueprint", "#reliability dl > div", "#roadmap li", "#features article", "#faq details"]) {
+    for (const sel of ["#principles [role=row]", "#record .blueprint", "#reliability dl > div", "#roadmap li", "#features article", "#faq details", "#updates [data-rise]"]) {
       await expect(page.locator(sel).first(), sel).toBeAttached();
     }
   });
@@ -142,6 +142,58 @@ test.describe("section entrances", () => {
     const kicker = recordKicker(page);
     await expect.poll(() => kicker.evaluate((el) => el.children.length), { timeout: 3_000 }).toBe(0);
     await expect(kicker).toHaveText(/The record you get/i);
+  });
+
+  // The Updates by email band, under the terminus and outside <main> (the owner, 2026-10-01): not a station, but its
+  // two halves rise once like any section's rows, under the same rules.
+  test("the band's two halves rise once, the first time the reader reaches the page's end, and never again", async ({ page }) => {
+    await watchMotion(page, "#updates [data-rise]");
+    await page.goto("/");
+    await waitForJourney(page);
+    const halves = page.locator("#updates [data-rise]");
+    await expect(halves).toHaveCount(2);
+    for (const half of await halves.all()) await expect.poll(() => transformOf(half)).toBe(ARMED);
+    await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "instant" }));
+    for (const half of await halves.all()) await expect.poll(() => transformOf(half), { timeout: 3_000 }).toBe(RISEN);
+    // Away and back: nothing of it is off its rest at any frame.
+    await resetMoved(page);
+    await scrollToId(page, "faq");
+    await frames(page, 3);
+    await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "instant" }));
+    await page.waitForTimeout(1_200);
+    expect(await movedFrames(page)).toBe(0);
+    for (const half of await halves.all()) expect(await transformOf(half)).toBe(RISEN);
+  });
+
+  test("Motion off, then on: the band already played does not play again", async ({ page }) => {
+    await watchMotion(page, "#updates [data-rise]");
+    await page.goto("/");
+    await waitForJourney(page);
+    const half = page.locator("#updates [data-rise]").first();
+    await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "instant" }));
+    await expect.poll(() => transformOf(half), { timeout: 3_000 }).toBe(RISEN);
+    await clickMotion(page);
+    await expect(page.locator("html")).toHaveAttribute("data-motion", "off");
+    await frames(page, 3);
+    await resetMoved(page);
+    await clickMotion(page);
+    await expect(page.locator("html")).toHaveAttribute("data-motion", "on");
+    await page.waitForTimeout(1_200);
+    expect(await movedFrames(page)).toBe(0);
+    expect(await transformOf(half)).toBe(RISEN);
+  });
+
+  test("Motion off: the band is never offset", async ({ page }) => {
+    await watchMotion(page, "#updates [data-rise]");
+    await motionOff(page);
+    await page.goto("/");
+    await waitForJourney(page);
+    const halves = page.locator("#updates [data-rise]");
+    for (const half of await halves.all()) expect(await transformOf(half)).toBe("none");
+    await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "instant" }));
+    await page.waitForTimeout(300);
+    for (const half of await halves.all()) expect(await transformOf(half)).toBe("none");
+    expect(await movedFrames(page)).toBe(0);
   });
 
   test("Motion off: nothing is ever offset", async ({ page }) => {

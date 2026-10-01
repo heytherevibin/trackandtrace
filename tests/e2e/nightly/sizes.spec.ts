@@ -103,7 +103,8 @@ for (const [width, height] of SIZES) {
         expect(await mastheadOverPins(page)).toEqual([]);
         expect(await mastheadRows(page)).toEqual([]);
         expect(await cutText(page), "text cut off").toEqual([]);
-        expect(await brokenWords(page, "main h2"), "a heading's word broken").toEqual([]);
+        // the Updates by email band's heading stands outside <main>, between it and the footer
+        expect(await brokenWords(page, "main h2, #updates h2"), "a heading's word broken").toEqual([]);
         expect(await collisionsTopToBottom(page, { ...LANDING_INSTRUMENTS, step: 0.15 })).toEqual([]);
       });
 

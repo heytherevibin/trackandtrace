@@ -8,7 +8,7 @@ import { messages } from "@/messages";
 import { cn } from "@/utils/cn";
 
 /**
- * The landing footer's Motion switch, after the clock. On by default; off stills every traveller page as the
+ * The footer's Motion switch, on every traveller page, after the clock. On by default; off stills every traveller page as the
  * device's reduced-motion setting does (motion.css, SiteMotion). When the device asks for reduced motion it
  * reads off, is disabled, and says why beside it. Only the track dims; the words keep their contrast.
  */

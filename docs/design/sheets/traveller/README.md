@@ -51,6 +51,8 @@ Email sign-ups with double opt-in, for `docs/superpowers/specs/2026-09-28-subscr
 | `SignupCapture.dc.html`, `SignupCapturePhone.dc.html` | The capture form, in each place it appears | place: landing footer, one-line footer, pre-booking · state: idle, invalid, sending, sent, too many, daily limit, error |
 | `Subscription.dc.html`, `SubscriptionPhone.dc.html` | Confirm (/subscribe/confirm) and Unsubscribe (/unsubscribe) | page: confirm, unsubscribe · list: news, availability · state: before, after, already done, expired, invalid link, error |
 
+**Decided 2026-10-01 (the owner):** the capture left both footers. The boards' "landing footer" and "one-line footer" places are no longer drawn by the app: the form is the "Updates by email" band above the footer (layout A of the three samples drawn that day: a split row under a hairline at the sheet's width; full on `/`, slim on app pages), and every page has the full footer with four columns. The boards stay as the record of what was approved on 2026-09-30; the form's field, button, states and consent line are unchanged, and the pre-booking place is exactly as drawn.
+
 Every state was rendered at the board's own viewport width and measured: board overflow, horizontal scroll, clipped text, field width, and the generated column labels in the stacked chart. 71 renders, and the report is reproducible from the boards alone.
 
 ### Decided while drawing

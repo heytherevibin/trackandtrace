@@ -7,7 +7,8 @@ import { cn } from "@/utils/cn";
 import { chooseSound, useSound } from "./use-sound";
 
 /**
- * The landing footer's Sound switch, after Motion: off by default. On, the page's journey sounds a soft rail
+ * The footer's Sound switch, after Motion: off by default. The footer is on every traveller page, the switch only
+ * on the landing. On, the page's journey sounds a soft rail
  * clack as the page scrolls, starting only from the reader's own gesture. It shows only while the journey
  * runs, since only the journey can sound (journey-island.css).
  */
