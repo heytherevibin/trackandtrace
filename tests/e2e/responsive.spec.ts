@@ -180,3 +180,20 @@ test.describe("the landing at 200% text", () => {
     }
   });
 });
+
+// layoutBreaks sees what runs past the window or a box that clips, not a row running past a bordered box that does not
+// clip: the roadmap's rows at 280 at 100% (their 200px and 220px minimums ran 5px past the list's border).
+test("at 280px every roadmap row stands inside the list's border", async ({ page, isMobile }) => {
+  test.skip(!isMobile, "a phone's width");
+  await page.setViewportSize({ width: 280, height: 844 });
+  await gotoReady(page, "/");
+  await waitForJourney(page);
+  const out = await page.locator("#roadmap ul").evaluate((ul) => {
+    const box = ul.getBoundingClientRect();
+    return [...ul.querySelectorAll("li *")].flatMap((el) => {
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && (r.left < box.left - 1 || r.right > box.right + 1) ? [`${el.tagName.toLowerCase()} "${(el.textContent ?? "").trim().slice(0, 24)}" [${Math.round(r.left)}, ${Math.round(r.right)}] in [${Math.round(box.left)}, ${Math.round(box.right)}]`] : [];
+    });
+  });
+  expect(out).toEqual([]);
+});
