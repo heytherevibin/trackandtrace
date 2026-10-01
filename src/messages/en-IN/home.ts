@@ -119,7 +119,9 @@ export const home = {
     },
     preBooking: {
       title: "Pre-booking",
-      detail: "Plan a journey before you book. The form is ready today; it fills with live availability the day a timetable and inventory source is connected.",
+      /** What a search does today. The old sentence promised live availability "the day a source is connected" and outlived that. */
+      detail:
+        "Plan a journey before you book. Pick the stations, a date and the classes you would travel in, and every train on the route answers at once — open berths and the fare, four dates at a time.",
     },
     accuracy: {
       title: "Accuracy",
