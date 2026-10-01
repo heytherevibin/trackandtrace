@@ -170,6 +170,8 @@ test.describe("section entrances", () => {
     await page.goto("/");
     await waitForJourney(page);
     const half = page.locator("#updates [data-rise]").first();
+    // It has an entrance to play: armed, out of sight, at load.
+    await expect.poll(() => transformOf(half)).toBe(ARMED);
     await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "instant" }));
     await expect.poll(() => transformOf(half), { timeout: 3_000 }).toBe(RISEN);
     await clickMotion(page);
@@ -183,7 +185,7 @@ test.describe("section entrances", () => {
     expect(await transformOf(half)).toBe(RISEN);
   });
 
-  test("Motion off: the band is never offset", async ({ page }) => {
+  test("Motion off: the band is never offset, and switching Motion off puts an armed band back at rest", async ({ page }) => {
     await watchMotion(page, "#updates [data-rise]");
     await motionOff(page);
     await page.goto("/");
@@ -194,6 +196,15 @@ test.describe("section entrances", () => {
     await page.waitForTimeout(300);
     for (const half of await halves.all()) expect(await transformOf(half)).toBe("none");
     expect(await movedFrames(page)).toBe(0);
+    // The same page with Motion on has an entrance to arm (out of sight, at the top): so the stillness above was
+    // Motion's, not a band with nothing to play. Off again, the armed band is back at rest at once.
+    await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+    await clickMotion(page);
+    await expect(page.locator("html")).toHaveAttribute("data-motion", "on");
+    for (const half of await halves.all()) await expect.poll(() => transformOf(half), { timeout: 3_000 }).toBe(ARMED);
+    await clickMotion(page);
+    await expect(page.locator("html")).toHaveAttribute("data-motion", "off");
+    for (const half of await halves.all()) await expect.poll(() => transformOf(half), { timeout: 3_000 }).toBe("none");
   });
 
   test("Motion off: nothing is ever offset", async ({ page }) => {

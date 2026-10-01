@@ -19,13 +19,13 @@ const LINK = "text-accent-text underline underline-offset-4 hover:text-accent-so
 const PLACE: Record<CapturePlace, { form: string; button: string; sent: string; consent: string }> = {
   band: {
     form: "flex flex-col gap-1.5",
-    button: "h-11 shrink-0 px-5",
+    button: "h-11 flex-[1_0_auto] px-5",
     sent: "m-0 text-sm text-ink-1/78",
     consent: "mt-2.5 m-0 text-2xs leading-normal text-ink-1/70",
   },
   "pre-booking": {
     form: "mt-3.5 flex max-w-[52ch] flex-col gap-1.5",
-    button: "h-11 shrink-0",
+    button: "h-11 flex-[1_0_auto]",
     sent: "mt-3.5 m-0 text-sm text-ink-1/78",
     consent: "mt-2.5 m-0 max-w-[60ch] text-2xs leading-normal text-ink-1/70",
   },
@@ -113,8 +113,12 @@ export function SignupCapture({
         // The band stands on nearly every page, and a page can carry a field of its own called "Email", so the band's
         // form is named for what it subscribes to. The pre-booking plate has its own heading and intro.
         <form noValidate onSubmit={submit} className={layout.form} {...(place === "band" ? { "aria-label": m.places.footerColumn } : {})}>
+          {/* One row while the field keeps its floor, 7.5rem, which follows the text's size; when the button no longer
+              fits beside that, it goes under the field and both are the form wide (text at 200% on a phone: the field
+              was 55px at 280px, never wrapping). Beside the field the button keeps its own width: its share of the
+              row's spare room is one part in a hundred thousand. */}
           <div className="flex flex-wrap items-end gap-x-2.5 gap-y-1.5">
-            <div className="flex min-w-0 flex-1 flex-col gap-1.5">{labelled}</div>
+            <div className="flex min-w-0 flex-[99999_1_7.5rem] flex-col gap-1.5">{labelled}</div>
             {button}
           </div>
           {note}

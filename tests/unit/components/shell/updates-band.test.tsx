@@ -65,6 +65,34 @@ describe("the Updates by email band", () => {
     for (const word of expected) expect(container.textContent).toContain(word);
   });
 
+  it("starts afresh on every page: an address typed on one page does not follow the reader to the next", async () => {
+    // The band lives in the layout, which a client navigation keeps mounted.
+    const drawn = draw("/");
+    await userEvent.type(screen.getByLabelText(m.form.label), "asha@example.in");
+    expect(screen.getByLabelText(m.form.label)).toHaveValue("asha@example.in");
+    at.path = "/watchlist";
+    drawn.rerender(<UpdatesBand />);
+    expect(screen.getByLabelText(m.form.label)).toHaveValue("");
+  });
+
+  it("starts afresh on every page: a refusal or the sent line does not follow the reader either", async () => {
+    const drawn = draw("/watchlist");
+    await userEvent.type(screen.getByLabelText(m.form.label), "nope");
+    await userEvent.click(screen.getByRole("button", { name: m.form.subscribe }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(m.errors.invalid);
+    at.path = "/accuracy";
+    drawn.rerender(<UpdatesBand />);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    sent();
+    await userEvent.type(screen.getByLabelText(m.form.label), "asha@example.in");
+    await userEvent.click(screen.getByRole("button", { name: m.form.subscribe }));
+    expect(await screen.findByRole("status")).toHaveTextContent(m.sent);
+    at.path = "/privacy";
+    drawn.rerender(<UpdatesBand />);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.getByLabelText(m.form.label)).toHaveValue("");
+  });
+
   it("records a sign-up on the landing as coming from the landing", async () => {
     const fetchMock = sent();
     draw("/");

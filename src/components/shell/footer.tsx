@@ -33,41 +33,48 @@ export function Footer() {
           </span>
           <p className="mt-4 text-sm text-ink-1/74">{messages.common.footerDisclaimer}</p>
         </div>
-        <div data-footer-column="" className="flex-[1_1_130px]">
-          <p className={COLUMN_HEAD}>{m.sections}</p>
-          <FooterSections />
-        </div>
-        <div data-footer-column="" className="flex-[1_1_130px]">
-          <p className={COLUMN_HEAD}>{m.product}</p>
-          <ul className={COLUMN_LIST}>
-            {PRIMARY_NAV.map(({ href, label }) => (
-              <li key={href}>
-                <Link href={href === "/" ? "/#terminal" : href} className={COLUMN_LINK}>
-                  {label}
+        {/* The three link columns. From sm they are one flex item, three equal columns on one row, so when the row is
+            too narrow for all four the brand takes a row and the three stay together (at 768px Company used to wrap
+            alone). Its basis and growth are the three columns' own (3 × 130px and the two gaps between them), so a row
+            that holds all four is drawn exactly as before. Below sm it steps aside (contents) and the phone's wrap is
+            unchanged. */}
+        <div className="max-sm:contents sm:grid sm:flex-[3_1_calc(390px+2*clamp(32px,4vw,72px))] sm:grid-cols-3 sm:gap-x-[clamp(32px,4vw,72px)]">
+          <div data-footer-column="" className="min-w-0 flex-[1_1_130px]">
+            <p className={COLUMN_HEAD}>{m.sections}</p>
+            <FooterSections />
+          </div>
+          <div data-footer-column="" className="min-w-0 flex-[1_1_130px]">
+            <p className={COLUMN_HEAD}>{m.product}</p>
+            <ul className={COLUMN_LIST}>
+              {PRIMARY_NAV.map(({ href, label }) => (
+                <li key={href}>
+                  <Link href={href === "/" ? "/#terminal" : href} className={COLUMN_LINK}>
+                    {label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div data-footer-column="" className="min-w-0 flex-[1_1_130px]">
+            <p className={COLUMN_HEAD}>{m.company}</p>
+            <ul className={COLUMN_LIST}>
+              <li>
+                <Link href="/privacy" className={COLUMN_LINK}>
+                  {m.privacy}
                 </Link>
               </li>
-            ))}
-          </ul>
-        </div>
-        <div data-footer-column="" className="flex-[1_1_130px]">
-          <p className={COLUMN_HEAD}>{m.company}</p>
-          <ul className={COLUMN_LIST}>
-            <li>
-              <Link href="/privacy" className={COLUMN_LINK}>
-                {m.privacy}
-              </Link>
-            </li>
-            <li>
-              <Link href="/tos" className={COLUMN_LINK}>
-                {m.terms}
-              </Link>
-            </li>
-            <li>
-              <Link href="/account" className={COLUMN_LINK}>
-                {messages.shell.nav.account}
-              </Link>
-            </li>
-          </ul>
+              <li>
+                <Link href="/tos" className={COLUMN_LINK}>
+                  {m.terms}
+                </Link>
+              </li>
+              <li>
+                <Link href="/account" className={COLUMN_LINK}>
+                  {messages.shell.nav.account}
+                </Link>
+              </li>
+            </ul>
+          </div>
         </div>
       </div>
       <div className="border-t border-line">

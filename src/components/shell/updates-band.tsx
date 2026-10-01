@@ -16,14 +16,16 @@ const TITLE_ID = `${UPDATES_BAND_ID}-title`;
  * rise once with the other sections (journey/arrivals.ts, [data-rise]); it is not a station.
  */
 export function UpdatesBand() {
-  const variant = bandVariant(usePathname());
+  const pathname = usePathname();
+  const variant = bandVariant(pathname);
   if (!variant) return null;
   const full = variant === "full";
   const m = messages.subscribe;
   return (
     <section id={UPDATES_BAND_ID} aria-labelledby={TITLE_ID} data-variant={variant}>
       <div className="page-frame">
-        <hr className="m-0 h-px border-0 bg-line" />
+        {/* A border, not a fill: forced colours drop backgrounds and keep borders, as the footer's own rule is kept. */}
+        <hr className="m-0 border-0 border-t border-line" />
         <div className={`grid grid-cols-1 gap-x-[clamp(32px,6vw,96px)] gap-y-5 md:grid-cols-[minmax(0,1fr)_minmax(0,min(30rem,50%))] md:items-start ${full ? "pb-[60px] pt-12" : "py-[28px]"}`}>
           <div data-rise="" className="min-w-0">
             <h2 id={TITLE_ID} className={full ? `m-0 ${H2}` : "m-0 text-2xl leading-6 tracking-head wrap-anywhere"}>
@@ -32,7 +34,9 @@ export function UpdatesBand() {
             <p className={full ? `m-0 mt-3.5 max-w-[44ch] ${BODY}` : "m-0 mt-1.5 text-sm text-ink-1/78"}>{m.promise.news}</p>
           </div>
           <div data-rise="" className="min-w-0">
-            <SignupCapture place="band" list="news" source={full ? "landing" : "footer"} />
+            {/* The shell outlives a client navigation, so the form is keyed on the page: an address, a refusal or the
+                sent line belongs to the page it was typed on and never follows the reader to the next. */}
+            <SignupCapture key={pathname} place="band" list="news" source={full ? "landing" : "footer"} />
           </div>
         </div>
       </div>
