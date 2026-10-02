@@ -7,11 +7,12 @@ import { messages } from "@/messages";
  * unsubscribe is a legal problem that stays invisible until someone complains, so the sender
  * appends it rather than trusting the body to carry it.
  *
- * `humanUrl` is the /unsubscribe page, which is a GET; the one-click POST endpoint belongs in the
+ * The line is the list's own: the availability list gets one email ever, and it must not tell its
+ * reader they asked for news. `humanUrl` is the /unsubscribe page, which is a GET; the one-click POST endpoint belongs in the
  * headers (see `listHeaders`), not here.
  */
-export function letterText(body: string, humanUrl: string): string {
-  return `${body.trimEnd()}\n\n${messages.subscribe.email.unsubscribeLine}\n${humanUrl}\n`;
+export function letterText(body: string, humanUrl: string, list: "news" | "availability"): string {
+  return `${body.trimEnd()}\n\n${messages.subscribe.email.unsubscribeLine[list]}\n${humanUrl}\n`;
 }
 
 /**
