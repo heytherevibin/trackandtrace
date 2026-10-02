@@ -20,13 +20,41 @@ describe("staleClaims", () => {
     // Resend's idempotency window is 24 hours. Past it a repeat might duplicate, so the row is
     // marked unknown and left alone. Nothing else in the system will ever move it.
     const rows = [
-      { personId: "p1", claimedAt: hoursAgo(25) },
-      { personId: "p2", claimedAt: hoursAgo(2) },
+      { personId: "p1", claimedAt: hoursAgo(25), firstAttemptedAt: hoursAgo(25) },
+      { personId: "p2", claimedAt: hoursAgo(2), firstAttemptedAt: hoursAgo(2) },
     ];
     expect(staleClaims(rows, AT)).toEqual(["p1"]);
   });
 
   it("leaves a row claimed inside the window alone, because the next run may still retry it", () => {
-    expect(staleClaims([{ personId: "p1", claimedAt: hoursAgo(23) }], AT)).toEqual([]);
+    expect(staleClaims([{ personId: "p1", claimedAt: hoursAgo(23), firstAttemptedAt: hoursAgo(23) }], AT)).toEqual([]);
+  });
+
+  // The window is Resend's idempotency key's, and a key's age is counted from the FIRST attempt:
+  // a re-claim moves `claimedAt` and does not give Resend its memory back.
+  it("measures from the first attempt, so a row re-claimed three times is still stale at 25 hours", () => {
+    const row = { personId: "p1", claimedAt: hoursAgo(0.5), firstAttemptedAt: hoursAgo(25) };
+    expect(staleClaims([row], AT)).toEqual(["p1"]);
+  });
+
+  it("leaves a row first attempted 23 hours ago alone even though it was claimed 20 minutes ago", () => {
+    const row = { personId: "p1", claimedAt: hoursAgo(1 / 3), firstAttemptedAt: hoursAgo(23) };
+    expect(staleClaims([row], AT)).toEqual([]);
+  });
+
+  it("is stale at exactly 24 hours and not a millisecond before", () => {
+    // A strictly daily cron lands exactly here. The claim stops re-claiming at 24 hours, so a row
+    // that is not stale at 24 hours is stuck: neither retryable nor unknown, for a whole day.
+    const exactly = { personId: "p1", claimedAt: hoursAgo(24), firstAttemptedAt: hoursAgo(24) };
+    const justUnder = { personId: "p2", claimedAt: hoursAgo(24), firstAttemptedAt: new Date(AT.getTime() - 24 * 3_600_000 + 1).toISOString() };
+    expect(staleClaims([exactly, justUnder], AT)).toEqual(["p1"]);
+  });
+
+  it.each([
+    ["absent", undefined],
+    ["null", null],
+    ["unreadable", "not a date"],
+  ])("counts a first attempt that is %s as stale, because unknown is the side that never sends twice", (_name, firstAttemptedAt) => {
+    expect(staleClaims([{ personId: "p1", claimedAt: hoursAgo(1), firstAttemptedAt }], AT)).toEqual(["p1"]);
   });
 });

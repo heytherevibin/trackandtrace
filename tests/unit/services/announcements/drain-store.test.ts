@@ -16,12 +16,26 @@ describe("the runner's reads", () => {
     expect(rpc).toHaveBeenCalledWith("announce_open_letters", {});
   });
 
-  it("throws on a letter of the wrong shape rather than dropping it, since a dropped letter is a letter never sent", async () => {
-    rpc.mockResolvedValueOnce({ data: [{ ...LETTER, subject: "" }], error: null });
-    await expect(openLetters()).rejects.toThrow();
-    rpc.mockResolvedValueOnce({ data: [{ ...LETTER, list: "other" }], error: null });
-    await expect(openLetters()).rejects.toThrow();
-    rpc.mockResolvedValueOnce({ data: [{ ...LETTER, state: "done" }], error: null });
+  it.each([
+    ["an empty subject", { subject: "" }],
+    ["an unknown list", { list: "other" }],
+    ["a state that is not open", { state: "done" }],
+    ["no queued_at", { queuedAt: null }],
+    ["an unreadable queued_at", { queuedAt: "yesterday-ish" }],
+  ])("skips a letter with %s, says so, and still returns the rest", async (_name, spoil) => {
+    // One malformed row must not stop every announcement for good: a `queued` letter with a null
+    // queued_at is a row nothing guarantees against, and throwing would keep the whole queue
+    // behind it unsent. The skipped letter is named in the log (an id is not an address).
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    rpc.mockResolvedValueOnce({ data: [{ ...LETTER, id: "BAD", ...spoil }, { ...LETTER, id: "GOOD" }], error: null });
+    expect((await openLetters()).map((l) => l.id)).toEqual(["GOOD"]);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0]?.join(" "))).toContain("BAD");
+    warn.mockRestore();
+  });
+
+  it("still throws when the answer is not a list at all, because that is the store failing and not a bad row", async () => {
+    rpc.mockResolvedValueOnce({ data: { not: "a list" }, error: null });
     await expect(openLetters()).rejects.toThrow();
   });
 
@@ -39,9 +53,22 @@ describe("the runner's reads", () => {
   });
 
   it("reads the rows still claimed", async () => {
-    rpc.mockResolvedValueOnce({ data: [{ personId: "p1", claimedAt: "2026-10-01T01:00:00.000Z" }], error: null });
-    expect(await openClaims("L")).toEqual([{ personId: "p1", claimedAt: "2026-10-01T01:00:00.000Z" }]);
+    const row = { personId: "p1", claimedAt: "2026-10-02T08:50:00.000Z", firstAttemptedAt: "2026-10-01T01:00:00.000Z" };
+    rpc.mockResolvedValueOnce({ data: [row], error: null });
+    expect(await openClaims("L")).toEqual([row]);
     expect(rpc).toHaveBeenCalledWith("announce_open_claims", { p_letter: "L" });
+  });
+
+  it("carries a first attempt that is missing as null, so the runner can call it stale rather than the read failing", async () => {
+    rpc.mockResolvedValueOnce({ data: [{ personId: "p1", claimedAt: "2026-10-02T08:50:00.000Z" }, { personId: "p2", claimedAt: "2026-10-02T08:50:00.000Z", firstAttemptedAt: null }], error: null });
+    expect((await openClaims("L")).map((r) => r.firstAttemptedAt)).toEqual([null, null]);
+  });
+
+  it("refuses a claim whose first attempt is not a string or null, or whose person or claim time is missing", async () => {
+    for (const bad of [{ personId: "p1", claimedAt: "x", firstAttemptedAt: 5 }, { claimedAt: "x", firstAttemptedAt: null }, { personId: "p1", firstAttemptedAt: null }]) {
+      rpc.mockResolvedValueOnce({ data: [bad], error: null });
+      await expect(openClaims("L")).rejects.toThrow();
+    }
   });
 
   it("reads what is left as two whole numbers", async () => {

@@ -43,16 +43,30 @@ async function main() {
   // not work is the legal problem this module exists to avoid. So no DATA_KEY, no send.
   if (!environment.DATA_KEY) throw new Misuse("DATA_KEY is not set, so the unsubscribe links this would sign could not be verified later. Run through `node --env-file=.env.local`, and never commit the key.");
   if (!environment.RESEND_API_KEY && !environment.E2E) throw new Misuse("RESEND_API_KEY is not set, so nothing could be sent.");
+  // The day's allowance is ONE counter shared with sign-up confirmations and operator mail, and it
+  // lives in the shared store. With no store configured the counter is an in-process Map that starts
+  // every run at zero and that the Vercel process never sees: three runs would send 120 against a
+  // plan of 100 a day, and report success each time. A cap that enforces nothing is worse than no
+  // cap, so a run without the real counter does not start. `sharedStoreConfig` is null when the
+  // Upstash pair is absent or incomplete, when there is no DATA_KEY, and when RATE_LIMIT_STRATEGY is
+  // "memory" — every way this could end up on the in-process counter.
+  const { sharedStoreConfig } = await load("services/env.ts");
+  if (!sharedStoreConfig(environment)) {
+    throw new Misuse(
+      "the day's announcement allowance cannot be enforced: no shared store holds the counter. Set KV_REST_API_URL and KV_REST_API_TOKEN (or UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN), and leave RATE_LIMIT_STRATEGY off \"memory\". An in-process counter starts every run at zero, so repeated runs would send past the plan's 100 a day.",
+    );
+  }
 
   const store = await load("services/announcements/store.ts");
   const reads = await load("services/announcements/drain-store.ts");
-  const { takeAnnouncements } = await load("services/announcements/budget.ts");
+  const { ANNOUNCEMENT_CEILING, refundAnnouncements, takeAnnouncements } = await load("services/announcements/budget.ts");
   const { letterText, listHeaders } = await load("services/announcements/letter.ts");
   const { sendToAddress } = await load("services/email/suppression.ts");
   const { signUnsubscribe, unsubscribeKey, unsubscribeUrl, travellerOrigin } = await load("services/subscriptions/links.ts");
   // The reading store, not `publicStore`: that one answers from this process's memory when Upstash
-  // errors, which would hand a run a fresh, full day's allowance. Here an unreadable counter throws,
-  // `takeAnnouncements` fails closed to 0, and the run sends nothing.
+  // ERRORS, which would hand a run a fresh, full day's allowance. Here an unreadable counter throws,
+  // `takeAnnouncements` fails closed to 0, and the run sends nothing. (An ABSENT configuration is
+  // the other case, and the refusal above is what covers it: this store alone does not.)
   const { publicStoreForReading } = await load("services/shared-store.ts");
   const { kv, prefix } = publicStoreForReading(environment);
 
@@ -67,7 +81,8 @@ async function main() {
       stateOf: reads.letterState,
       openClaims: reads.openClaims,
       remaining: reads.remainingFor,
-      take: (want) => takeAnnouncements(kv, prefix, new Date(), want),
+      take: (want, at) => takeAnnouncements(kv, prefix, at, want),
+      refund: (n, at) => refundAnnouncements(kv, prefix, at, n),
       claim: store.claimDeliveries,
       mark: store.markDelivery,
       finish: reads.finishLetter,
@@ -75,7 +90,7 @@ async function main() {
     },
     // Links in mail that reaches an inbox are the site's own address, never one assembled from the
     // machine this happens to run on.
-    { origin: travellerOrigin(null, "production"), from: environment.SUBSCRIBE_EMAIL_FROM },
+    { origin: travellerOrigin(null, "production"), from: environment.SUBSCRIBE_EMAIL_FROM, batchMax: ANNOUNCEMENT_CEILING },
   );
 
   // `process.exitCode`, never `process.exit`: stdout to a pipe is asynchronous and exit does not drain it.

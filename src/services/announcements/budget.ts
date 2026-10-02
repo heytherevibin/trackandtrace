@@ -55,3 +55,20 @@ export async function takeAnnouncements(kv: Kv, prefix: string, at: Date, want: 
     return 0;
   }
 }
+
+/**
+ * Gives back `n` announcement emails that were reserved with `takeAnnouncements` and then not used.
+ *
+ * The counter is shared with sign-up confirmations and operator mail, so a reservation that goes
+ * unclaimed must not stay counted: reserving 40 and claiming 2 would otherwise take the
+ * confirmations' band of 40-60 down to 20 for mail that never left. It must be handed the same day
+ * the reservation was made on (`at`), never "now", so a batch that straddles 00:00 UTC refunds the
+ * counter it charged.
+ *
+ * Never throws, like the refund inside `takeAnnouncements`: if it fails the day is over-counted,
+ * which sends less rather than more. Anything that is not a positive whole number is ignored.
+ */
+export async function refundAnnouncements(kv: Kv, prefix: string, at: Date, n: number): Promise<void> {
+  if (!Number.isSafeInteger(n) || n <= 0) return;
+  await kv.incrBy(key(prefix, at), KEPT_MS, -n).catch(() => undefined);
+}

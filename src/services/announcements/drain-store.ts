@@ -1,4 +1,5 @@
 import { AppError } from "@/services/errors";
+import { log } from "@/services/log";
 import { createAdminSupabase } from "@/services/supabase/admin";
 
 // What the send runner READS and the one transition it owns, beside the six writes in store.ts.
@@ -6,8 +7,34 @@ import { createAdminSupabase } from "@/services/supabase/admin";
 //
 // Same rule as store.ts: a database error THROWS, and an answer of the wrong shape throws too. The
 // runner acts on every one of these, and a failure read as "no letters", "not stopped" or "nothing
-// left" would respectively send nothing, keep sending past a Stop, or finish a letter early.
-// Nothing here logs. An error carries the RPC's name and never an address, a signature or a person id.
+// left" would respectively send nothing, keep sending past a Stop, or finish a letter early. The one
+// exception is a single malformed LETTER in `openLetters`, which is skipped and named in the log: see
+// there. Nothing else logs. An error carries the RPC's name and never an address, a signature or a
+// person id.
+//
+// ---------------------------------------------------------------------------
+// THIS FILE IS THE MIGRATION'S SPECIFICATION for the functions it calls. The migration is written to
+// match it, so what is only implied by a destructuring line below is stated here.
+// ---------------------------------------------------------------------------
+//   * KEYS ARE CAMELCASE. Each function returns jsonb built with `jsonb_build_object('personId', …)`,
+//     the way `announce_claim` does: `personId`, `claimedAt`, `firstAttemptedAt`, `queuedAt`. A
+//     snake_case key reads as a missing field.
+//   * `announce_open_letters()`   setof jsonb {id, list, subject, body, state, queuedAt}, for letters
+//                                 whose state is `queued` or `sending`.
+//   * `announce_letter_state(p_letter uuid)`  text, null when there is no such letter.
+//   * `announce_open_claims(p_letter uuid)`   setof jsonb {personId, claimedAt, firstAttemptedAt} for
+//                                 every delivery in state `sending`.
+//   * `announce_remaining(p_letter uuid)`     jsonb {pending, sending}, whole numbers.
+//   * `announce_finish(p_letter uuid)`        void: `done` and `finished_at = now()` only from
+//                                 `queued` or `sending`, so a Stop that landed mid-run stays a Stop.
+//   * THE TRANSITION `queued` -> `sending` HAPPENS IN `announce_claim`, on the first claim of a
+//     letter. Nothing in the runner writes it, and `announce_open_letters` returns both states.
+//   * TWO TIMESTAMPS ON A DELIVERY, with different jobs. `claimed_at` is set on EVERY claim, a
+//     re-claim included, and drives the claim's 15-minute re-claim floor. `first_attempted_at` is set
+//     once, by the first claim, never touched by a re-claim, and is what the 24-hour idempotency
+//     window is measured from. The claim's 24-hour ceiling is on `first_attempted_at`, not
+//     `claimed_at`: Resend's memory of a key starts at the first attempt and a re-claim does not
+//     renew it. Both columns come back from `announce_open_claims`.
 
 type Rpc = (name: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: unknown }>;
 
@@ -27,7 +54,13 @@ export type OpenLetter = {
   readonly state: "queued" | "sending";
   readonly queuedAt: string;
 };
-export type OpenClaim = { readonly personId: string; readonly claimedAt: string };
+export type OpenClaim = {
+  readonly personId: string;
+  /** The latest claim, a re-claim included. The claim's 15-minute floor reads this. */
+  readonly claimedAt: string;
+  /** The first claim, never moved. The 24-hour window reads this; null means unknown, which the runner treats as stale. */
+  readonly firstAttemptedAt: string | null;
+};
 export type Remaining = { readonly pending: number; readonly sending: number };
 
 const STATES: readonly string[] = ["draft", "queued", "sending", "stopped", "done"];
@@ -40,7 +73,7 @@ function asOpenLetter(row: unknown): OpenLetter | null {
   const r = record(row);
   if (!r) return null;
   const { id, list, subject, body, state, queuedAt } = r;
-  if (!nonEmpty(id) || !nonEmpty(subject) || !nonEmpty(body) || !nonEmpty(queuedAt)) return null;
+  if (!nonEmpty(id) || !nonEmpty(subject) || !nonEmpty(body) || !nonEmpty(queuedAt) || Number.isNaN(Date.parse(queuedAt))) return null;
   if (list !== "news" && list !== "availability") return null;
   if (state !== "queued" && state !== "sending") return null;
   return { id, list, subject, body, state, queuedAt };
@@ -48,17 +81,24 @@ function asOpenLetter(row: unknown): OpenLetter | null {
 
 /**
  * Every letter that is queued or sending, in no promised order: choosing among them is the runner's
- * decision and lives in `announce-plan.mjs`. A row of the wrong shape throws rather than being
- * dropped, because a dropped letter is one that is silently never sent.
+ * decision and lives in `announce-plan.mjs`.
+ *
+ * A letter of the wrong shape is SKIPPED and named in the log, and the rest are returned. Throwing
+ * would let one row nothing guarantees against — a `queued` letter whose `queued_at` is null — stop
+ * every announcement for good. The skipped one is not sent until someone fixes it, which is why it
+ * is logged on every run; its id is a uuid, not an address. An answer that is not a list at all is
+ * the store failing, and still throws.
  */
 export async function openLetters(): Promise<readonly OpenLetter[]> {
   const { data, error } = await call("announce_open_letters", {});
   if (error || !Array.isArray(data)) throw failed("announce_open_letters");
-  return data.map((row) => {
+  const letters: OpenLetter[] = [];
+  for (const row of data) {
     const letter = asOpenLetter(row);
-    if (!letter) throw failed("announce_open_letters");
-    return letter;
-  });
+    if (letter) letters.push(letter);
+    else log.warn(`[announce] skipped a malformed letter and drained the rest: ${nonEmpty(record(row)?.id) ? String(record(row)?.id) : "no id"}`);
+  }
+  return letters;
 }
 
 /** The letter's state now, or null when there is no such letter. Read before each batch and each send, so Stop is immediate. */
@@ -77,7 +117,11 @@ export async function openClaims(id: string): Promise<readonly OpenClaim[]> {
   return data.map((row) => {
     const r = record(row);
     if (!r || !nonEmpty(r.personId) || !nonEmpty(r.claimedAt)) throw failed("announce_open_claims");
-    return { personId: r.personId, claimedAt: r.claimedAt };
+    // Absent or null is "never recorded", not a failed read: the runner counts it stale, which is
+    // the side that never sends twice. Anything else that is not a string is a wrong answer.
+    const first = r.firstAttemptedAt ?? null;
+    if (first !== null && typeof first !== "string") throw failed("announce_open_claims");
+    return { personId: r.personId, claimedAt: r.claimedAt, firstAttemptedAt: first };
   });
 }
 

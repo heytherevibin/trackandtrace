@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { ANNOUNCEMENT_CEILING, announcementBudget, takeAnnouncements } from "@/services/announcements/budget";
+import { ANNOUNCEMENT_CEILING, announcementBudget, refundAnnouncements, takeAnnouncements } from "@/services/announcements/budget";
 import { KEPT_MS, key, takeConfirmation } from "@/services/email/allowance";
 import { MemoryKv } from "@/services/kv";
 
@@ -97,5 +97,30 @@ describe("the announcement budget", () => {
     const incrBy = vi.fn().mockResolvedValueOnce(42).mockRejectedValueOnce(new Error("down"));
     const kv = { incrBy, get: vi.fn(), set: vi.fn(), del: vi.fn(), incr: vi.fn(), ttl: vi.fn() };
     expect(await takeAnnouncements(kv as never, "t", new Date(), 10)).toBe(8);
+  });
+});
+
+describe("giving back what was reserved but never claimed", () => {
+  const at = new Date("2026-10-02T06:00:00Z");
+
+  it("takes the unused part off the shared counter, so confirmations keep their room", async () => {
+    // Reserved 40, claimed 2: counting 40 for mail that never left would shrink the confirmations'
+    // 40-60 band to 20, and sign-in confirmations are what the day protects first.
+    const kv = new MemoryKv();
+    expect(await takeAnnouncements(kv, "t", at, 40)).toBe(40);
+    await refundAnnouncements(kv, "t", at, 38);
+    expect(await kv.get(key("t", at))).toBe("2");
+  });
+
+  it("does nothing for zero, a negative or a non-whole number", async () => {
+    const kv = new MemoryKv();
+    await takeAnnouncements(kv, "t", at, 10);
+    for (const n of [0, -3, Number.NaN, 1.5]) await refundAnnouncements(kv, "t", at, n);
+    expect(await kv.get(key("t", at))).toBe("10");
+  });
+
+  it("never throws when the refund fails: the day is over-counted, which only sends less", async () => {
+    const kv = { incrBy: vi.fn(async () => { throw new Error("down"); }), get: vi.fn(), set: vi.fn(), del: vi.fn(), incr: vi.fn(), ttl: vi.fn() };
+    await expect(refundAnnouncements(kv as never, "t", at, 5)).resolves.toBeUndefined();
   });
 });

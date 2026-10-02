@@ -33,22 +33,31 @@
 //
 // WHAT THIS CANNOT SEE. It never learns whether a `sent` message was delivered: that is the webhook's
 // business, not the runner's. A send whose mark then failed is left `sending` and retried under the
-// same key, which is safe inside the window and is `unknown` after it. And it does not refund the
-// day's allowance for rows it reserved and then did not claim: it errs towards sending less.
+// same key, which is safe inside the window and is `unknown` after it.
+//
+// TWO CLOCKS, TWO COLUMNS. A delivery carries `claimedAt`, which every claim moves (a re-claim
+// included) and which only the claim's own 15-minute floor reads; and `firstAttemptedAt`, set once
+// by the first claim and never moved. The 24-hour question — has Resend forgotten this row's
+// idempotency key? — is about the FIRST attempt, because a re-claim does not give Resend its memory
+// back. Measured from the last claim, a row that keeps timing out is re-claimed daily, never goes
+// stale, never becomes `unknown`, and after 36 hours is sent under a key Resend forgot 12 hours ago:
+// the reader gets the letter twice.
+//
+// THE DAY'S COUNTER IS SHARED with sign-up confirmations and operator mail, so this run is charged
+// for what it CLAIMED and not for what it reserved: every batch refunds `reserved - claimed`. A
+// reservation of 40 that claims 2 and is not refunded would count 40 for mail that never left and
+// shrink the confirmations' band from 40-60 to 20.
 // ---------------------------------------------------------------------------
 
 /** Resend remembers an idempotency key for 24 hours; past that a repeat may send twice. */
 export const IDEMPOTENCY_WINDOW_MS = 24 * 3_600_000;
-
-/** The most one reservation asks for. The budget clamps to the same number; this keeps the ask honest. */
-export const BATCH_MAX = 40;
 
 /** A guard on the loop, not a rule: the day's counter ends the run long before this does. */
 const BATCHES_MAX = 50;
 
 /**
  * @typedef {{ id: string, list: "news" | "availability", subject: string, body: string, state: string, queuedAt: string }} OpenLetter
- * @typedef {{ personId: string, claimedAt: string }} OpenClaim
+ * @typedef {{ personId: string, claimedAt: string, firstAttemptedAt?: string | null }} OpenClaim
  */
 
 /**
@@ -64,9 +73,13 @@ export function nextBatch({ budget, pending }) {
 }
 
 /**
- * The people whose rows were claimed more than 24 hours ago.
+ * The people whose first attempt was 24 hours ago or more.
  *
- * A date that cannot be read is stale: a claim we cannot date cannot be shown to be inside the
+ * Measured from `firstAttemptedAt` and not `claimedAt`: see the header. The boundary is INCLUSIVE.
+ * The claim stops re-claiming at 24 hours, so a row exactly 24 hours old that is not stale is
+ * neither retryable nor `unknown`; and a strictly daily schedule lands exactly there.
+ *
+ * A first attempt that is absent or unreadable is stale: it cannot be shown to be inside the
  * window, and `unknown` is the side that never sends twice.
  *
  * @param {readonly OpenClaim[]} rows
@@ -76,8 +89,8 @@ export function nextBatch({ budget, pending }) {
 export function staleClaims(rows, at) {
   return rows
     .filter((row) => {
-      const claimed = Date.parse(row.claimedAt);
-      return Number.isNaN(claimed) || at.getTime() - claimed > IDEMPOTENCY_WINDOW_MS;
+      const first = Date.parse(row.firstAttemptedAt ?? "");
+      return Number.isNaN(first) || at.getTime() - first >= IDEMPOTENCY_WINDOW_MS;
     })
     .map((row) => row.personId);
 }
@@ -169,15 +182,17 @@ export function composeMail({ letter, personId, email, origin, from, sign, deps 
  *   stateOf: (id: string) => Promise<string | null>,
  *   openClaims: (id: string) => Promise<readonly OpenClaim[]>,
  *   remaining: (id: string) => Promise<{ pending: number, sending: number }>,
- *   take: (want: number) => Promise<number>,
+ *   take: (want: number, at: Date) => Promise<number>,
+ *   refund: (n: number, at: Date) => Promise<void>,
  *   claim: (id: string, n: number) => Promise<readonly { personId: string, email: string }[]>,
  *   mark: (id: string, person: string, state: "sent" | "unknown" | "skipped", providerId: string | null) => Promise<void>,
  *   finish: (id: string) => Promise<void>,
  *   send: (mail: ReturnType<typeof composeMail>, kind: "list", key: string) => Promise<{ outcome?: string, id?: string }>,
  * }} world
- * @param {{ origin: string, from: string }} options
+ * @param {{ origin: string, from: string, batchMax: number }} options `batchMax` is the budget's own
+ *   ceiling, passed in so the number is stated once, in `budget.ts`.
  */
-export async function drain(world, { origin, from }) {
+export async function drain(world, { origin, from, batchMax }) {
   const summary = { letterId: null, stale: 0, claimed: 0, sent: 0, skipped: 0, failed: 0, stopped: false, finished: false, budgetSpent: false };
   const letter = pickLetter(await world.openLetters());
   if (!letter) {
@@ -213,14 +228,24 @@ export async function drain(world, { origin, from }) {
     const claimable = first ? left.pending + left.sending : left.pending;
     first = false;
     if (claimable === 0) break;
-    const want = Math.min(claimable, BATCH_MAX);
-    const budget = await world.take(want);
+    const want = Math.min(claimable, batchMax);
+    // One instant for the whole batch, so the reservation and its refund land on the same day's counter.
+    const at = world.now();
+    const budget = await world.take(want, at);
     const n = nextBatch({ budget, pending: want });
     if (n === 0) {
       summary.budgetSpent = true;
       break;
     }
-    const rows = await world.claim(letter.id, n);
+    // The counter is shared with confirmations: it must end up charged for what was claimed.
+    let rows;
+    try {
+      rows = await world.claim(letter.id, n);
+    } catch (error) {
+      await world.refund(n, at);
+      throw error;
+    }
+    if (n > rows.length) await world.refund(n - rows.length, at);
     summary.claimed += rows.length;
     if (rows.length === 0) break;
 
