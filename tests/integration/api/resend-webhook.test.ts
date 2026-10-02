@@ -13,6 +13,7 @@ vi.mock("@/services/announcements/store", () => ({ recordWebhook }));
 
 import { POST } from "@/app/api/webhooks/resend/route";
 import { resetEnvCache } from "@/services/env";
+import { AppError } from "@/services/errors";
 
 const SECRET = `whsec_${Buffer.alloc(32, 5).toString("base64")}`;
 const ID = "msg_2abc";
@@ -159,7 +160,36 @@ describe("POST /api/webhooks/resend", () => {
     expect(second?.[2]).toBe("b@example.in");
   });
 
-  it("answers 200 and records nothing for a signed event that names no recipient, because retrying cannot help", async () => {
+  it.each(["email.bounced", "email.complained", "email.delivery_delayed", "email.delivered", "suppression.added", "suppression.removed"])(
+    "answers non-2xx and records nothing for a verified %s with no data.to, so the missed event shows in Resend and is retried",
+    async (type) => {
+      const body = JSON.stringify({ type, data: {} });
+      const res = await POST(req(body, signed(body)));
+      expect(res.status).toBeGreaterThanOrEqual(400);
+      expect(recordWebhook).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    ["no data at all", JSON.stringify({ type: "email.complained" })],
+    ["an empty data.to", JSON.stringify({ type: "email.bounced", data: { to: [] } })],
+  ])("answers non-2xx and records nothing for a verified event with %s", async (_name, body) => {
+    const res = await POST(req(body, signed(body)));
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(recordWebhook).not.toHaveBeenCalled();
+  });
+
+  it("logs the type of an event it could not act on, and nothing else about it", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const body = JSON.stringify({ type: "email.complained", data: { from: "Trakline <updates@trakline.in>", subject: "private subject" } });
+    const head = signed(body);
+    await POST(req(body, head));
+    const logged = JSON.stringify(error.mock.calls);
+    expect(logged).toContain("email.complained");
+    for (const secret of [head.signature, "private subject", "updates@trakline.in", head.id]) expect(logged).not.toContain(secret);
+  });
+
+  it("keeps a quiet 200 for a verified event type it does not act on, and records nothing", async () => {
     const body = JSON.stringify({ type: "domain.updated", data: { name: "trakline.in" } });
     expect((await POST(req(body, signed(body)))).status).toBe(200);
     expect(recordWebhook).not.toHaveBeenCalled();
@@ -174,12 +204,31 @@ describe("POST /api/webhooks/resend", () => {
     expect(recordWebhook).not.toHaveBeenCalled();
   });
 
-  it("answers 500 when the store fails, so Svix retries, and says nothing about why", async () => {
-    recordWebhook.mockRejectedValueOnce(new Error(`database down for ${EMAIL}`));
+  it.each([
+    ["an AppError exactly as the store throws it", () => new AppError("SOURCE_UNAVAILABLE", `announce_webhook failed for ${EMAIL}`)],
+    ["a plain Error", () => new Error(`database down for ${EMAIL}`)],
+  ])("answers 500 when the store fails with %s, so Svix retries, and names nothing internal", async (_name, failure) => {
+    recordWebhook.mockRejectedValueOnce(failure());
     const body = event("email.bounced");
     const res = await POST(req(body, signed(body)));
     expect(res.status).toBe(500);
-    expect(await res.text()).not.toContain(EMAIL);
+    const text = await res.text();
+    expect(text).not.toContain(EMAIL);
+    expect(text).not.toContain("announce_webhook");
+    expect(text).not.toContain("SOURCE_UNAVAILABLE");
+  });
+
+  it("gives the same ids in the same order to an identical retry, which is what makes the replay a no-op", async () => {
+    const body = event("email.bounced", ["a@example.in", "b@example.in", "c@example.in"]);
+    const head = signed(body);
+    await POST(req(body, head));
+    const first = recordWebhook.mock.calls.map(([id, , email]) => [id, email]);
+    recordWebhook.mockClear();
+    await POST(req(body, head));
+    const second = recordWebhook.mock.calls.map(([id, , email]) => [id, email]);
+    expect(first).toHaveLength(3);
+    expect(second).toEqual(first);
+    expect(first.map(([id]) => id)).toEqual([ID, `${ID}#1`, `${ID}#2`]);
   });
 
   it("does not log an address, a signature or the body on any path", async () => {
