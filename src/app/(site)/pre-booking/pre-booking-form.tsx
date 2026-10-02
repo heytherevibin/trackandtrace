@@ -170,15 +170,17 @@ export function PreBookingForm() {
       <form onSubmit={submit} noValidate className="blueprint mt-8" aria-labelledby={`${ids}-form`}>
         <Corners />
         <div className="flex flex-wrap items-stretch border-b border-line">
-          <h2 id={`${ids}-form`} className={`${CELL} min-w-[14ch] flex-1 px-5 py-2.5 ${PLATE_TITLE_STACK}`}>
+          <h2 id={`${ids}-form`} className={`${CELL} min-w-[min(14ch,100%)] flex-1 px-5 py-2.5 ${PLATE_TITLE_STACK}`}>
             {m.form.title}
           </h2>
           <span className={cn(CELL, "whitespace-nowrap border-l border-line px-5 py-2.5 text-ink-1/70", plateCellClass(0))}>{m.form.sheet}</span>
         </div>
         <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,180px),1fr))] items-end gap-4 p-5">
           {/* From, swap, To as ONE cell of the outer grid: the pair belongs together, and the arrow
-              has to sit between them at every width rather than wrapping off on its own. */}
-          <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2 sm:col-span-2">
+              has to sit between them at every width rather than wrapping off on its own. One row while each
+              field keeps 4rem (64px as drawn: a 280px phone gives them 70px); with the text made larger than
+              that (200% on a phone left each 42px, too narrow to type in) they stack, the arrow still between. */}
+          <div className="flex flex-wrap items-end gap-2 sm:col-span-2 *:first:flex-[1_1_4rem] *:last:flex-[1_1_4rem]">
             <StationField id={`${ids}-from`} label={m.from} labelClassName={FIELD_LABEL} value={from} onChange={setFrom} />
             {/* The return journey is these two the other way round. Typing them again is the kind of
                 work a form should do for the reader. */}
@@ -271,7 +273,7 @@ export function PreBookingForm() {
         <section className="blueprint mt-[28px]" aria-labelledby={`${ids}-notify`}>
           <Corners />
           <div className="flex flex-wrap items-stretch border-b border-line">
-            <h2 id={`${ids}-notify`} className={`${CELL} min-w-[14ch] flex-1 px-5 py-2.5`}>
+            <h2 id={`${ids}-notify`} className={`${CELL} min-w-[min(14ch,100%)] flex-1 px-5 py-2.5`}>
               {messages.subscribe.places.preBookingTitle}
             </h2>
           </div>
@@ -285,11 +287,11 @@ export function PreBookingForm() {
       <section className="blueprint mt-[28px]" aria-labelledby={`${ids}-lifecycle`}>
         <Corners />
         <div className="flex flex-wrap items-stretch border-b border-line">
-          <h2 id={`${ids}-lifecycle`} className={`${CELL} min-w-[14ch] flex-1 px-5 py-2.5`}>
+          <h2 id={`${ids}-lifecycle`} className={`${CELL} min-w-[min(14ch,100%)] flex-1 px-5 py-2.5`}>
             {m.lifecycle}
           </h2>
         </div>
-        <Timeline steps={steps} label={m.lifecycle} className="p-5" />
+        <Timeline steps={steps} label={m.lifecycle} className="p-[20px]" />
       </section>
     </>
   );

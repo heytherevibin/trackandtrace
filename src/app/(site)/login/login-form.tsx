@@ -90,14 +90,14 @@ export function LoginForm({ configured, google, passkey, error }: LoginFormProps
   };
 
   return (
-    <section className="mx-auto w-full max-w-[520px] px-6 pb-20 pt-[clamp(40px,7vw,80px)]">
+    <section className="mx-auto w-full max-w-[520px] px-[24px] pb-20 pt-[clamp(40px,7vw,80px)]">
       <Mark size={40} />
       <h1 className="optical-hang mt-6 text-signin tracking-display">{m.title}</h1>
       <p className="mt-3 text-base text-ink-1/78">{google ? m.lead : passkeyReady ? m.leadPasskey : m.leadEmailOnly}</p>
 
       <div className="blueprint mt-8">
         <Corners />
-        <div className="p-6">
+        <div className="p-[24px]">
           {!configured ? (
             <div role="status" className="flex flex-col gap-3">
               <h2 className={STATE_TITLE}>{m.notConfigured.title}</h2>

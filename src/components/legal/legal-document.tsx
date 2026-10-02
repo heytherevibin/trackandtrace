@@ -39,11 +39,11 @@ export function LegalDocument({
           {version === undefined ? null : <span className="ml-3 text-ink-1/70">{m.versionLine(version)}</span>}
         </p>
       </div>
-      <div className="mt-8 grid items-start gap-8 lg:grid-cols-[minmax(0,16rem)_minmax(0,1fr)] lg:gap-x-16">
+      <div className="mt-8 grid grid-cols-[minmax(0,1fr)] items-start gap-8 lg:grid-cols-[minmax(0,16rem)_minmax(0,1fr)] lg:gap-x-16">
         <nav aria-label={m.onThisPage} className="blueprint lg:sticky lg:top-24">
           <Corners />
           <div className="flex flex-wrap items-stretch border-b border-line">
-            <span className="min-w-[14ch] flex-1 px-5 py-2.5 font-display text-label font-semibold uppercase leading-6 tracking-caps">{m.onThisPage}</span>
+            <span className="min-w-[min(14ch,100%)] flex-1 px-5 py-2.5 font-display text-label font-semibold uppercase leading-6 tracking-caps">{m.onThisPage}</span>
           </div>
           <ol className="flex flex-col gap-2.5 p-5">
             {sections.map((s, index) => (
@@ -52,7 +52,7 @@ export function LegalDocument({
                   <span aria-hidden="true" className="font-display text-label font-semibold tracking-caps text-accent-text tnum">
                     {sectionNumber(index)}
                   </span>
-                  <span>{s.title}</span>
+                  <span className="min-w-0">{s.title}</span>
                 </a>
               </li>
             ))}

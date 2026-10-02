@@ -36,7 +36,7 @@ export default function AccuracyPage() {
         <Corners />
         <h2 className="text-3xl leading-[1.12] tracking-head text-pretty">{m.status.title}</h2>
         <p className="mt-2.5 max-w-[64ch] text-body text-ink-1/78">{m.status.detail}</p>
-        <dl className="mt-[18px] grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3 border-t border-line pt-3.5">
+        <dl className="mt-[18px] grid grid-cols-[repeat(auto-fit,minmax(min(100%,150px),1fr))] gap-3 border-t border-line pt-3.5">
           {m.status.facts.map((fact) => (
             <div key={fact.label}>
               <dt className="font-display text-2xs font-semibold uppercase leading-normal tracking-caps text-ink-1/70">{fact.label}</dt>

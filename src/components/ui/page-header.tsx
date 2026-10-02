@@ -37,7 +37,9 @@ export function PageHeader({
           {lead ? <p className="mt-3.5 text-base text-ink-2">{lead}</p> : null}
           {meta ? <div className="legend mt-3 flex flex-wrap gap-x-4 gap-y-1">{meta}</div> : null}
         </div>
-        {actions ? <div className="flex shrink-0 flex-wrap items-center gap-3">{actions}</div> : null}
+        {/* The actions keep one row as drawn, to within 4px of the window's edge (a 280px phone draws Refresh, Share and
+            Save 15px into the page's margin); wider than that (their text at 200%), they wrap. */}
+        {actions ? <div className="flex max-w-[calc(100vw-var(--gutter)-4px)] shrink-0 flex-wrap items-center gap-3">{actions}</div> : null}
       </div>
     </header>
   );

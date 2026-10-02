@@ -54,11 +54,18 @@
   --text-4xl--line-height: 1.1;
   --text-5xl: 2rem;
   --text-5xl--line-height: 2.25rem;
-  --text-page: clamp(2.125rem, 4vw, 3.25rem);
+  /* The page title, as drawn: 34px to 52px. With the text made larger it grows with it for as long as the page's
+     column holds a twelve-letter word whole (5.8em with its tracking, the measure the landing's heading-fit uses), and
+     never goes below the drawn 34px: on a narrow window at 200% text it stops short of doubling instead of running
+     past the window. At 100% text the second term is never the smaller one, at any width. */
+  --text-page: min(clamp(2.125rem, 4vw, 3.25rem), max(34px, (100vw - 2 * var(--gutter)) / 5.8));
   --text-page--line-height: 1.06;
-  --text-hero: clamp(2.75rem, 5.4vw, 4.75rem);
+  /* The hero's title, the same rule against its own longest words (RAILWAY, RECORDS: 3.1em wide), never below the
+     drawn 44px. */
+  --text-hero: min(clamp(2.75rem, 5.4vw, 4.75rem), max(44px, (100vw - 2 * var(--gutter)) / 3.4));
   --text-hero--line-height: 1.04;
-  --text-signin: clamp(2.125rem, 5vw, 3rem);
+  /* The sign-in column's title (and the subscription pages'): the same rule, against a column with 1.5rem each side. */
+  --text-signin: min(clamp(2.125rem, 5vw, 3rem), max(34px, (100vw - 3rem) / 5.8));
   --text-signin--line-height: 1.06;
 
   --tracking-normal: 0em;
@@ -155,4 +162,10 @@
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --header-height: 4rem;
   --gutter: clamp(1.25rem, 5vw, 4.5rem);
+}
+/* Every page but the landing: 20px to 72px, in px. The page's margin is not text, and a margin that doubled with the text
+   took 80px of a 280px window at 200%. Identical at 100%. The landing keeps its margin in rem: its journey judges what
+   fits the window from the column that margin leaves (drawing.ts, run.ts), and was fitted to it at 200% (#110). */
+:root:not(:has(#hero-title)) {
+  --gutter: clamp(20px, 5vw, 72px);
 }

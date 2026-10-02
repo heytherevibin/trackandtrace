@@ -12,11 +12,12 @@ export function ResultTagRow({ tag, source, pnr, status }: { readonly tag: strin
   const sourceTag = sourceTagFor(source);
   return (
     <div className="flex flex-wrap items-center gap-2.5">
-      <Badge variant="accent" data-status={status}>
+      {/* A tag keeps to one line as drawn, and wraps only where the line is shorter than it (its text at 200% on a phone). */}
+      <Badge variant="accent" data-status={status} className="max-w-full whitespace-normal">
         {tag}
       </Badge>
       {sourceTag === "sample" ? (
-        <Badge variant="outline" title={messages.common.sampleDataHint}>
+        <Badge variant="outline" title={messages.common.sampleDataHint} className="max-w-full whitespace-normal">
           {messages.common.sampleData}
         </Badge>
       ) : null}

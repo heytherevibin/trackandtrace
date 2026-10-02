@@ -16,7 +16,7 @@ import { cn } from "@/utils/cn";
 const m = messages.booking.list;
 
 const BTN =
-  "press relative inline-flex min-h-8 cursor-pointer select-none items-center justify-center gap-1.5 whitespace-nowrap border border-line bg-transparent px-2.5 py-1 font-display text-label font-semibold uppercase leading-none tracking-caps text-ink-1 hover:bg-ink-1/7 disabled:cursor-not-allowed disabled:opacity-45 max-sm:h-11";
+  "press relative inline-flex min-h-8 cursor-pointer select-none items-center justify-center gap-1.5 max-w-full shrink-0 whitespace-normal border border-line bg-transparent px-2.5 py-1 font-display text-label font-semibold uppercase leading-none tracking-caps text-ink-1 hover:bg-ink-1/7 disabled:cursor-not-allowed disabled:opacity-45 max-sm:h-11";
 
 /**
  * How many days a week, never which ones.
@@ -133,9 +133,10 @@ export function TrainRowView({
           `auto-fit` would give a single block the whole row, so the collapsed state was held to a
           fixed 480px — a number that matched no track at any width, and read wider than the
           three-up it is meant to look like. `auto-fill` keeps the empty tracks, so one block is
-          exactly one column and stays that width as more arrive. */}
+          exactly one column and stays that width as more arrive. The track's floor is 9.375rem (150px as
+          drawn), in rem: a status tag does not wrap, and with its text at 200% it ran past a 150px card. */}
       {asked.length === 0 && notCarried.length === 0 ? null : (
-        <div className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(min(100%,150px),1fr))] gap-2">
+        <div className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(min(100%,9.375rem),1fr))] gap-2">
           {asked.map(([cls, answer]) => (
             <ClassBlock
               key={cls}

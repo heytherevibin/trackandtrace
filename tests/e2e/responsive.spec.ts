@@ -3,6 +3,7 @@ import { PNR, gotoReady } from "./helpers";
 import { drawStill, waitForJourney } from "./journey/journey-helpers";
 import { brokenWords, cutText, layoutBreaks } from "./layout";
 import { UNSUBSCRIBE } from "./subscribe-link";
+import { sweepAt200, text200 } from "./text-200";
 
 // Every route fits a phone: no sideways page scroll, nothing drawn past the screen edge, and no
 // container that hides part of its content (a clipped nav strip, a table wider than its plate).
@@ -49,6 +50,50 @@ test("layoutBreaks still finds a box that hides its content, a box past the wind
   // the same pin, made a sideways scroller: a reader could scroll what it holds, so it is measured as any box is
   await page.addStyleTag({ content: "html[data-journey='on'] #run.is-running .run-pin { overflow-x: auto !important; overflow-y: hidden !important; }" });
   expect(await layoutBreaks(page)).toContainEqual(expect.stringMatching(/^hides \d+px of its content: div "KM \d{3}/));
+});
+
+// layoutBreaks also leaves alone two things a wide window or large text brings (layout.ts): the hero's dial, a drawing
+// behind the page's words that `main` clips at the page's edge by design, and a reader's own scroller, a named region in
+// the Tab order. Only those: content past the edge of the same `main`, and a scroller a reader cannot reach, are found.
+test("layoutBreaks leaves the hero's dial and a reader's own scroller alone, and nothing else like them", async ({ page, isMobile }) => {
+  test.skip(!isMobile, "runs once, on the phone project, at a desk's width");
+  await drawStill(page);
+  await page.setViewportSize({ width: 1280, height: 844 });
+  await gotoReady(page, "/");
+  await waitForJourney(page);
+  const dial = await page.locator(".hero-dial").evaluate((el) => Math.round(el.getBoundingClientRect().right - document.documentElement.clientWidth));
+  expect(dial, "the dial runs past the window, so the page clips it: the case this test is about").toBeGreaterThan(1);
+  expect(await layoutBreaks(page)).toEqual([]);
+  await page.evaluate(() => {
+    const scroller = (id: string, reachable: boolean) => {
+      const box = document.createElement("div");
+      box.id = id;
+      box.setAttribute("style", "width: 200px; overflow-x: auto;");
+      box.setAttribute("role", "region");
+      box.setAttribute("aria-label", "A table");
+      if (reachable) box.tabIndex = 0;
+      const wide = document.createElement("div");
+      wide.setAttribute("style", "width: 600px; height: 20px;");
+      wide.textContent = "wide";
+      box.append(wide);
+      return box;
+    };
+    document.querySelector("main")?.prepend(scroller("reachable", true), scroller("unreachable", false));
+  });
+  const scrollers = await layoutBreaks(page);
+  expect(scrollers).toContainEqual(expect.stringMatching(/^hides 400px of its content: div#unreachable/));
+  expect(scrollers.filter((b) => b.includes("div#reachable")), "a named, focusable scroller").toEqual([]);
+  // real content past the page's edge, beside the dial: the page's clip hides it, and that is still found
+  await page.evaluate(() => {
+    const wide = document.createElement("p");
+    wide.id = "past-the-page";
+    wide.setAttribute("style", "width: 1600px; margin: 0;");
+    wide.textContent = "Words wider than the page.";
+    document.querySelector("main")?.prepend(wide);
+  });
+  const past = await layoutBreaks(page);
+  expect(past).toContainEqual(expect.stringMatching(/^past the edge \[\d+, \d+\]: p#past-the-page/));
+  expect(past).toContainEqual(expect.stringMatching(/^hides \d+px of its content: main#main/));
 });
 
 // The run's track runs on past the window's side by design, clipped by its pin: layoutBreaks leaves what the pin clips
@@ -179,6 +224,27 @@ test.describe("the landing at 200% text", () => {
       expect(new Set(displays), `${width}px`).toEqual(new Set(["table-row"]));
     }
   });
+});
+
+// Every traveller page, in each state the fixture server can draw, with its text at 200% (text-200.ts): nothing scrolls
+// sideways, no text is cut or broken mid-word, every control answers a finger across 44px, no field is too narrow to
+// type in. Three widths on every PR, each the tightest of its layout: the narrowest phone (280), the first width where
+// tables are tables and the page is still one column (640), and the first where the desk's columns stand (1024). The
+// nightly runs all nine widths, one test a page and width, with the landing's drawing live (nightly/text-200.spec.ts);
+// here the landing draws still, which costs the software GPU nothing.
+test.describe("every page with its text at 200%", () => {
+  test.skip(({ isMobile }) => !isMobile, "runs once, on the phone project (a touch screen), across the widths");
+
+  for (const width of [280, 640, 1024] as const) {
+    test(`reflows at ${width}px`, async ({ page }) => {
+      test.setTimeout(300_000);
+      await drawStill(page);
+      await text200(page);
+      await page.setViewportSize({ width, height: 844 });
+      const failures = await sweepAt200(page);
+      expect(failures, failures.join("\n")).toEqual([]);
+    });
+  }
 });
 
 // layoutBreaks sees what runs past the window or a box that clips, not a row running past a bordered box that does not

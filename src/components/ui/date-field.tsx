@@ -206,7 +206,7 @@ export function DateField({
           aria-invalid={invalid || undefined}
           aria-describedby={describedBy}
           onChange={(event) => onChange(event.target.value)}
-          className="well h-10 w-full pl-2.5 pr-10 [&::-webkit-calendar-picker-indicator]:hidden"
+          className="well h-10 w-full pl-[10px] pr-[40px] [&::-webkit-calendar-picker-indicator]:hidden"
         />
         <button
           ref={toggle}
@@ -216,7 +216,7 @@ export function DateField({
           aria-expanded={open}
           aria-controls={open ? dialogId : undefined}
           onClick={() => (open ? close() : openCalendar())}
-          className="press absolute inset-y-px right-px inline-flex w-9 cursor-pointer items-center justify-center text-ink-1/70 hover:text-ink-1"
+          className="press absolute inset-y-px right-px inline-flex w-[36px] cursor-pointer items-center justify-center text-ink-1/70 hover:text-ink-1"
         >
           <svg viewBox="0 0 16 16" aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.25">
             <rect x="2" y="3.5" width="12" height="11" />

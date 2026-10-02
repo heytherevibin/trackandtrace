@@ -7,9 +7,20 @@ import type { Page } from "@playwright/test";
  * (overflow-x: clip, never a scroller) and lies inside the window; everything else in and around it is measured as ever. */
 const CARRIED = ["#run.is-running > .run-pin"] as const;
 
+/** Drawings behind the page's words that the page clips at its own edge, by design and at every text size: the hero's
+ * dial (journey.css: wider than its column, `main` clips it "as v3 does"), announced to nobody (aria-hidden) and
+ * answering no pointer. Such a drawing is not content a reader loses: it is left out of "past the edge", and the box
+ * that clips it is measured without it, so real content that box hides is still found. */
+const DRAWN_BEHIND = [".hero-dial"] as const;
+
+/** A reader's own scroller: a region with a name, in the Tab order, that scrolls sideways (WCAG 1.4.10's exception for
+ * a table that cannot reflow). What it holds is brought into view by the reader, so it neither "hides" content nor runs
+ * "past the edge" while the region itself stands inside the window. All four, or it is measured as any box. */
+const READERS_SCROLLER = '[role="region"][tabindex="0"]:is([aria-label], [aria-labelledby])';
+
 /** Describes everything that breaks the phone layout on the current page; empty when it fits. */
 export async function layoutBreaks(page: Page): Promise<string[]> {
-  return page.evaluate((carried) => {
+  return page.evaluate(({ carried, behind, scroller }) => {
     const vw = document.documentElement.clientWidth;
     const name = (el: Element) => {
       const text = (el.textContent ?? "").trim().replace(/\s+/g, " ").slice(0, 32);
@@ -40,19 +51,40 @@ export async function layoutBreaks(page: Page): Promise<string[]> {
       const box = stage.getBoundingClientRect();
       return box.left >= -1 && box.right <= vw + 1 ? stage : null;
     };
+    /** The reader's scroller `el` lies inside, while it scrolls sideways and stands inside the window. */
+    const scrollerOf = (el: Element) => {
+      const region = el.parentElement?.closest(scroller) ?? null;
+      if (!region || !["auto", "scroll"].includes(getComputedStyle(region).overflowX)) return null;
+      const box = region.getBoundingClientRect();
+      return box.left >= -1 && box.right <= vw + 1 ? region : null;
+    };
+    const isScroller = (el: Element) => el.matches(scroller) && ["auto", "scroll"].includes(getComputedStyle(el).overflowX);
+    /** How far `el`'s content runs past its box, the drawings behind the page taken out for the reading. */
+    const hidden = (el: Element) => {
+      const drawn = [...el.querySelectorAll<HTMLElement>(behind.join(", "))];
+      if (drawn.length === 0) return el.scrollWidth - el.clientWidth;
+      const was = drawn.map((d) => d.style.display);
+      for (const d of drawn) d.style.display = "none";
+      const over = el.scrollWidth - el.clientWidth;
+      for (const [i, d] of drawn.entries()) d.style.display = was[i] ?? "";
+      return over;
+    };
     const breaks: string[] = [];
     if (document.documentElement.scrollWidth > vw) breaks.push(`page scrolls sideways: ${document.documentElement.scrollWidth}px in ${vw}px`);
     for (const el of document.body.querySelectorAll("*")) {
-      if (!shown(el)) continue;
+      if (!shown(el) || el.closest(behind.join(", "))) continue;
       const stage = stageOf(el);
       const box = el.getBoundingClientRect();
-      if ((box.right > vw + 1 || box.left < -1) && !(stage && stage !== el)) breaks.push(`past the edge [${Math.round(box.left)}, ${Math.round(box.right)}]: ${name(el)}`);
+      if ((box.right > vw + 1 || box.left < -1) && !(stage && stage !== el) && !scrollerOf(el)) breaks.push(`past the edge [${Math.round(box.left)}, ${Math.round(box.right)}]: ${name(el)}`);
       const style = getComputedStyle(el);
       const clips = style.overflowX !== "visible" && !["INPUT", "SELECT", "TEXTAREA"].includes(el.tagName) && style.textOverflow !== "ellipsis";
-      if (clips && el.scrollWidth > el.clientWidth + 1 && stage !== el) breaks.push(`hides ${el.scrollWidth - el.clientWidth}px of its content: ${name(el)}`);
+      if (clips && el.scrollWidth > el.clientWidth + 1 && stage !== el && !isScroller(el)) {
+        const over = hidden(el);
+        if (over > 1) breaks.push(`hides ${over}px of its content: ${name(el)}`);
+      }
     }
     return breaks.slice(0, 12);
-  }, CARRIED);
+  }, { carried: CARRIED, behind: DRAWN_BEHIND, scroller: READERS_SCROLLER });
 }
 
 /** Words a reader cannot read to the end (spec §9's 200% text; J6 nightly): a line of text that runs past the window's

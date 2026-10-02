@@ -35,7 +35,7 @@ export function RecentChecks({ onPick }: { readonly onPick: (pnr: string) => voi
             type="button"
             data-testid="recent-item"
             onClick={() => onPick(r.pnr)}
-            className="press inline-flex cursor-pointer items-center gap-2 border border-line bg-transparent px-2.5 py-1 font-display text-xs font-semibold leading-normal tracking-brand text-ink-1 tnum hover:bg-accent/10"
+            className="press inline-flex max-w-full cursor-pointer flex-wrap items-center gap-x-2 border border-line bg-transparent px-2.5 py-1 font-display text-xs font-semibold leading-normal tracking-brand text-ink-1 tnum hover:bg-accent/10"
           >
             {formatPnr(r.pnr)}
             {status ? <span className="text-2xs uppercase leading-normal text-ink-1/65">{status}</span> : null}

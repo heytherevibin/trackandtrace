@@ -50,9 +50,11 @@ export function TopNav() {
           One row, 64px. The menu's row compacts before it wraps: below 16.5rem of this container SIGN IN keeps only its
           icon (user-menu.tsx), so a 390px phone at 200% text keeps one row. Should even that not fit (a narrower phone,
           text at 200%), it reflows as the last resort: the controls drop to a row of their own, as tall as the first,
-          so nothing is pushed past the window's edge. */}
+          so nothing is pushed past the window's edge. The row's side margin is the page's as drawn, held in px here on
+          every page, the landing included (tokens.css keeps the landing's in rem): a margin doubled with the text took
+          the 40px that keeps a 360px phone at 200% to one row. */}
       <div className="@container">
-        <div className="page-frame flex min-h-16 flex-wrap items-center gap-x-3 lg:gap-x-5">
+        <div className="page-frame flex min-h-16 flex-wrap items-center gap-x-3 [--gutter:clamp(20px,5vw,72px)] lg:gap-x-5">
           {minimal ? null : (
             <NavMenu pathname={pathname} className="lg:@min-[62rem]:hidden" />
           )}
