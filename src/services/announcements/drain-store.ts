@@ -22,9 +22,16 @@ import { createAdminSupabase } from "@/services/supabase/admin";
 //   * `announce_open_letters()`   setof jsonb {id, list, subject, body, state, queuedAt}, for letters
 //                                 whose state is `queued` or `sending`.
 //   * `announce_letter_state(p_letter uuid)`  text, null when there is no such letter.
-//   * `announce_open_claims(p_letter uuid)`   setof jsonb {personId, claimedAt, firstAttemptedAt} for
-//                                 every delivery in state `sending`.
-//   * `announce_remaining(p_letter uuid)`     jsonb {pending, sending}, whole numbers.
+//   * `announce_open_claims(p_letter uuid)`   setof jsonb {personId, claimedAt, firstAttemptedAt,
+//                                 state} for every delivery that is NOT SETTLED, which is `sending`
+//                                 or `unknown`. Both are returned and each says which it is: the
+//                                 stuck report has a rule for "any unknown at all", and with only
+//                                 `sending` rows that rule passes its own tests and reads nothing.
+//   * `announce_remaining(p_letter uuid)`     jsonb {pending, sending, lastSentAt}. The counts are
+//                                 whole numbers; `lastSentAt` is the LATEST `sent_at` among this
+//                                 letter's sent deliveries, or null when it has never sent one.
+//                                 Null is "has never sent", which the report measures from
+//                                 `queuedAt` instead — never from the epoch.
 //   * `announce_finish(p_letter uuid)`        void: `done` and `finished_at = now()` only from
 //                                 `queued` or `sending`, so a Stop that landed mid-run stays a Stop.
 //   * THE TRANSITION `queued` -> `sending` HAPPENS IN `announce_claim`, on the first claim of a
@@ -54,14 +61,23 @@ export type OpenLetter = {
   readonly state: "queued" | "sending";
   readonly queuedAt: string;
 };
+/** Not settled: `sending` is claimed and awaiting a mark, `unknown` is an outcome we cannot state. */
+export type ClaimState = "sending" | "unknown";
 export type OpenClaim = {
   readonly personId: string;
   /** The latest claim, a re-claim included. The claim's 15-minute floor reads this. */
   readonly claimedAt: string;
   /** The first claim, never moved. The 24-hour window reads this; null means unknown, which the runner treats as stale. */
   readonly firstAttemptedAt: string | null;
+  /** Which kind of unsettled this is. The report's unknown rule reads it, and reads nothing without it. */
+  readonly state: ClaimState;
 };
-export type Remaining = { readonly pending: number; readonly sending: number };
+export type Remaining = {
+  readonly pending: number;
+  readonly sending: number;
+  /** The latest delivery this letter actually sent, or null when it has never sent one. */
+  readonly lastSentAt: string | null;
+};
 
 const STATES: readonly string[] = ["draft", "queued", "sending", "stopped", "done"];
 
@@ -110,7 +126,7 @@ export async function letterState(id: string): Promise<LetterState | null> {
   return data as LetterState;
 }
 
-/** Every delivery of the letter still claimed (`sending`), with when it was claimed. */
+/** Every delivery of the letter that is not settled — `sending` or `unknown` — and which it is. */
 export async function openClaims(id: string): Promise<readonly OpenClaim[]> {
   const { data, error } = await call("announce_open_claims", { p_letter: id });
   if (error || !Array.isArray(data)) throw failed("announce_open_claims");
@@ -121,16 +137,31 @@ export async function openClaims(id: string): Promise<readonly OpenClaim[]> {
     // the side that never sends twice. Anything else that is not a string is a wrong answer.
     const first = r.firstAttemptedAt ?? null;
     if (first !== null && typeof first !== "string") throw failed("announce_open_claims");
-    return { personId: r.personId, claimedAt: r.claimedAt, firstAttemptedAt: first };
+    // The state is ACTED ON — `unknown` is what the report names and `sending` is what the claim
+    // may retry — so an unrecognised one is the store answering wrongly, not a row to guess at.
+    if (r.state !== "sending" && r.state !== "unknown") throw failed("announce_open_claims");
+    return { personId: r.personId, claimedAt: r.claimedAt, firstAttemptedAt: first, state: r.state };
   });
 }
 
-/** How many deliveries are still `pending` and how many are `sending` (claimed, awaiting a retry or a mark). */
+/**
+ * How many deliveries are still `pending`, how many are `sending` (claimed, awaiting a retry or a
+ * mark), and when this letter last actually sent one.
+ *
+ * Every field read off the answer must also be COPIED INTO the returned object. A field produced by
+ * the database and dropped here is invisible to everything above, and the check that depends on it
+ * goes on passing while measuring something else: that is exactly how `lastSentAt` came to be
+ * computed by the store, discarded here, and read as "has never sent" for ever.
+ */
 export async function remainingFor(id: string): Promise<Remaining> {
   const { data, error } = await call("announce_remaining", { p_letter: id });
   const r = record(data);
   if (error || !r || !count(r.pending) || !count(r.sending)) throw failed("announce_remaining");
-  return { pending: r.pending, sending: r.sending };
+  // Absent and null alike are "has never sent", which the report measures from `queuedAt` instead.
+  // Anything else that is not a string is a wrong answer.
+  const lastSentAt = r.lastSentAt ?? null;
+  if (lastSentAt !== null && typeof lastSentAt !== "string") throw failed("announce_remaining");
+  return { pending: r.pending, sending: r.sending, lastSentAt };
 }
 
 /** Marks the letter done. The database refuses to move a stopped letter, so a Stop that landed mid-run stays a Stop. */

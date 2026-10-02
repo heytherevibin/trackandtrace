@@ -53,7 +53,7 @@ const reason = (error) => (error instanceof Error ? error.message : "unknown err
  * tolerates a bad row on purpose, and a report that dies on one is a report that stops reporting.
  * Skipped makes the run incomplete, so it exits 2 whatever else was found: see `exitCodeFor`.
  *
- * @param {{ openLetters: () => Promise<readonly { id: string, state: string, queuedAt: string }[]>, remainingFor: (id: string) => Promise<{ pending: number, sending: number, lastSentAt?: string | null }>, openClaims: (id: string) => Promise<readonly { personId: string, claimedAt: string, firstAttemptedAt: string | null }[]> }} reads
+ * @param {{ openLetters: () => Promise<readonly { id: string, state: string, queuedAt: string }[]>, remainingFor: (id: string) => Promise<{ pending: number, sending: number, lastSentAt?: string | null }>, openClaims: (id: string) => Promise<readonly { personId: string, claimedAt: string, firstAttemptedAt: string | null, state?: string }[]> }} reads
  * @param {{ now: () => Date, say: (line: string) => void }} world
  * @returns {Promise<number>}
  */
@@ -71,9 +71,13 @@ export async function report(reads, { now, say }) {
       const [remaining, claims] = await Promise.all([reads.remainingFor(one.id), reads.openClaims(one.id)]);
       if (typeof remaining?.pending !== "number" || typeof remaining.sending !== "number") throw new Error("the store gave no counts");
       if (!Array.isArray(claims)) throw new Error("the store gave no list of claims");
-      const claimRows = claims.map((claim) => ({ letterId: one.id, personId: claim.personId, state: "sending", claimedAt: claim.claimedAt, firstAttemptedAt: claim.firstAttemptedAt }));
-      // `lastSentAt` is read straight off the answer: the store does not type it yet. Absent and null
-      // both mean "has never sent", and the verdict reads them the same. Only the note below tells them apart.
+      // Each row's OWN state, never a constant. `openClaims` returns the deliveries that are not
+      // settled, which is `sending` and `unknown` alike, and the unknown rule is fed by exactly
+      // this field: written as `"sending"` the rule passes its own tests and names nothing for ever.
+      // A stand-in store that supplies no state is read as `sending`, which is what every row was.
+      const claimRows = claims.map((claim) => ({ letterId: one.id, personId: claim.personId, state: claim.state ?? "sending", claimedAt: claim.claimedAt, firstAttemptedAt: claim.firstAttemptedAt }));
+      // Absent and null both mean "has never sent", and the verdict reads them the same. Only the
+      // note below tells them apart, for a store old enough not to answer the field at all.
       if (remaining.lastSentAt === undefined) unmeasured += 1;
       letters.push({ id: one.id, state: one.state, pending: remaining.pending, sending: remaining.sending, lastSentAt: remaining.lastSentAt ?? null, queuedAt: one.queuedAt });
       rows.push(...claimRows);
@@ -88,7 +92,7 @@ export async function report(reads, { now, say }) {
   if (unmeasured > 0) {
     say(`note: the store gave no last-delivery time for ${unmeasured} of ${letters.length} letters, so each was measured from when it was queued; a letter is named once it is 48 hours old with rows pending, or with no work left and still open, even if it has been sending steadily.`);
   }
-  say("note: deliveries whose outcome is unknown are not read here, so none can be named.");
+  say("note: a letter's own log says WHY it is stuck; this reads the store and can only say that it is.");
   return exitCodeFor(entries, skipped.length);
 }
 

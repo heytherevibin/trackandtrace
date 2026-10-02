@@ -18,9 +18,11 @@ const SUBJECT = "A subject nobody may read in a log";
 const BODY = "A body nobody may read in a log";
 const ADDRESS = "someone@example.com";
 
-// `queuedAt` is the clock these runs are driven by. The store's own `remainingFor` copies only
-// `pending` and `sending` off the answer today and drops `lastSentAt`, so a run through the real read
-// path has no other. (Task 2 owns that; when it carries the field through, `lastSentAt` below is read.)
+// The answers below travel the real read path, `drain-store.ts`, so what reaches the rules is only
+// what that wrapper copies through. That matters for two fields in particular: `lastSentAt`, which
+// the store computes and the wrapper once dropped, leaving `queuedAt` the only clock a real run had;
+// and a claim's own `state`, without which the unknown rule is fed nothing. Both are asserted here
+// rather than in a wrapper unit test, because this proves they arrive all the way at the decision.
 type Answers = { queuedHoursAgo: number; remaining: Record<string, unknown> | null; claims: readonly Record<string, unknown>[] };
 let answers: Answers = { queuedHoursAgo: 1, remaining: null, claims: [] };
 let server: Server;
@@ -92,6 +94,34 @@ describe("the report, started for real against a store that answers", () => {
     expect(out.stderr).toBe("");
   });
 
+  it("does NOT name a letter queued ten days ago that sent an hour ago, because lastSentAt reaches the rule", async () => {
+    // The pair to the first case above, and the one that proves the field arrives. Measured from
+    // `queuedAt` — the only clock a run had while the wrapper dropped `lastSentAt` — this letter is
+    // 240 hours old with ten pending and would be named. Measured from its last delivery it is
+    // moving, and a report that cried wolf on every healthy long letter is a report nobody reads.
+    answers = { queuedHoursAgo: 240, remaining: { pending: 10, sending: 0, lastSentAt: ago(1) }, claims: [] };
+    const out = await start();
+    expect(out.status).toBe(0);
+    expect(out.stdout).toMatch(/nothing is stuck/i);
+    expect(out.stderr).toBe("");
+  });
+
+  it("names an unknown delivery, which only reaches the rule because the row carries its own state", async () => {
+    // Nothing else here is a finding: the letter sent an hour ago, nothing is pending, and the row's
+    // first attempt is an hour old, so neither the 48-hour rule nor the stale-claim rule fires. The
+    // only reason anything is said is the row's `state`. Assembled as a constant `"sending"`, as it
+    // was while `announce_open_claims` returned only claimed rows, this run exits 0 and says nothing.
+    answers = {
+      queuedHoursAgo: 2,
+      remaining: { pending: 0, sending: 1, lastSentAt: ago(1) },
+      claims: [{ personId: "person-1", claimedAt: ago(1), firstAttemptedAt: ago(1), state: "unknown" }],
+    };
+    const out = await start();
+    expect(out.status).toBe(1);
+    expect(out.stdout).toContain("1 unknown: we cannot say whether it was sent");
+    expect(out.stderr).toBe("");
+  });
+
   it("exits 2 when a letter's counts cannot be read, whatever else it found", async () => {
     answers = { queuedHoursAgo: 240, remaining: null, claims: [] };
     const out = await start();
@@ -108,7 +138,7 @@ describe("the report, started for real against a store that answers", () => {
     answers = {
       queuedHoursAgo: 240,
       remaining: { pending: 10, sending: 1, lastSentAt: ago(100) },
-      claims: [{ personId: "person-1", email: ADDRESS, claimedAt: ago(30), firstAttemptedAt: ago(30) }],
+      claims: [{ personId: "person-1", email: ADDRESS, claimedAt: ago(30), firstAttemptedAt: ago(30), state: "sending" }],
     };
     const out = await start();
     expect(out.status).toBe(1);

@@ -27,8 +27,8 @@
 //          leaves exactly this, and the next run finishes it. Past 48 hours the next run has had
 //          its turn and has not. With one letter open there is no neighbour to raise the alarm.
 //          (A letter with deliveries still IN FLIGHT is the claim rule's, below, not this one's.)
-//        * A letter that has NEVER SENT has `lastSentAt` null (or absent: the store does not supply
-//          the field yet, and absent is read exactly as null). Null is "has never sent", NEVER the
+//        * A letter that has NEVER SENT has `lastSentAt` null (or absent, from a store that does
+//          not answer the field at all, and absent is read exactly as null). Null is "has never sent", NEVER the
 //          epoch: as the epoch every freshly queued letter would be 56 years stale and the report
 //          would cry wolf on its first run. What a never-sent letter is measured from is the time
 //          it was queued, so it is named once it has sat 48 hours and has still not sent one. That
@@ -62,12 +62,10 @@
 // What this reading CANNOT see, said plainly because a report that hides its blind spots is worse
 // than none:
 //
-//   * UNKNOWN DELIVERIES, TODAY. The only per-delivery read there is, `openClaims`, returns rows
-//     that are `sending`; it never returns an `unknown` one. Rule 3 is therefore proven here and
-//     fed nothing by the runner until a read for unknown deliveries exists.
-//   * PROGRESS, until the store supplies `lastSentAt`. It is meant to come from `announce_remaining`
-//     and, absent, every letter reads as one that has never sent, so a letter that IS sending is
-//     named once it is more than 48 hours old with rows pending. The runner says when that is so.
+//   * WHETHER AN UNKNOWN WAS ACTUALLY SENT. Rule 3 names them because that is the one thing nobody
+//     can say. `openClaims` returns the deliveries that are not settled — `sending` and `unknown`
+//     alike, each carrying its own state — so the rule is fed; what it can never report is which
+//     way the delivery went.
 //   * a letter that is not `queued` or `sending`: the runner reads open letters only. A stopped or
 //     finished letter's deliveries are not counted, which is the point, and also the limit.
 //   * why a letter is stuck. "No delivery in 48 hours" is the same line whether the job is not
