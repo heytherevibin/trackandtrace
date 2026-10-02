@@ -46,6 +46,8 @@ A private `announcements` schema: RLS enabled with no policies, every reach-in t
 - `recipients_total int` — frozen at queue time
 - `created_by uuid not null` → the console member (`console.members`), so the audit log and this table agree on who
 - `created_at`, `queued_at`, `finished_at`
+- `queued_by uuid`, `stopped_by uuid`, `stopped_at timestamptz` — the console members who queued and stopped it, and when. These are columns here, and not a read of the module-14 audit log, because a list view should not have to join another module to say who queued a letter, and the list must not depend on audit retention. (The audit log still records both transitions; the columns are the list's own copy of the facts it shows.)
+- `test_sent_to text` — the address the test send went to, so the console can say where it went rather than assume the member's own
 
 **`announcements.deliveries`** — one row per recipient per letter, written at Queue.
 
@@ -74,9 +76,17 @@ A daily scheduled workflow, the same shape as `crawl.yml`: paired secrets, a con
 2. `budget = max(0, 40 − count)`. Zero is a normal outcome and is reported as one.
 
    The three ceilings compose without a fourth rule: announcements stop at 40, confirmations at 60, operator mail is counted but never gated. Worst case the day fills 0–40 announcements, 40–60 confirmations, 60–100 operators — the reserve holds. If confirmations arrive first and reach 40, announcements send nothing that day, which is the intended order of sacrifice.
-3. Claim `budget` rows atomically: `update … set state='sending', claimed_at=now() where state='pending' … returning`.
+3. Pick the letter (see *One letter at a time*, below), then claim up to `budget` of **its** rows atomically: `update … set state='sending', claimed_at=now() where state='pending' and letter_id = <that letter> … returning`.
 4. Per claimed row: re-check suppression and consent, then send with `Idempotency-Key = <letter_id>:<person_id>`, and store the returned `id`.
 5. Mark `sent`. Check the letter's state before each batch **and before each send**, so Stop takes effect immediately.
+
+### One letter at a time
+
+8. **One letter drains at a time, in queue order.** Each run takes the letter with the oldest `queued_at` that is not `done` or `stopped`, and works it until it is done before touching the next. Letters are never interleaved: interleaving makes every letter slow and none of them predictable, whereas one at a time lets the console say "this finishes about X, then the next begins", and that sentence stays true.
+
+   `queued` therefore also means "queued behind another letter": the state holds from Queue until the letter's first claim, however long the letters ahead take. A queued letter can be stopped, as any other.
+
+   **The consequence for estimates.** A letter's estimate is *about N days, starting when the one ahead finishes*. With nothing ahead it is simply "about N days at 40 a day". The console's Queue confirm names the letter ahead and gives a finish that includes it.
 
 ### The ambiguous failure
 

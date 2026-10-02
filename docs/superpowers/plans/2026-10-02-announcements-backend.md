@@ -175,6 +175,10 @@ create table announcements.letters (
   created_by      uuid not null,
   created_at      timestamptz not null default now(),
   queued_at       timestamptz,
+  queued_by       uuid,
+  stopped_by      uuid,
+  stopped_at      timestamptz,
+  test_sent_to    text,
   finished_at     timestamptz
 );
 

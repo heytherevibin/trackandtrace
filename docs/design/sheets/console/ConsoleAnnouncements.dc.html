@@ -154,7 +154,7 @@ The Trakline team</textarea>
 </sc-if>
 <sc-if value="{{hasTest}}" hint-placeholder-val="{{ false }}">
 <div style="display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 12px 20px; border-top: 1px solid var(--line);">
-<span id="queue-ready" style="flex-grow: 1; font-size: 13px; line-height: 20px; color: var(--ink-2);">Queue sends to 431 people over about 11 days.</span>
+<span id="queue-ready" style="flex-grow: 1; font-size: 13px; line-height: 20px; color: var(--ink-2);">Queue sends to 431 people, about 11 days at 40 a day, after the letter ahead.</span>
 <button type="button" class="btn btn-secondary">Save draft</button>
 <button type="button" class="btn btn-primary" aria-describedby="queue-ready">Queue</button>
 </div>
@@ -257,14 +257,15 @@ The Trakline team</textarea>
 <td>{{s.reason}}</td>
 <td class="tnum">{{s.when}}</td>
 <td>{{s.source}}</td>
-<td style="text-align: right; overflow: visible;"><sc-if value="{{s.masked}}" hint-placeholder-val="{{ true }}"><button type="button" class="btn btn-ghost btn-sm" aria-label="{{s.revealLabel}}">Reveal</button></sc-if> <button type="button" class="btn btn-ghost btn-sm" aria-label="{{s.liftLabel}}">Lift</button></td>
+<td style="text-align: right; overflow: visible;"><sc-if value="{{s.masked}}" hint-placeholder-val="{{ true }}"><button type="button" class="btn btn-ghost btn-sm" aria-label="{{s.revealLabel}}">Reveal</button></sc-if> <sc-if value="{{s.canLift}}" hint-placeholder-val="{{ true }}"><button type="button" class="btn btn-ghost btn-sm" aria-label="{{s.liftLabel}}">Lift</button></sc-if><sc-if value="{{s.cantLift}}" hint-placeholder-val="{{ false }}"><button type="button" class="btn btn-ghost btn-sm" disabled="true" title="Reveal the address first" aria-label="{{s.liftLabel}}">Lift</button></sc-if></td>
 </tr>
 </sc-for>
 </tbody></table>
 <ul style="margin: 0; padding: 12px 20px 16px 36px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 4px; font-size: 13px; line-height: 20px; color: var(--ink-2);">
 <li>All stops every email to the address, sign-in and confirmation mail included. List mail stops letters and nothing else.</li>
 <li>Operator marks an address that belongs to a console member.</li>
-<li>Lift ends a suppression, and mail to the address resumes. It asks first, and is written to the audit log.</li>
+<li>Lift needs the address revealed first, so you can see whose mail you are restarting. It ends a suppression we recorded and asks first; it is written to the audit log.</li>
+<li>A row from the mail service's own list also has to be cleared there: lifting ours does not lift theirs.</li>
 </ul>
 </section>
 </sc-if>
@@ -284,8 +285,12 @@ The Trakline team</textarea>
 <dd>Trakline news: what's coming next</dd>
 <dt class="legend">People</dt>
 <dd>431</dd>
+<dt class="legend">Behind</dt>
+<dd>Trakline news: a clearer chart view, about 4 days left</dd>
 <dt class="legend">Takes</dt>
-<dd>About 11 days at 40 a day</dd>
+<dd>About 11 days at 40 a day, starting when that one finishes</dd>
+<dt class="legend">Finishes</dt>
+<dd>Around 4 Oct 2026</dd>
 </dl>
 <p class="state-detail">Once queued, the letter goes to real people. You can stop it, but a stopped letter can't be resumed.</p>
 <div class="state-actions" style="justify-content: flex-end; margin-top: 24px;">
@@ -305,6 +310,27 @@ The Trakline team</textarea>
 <div class="state-actions" style="justify-content: flex-end; margin-top: 24px;">
 <button type="button" class="btn btn-secondary">Cancel</button>
 <button type="button" class="btn btn-primary">Stop sending</button>
+</div>
+</section>
+</div>
+</sc-if>
+<sc-if value="{{dlgLiftProv}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; inset: 0; z-index: 5; background: var(--backdrop); display: flex; align-items: center; justify-content: center; padding: 16px;">
+<section class="plate state" role="alertdialog" aria-modal="true" aria-labelledby="liftp-title" style="width: 520px; background: var(--surface-3); box-shadow: var(--elevation-3);">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+<h2 class="state-title" id="liftp-title">Lift this suppression?</h2>
+<dl class="kv" style="margin-top: 12px; grid-template-columns: 110px 1fr;">
+<dt class="legend">Address</dt>
+<dd>p.mehta@example.com</dd>
+<dt class="legend">Scope</dt>
+<dd>All</dd>
+<dt class="legend">Source</dt>
+<dd>The mail service's own list</dd>
+</dl>
+<p class="state-detail">Lifting ours does not lift the mail service's own list, which suppressed this address on 9 Sep 2026. Clear it there too, or mail to the address will still be refused. Lifting is written to the audit log.</p>
+<div class="state-actions" style="justify-content: flex-end; margin-top: 24px;">
+<button type="button" class="btn btn-secondary">Cancel</button>
+<button type="button" class="btn btn-primary">Lift suppression</button>
 </div>
 </section>
 </div>
@@ -330,7 +356,7 @@ The Trakline team</textarea>
 </sc-if>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"state":{"editor":"enum","options":["List","Compose","Queue confirm","Sending","Stop confirm","Stopped","Done","Suppressions","Lift confirm","No access"],"default":"List","section":"State"},"role":{"editor":"enum","options":["Owner","Admin"],"default":"Owner","section":"State"},"defaultTheme":{"editor":"enum","options":["system","light","dark"],"default":"system","section":"Appearance"},"$preview":{"width":1440,"height":1300}}'>
+<script type="text/x-dc" data-dc-script data-props='{"state":{"editor":"enum","options":["List","Compose","Queue confirm","Sending","Stop confirm","Stopped","Done","Suppressions","Lift confirm","Lift confirm (mail service list)","No access"],"default":"List","section":"State"},"role":{"editor":"enum","options":["Owner","Admin"],"default":"Owner","section":"State"},"defaultTheme":{"editor":"enum","options":["system","light","dark"],"default":"system","section":"Appearance"},"$preview":{"width":1440,"height":1300}}'>
 class Component extends DCLogic {
   state = { theme: null, sysDark: false };
   componentDidMount() {
@@ -346,7 +372,7 @@ class Component extends DCLogic {
     var p = this.props;
     var st = p.state || 'List';
     // The confirm states are a board underneath with the dialog over it.
-    var base = { 'Queue confirm': 'Compose', 'Stop confirm': 'Sending', 'Lift confirm': 'Suppressions' }[st] || st;
+    var base = { 'Queue confirm': 'Compose', 'Stop confirm': 'Sending', 'Lift confirm': 'Suppressions', 'Lift confirm (mail service list)': 'Suppressions' }[st] || st;
     var noAccess = st === 'No access';
     // Announcements is Owner and Admin only: the no-access state is drawn as Support opening it.
     var who = noAccess ? 'Support' : (p.role || 'Owner');
@@ -401,8 +427,8 @@ class Component extends DCLogic {
       },
       Stopped: {
         stateWord: 'Stopped', headLegend: 'Stopped', headline: 'Sent to 120 people',
-        headDetail: 'It was not sent to 295 others, and won\'t be. Stopped on 10 Sep 2026, 10:40 IST by Rohan Iyer.',
-        total: 418, handled: 123, pct: '29%', meterLeft: '123 of 418 handled', meterRight: '295 not sent',
+        headDetail: '3 were skipped, and 295 were never reached and won\'t be. Stopped on 10 Sep 2026, 10:40 IST by Rohan Iyer.',
+        total: 418, handled: 123, pct: '29%', meterLeft: '123 of 418 handled', meterRight: '295 never reached',
         sent: '120', skipped: '3', unknown: '0', canStop: false, cantResume: true, hasToday: false,
         listCell: 'News · 418 people', subject: 'Trakline news: the new look', list: 'News · 418 people when it was queued',
         queued: '8 Sep 2026, 09:12 IST by Asha Rao', test: '8 Sep 2026, 09:03 IST to asha@example.com',
@@ -426,10 +452,15 @@ class Component extends DCLogic {
       { address: 's•••@example.com', operator: false, masked: true, scope: 'List mail', scopeClass: 'tag tag-grey', reason: 'Spam complaint', when: '15 Sep 2026, 18:03 IST', source: 'Complaint report' },
       { address: 'a•••@example.com', operator: false, masked: true, scope: 'List mail', scopeClass: 'tag tag-grey', reason: 'Delayed three times in 30 days', when: '12 Sep 2026, 07:12 IST', source: 'Delivery reports' },
       { address: 'p•••@example.com', operator: false, masked: true, scope: 'All', scopeClass: 'tag tag-filled', reason: 'Hard bounce', when: '9 Sep 2026, 16:30 IST', source: 'The mail service\'s own list' }
-    ].map(function (s) { s.revealLabel = 'Reveal the address ' + s.address; s.liftLabel = 'Lift the suppression on ' + s.address; return s; });
+    ].map(function (s) { s.revealLabel = 'Reveal the address ' + s.address; s.canLift = !s.masked; s.cantLift = s.masked; s.liftLabel = s.masked ? 'Lift the suppression on ' + s.address + ' (reveal the address first)' : 'Lift the suppression on ' + s.address; return s; });
 
+    if (st === 'Lift confirm (mail service list)') {
+      // The mail service's own-list row has been revealed, so it can be lifted.
+      supp[4].address = 'p.mehta@example.com'; supp[4].masked = false; supp[4].canLift = true; supp[4].cantLift = false;
+      supp[4].revealLabel = ''; supp[4].liftLabel = 'Lift the suppression on p.mehta@example.com';
+    }
     var detailKey = base === 'Sending' || base === 'Stopped' || base === 'Done' ? base : 'Sending';
-    var heights = { 'List': 900, 'Compose': 1120, 'Sending': 1300, 'Stopped': 1260, 'Done': 1300, 'Suppressions': 900, 'No access': 700 };
+    var heights = { 'List': 900, 'Compose': 1120, 'Sending': 1300, 'Stopped': 1300, 'Done': 1300, 'Suppressions': 900, 'No access': 700 };
     var m = members[who];
     return {
       face: dark ? 'night' : 'day', faceH: (heights[base] || 1000) + 'px',
@@ -445,7 +476,7 @@ class Component extends DCLogic {
       tabLetters: base === 'List' ? 'true' : 'false', tabSupp: base === 'Suppressions' ? 'true' : 'false',
       isList: base === 'List', isCompose: base === 'Compose', isDetail: base === 'Sending' || base === 'Stopped' || base === 'Done',
       noTest: st !== 'Queue confirm', hasTest: st === 'Queue confirm',
-      dlgQueue: st === 'Queue confirm', dlgStop: st === 'Stop confirm', dlgLift: st === 'Lift confirm',
+      dlgQueue: st === 'Queue confirm', dlgStop: st === 'Stop confirm', dlgLift: st === 'Lift confirm', dlgLiftProv: st === 'Lift confirm (mail service list)',
       isSupp: base === 'Suppressions', isNoAccess: noAccess
     };
   }
