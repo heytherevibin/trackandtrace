@@ -4,6 +4,8 @@ import { exitCodeFor, stuck, summarise } from "../../../scripts/announce-coverag
 const AT = new Date("2026-10-02T09:00:00.000Z");
 const hoursAgo = (n: number) => new Date(AT.getTime() - n * 3_600_000).toISOString();
 
+const claim = (over = {}) => ({ letterId: "L", personId: "p1", state: "sending", claimedAt: hoursAgo(1), firstAttemptedAt: hoursAgo(25), ...over });
+
 const letter = (over = {}) => ({ id: "L", state: "sending", pending: 10, lastSentAt: hoursAgo(1), ...over });
 
 describe("what counts as stuck", () => {
@@ -35,40 +37,40 @@ describe("what counts as stuck", () => {
 });
 
 describe("the edges of each rule", () => {
-  it("does not name a letter at exactly 48 hours, or a claim at exactly 24: the window is crossed, not touched", () => {
-    const rows = [{ letterId: "L", personId: "p1", state: "sending", claimedAt: hoursAgo(24) }];
-    expect(stuck([letter({ lastSentAt: hoursAgo(48) })], rows, AT)).toEqual([]);
+  it("does not name a letter at exactly 48 hours since its last delivery, but does just past it: a daily job lands on the boundary", () => {
+    expect(stuck([letter({ lastSentAt: hoursAgo(48) })], [], AT)).toEqual([]);
+    expect(stuck([letter({ lastSentAt: hoursAgo(48.01) })], [], AT)).toHaveLength(1);
   });
 
-  it("does not name a letter with nothing pending, however long ago it last sent: it is about to finish", () => {
-    expect(stuck([letter({ pending: 0, lastSentAt: hoursAgo(100) })], [], AT)).toEqual([]);
+  it("names a claim at exactly 24 hours, as the runner does: the claim stops re-claiming there, so it is neither retryable nor unknown", () => {
+    // Inclusive, like `staleClaims` in announce-plan.mjs, because a strictly daily schedule lands exactly here.
+    expect(stuck([letter()], [claim({ firstAttemptedAt: hoursAgo(24) })], AT)).toHaveLength(1);
+    expect(stuck([letter()], [claim({ firstAttemptedAt: hoursAgo(23.99) })], AT)).toEqual([]);
   });
 
   it("counts every stale claim, and says deliveries in the plural", () => {
     const rows = [
-      { letterId: "L", personId: "p1", state: "sending", claimedAt: hoursAgo(25) },
-      { letterId: "L", personId: "p2", state: "sending", claimedAt: hoursAgo(40) },
-      { letterId: "L", personId: "p3", state: "sending", claimedAt: hoursAgo(2) },
+      claim({ personId: "p1", firstAttemptedAt: hoursAgo(25) }),
+      claim({ personId: "p2", firstAttemptedAt: hoursAgo(40) }),
+      claim({ personId: "p3", firstAttemptedAt: hoursAgo(2) }),
     ];
     expect(stuck([letter()], rows, AT)).toEqual([{ letterId: "L", why: "2 deliveries claimed over 24 hours ago and never marked" }]);
   });
 
   it("measures a claim from its FIRST attempt, because a re-claim does not renew the provider's memory of the key", () => {
     // Claimed 30 hours ago, re-claimed one hour ago. The 24-hour window runs from the first attempt.
-    const rows = [{ letterId: "L", personId: "p1", state: "sending", claimedAt: hoursAgo(1), firstAttemptedAt: hoursAgo(30) }];
+    const rows = [claim({ claimedAt: hoursAgo(1), firstAttemptedAt: hoursAgo(30) })];
     expect(stuck([letter()], rows, AT)).toEqual([{ letterId: "L", why: "1 delivery claimed over 24 hours ago and never marked" }]);
   });
 
-  it("falls back to the latest claim when the first attempt was never recorded, null or absent alike", () => {
+  it("counts a claim whose first attempt is null, absent or unreadable as stale, never as fresh, matching the runner", () => {
+    // `claimedAt` restarts on every re-claim, so falling back to it would go blind exactly where a
+    // duplicate send hides: a row re-claimed each day would never look old.
     const fresh = { letterId: "L", personId: "p1", state: "sending", claimedAt: hoursAgo(2) };
-    expect(stuck([letter()], [{ ...fresh, firstAttemptedAt: null }], AT)).toEqual([]);
-    expect(stuck([letter()], [fresh], AT)).toEqual([]);
-    expect(stuck([letter()], [{ ...fresh, claimedAt: hoursAgo(26), firstAttemptedAt: null }], AT)).toHaveLength(1);
-  });
-
-  it("does not read a claim it cannot date as a fresh one", () => {
-    const rows = [{ letterId: "L", personId: "p1", state: "sending", claimedAt: "not a date" }];
-    expect(stuck([letter()], rows, AT)).toEqual([{ letterId: "L", why: "1 delivery claimed over 24 hours ago and never marked" }]);
+    const why = "1 delivery claimed over 24 hours ago and never marked";
+    expect(stuck([letter()], [{ ...fresh, firstAttemptedAt: null }], AT)).toEqual([{ letterId: "L", why }]);
+    expect(stuck([letter()], [fresh], AT)).toEqual([{ letterId: "L", why }]);
+    expect(stuck([letter()], [{ ...fresh, firstAttemptedAt: "not a date" }], AT)).toEqual([{ letterId: "L", why }]);
   });
 
   it("does not read a last-sent time it cannot date as recent progress", () => {
@@ -78,6 +80,45 @@ describe("the edges of each rule", () => {
   it("ignores a claim that belongs to a letter it was not given", () => {
     const rows = [{ letterId: "other", personId: "p1", state: "unknown", claimedAt: hoursAgo(30) }];
     expect(stuck([letter()], rows, AT)).toEqual([]);
+  });
+
+  it("counts only deliveries that are `sending` as claims and only `unknown` ones as unknowns: a sent or skipped row is neither", () => {
+    const rows = [
+      claim({ personId: "p1", state: "sent", firstAttemptedAt: hoursAgo(30) }),
+      claim({ personId: "p2", state: "skipped", firstAttemptedAt: hoursAgo(30) }),
+    ];
+    expect(stuck([letter()], rows, AT)).toEqual([]);
+  });
+});
+
+describe("an open letter with no work left", () => {
+  // `drain` stops on a spent allowance BEFORE it re-reads what remains, so the normal end of a day's
+  // run can leave a letter with nothing pending and nothing in flight that was never marked done.
+  // The next run finishes it. If a few days pass and it is still open, the job is not running, and
+  // with one letter there is no neighbour to raise the alarm: a clean bill of health would be false.
+  const finished = (over = {}) => letter({ pending: 0, sending: 0, ...over });
+
+  it("is named once it has sat 48 hours since its last delivery: it finished its work and was never marked done", () => {
+    expect(stuck([finished({ lastSentAt: hoursAgo(120) })], [], AT))
+      .toEqual([{ letterId: "L", why: "no work left, but it was never marked done" }]);
+  });
+
+  it("is nothing inside those 48 hours, because the next daily run has not had its turn", () => {
+    expect(stuck([finished({ lastSentAt: hoursAgo(20) })], [], AT)).toEqual([]);
+    expect(stuck([finished({ lastSentAt: hoursAgo(48) })], [], AT)).toEqual([]);
+  });
+
+  it("is named when it never sent at all and was queued over 48 hours ago", () => {
+    expect(stuck([finished({ state: "queued", lastSentAt: null, queuedAt: hoursAgo(49) })], [], AT)).toHaveLength(1);
+    expect(stuck([finished({ state: "queued", lastSentAt: null, queuedAt: hoursAgo(1) })], [], AT)).toEqual([]);
+  });
+
+  it("is not named for it while a delivery is still in flight: the claim rule speaks for that", () => {
+    expect(stuck([finished({ sending: 2, lastSentAt: hoursAgo(120) })], [], AT)).toEqual([]);
+  });
+
+  it("is still nothing for a letter that is done, however old", () => {
+    expect(stuck([finished({ state: "done", lastSentAt: hoursAgo(300) })], [], AT)).toEqual([]);
   });
 });
 
@@ -104,6 +145,17 @@ describe("one entry per reason, not one per letter", () => {
       "no delivery in 48 hours, 10 still pending",
       "1 delivery claimed over 24 hours ago and never marked",
       "1 unknown: we cannot say whether it was sent",
+    ]);
+  });
+
+  it("lists every letter's first reason before any letter's second: reason-major, not letter-major", () => {
+    const letters = [letter({ id: "B", lastSentAt: hoursAgo(60) }), letter({ id: "A", lastSentAt: hoursAgo(60) })];
+    const rows = [claim({ letterId: "A" }), claim({ letterId: "B" })];
+    expect(stuck(letters, rows, AT).map((entry) => `${entry.letterId}: ${entry.why}`)).toEqual([
+      "B: no delivery in 48 hours, 10 still pending",
+      "A: no delivery in 48 hours, 10 still pending",
+      "B: 1 delivery claimed over 24 hours ago and never marked",
+      "A: 1 delivery claimed over 24 hours ago and never marked",
     ]);
   });
 
@@ -151,6 +203,11 @@ describe("a letter that has never sent", () => {
       .toEqual([{ letterId: "L", why: "nothing delivered in the 48 hours since it was queued, 10 still pending" }]);
   });
 
+  it("is named just past 48 hours since it was queued and not at exactly 48, as for a letter that has sent", () => {
+    expect(stuck([queued({ queuedAt: hoursAgo(48) })], [], AT)).toEqual([]);
+    expect(stuck([queued({ queuedAt: hoursAgo(48.01) })], [], AT)).toHaveLength(1);
+  });
+
   it("reads an absent lastSentAt exactly as a null one, because the store does not supply it yet", () => {
     // No `lastSentAt` key at all, as `remainingFor` returns today.
     const without = { id: "L", state: "queued", pending: 10, queuedAt: hoursAgo(49) };
@@ -168,6 +225,19 @@ describe("the report", () => {
   it("exits 0 when nothing is stuck and 1 when something is", () => {
     expect(exitCodeFor([])).toBe(0);
     expect(exitCodeFor([{ letterId: "L", why: "x" }])).toBe(1);
+  });
+
+  it("exits 2 when a letter could not be read and nothing else is stuck, and 1 when something is, skipped or not", () => {
+    // A report that skipped a letter cannot say nothing is stuck, so it must not exit 0; and a
+    // finding is a finding, so it must still exit 1.
+    expect(exitCodeFor([], 1)).toBe(2);
+    expect(exitCodeFor([{ letterId: "L", why: "x" }], 1)).toBe(1);
+  });
+
+  it("does not say nothing is stuck when a letter could not be read", () => {
+    const text = summarise([], 2, 1).join("\n");
+    expect(text).not.toMatch(/nothing is stuck/i);
+    expect(text).toContain("1 letter could not be read");
   });
 
   it("says plainly that nothing is stuck, and how many letters it looked at", () => {

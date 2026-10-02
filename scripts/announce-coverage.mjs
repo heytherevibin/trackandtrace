@@ -15,26 +15,41 @@
 // shows, and each is reported SEPARATELY. A letter can be advancing and still carry a stale claim,
 // so `stuck` returns one entry per REASON, never one per letter, and never lets one reason win.
 //
-//   1. NO DELIVERY IN 48 HOURS. A letter with rows still pending whose last delivery was more than
-//      48 hours ago. The job runs daily, so two runs without progress mean it is not running, or
-//      every send is failing; either way a person should look. Strictly more than 48 hours: a run
-//      that is a few minutes late must not raise it.
+//   1. NO DELIVERY IN 48 HOURS. A letter whose last delivery was more than 48 hours ago and that
+//      still has work it is not doing. The job runs daily, so two runs without progress mean it is
+//      not running, or every send is failing; either way a person should look. Strictly more than
+//      48 hours: a run that is a few minutes late must not raise it. Two shapes, one clock:
+//        * ROWS STILL PENDING: "no delivery in 48 hours, N still pending".
+//        * NO WORK LEFT, AND NOT MARKED DONE: nothing pending and nothing in flight, yet the letter
+//          is still open. It finished its work and should have been marked `done`; if it was not, it
+//          is stuck, and a clean bill of health would be false. This is not exotic: `drain` stops
+//          on a spent allowance BEFORE it re-reads what remains, so the normal end of a day's run
+//          leaves exactly this, and the next run finishes it. Past 48 hours the next run has had
+//          its turn and has not. With one letter open there is no neighbour to raise the alarm.
+//          (A letter with deliveries still IN FLIGHT is the claim rule's, below, not this one's.)
 //        * A letter that has NEVER SENT has `lastSentAt` null (or absent: the store does not supply
 //          the field yet, and absent is read exactly as null). Null is "has never sent", NEVER the
 //          epoch: as the epoch every freshly queued letter would be 56 years stale and the report
 //          would cry wolf on its first run. What a never-sent letter is measured from is the time
-//          it was queued, so it is named once it has sat 48 hours with rows pending and has still
-//          not sent one. That is the case this report most needs to catch (queued, and the job
-//          never ran, or never once succeeded), and reading null as "nothing to measure" would leave
-//          it silent for ever. With neither time known there is nothing to measure from and nothing
-//          is said.
+//          it was queued, so it is named once it has sat 48 hours and has still not sent one. That
+//          is the case this report most needs to catch (queued, and the job never ran, or never once
+//          succeeded), and reading null as "nothing to measure" would leave it silent for ever. With
+//          neither time known there is nothing to measure from and nothing is said.
 //        * A time that cannot be parsed is not recent progress: it is named, never excused.
 //   2. A DELIVERY CLAIMED OVER 24 HOURS AGO AND NEVER MARKED. A row still `sending` past the
 //      provider's idempotency window. The runner marks such a row unknown rather than retry it, so
-//      one that is still `sending` means the runner is not reaching it. The age is measured from the
-//      FIRST attempt, not the latest claim: a re-claim does not renew the provider's memory of the
-//      key. Where the first attempt was never recorded the latest claim stands in. A claim whose
-//      time cannot be parsed is counted, never excused.
+//      one that is still `sending` means the runner is not reaching it. This is `staleClaims` in
+//      announce-plan.mjs and agrees with it on purpose, because two components that disagree about
+//      what "in flight too long" means is how one of them becomes wrong with nothing failing:
+//        * measured from the FIRST attempt, never the latest claim. A re-claim renews `claimedAt`
+//          but not the provider's memory of the key, so `claimedAt` is a clock that restarts daily,
+//          and a row re-claimed each day would never look old: blind exactly where a duplicate send
+//          hides. There is NO fallback to `claimedAt`.
+//        * a first attempt that is absent, null or unreadable counts as STUCK, the side that never
+//          sends twice.
+//        * the boundary is INCLUSIVE: exactly 24 hours is named. The claim stops re-claiming there,
+//          so a row exactly that old is neither retryable nor unknown, and a strictly daily
+//          schedule lands exactly on it.
 //   3. ANY UNKNOWN AT ALL. A delivery whose outcome we cannot state, whatever its age: it was
 //      neither confirmed sent nor confirmed not sent, and it is never normal.
 //
@@ -72,7 +87,7 @@ export const CLAIM_WINDOW_HOURS = 24;
 const HOUR_MS = 3_600_000;
 
 /**
- * @typedef {{ id: string, state: string, pending: number, lastSentAt?: string | null, queuedAt?: string }} OpenLetter
+ * @typedef {{ id: string, state: string, pending: number, sending?: number, lastSentAt?: string | null, queuedAt?: string }} OpenLetter
  * @typedef {{ letterId: string, personId?: string, state: string, claimedAt: string, firstAttemptedAt?: string | null }} DeliveryRow
  * @typedef {{ letterId: string, why: string }} Stuck
  */
@@ -83,15 +98,24 @@ function olderThan(time, hours, at) {
   return Number.isNaN(then) || at.getTime() - then > hours * HOUR_MS;
 }
 
+/** @param {DeliveryRow} row @param {Date} at A first attempt that is absent or unreadable is stale; the boundary is inclusive, as `staleClaims` has it. */
+function claimIsStale(row, at) {
+  const first = Date.parse(row.firstAttemptedAt ?? "");
+  return Number.isNaN(first) || at.getTime() - first >= CLAIM_WINDOW_HOURS * HOUR_MS;
+}
+
 /** @param {OpenLetter} letter @param {Date} at @returns {string | null} */
 function noDelivery(letter, at) {
-  if (!(letter.pending > 0)) return null;
   // null and absent alike are "has never sent": measured from when it was queued, never from the epoch.
-  if (letter.lastSentAt !== null && letter.lastSentAt !== undefined) {
-    return olderThan(letter.lastSentAt, NO_PROGRESS_HOURS, at) ? `no delivery in ${NO_PROGRESS_HOURS} hours, ${letter.pending} still pending` : null;
+  const since = letter.lastSentAt ?? letter.queuedAt;
+  if (since === undefined || since === null || !olderThan(since, NO_PROGRESS_HOURS, at)) return null;
+  if (letter.pending > 0) {
+    return letter.lastSentAt === undefined || letter.lastSentAt === null
+      ? `nothing delivered in the ${NO_PROGRESS_HOURS} hours since it was queued, ${letter.pending} still pending`
+      : `no delivery in ${NO_PROGRESS_HOURS} hours, ${letter.pending} still pending`;
   }
-  if (letter.queuedAt === undefined || letter.queuedAt === null) return null;
-  return olderThan(letter.queuedAt, NO_PROGRESS_HOURS, at) ? `nothing delivered in the ${NO_PROGRESS_HOURS} hours since it was queued, ${letter.pending} still pending` : null;
+  // Nothing pending. In flight is the claim rule's business; with nothing in flight either, the work is done and the letter is not.
+  return letter.sending > 0 ? null : "no work left, but it was never marked done";
 }
 
 /**
@@ -113,7 +137,7 @@ export function stuck(letters, rows, at) {
     if (why !== null) found.push({ letterId: letter.id, why });
   }
   for (const letter of looked) {
-    const old = rows.filter((row) => row.letterId === letter.id && row.state === "sending" && olderThan(row.firstAttemptedAt ?? row.claimedAt, CLAIM_WINDOW_HOURS, at));
+    const old = rows.filter((row) => row.letterId === letter.id && row.state === "sending" && claimIsStale(row, at));
     if (old.length > 0) found.push({ letterId: letter.id, why: `${old.length} ${old.length === 1 ? "delivery" : "deliveries"} claimed over ${CLAIM_WINDOW_HOURS} hours ago and never marked` });
   }
   for (const letter of looked) {
@@ -128,22 +152,32 @@ export function stuck(letters, rows, at) {
  * address, subject or body that a row carried can reach it.
  *
  * @param {readonly Stuck[]} entries
- * @param {number} openLetters how many letters were looked at
+ * @param {number} openLetters how many letters were read
+ * @param {number} [skipped] how many more could not be read
  * @returns {string[]}
  */
-export function summarise(entries, openLetters) {
+export function summarise(entries, openLetters, skipped = 0) {
   const looked = `${openLetters} open letter${openLetters === 1 ? "" : "s"}`;
-  if (entries.length === 0) return [`Nothing is stuck: ${looked} read, and each is advancing, or has nothing to advance.`];
-  return [`${entries.length} thing${entries.length === 1 ? " is" : "s are"} stuck across ${looked}:`, ...entries.map((entry) => `  letter ${entry.letterId}: ${entry.why}`)];
+  const unread = skipped === 0 ? [] : [`${skipped} letter${skipped === 1 ? "" : "s"} could not be read, so ${skipped === 1 ? "it is" : "they are"} not reported either way.`];
+  if (entries.length === 0) {
+    return skipped === 0
+      ? [`Nothing is stuck: ${looked} read, and each is advancing, or has nothing to advance.`]
+      : [`Nothing was found wrong in the ${looked} that could be read.`, ...unread];
+  }
+  return [`${entries.length} thing${entries.length === 1 ? " is" : "s are"} stuck across ${looked}:`, ...entries.map((entry) => `  letter ${entry.letterId}: ${entry.why}`), ...unread];
 }
 
 /**
  * Non-zero the moment anything is stuck, so a check wired to this fails on a send that has quietly
- * stopped rather than on nothing at all.
+ * stopped rather than on nothing at all. 1 means the store was read and something is stuck, and
+ * nothing else does: a finding wins over a letter that could not be read, and a letter that could
+ * not be read is never a clean 0, because a report that skipped it cannot say it is fine.
  *
  * @param {readonly Stuck[]} entries
+ * @param {number} [skipped]
  * @returns {number}
  */
-export function exitCodeFor(entries) {
-  return entries.length === 0 ? 0 : 1;
+export function exitCodeFor(entries, skipped = 0) {
+  if (entries.length > 0) return 1;
+  return skipped > 0 ? 2 : 0;
 }
