@@ -129,8 +129,7 @@ export function startRun({ motion }: JourneyContext): Teardown {
     lean = 0;
     lastP = 0;
     aimed = -1;
-    linked = null;
-    watch.disarm();
+    if (!linked) watch.disarm(); // a link's glide goes on to its section, pinned or plain (goalOf)
   };
 
   const paint = () => {
@@ -379,8 +378,8 @@ export function startRun({ motion }: JourneyContext): Teardown {
     const link = linked;
     if (link) {
       // only while the address still names its section: Back mid-glide is the reader's, and theirs to keep (the review)
-      if (!layout || window.location.hash !== `#${link.section.id}`) return;
-      const goal = stationY(link.i, layout);
+      if (window.location.hash !== `#${link.section.id}`) return;
+      const goal = goalOf(link.i, link.section);
       linked = { ...link, from: window.scrollY, goal };
       window.scrollTo({ top: goal });
       return goal;
@@ -399,20 +398,26 @@ export function startRun({ motion }: JourneyContext): Teardown {
     if (!section || i < 0) return;
     event.preventDefault();
     window.history.pushState(null, "", `#${section.id}`);
-    glideTo(section, i, layout);
+    glideTo(section, i);
     section.focus({ preventScroll: true });
   };
   /** Glides station i to the window for a link to `section`, watched from here as a Tab's glide is from its focus, and
    * followed to its end (focus-glide.ts's watch, and its bounds): a phone's toolbar resizes the window a few frames in,
    * the glide's end set as it began (short of 07 in 4 runs in 10). `taken`: the takes a glide carried through the
    * journey's rebuild has had. */
-  function glideTo(section: HTMLElement, i: number, layout: RunLayout, taken = 0): void {
+  function glideTo(section: HTMLElement, i: number, taken = 0): void {
     const from = window.scrollY;
-    const goal = stationY(i, layout);
+    const goal = goalOf(i, section);
     window.scrollTo({ top: goal });
     aimed = -1;
     linked = Math.abs(goal - from) < 1 ? null : { i, section, from, goal };
     if (linked) watch.arm(taken, goal);
+  }
+  /** Where a link to `section` takes the page: station i at the window while the run is pinned; while it is not (a rebuild
+   * that found the glide inside the run unpins it, and it pins again only once its reader is above it), the section's own
+   * top under the masthead. A pin or an unpin moves it, and the glide is taken up to where it then is (retarget). */
+  function goalOf(i: number, section: HTMLElement): number {
+    return at ? stationY(i, at) : Math.round(section.getBoundingClientRect().top + window.scrollY - mastheadBottom());
   }
   /** Back mid-glide (the address names the section no more): the reader's own way through the history, and the browser's
    * to scroll. Let go for good, Forward or not. */
@@ -432,7 +437,7 @@ export function startRun({ motion }: JourneyContext): Teardown {
    * reader a drag took off it keeps their place (focus-glide.ts's rule for a relayout). */
   function retarget(): void {
     const link = linked;
-    const goal = link && at && watch.armed() ? stationY(link.i, at) : null;
+    const goal = link && watch.armed() ? goalOf(link.i, link.section) : null;
     if (!link || goal === null || Math.abs(goal - link.goal) < 1) return;
     if (!between(lastY, link.from, link.goal)) {
       linked = null;
@@ -444,12 +449,12 @@ export function startRun({ motion }: JourneyContext): Teardown {
   }
 
   decide();
-  // The rebuild's teardown left a link's glide it watched (the unpin cut it short, and the run has pinned again): taken
-  // up by this start, in the same task, while the address still names its section.
+  // The rebuild's teardown left a link's glide it watched (the unpin cut it short): taken up by this start, in the same
+  // task, while the address still names its section, whether the run has pinned again or not (goalOf).
   const passed = handover;
   handover = null;
-  const section = passed && at ? sections.find((s) => s.id === passed.id && window.location.hash === `#${s.id}`) : undefined;
-  if (passed && at && section) glideTo(section, stations.findIndex((s) => section.contains(s)), at, passed.taken);
+  const section = passed ? sections.find((s) => s.id === passed.id && window.location.hash === `#${s.id}`) : undefined;
+  if (passed && section) glideTo(section, stations.findIndex((s) => section.contains(s)), passed.taken);
   window.addEventListener(LAYOUT_EVENT, soon);
   window.addEventListener(LAYOUT_EVENT, learn); // after a piece above moved the reader by its own change
   window.addEventListener("scroll", onScrolled, { passive: true });

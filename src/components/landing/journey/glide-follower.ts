@@ -2,6 +2,12 @@
 // target, so "between where it began and its target" cannot tell the glide from the reader's own hand: a scrollbar's drag
 // sends no wheel, touch, key or press. The browser's own glide goes on toward the end it set every frame, never back,
 // never stopping short of it, never dropping to a crawl far from it.
+//
+// What it cannot tell (the re-review, 2026-10-02): a hand that moves the page steadily on toward the target reads as the
+// glide for as long as it moves, at any speed; it is known once it stops short of the end, three frames on. So nothing
+// is taken up while a doubt stands (doubting), and a place-keeping jump that lands on a doubt settles it for the reader.
+// What is left: a hand still moving like a glide in the very frame a cut lands is taken up once, and its next move
+// cancels that glide; a hand moving so until the frame of a place-keeping jump, then held, is carried.
 
 /** Frames in a row that are not a glide's (followGlide) before the page counts as the reader's. One or two can be the
  * machine's (a frame the scroll did not advance in, under load). */
@@ -14,25 +20,34 @@ const CRAWL = 0.25;
 export interface GlideFollower {
   /** The page stands at `y` at `now` (ms): false once it is the reader's own move, not the glide's. */
   step(y: number, now: number): boolean;
-  /** A place-keeping jump moved the page: its move is no one's, and the glide ended with it. */
+  /** A place-keeping jump moved the page: its move is no one's, and the glide ended with it. One that lands while a
+   * doubt stands leaves that doubt unanswerable (the page stands still after it either way): the reader's. */
   jumped(): void;
+  /** A frame or two have not been a glide's, and the next will say whose they were: nothing is taken up meanwhile. */
+  doubting(): boolean;
+  /** The page has moved toward the end at least once: a glide did begin. */
+  begun(): boolean;
 }
 
-/** Follows a glide the browser is making from `from` to `end`, a frame at a time (rules above). */
-export function followGlide(from: number, end: number, at: number): GlideFollower {
+/** Follows a glide the browser is making from `from` to `end`, a frame at a time (rules above). Its speed is measured
+ * between frames' own times, so the first frame has none. */
+export function followGlide(from: number, end: number): GlideFollower {
   const dir = end >= from ? 1 : -1;
   let lastY = from;
-  let lastT = at;
+  let lastT: number | null = null;
   let speed = 0; // the last sound frame's, px per ms
   let moving = false;
   let doubts = 0;
   let skip = false;
+  let begun = false;
+  let lost = false; // a jump landed on a doubt
   return {
     step(y, now) {
       const d = (y - lastY) * dir;
-      const dt = Math.max(1, now - lastT);
+      const v = lastT === null ? 0 : d / Math.max(1, now - lastT);
       lastY = y;
       lastT = now;
+      if (lost) return false;
       if (skip) {
         skip = false;
         moving = false;
@@ -43,10 +58,11 @@ export function followGlide(from: number, end: number, at: number): GlideFollowe
         doubts = 0;
         return true;
       }
-      const sound = d >= 1 && !(moving && d / dt < speed * CRAWL);
+      const sound = d >= 1 && !(moving && v < speed * CRAWL);
       if (sound) {
+        begun = true;
         moving = true;
-        speed = d / dt;
+        speed = v;
         doubts = 0;
         return true;
       }
@@ -55,7 +71,10 @@ export function followGlide(from: number, end: number, at: number): GlideFollowe
       return doubts < DOUBTS;
     },
     jumped() {
+      if (doubts > 0) lost = true;
       skip = true;
     },
+    doubting: () => doubts > 0,
+    begun: () => begun,
   };
 }

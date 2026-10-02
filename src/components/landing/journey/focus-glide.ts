@@ -130,8 +130,9 @@ function seen(el: Element): boolean {
 export interface GlideWatch {
   /** A glide has begun: watch it for a place-keeping jump that cuts it short. `taken`: the takes it has already had (one
    * carried through the journey's rebuild). `end`: where the browser is gliding the page to, for an in-page link's
-   * glide: followed frame by frame (followGlide), scroll anchoring held off while it is watched. */
-  arm(taken?: number, end?: number): void;
+   * glide: followed frame by frame (followGlide), scroll anchoring held off while it is watched. `unsure`: the click may
+   * glide nowhere (its default was prevented), so nothing is taken up for it until the page has moved toward `end`. */
+  arm(taken?: number, end?: number, unsure?: boolean): void;
   /** Still watching the glide it was armed for: not let go by the reader's own scroll or pointer, nor by the page. */
   armed(): boolean;
   /** Something other than a jump cut the glide short (a relayout): taken up as a jump's cut is. */
@@ -156,6 +157,7 @@ export function watchGlide(retake: () => number | void): GlideWatch {
   let frame = 0;
   let unanchored = false;
   let follower: GlideFollower | null = null; // a link's glide, followed
+  let unsure = false; // a link's glide that may never begin (arm)
   let unbegun = -1; // frames a link's glide just taken up has left the page still; -1 once it moves, or with none asked
 
   /** Scroll anchoring held off (<html style="overflow-anchor: none">), or given back. */
@@ -193,7 +195,10 @@ export function watchGlide(retake: () => number | void): GlideWatch {
       window.scrollTo({ top: y, behavior: "instant" });
       onCut();
     }
-    if (cut) {
+    // Nothing is taken up while a frame's doubt stands (a hand that stopped as the cut landed is known a frame later), nor
+    // for a click that may glide nowhere until the page has moved toward its target.
+    const wait = follower !== null && (follower.doubting() || (unsure && !follower.begun()));
+    if (cut && !wait) {
       quiet += 1;
       if (quiet >= QUIET) {
         takes += 1;
@@ -205,7 +210,7 @@ export function watchGlide(retake: () => number | void): GlideWatch {
         if (!armed) return; // the last take, or the retake let go
         lastY = window.scrollY;
         if (follower && typeof end === "number") {
-          follower = followGlide(lastY, end, now);
+          follower = followGlide(lastY, end);
           unbegun = 0;
         }
       }
@@ -238,9 +243,10 @@ export function watchGlide(retake: () => number | void): GlideWatch {
   window.addEventListener("scroll", onScroll, { passive: true });
   for (const type of OWN) window.addEventListener(type, onOwn, { capture: true, passive: true });
   return {
-    arm: (taken = 0, end) => {
+    arm: (taken = 0, end, maybe = false) => {
+      unsure = maybe;
       anchoring(end !== undefined);
-      follower = end === undefined ? null : followGlide(window.scrollY, end, performance.now());
+      follower = end === undefined ? null : followGlide(window.scrollY, end);
       armed = true;
       takes = taken;
       started = false;
@@ -367,7 +373,8 @@ export function startFocusGlide({ motion }: JourneyContext): Teardown {
   };
   /** A click on an in-page link, unmodified, that glides the page to its target: watched from the click, as a Tab's glide
    * is from its focus. Its default prevented or not: the router's own link (the masthead's to the terminal) prevents it
-   * and glides to the fragment itself; a click that glides nowhere is let go half a second on (START_LINK). */
+   * and glides to the fragment itself; a click that glides nowhere is let go half a second on (START_LINK), and nothing
+   * is taken up for it meanwhile (arm's `unsure`). */
   const onClick = (event: MouseEvent) => {
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     const link = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>(IN_PAGE) : null;
@@ -376,7 +383,9 @@ export function startFocusGlide({ motion }: JourneyContext): Teardown {
     watch.disarm();
     target = el;
     linked = true;
-    watch.arm(0, aim(el).end);
+    // unsure it glides at all: its default prevented, and the address naming its target already (nothing shows it went
+    // anywhere). A prevented click that does go there changes the address (the router's), and the address rule holds it.
+    watch.arm(0, aim(el).end, event.defaultPrevented && window.location.hash === `#${el.id}`);
   };
   const onScroll = () => {
     lastY = window.scrollY;

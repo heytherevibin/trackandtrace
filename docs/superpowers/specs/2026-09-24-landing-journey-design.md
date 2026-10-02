@@ -499,6 +499,23 @@ Decided after J6 (2026-10-02): an in-page link's glide is taken up again, as a T
   takes nothing up while the address names something else. The run's take-up held to where focus was, which a rebuild
   moves; it holds to the address now, and a link's glide to 06 or 07 is handed through the journey's rebuild as
   `focus-glide.ts` hands its own.
+- Nothing is taken up while a frame's doubt stands (the re-review, 2026-10-02): the take-up came two frames after a
+  cut and the third doubt a frame later, so a hand that stopped as the cut landed was carried to 07. A real glide
+  clears its doubt with its next frame; a held hand reaches three and is let go. A place-keeping jump that lands on a
+  doubt settles it for the reader, since the page stands still after it either way.
+  What the follower cannot tell, stated as the bound: a hand that moves the page steadily on toward the target reads
+  as the glide for as long as it moves, at any speed (a glide's speed is not constant, but WebKit's is nearly so
+  through its middle, and a test of its shape would let real glides go on a slow machine); it is known once it stops
+  short of the end. So a hand still moving so in the very frame a cut lands is taken up once, and its next move
+  cancels that glide; and a hand moving so until the frame of a place-keeping jump, then held, is carried.
+- A click that may glide nowhere (its default prevented, the address naming its target already, so nothing shows it
+  went anywhere) is watched, but nothing is taken up for it until the page has moved toward its target. A prevented
+  click that does navigate changes the address (the router's), and the address rule holds it either way.
+- A link's glide to 06 or 07 goes on whether the run is pinned or not. A rebuild that finds the glide already inside
+  the run unpins it under a reader no longer above it, and the run pins again only once they are: the glide handed
+  through the rebuild found no pinned run and was dropped, the reader left 1,912 px short of 07 (desktop WebKit, whose
+  glide is there four frames in: 7 runs in 30). Its goal is the station at the window while the run is pinned and the
+  section's own top under the masthead while it is not, taken up again as the run pins or unpins.
 - A take-up the browser does not begin is asked for again. WebKit, its own glide stopped by the journey's rebuild in
   that frame, now and then takes the page to stand at that glide's end already, and makes no glide toward it (9 runs
   in 120 to 08 on a phone; a glide by 300 px from there ended 300 px past the target). After six still frames an

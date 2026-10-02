@@ -123,19 +123,25 @@ test.describe("a tapped in-page link's glide (spec §3.G)", () => {
   // says nothing: the review, 2026-10-02), and a resize follows: they stay where they put it, as place-keeping leaves
   // them, never carried on to the target. The glide is known from a reader's own move by how it goes: on toward its end
   // every frame, never back, never stopping short, never slowing to a crawl far from it.
-  const DRAGS = {
-    "on toward the target": (start: number, i: number) => start + 400 + i * 7,
-    "back up the page": (start: number, i: number) => start + 600 - i * 7,
-    "to a standstill": (start: number) => start + 400,
-  } as const;
+  // Each drag as the page's place frame by frame (`start`: where the page stood at the tap; `y0`: where the glide had
+  // taken it as the hand took over). The last three stop as the cut lands, or never look unlike a glide while they move
+  // (the re-review, 2026-10-02: taken up on the second still frame, before the third doubt, each was carried to 07).
+  const DRAGS: Readonly<Record<string, (start: number, y0: number) => readonly number[]>> = {
+    "on toward the target, six frames": (start) => [0, 1, 2, 3, 4, 5].map((i) => start + 400 + i * 7),
+    "back up the page, six frames": (start) => [0, 1, 2, 3, 4, 5].map((i) => start + 600 - i * 7),
+    "to a standstill, six frames": (start) => [0, 1, 2, 3, 4, 5].map(() => start + 400),
+    "one frame before the resize": (start) => [start + 400],
+    "two frames before the resize": (start) => [start + 400, start + 400],
+    "steadily on toward the target, 30 px a frame for twelve frames": (_start, y0) => Array.from({ length: 12 }, (_, i) => y0 + 30 * (i + 1)),
+  };
   for (const { code, id, name } of LINKS)
-    for (const [how, to] of Object.entries(DRAGS))
-      test(`never carries a reader who dragged the scrollbar ${how} mid-glide on to ${code}`, async ({ page, isMobile }) => {
+    for (const [how, places] of Object.entries(DRAGS))
+      test(`never carries a reader who dragged the scrollbar ${how}, then held it, on to ${code}`, async ({ page, isMobile }) => {
         const start = await openAndTap(page, isMobile, name);
         await frames(page, 3);
-        // six frames of it, then the reader holds the page still (the bar still in hand), and the window is resized
-        for (let i = 0; i < 6; i += 1) {
-          await page.evaluate((y) => window.scrollTo({ top: y, behavior: "instant" }), to(start, i));
+        const y0 = await page.evaluate(() => window.scrollY);
+        for (const y of places(start, y0)) {
+          await page.evaluate((top) => window.scrollTo({ top, behavior: "instant" }), y);
           await frames(page, 1);
         }
         const left = await page.evaluate(() => Math.round(window.scrollY));
@@ -201,6 +207,78 @@ test.describe("a tapped in-page link's glide (spec §3.G)", () => {
       expect(await fromTarget(page, id)).toBeLessThanOrEqual(4);
     });
   }
+
+  // Which rule each of these guards. Back fires popstate, on which both watches let go (and in WebKit the browser's own
+  // scroll back is no glide's move, so the follower lets go too): the two tests above hold those. The address rule itself
+  // (nothing is taken up while the address names something else) is held alone here: the address is replaced under the
+  // glide with no popstate and no scroll, so only that rule stands between the resize's cut and a take-up.
+  for (const { code, name } of LINKS)
+    test(`takes nothing up to ${code} once the address names it no more, with no Back to say so`, async ({ page, isMobile }) => {
+      await openAndTap(page, isMobile, name);
+      await frames(page, 4);
+      await countGlides(page);
+      await page.evaluate(() => window.history.replaceState(null, "", window.location.pathname));
+      await page.setViewportSize(sizes(isMobile).short);
+      await settled(page);
+      expect(await glidesMade(page), "glides the page started once the address had moved on").toBe(0);
+    });
+
+  // A link that glides nowhere: its own handler prevents the default and does nothing, the address naming its target
+  // already. The click is watched all the same (the router's links prevent it too), but nothing is taken up for it until
+  // the page has moved toward the target: a resize five frames on leaves the reader where they are (the re-review:
+  // carried to 08 on all four projects).
+  test("never takes a reader to 08 for a click that glided nowhere", async ({ page, isMobile }) => {
+    await drawStill(page);
+    await page.setViewportSize(sizes(isMobile).tall);
+    await page.goto("/");
+    await waitForJourney(page);
+    await dismissInstall(page);
+    await running(page);
+    await page.evaluate(() => window.scrollTo({ top: 600, behavior: "instant" }));
+    await atRest(page);
+    await page.evaluate(() => {
+      window.history.replaceState(null, "", "#faq");
+      const link = document.createElement("a");
+      link.href = "#faq";
+      link.textContent = "nowhere";
+      link.addEventListener("click", (event) => event.preventDefault());
+      document.querySelector("main")?.prepend(link);
+      link.click();
+    });
+    await frames(page, 5);
+    const left = await page.evaluate(() => Math.round(window.scrollY));
+    await page.setViewportSize(sizes(isMobile).short);
+    await settled(page);
+    const y = await page.evaluate(() => Math.round(window.scrollY));
+    expect(Math.abs(y - left), `the reader stood at ${left}, and stands at ${y}`).toBeLessThanOrEqual(400);
+    expect(await fromLanding(page, "faq")).toBeGreaterThan(1000);
+  });
+
+  // The rebuild lands once the glide is inside the run: the unpin sends that reader to the run's start (a change of
+  // shape), and the run, its reader no longer above it, does not pin again until they are. The glide handed through the
+  // rebuild found no pinned run to aim at and was dropped, the reader left 1,912 px short of 07 on the nightly's desktop
+  // WebKit, whose glide is there four frames in (7 runs in 30; the re-review, 2026-10-02). Forced here in every engine.
+  test("reaches 07 though the journey rebuilds as the glide passes through the run", async ({ page, isMobile }) => {
+    test.setTimeout(60_000); // the rest wait's own limit (REST_MS), and the page's loads
+    await openAndTap(page, isMobile, "Where it gets used");
+    await page.evaluate(
+      (rebuild) =>
+        new Promise<void>((done) => {
+          const tick = () => {
+            const top = document.getElementById("run")?.getBoundingClientRect().top ?? 0;
+            if (top > -200) return void requestAnimationFrame(tick);
+            window.dispatchEvent(new Event(rebuild));
+            done();
+          };
+          requestAnimationFrame(tick);
+        }),
+      REBUILD_EVENT,
+    );
+    await settled(page);
+    await running(page);
+    await atTheWindow(page, await stationOf(page, "#use *"));
+    expect(await from07(page)).toBeLessThanOrEqual(4);
+  });
 
   // The masthead's link to the terminal is the router's own (a Next <Link>): its click arrives with its default prevented,
   // and the router glides to the fragment itself. Watched from the click all the same.
