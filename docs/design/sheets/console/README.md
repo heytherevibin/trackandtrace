@@ -1,4 +1,4 @@
-# Console sheets: B0 and B2
+# Console sheets: B0, B2 and B4
 
 The console's sheets, drawn on the Design canvas. B0 (the frame and its audit log) and B2 (admin core) were approved on 19 Sep 2026. Phase 2 builds from these files. Where they differ from the prompts in `docs/superpowers/specs/phase-1-sheets/b0-calibration.md` and `b2-admin-core.md`, these files win.
 
@@ -46,3 +46,17 @@ Approved as drawn. These choices made in the drawing are now the spec:
 - Choosing RapidAPI as primary shows the low-quota warning in the confirm dialog, before the key tap.
 - Each limit has its own Save (disabled until the value changes). A paused PNR checks row shows its message with Edit message.
 - The sample figures agree with Overview: checks answering since 09:12 IST, paused at 14:02 by Asha Rao, RapidAPI 3 of 10 used this month, the live-check budget at 157 of 300.
+
+## B4
+
+Drawn on 2 Oct 2026, **for approval**. Nothing is built from these until the owner approves them; the console's pages (announcements PR 3) are then transcribed 1:1. Same frame, same `industry.css`, no new classes. The sample world is the other console sheets': Saturday 19 Sep 2026, 14:32 IST.
+
+| File | Sheet | States (props) |
+|---|---|---|
+| `ConsoleAnnouncements.dc.html`, `ConsoleAnnouncementsPhone.dc.html` | 23 Announcements, Form TC-10 | role (Owner, Admin) · state: List, Compose, Sending, Stopped, Done, Suppressions, No access |
+
+- **Letters** are a table at 1440 and cards at 390. A letter is Draft, Sending, Stopped or Done; its progress reads `Sent 120 · Skipped 3 · Unknown 0 of 418`.
+- **Compose** keeps Queue disabled, with its reason beside it, until a test send has been made. The Availability list is single-use: once its one send has finished it can't be chosen again.
+- **Sending** shows Sent, Skipped and Unknown as separate figures and an estimate at 40 a day, with Stop. **Stopped** states what went and what never will, with no actions. **Done** has final counts and no actions.
+- **Suppressions** lists address, scope (All or List mail), reason, when and source. Addresses are masked until revealed, except an operator's (a console member's), which is marked.
+- **No access** is drawn as Support opening the module; Viewer sees the same with its own role name.
