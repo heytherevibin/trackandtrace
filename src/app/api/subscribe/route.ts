@@ -3,7 +3,7 @@ import { z } from "zod";
 import { messages } from "@/messages";
 import { jsonError, jsonOk } from "@/services/api-response";
 import { takeConfirmation } from "@/services/email/allowance";
-import { sendEmail } from "@/services/email/send";
+import { sendToAddress } from "@/services/email/suppression";
 import { env } from "@/services/env";
 import { clientIp } from "@/services/rate-limit";
 import { readBody } from "@/services/request-body";
@@ -53,7 +53,7 @@ export async function POST(req: Request): Promise<Response> {
       limiter,
       allowance: () => takeConfirmation(kv, prefix, new Date()),
       signUp: signUpRow,
-      send: sendEmail,
+      send: (letter) => sendToAddress(letter, "transactional"),
       origin: travellerOrigin(req.headers.get("host"), current.VERCEL_ENV),
       from: current.SUBSCRIBE_EMAIL_FROM,
       token: () => randomBytes(32).toString("base64url"),

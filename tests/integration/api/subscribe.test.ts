@@ -17,6 +17,7 @@ const { store, sendEmail } = vi.hoisted(() => ({
   sendEmail: vi.fn(async () => ({ outcome: "sent", id: "msg_1" }) as const),
 }));
 vi.mock("@/services/subscriptions/store", () => store);
+vi.mock("@/services/announcements/store", () => ({ suppressionFor: async () => null }));
 vi.mock("@/services/email/send", () => ({ sendEmail }));
 vi.mock("@/services/email/allowance", () => ({ takeConfirmation: async () => "ok" }));
 

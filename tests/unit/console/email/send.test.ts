@@ -4,6 +4,10 @@ import { sendConsoleEmail } from "@/console/email/send";
 import { env, resetEnvCache } from "@/services/env";
 import { MemoryKv } from "@/services/kv";
 
+// Suppression is read from the database before every send; nothing here is suppressed, and the
+// wrapper's own refusals are pinned in tests/unit/services/email/suppression.test.ts.
+vi.mock("@/services/announcements/store", () => ({ suppressionFor: async () => null }));
+
 // The store console mail is counted against. A real one talks to Upstash; this one is read back
 // below to prove a console letter takes from the same daily allowance a sign-up confirmation does.
 const counter = new MemoryKv();

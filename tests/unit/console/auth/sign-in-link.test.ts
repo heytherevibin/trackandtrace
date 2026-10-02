@@ -17,6 +17,10 @@ const { createConsoleServiceDb } = vi.hoisted(() => ({
 }));
 vi.mock("@/console/auth/db", () => ({ createConsoleServiceDb }));
 
+// Suppression is read from the database before every send; nothing here is suppressed, and the
+// wrapper's own refusals are pinned in tests/unit/services/email/suppression.test.ts.
+vi.mock("@/services/announcements/store", () => ({ suppressionFor: async () => null }));
+
 const MEMBER = { user_id: "11111111-1111-1111-1111-111111111111", email: "asha@trakline.in", name: "Asha Rao", role: "owner", status: "active", key_count: 2 };
 
 function fakeDb(opts: { member?: unknown; hashedToken?: string; linkError?: boolean } = {}) {

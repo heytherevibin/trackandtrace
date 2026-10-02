@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { messages } from "@/messages";
-import type { Letter, SendResult } from "@/services/email/send";
+import type { Letter, SendResult } from "@/services/email/suppression";
 import { AppError } from "@/services/errors";
 import { addressKey, type RateLimiter } from "@/services/rate-limit";
 import { SUBSCRIBE_RATE_LIMIT } from "./limits";

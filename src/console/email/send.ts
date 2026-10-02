@@ -1,5 +1,5 @@
 import { countSent } from "@/services/email/allowance";
-import { sendEmail, type SendOutcome } from "@/services/email/send";
+import { sendToAddress, type SendOutcome } from "@/services/email/suppression";
 import { env } from "@/services/env";
 import { log } from "@/services/log";
 import { publicStoreForReading } from "@/services/shared-store";
@@ -13,7 +13,7 @@ export interface ConsoleLetter {
 }
 
 /**
- * Console email (spec §I). The sender itself is `@/services/email/send`, shared with the traveller
+ * Console email (spec §I). The sender itself is `@/services/email/suppression`, shared with the traveller
  * side, which cannot import `@/console/*`; this adds the one thing that is the console's own, its
  * From address.
  *
@@ -22,7 +22,7 @@ export interface ConsoleLetter {
  */
 export async function sendConsoleEmail(letter: ConsoleLetter): Promise<SendOutcome> {
   try {
-    const { outcome } = await sendEmail({ from: env().CONSOLE_EMAIL_FROM, ...letter });
+    const { outcome } = await sendToAddress({ from: env().CONSOLE_EMAIL_FROM, ...letter }, "transactional");
     // Counted, never gated. Console mail takes from the same daily allowance a sign-up confirmation
     // does, so a busy console leaves fewer confirmations — but an operator locked out because
     // travellers signed up would be the wrong failure, so nothing here can refuse a console letter.
