@@ -3,7 +3,7 @@ import { messages } from "@/messages";
 import { readerPlace } from "./drawing-mode";
 import { keyboardFocus, watchGlide, watchTab } from "./focus-glide";
 import { anchorOf, band, fitsRun, hereAt, layers, leanStep, offsets, runLayout, trainFor, type RunLayout } from "./geometry/run";
-import { LAYOUT_EVENT, emit } from "./journey-events";
+import { JUMP_EVENT, LAYOUT_EVENT, emit } from "./journey-events";
 import { keepPlace, laidOut, mastheadBottom, viewHeight, watchView, type ReadPlace } from "./keep-place";
 import { SMOOTH } from "./motion-tokens";
 import { keepUp, refreshObserver, track } from "./observers";
@@ -63,6 +63,9 @@ export function startRun({ motion }: JourneyContext): Teardown {
   let placeFrame = 0;
   let layoutFrame = 0;
   let aimed = -1; // the station a Tab stop's glide is bringing to the window, while watch is armed for it
+  // The station a link glides to the window, while watch is armed for it; `from`: the page as it began, was cut or taken up.
+  let linked: { readonly i: number; readonly section: HTMLElement; readonly from: number; readonly goal: number } | null = null;
+  let lastY = window.scrollY; // the page's scroll as the last scroll event found it: a relayout's own move comes after it
 
   /** The scroll at which station i stands at the window: the run's start (its top under the masthead) plus its anchor. */
   const stationY = (i: number, layout: RunLayout): number =>
@@ -162,6 +165,7 @@ export function startRun({ motion }: JourneyContext): Teardown {
     lean = 0;
     lastP = 0;
     aimed = -1;
+    linked = null;
     watch.disarm();
   };
 
@@ -288,6 +292,7 @@ export function startRun({ motion }: JourneyContext): Teardown {
     if (driver) refreshObserver(driver.observer);
     paint();
     if (run.offsetHeight !== before) emit(LAYOUT_EVENT);
+    retarget(); // the stations stand elsewhere, though the run's height may not have changed
   };
   const soon = () => {
     if (!layoutFrame) layoutFrame = requestAnimationFrame(() => relayout());
@@ -320,6 +325,7 @@ export function startRun({ motion }: JourneyContext): Teardown {
     measuredIn = { w: window.innerWidth, h: window.innerHeight };
   };
   const onScrolled = () => {
+    lastY = window.scrollY;
     if (!read) return;
     if (window.innerWidth === measuredIn.w && window.innerHeight === measuredIn.h) read = { ...read, y: window.scrollY };
     else if (steady()) learn(); // the window changed (a toolbar, a zoom, a resize still to land): measured afresh
@@ -349,6 +355,7 @@ export function startRun({ motion }: JourneyContext): Teardown {
   const onResize = () => {
     if (!at) soon(); // unpinned, a window that grew may fit now; pinned, the pin's observer answers
     else learn(); // a window change the pin did not follow (a toolbar): the place, measured afresh
+    retarget();
   };
 
   // Tab onto a link in a card: bring its station to the window (the page's own scroll-behavior glides it). Only the
@@ -362,6 +369,7 @@ export function startRun({ motion }: JourneyContext): Teardown {
     const station = el?.closest<HTMLElement>("[data-station]") ?? null;
     const i = station ? stations.indexOf(station) : -1;
     if (!el || i < 0 || !tab.down() || !keyboardFocus(el)) return;
+    linked = null; // a Tab's glide from here on, not a link's
     if (!layout) {
       // Not pinned (a reader below the run Shift+Tabs up into it): the browser glides to the card as to any link, and
       // the glide may bring the run's top into the window, pinning it at its start with the card clipped far to the
@@ -404,6 +412,14 @@ export function startRun({ motion }: JourneyContext): Teardown {
    * when). `aimed` stays: onFocus and a relayout reset it. */
   const watch = watchGlide(() => {
     const layout = at;
+    const link = linked;
+    if (link) {
+      if (!layout || document.activeElement !== link.section) return;
+      const goal = stationY(link.i, layout);
+      linked = { ...link, from: window.scrollY, goal };
+      window.scrollTo({ top: goal });
+      return;
+    }
     const i = aimed;
     const station = stations[i];
     if (layout && station?.contains(document.activeElement)) window.scrollTo({ top: stationY(i, layout) });
@@ -418,15 +434,45 @@ export function startRun({ motion }: JourneyContext): Teardown {
     if (!section || i < 0) return;
     event.preventDefault();
     window.history.pushState(null, "", `#${section.id}`);
-    window.scrollTo({ top: stationY(i, layout) });
+    const from = window.scrollY;
+    const goal = stationY(i, layout);
+    window.scrollTo({ top: goal });
     section.focus({ preventScroll: true });
+    // Watched from the click, as a Tab's glide is from its focus, and taken up while focus is where the click put it: a
+    // phone's toolbar resizes the window a few frames in, the glide's end set as it began (short of 07 in 4 runs in 10).
+    aimed = -1;
+    linked = Math.abs(goal - from) < 1 ? null : { i, section, from, goal };
+    if (linked) watch.arm(0, true);
   };
+  /** A place-keeping jump cut the link's glide (the watch hears it too): its course starts again from where it put the page. */
+  const onJump = () => {
+    if (!linked || !watch.armed()) return;
+    lastY = window.scrollY;
+    linked = { ...linked, from: lastY };
+  };
+  /** A relayout moved the station a link's glide is bringing to the window, with no jump to say so (a resize re-laying the
+   * run, or 02 above it refit): a cut, taken up as a jump's is, if the page stood on the glide's course until then; a
+   * reader a drag took off it keeps their place (focus-glide.ts's rule for a relayout). */
+  function retarget(): void {
+    const link = linked;
+    const goal = link && at && watch.armed() ? stationY(link.i, at) : null;
+    if (!link || goal === null || Math.abs(goal - link.goal) < 1) return;
+    if (!between(lastY, link.from, link.goal)) {
+      linked = null;
+      watch.disarm();
+      return;
+    }
+    linked = { ...link, goal };
+    watch.cut();
+  }
 
   decide();
   window.addEventListener(LAYOUT_EVENT, soon);
   window.addEventListener(LAYOUT_EVENT, learn); // after a piece above moved the reader by its own change
   window.addEventListener("scroll", onScrolled, { passive: true });
   window.addEventListener("resize", onResize);
+  window.addEventListener(LAYOUT_EVENT, retarget);
+  window.addEventListener(JUMP_EVENT, onJump);
   trackEl.addEventListener("focusin", onFocus);
   document.addEventListener("click", onClick);
   return () => {
@@ -437,6 +483,8 @@ export function startRun({ motion }: JourneyContext): Teardown {
     window.removeEventListener(LAYOUT_EVENT, learn);
     window.removeEventListener("scroll", onScrolled);
     window.removeEventListener("resize", onResize);
+    window.removeEventListener(LAYOUT_EVENT, retarget);
+    window.removeEventListener(JUMP_EVENT, onJump);
     pinObserver.disconnect();
     stopView();
     trackEl.removeEventListener("focusin", onFocus);

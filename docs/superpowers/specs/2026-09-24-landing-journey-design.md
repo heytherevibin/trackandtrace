@@ -474,6 +474,20 @@ of shape still lands on its start.
   or not: its move uses no window height, and J6-7's order holds. `viewHeight` reads the large viewport from the layout
   each time, never kept by the window's size.
 
+Decided after J6 (2026-10-02): an in-page link's glide is taken up again, as a Tab stop's is, when it is cut short.
+- The browser sets a glide's end as it begins. A window resized a few frames in (a phone's toolbar) moves every section
+  below a piece sized by the window (the still's columns, 02, the run) out from under that end, with no jump; a
+  place-keeping jump made meanwhile cancels the glide outright; and WebKit's own scroll anchoring, answering the resize,
+  stops it where it stands with nothing for the page to hear. Measured on the board's links to 07 and 08: short on every
+  run in Chromium's phone, and in about 4 runs in 10 in WebKit's.
+- The click arms the same watch a Tab's focus does, under the same bounds: taken up two frames after a jump, or after a
+  relayout that moved the target while the page stood on the glide's course, at most three times; let go by the reader's
+  own scroll (a wheel, a finger moving, a scrolling key), a press, or ten still frames. It is taken up to the link's
+  target at its landing while the address still names it (`focus-glide.ts`); a link to 06 or 07 of the running run to
+  its first station while focus is where the click put it (`run.ts`). No rule for a Tab's glide changed.
+- Scroll anchoring is held off (`overflow-anchor: none` on the root) only while a link's glide is watched, and given back
+  as the watch lets go. The page keeps its own places without it, as it does on every browser that has none.
+
 Found after J6, finishing 200% text (2026-09-29; 100% text unchanged throughout):
 - the masthead keeps one row at 390×844 with 200% text: below 16.5rem of its inner query container SIGN IN keeps only
   its icon (its name stays, visually hidden), as it already does below xs; 16.5rem is 264px at 100% text, inside xs.

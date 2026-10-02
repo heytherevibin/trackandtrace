@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { startFocusGlide } from "@/components/landing/journey/focus-glide";
-import { at, frames, jump, modality, policy, pressTab, relayout, reveal, tabOnto, setUpGlideRig } from "./focus-glide-rig";
+import { at, frames, glide, jump, modality, policy, pressTab, relayout, reveal, tabOnto, setUpGlideRig } from "./focus-glide-rig";
 import { testContext } from "./journey-context";
 
 // A relayout cuts a glide short too (the owner, 2026-09-28): the browser sets a glide's end as it begins, so a piece that
@@ -207,5 +207,131 @@ describe("a relayout never takes up a glide against the reader", () => {
     frames(3);
     expect(reveal).not.toHaveBeenCalled();
     stop();
+  });
+});
+
+// An in-page link's glide is cut short the same ways (the reviewer, 2026-10-01: a phone's toolbar resizing the window a few
+// frames into a tapped link's glide), and is taken up under the same bounds, to its target's landing. Scroll anchoring is
+// held off while it is watched: WebKit's stopped the glide with nothing to hear.
+describe("an in-page link's glide", () => {
+  /** A link to 04 above it on the page, 04 itself 1,400 px down (`at.box`, moved by relayout) with an 80 px scroll margin,
+   * and its click with the glide's first scroll. */
+  const tapLinkTo04 = () => {
+    const section = document.getElementById("reliability")!;
+    section.style.scrollMarginTop = "80px";
+    section.getBoundingClientRect = () => ({ top: at.box.top - at.y, bottom: at.box.bottom - at.y }) as DOMRect;
+    section.scrollIntoView = reveal;
+    const link = document.createElement("a");
+    link.href = "#reliability";
+    document.body.prepend(link);
+    window.location.hash = "#reliability"; // the browser's own navigation, which jsdom does not make
+    link.click();
+    glide();
+    frames(1);
+    return link;
+  };
+  const anchoring = () => document.documentElement.style.getPropertyValue("overflow-anchor");
+
+  it("is taken up, to its target's landing, when a relayout moved the target under it", () => {
+    const stop = startFocusGlide(testContext());
+    tapLinkTo04();
+    relayout(-240, "resize");
+    frames(3);
+    expect(reveal).toHaveBeenCalledTimes(1);
+    expect(reveal).toHaveBeenCalledWith({ block: "start" });
+    stop();
+  });
+
+  it("is taken up after a place-keeping jump, though focus never moved to its target", () => {
+    const stop = startFocusGlide(testContext());
+    tapLinkTo04();
+    jump();
+    frames(3);
+    expect(reveal).toHaveBeenCalledTimes(1);
+    stop();
+  });
+
+  it("holds scroll anchoring off while it is watched, and gives it back once the page has held still", () => {
+    const stop = startFocusGlide(testContext());
+    expect(anchoring()).toBe("");
+    tapLinkTo04();
+    expect(anchoring()).toBe("none");
+    frames(10);
+    expect(anchoring()).toBe("");
+    stop();
+  });
+
+  it("is the reader's once a finger moves on the page: nothing is taken up, and scroll anchoring is given back", () => {
+    const stop = startFocusGlide(testContext());
+    tapLinkTo04();
+    window.dispatchEvent(new Event("touchmove"));
+    expect(anchoring()).toBe("");
+    relayout(-240, "resize");
+    jump();
+    frames(3);
+    expect(reveal).not.toHaveBeenCalled();
+    stop();
+  });
+
+  it("is let go when the reader has gone elsewhere: the address names another place", () => {
+    const stop = startFocusGlide(testContext());
+    tapLinkTo04();
+    window.location.hash = "#faq";
+    jump();
+    frames(3);
+    expect(reveal).not.toHaveBeenCalled();
+    stop();
+  });
+
+  it("keeps a reader a drag took off its course where they are", () => {
+    const stop = startFocusGlide(testContext());
+    tapLinkTo04();
+    at.y = 6000; // far past 04: a scrollbar drag, which sends no wheel, touch or key
+    window.dispatchEvent(new Event("scroll"));
+    relayout(-240, "resize");
+    frames(3);
+    expect(reveal).not.toHaveBeenCalled();
+    expect(anchoring()).toBe("");
+    stop();
+  });
+
+  it("leaves a link to a section of the running run to run.ts, and a modified click to the browser", () => {
+    const stop = startFocusGlide(testContext());
+    const features = document.getElementById("features")!;
+    features.scrollIntoView = reveal;
+    const toRun = document.createElement("a");
+    toRun.href = "#features";
+    const modified = document.createElement("a");
+    modified.href = "#reliability";
+    document.body.prepend(toRun, modified);
+    document.getElementById("reliability")!.scrollIntoView = reveal;
+    toRun.click();
+    expect(anchoring()).toBe("");
+    modified.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, metaKey: true }));
+    expect(anchoring()).toBe("");
+    jump();
+    frames(3);
+    expect(reveal).not.toHaveBeenCalled();
+    stop();
+  });
+
+  it("leaves a Tab's glide as it was: scroll anchoring stays the browser's", () => {
+    const stop = startFocusGlide(testContext());
+    const set = vi.spyOn(document.documentElement.style, "setProperty");
+    tabOnto(policy());
+    jump();
+    frames(3);
+    expect(reveal).toHaveBeenCalledWith({ block: "center", inline: "nearest" });
+    expect(set).not.toHaveBeenCalledWith("overflow-anchor", "none");
+    stop();
+  });
+
+  it("gives scroll anchoring back when the journey ends mid-glide", () => {
+    const stop = startFocusGlide(testContext());
+    tapLinkTo04();
+    expect(anchoring()).toBe("none");
+    stop();
+    frames(1);
+    expect(anchoring()).toBe("");
   });
 });
