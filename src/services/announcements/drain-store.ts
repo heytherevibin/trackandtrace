@@ -33,7 +33,11 @@ import { createAdminSupabase } from "@/services/supabase/admin";
 //                                 Null is "has never sent", which the report measures from
 //                                 `queuedAt` instead — never from the epoch.
 //   * `announce_finish(p_letter uuid)`        void: `done` and `finished_at = now()` only from
-//                                 `queued` or `sending`, so a Stop that landed mid-run stays a Stop.
+//                                 `queued` or `sending`, so a Stop that landed mid-run stays a Stop,
+//                                 and only while NO delivery is `unknown`. An unknown letter stays
+//                                 open on purpose, so the stuck report names it every day until a
+//                                 human settles that row: `unknown` means we cannot say whether
+//                                 that person received the letter, so we do not know it is done.
 //   * THE TRANSITION `queued` -> `sending` HAPPENS IN `announce_claim`, on the first claim of a
 //     letter. Nothing in the runner writes it, and `announce_open_letters` returns both states.
 //   * TWO TIMESTAMPS ON A DELIVERY, with different jobs. `claimed_at` is set on EVERY claim, a
@@ -65,8 +69,14 @@ export type OpenLetter = {
 export type ClaimState = "sending" | "unknown";
 export type OpenClaim = {
   readonly personId: string;
-  /** The latest claim, a re-claim included. The claim's 15-minute floor reads this. */
-  readonly claimedAt: string;
+  /**
+   * The latest claim, a re-claim included. The claim's 15-minute floor reads this.
+   *
+   * Null for a row nobody claimed — which is what an operator settling a stuck delivery by hand
+   * writes, exactly as the runbook tells them to. Throwing on it would make one hand-written row
+   * fail every read of that letter for ever.
+   */
+  readonly claimedAt: string | null;
   /** The first claim, never moved. The 24-hour window reads this; null means unknown, which the runner treats as stale. */
   readonly firstAttemptedAt: string | null;
   /** Which kind of unsettled this is. The report's unknown rule reads it, and reads nothing without it. */
@@ -132,15 +142,18 @@ export async function openClaims(id: string): Promise<readonly OpenClaim[]> {
   if (error || !Array.isArray(data)) throw failed("announce_open_claims");
   return data.map((row) => {
     const r = record(row);
-    if (!r || !nonEmpty(r.personId) || !nonEmpty(r.claimedAt)) throw failed("announce_open_claims");
-    // Absent or null is "never recorded", not a failed read: the runner counts it stale, which is
-    // the side that never sends twice. Anything else that is not a string is a wrong answer.
+    if (!r || !nonEmpty(r.personId)) throw failed("announce_open_claims");
+    // Absent or null is "never recorded" for BOTH times, not a failed read: the runner counts an
+    // absent first attempt stale, which is the side that never sends twice, and a hand-settled row
+    // may carry no claim time at all. Anything else that is not a string is a wrong answer.
+    const claimed = r.claimedAt ?? null;
+    if (claimed !== null && typeof claimed !== "string") throw failed("announce_open_claims");
     const first = r.firstAttemptedAt ?? null;
     if (first !== null && typeof first !== "string") throw failed("announce_open_claims");
     // The state is ACTED ON — `unknown` is what the report names and `sending` is what the claim
     // may retry — so an unrecognised one is the store answering wrongly, not a row to guess at.
     if (r.state !== "sending" && r.state !== "unknown") throw failed("announce_open_claims");
-    return { personId: r.personId, claimedAt: r.claimedAt, firstAttemptedAt: first, state: r.state };
+    return { personId: r.personId, claimedAt: claimed, firstAttemptedAt: first, state: r.state };
   });
 }
 

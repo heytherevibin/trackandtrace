@@ -78,11 +78,19 @@ describe("the runner's reads", () => {
     expect((await openClaims("L")).map((r) => r.firstAttemptedAt)).toEqual([null, null]);
   });
 
-  it("refuses a claim whose first attempt is not a string or null, whose state it does not know, or whose person or claim time is missing", async () => {
+  it("carries a claim time that is missing as null, because a hand-settled row has none", async () => {
+    // The runbook tells an operator to settle a stuck delivery by hand, and a row written by hand
+    // has no claim time. Throwing on it would make that ONE row fail every read of that letter, for
+    // ever — and the letter it belongs to is by definition the one somebody is trying to fix.
+    rpc.mockResolvedValueOnce({ data: [{ personId: "p1", firstAttemptedAt: null, state: "unknown" }, { personId: "p2", claimedAt: null, firstAttemptedAt: null, state: "unknown" }], error: null });
+    expect((await openClaims("L")).map((r) => r.claimedAt)).toEqual([null, null]);
+  });
+
+  it("refuses a claim whose times are not strings, whose state it does not know, or that names no person", async () => {
     for (const bad of [
       { personId: "p1", claimedAt: "x", firstAttemptedAt: 5, state: "sending" },
+      { personId: "p1", claimedAt: 5, firstAttemptedAt: null, state: "sending" },
       { claimedAt: "x", firstAttemptedAt: null, state: "sending" },
-      { personId: "p1", firstAttemptedAt: null, state: "sending" },
       { personId: "p1", claimedAt: "x", firstAttemptedAt: null },
       { personId: "p1", claimedAt: "x", firstAttemptedAt: null, state: "pending" },
     ]) {

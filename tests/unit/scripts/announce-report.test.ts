@@ -72,7 +72,7 @@ describe("the exit code the runner answers", () => {
     const out = run({
       letters: [open("L1")],
       remaining: { L1: { pending: 10, sending: 1, lastSentAt: hoursAgo(1) } },
-      claims: { L1: [{ personId: "p1", claimedAt: hoursAgo(1), firstAttemptedAt: hoursAgo(30) }] },
+      claims: { L1: [{ personId: "p1", claimedAt: hoursAgo(1), firstAttemptedAt: hoursAgo(30), state: "sending" }] },
     });
     expect(await out.result).toBe(1);
     expect(out.said.join("\n")).toContain("1 delivery claimed over 24 hours ago and never marked");
@@ -98,7 +98,7 @@ describe("the exit code the runner answers", () => {
     const out = run({
       letters: [open("L1")],
       remaining: { L1: { pending: 10, sending: 1, lastSentAt: hoursAgo(1) } },
-      claims: { L1: [{ personId: "p1", claimedAt: hoursAgo(1 / 3), firstAttemptedAt: hoursAgo(1 / 3) }] },
+      claims: { L1: [{ personId: "p1", claimedAt: hoursAgo(1 / 3), firstAttemptedAt: hoursAgo(1 / 3), state: "sending" }] },
     });
     expect(await out.result).toBe(0);
     expect(out.said.join("\n")).toMatch(/nothing is stuck/i);
@@ -145,6 +145,24 @@ describe("the exit code the runner answers", () => {
     expect(await out.result).toBe(2);
     expect(out.complained).toEqual([]);
     expect(out.said.join("\n")).toContain("BAD");
+  });
+
+  it("skips a letter whose claims carry no state, rather than assuming they are all sending", async () => {
+    // A claim's state is what the unknown rule reads. Defaulting an absent one to "sending" would
+    // keep alive exactly the assembly that made that rule read nothing: every row in flight, no row
+    // ever unknown, a clean bill of health that measured one of the three rules and called it three.
+    // So an answer without it is a wrong shape, and a wrong shape skips its letter and says so.
+    const out = run({
+      letters: [open("BAD"), open("L2")],
+      remaining: { L2: { pending: 10, sending: 0, lastSentAt: hoursAgo(100) } },
+      claims: { BAD: [{ personId: "p1", claimedAt: hoursAgo(1), firstAttemptedAt: hoursAgo(1) }] },
+    });
+    expect(await out.result).toBe(2);
+    expect(out.complained).toEqual([]);
+    const text = out.said.join("\n");
+    expect(text).toContain("BAD");
+    expect(text).toMatch(/skipped/);
+    expect(text).toContain("L2");
   });
 
   it("skips a letter it cannot read, says so, reports the rest, and does not call the run clean", async () => {
@@ -242,7 +260,7 @@ describe("what the runner prints", () => {
   const world: World = {
     letters: [open("L1")],
     remaining: { L1: { pending: 10, sending: 1, lastSentAt: hoursAgo(100) } },
-    claims: { L1: [{ personId: "p1", email: "someone@example.com", claimedAt: hoursAgo(30), firstAttemptedAt: hoursAgo(30) }] },
+    claims: { L1: [{ personId: "p1", email: "someone@example.com", claimedAt: hoursAgo(30), firstAttemptedAt: hoursAgo(30), state: "sending" }] },
   };
 
   it("is a letter's id and a reason, never its subject, its body, an address or a person", async () => {

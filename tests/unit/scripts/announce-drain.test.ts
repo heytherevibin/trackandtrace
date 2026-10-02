@@ -45,7 +45,7 @@ const letter = (over: Partial<Letter> = {}): Letter => ({
 
 type Door = { outcome: "sent"; id: string } | { outcome: "captured" } | { outcome: "failed" } | { outcome: "suppressed" };
 type Rows = { personId: string; email: string }[];
-type Claim = { personId: string; claimedAt: string; firstAttemptedAt: string | null };
+type Claim = { personId: string; claimedAt: string | null; firstAttemptedAt: string | null; state: string };
 type Left = { pending: number; sending: number };
 
 const AB: Rows = [{ personId: "p1", email: "a@example.in" }, { personId: "p2", email: "b@example.in" }];
@@ -172,7 +172,7 @@ describe("every call is about the letter being drained", () => {
   it("asks about, claims for, marks and finishes the picked letter and no other", async () => {
     // Claiming another letter's rows would send them this letter's subject and body, mark rows the
     // letter does not own, and leave the other letter's rows `sending` forever.
-    const { w, seen, log } = world({ claims: [{ personId: "old", claimedAt: hoursAgo(1), firstAttemptedAt: hoursAgo(30) }] });
+    const { w, seen, log } = world({ claims: [{ personId: "old", claimedAt: hoursAgo(1), firstAttemptedAt: hoursAgo(30), state: "sending" }] });
     await run(w);
     for (const fn of ["stateOf", "openClaims", "remaining", "claim", "mark", "finish"]) {
       expect(seen[fn]?.length, `${fn} was called`).toBeGreaterThan(0);
@@ -187,14 +187,32 @@ describe("a run, in order", () => {
     const claims = [
       // Re-claimed 30 minutes ago, but its idempotency key was first used 25 hours ago, so Resend
       // has forgotten it: a retry now could send the letter twice.
-      { personId: "old", claimedAt: hoursAgo(0.5), firstAttemptedAt: hoursAgo(25) },
-      { personId: "fresh", claimedAt: hoursAgo(1 / 3), firstAttemptedAt: hoursAgo(23) },
+      { personId: "old", claimedAt: hoursAgo(0.5), firstAttemptedAt: hoursAgo(25), state: "sending" },
+      { personId: "fresh", claimedAt: hoursAgo(1 / 3), firstAttemptedAt: hoursAgo(23), state: "sending" },
     ];
     const { w, log } = world({ claims });
     await run(w);
     expect(log[0]).toBe("mark L1 old unknown null");
     expect(log.indexOf("mark L1 old unknown null")).toBeLessThan(log.findIndex((l) => l.startsWith("take")));
     expect(log.some((l) => l.startsWith("mark L1 fresh"))).toBe(false);
+  });
+
+  it("never re-marks a row that is ALREADY unknown, however old its first attempt is", async () => {
+    // `openClaims` answers with everything unsettled — `sending` and `unknown` alike — and the
+    // store deliberately leaves a letter OPEN while any row is unknown, so this read returns that
+    // row on every run from now until a human settles it. Without the filter each run would mark it
+    // unknown again, count it in `stale`, and print "1 claimed over 24 hours ago, so it is now
+    // unknown" — work it did not do, every day. Nobody is mailed either way; the log is the damage.
+    const claims = [
+      { personId: "settled", claimedAt: hoursAgo(1), firstAttemptedAt: hoursAgo(90), state: "unknown" },
+      { personId: "old", claimedAt: hoursAgo(1), firstAttemptedAt: hoursAgo(30), state: "sending" },
+    ];
+    const { w, log, said } = world({ claims });
+    const summary = await run(w);
+    expect(log.some((l) => l.includes("settled"))).toBe(false);
+    expect(log).toContain("mark L1 old unknown null");
+    expect(summary.stale).toBe(1);
+    expect(said.join("\n")).toContain("1 claimed over 24 hours ago");
   });
 
   it("claims exactly what the day's budget allowed", async () => {
@@ -403,7 +421,7 @@ describe("what a run prints", () => {
       letters: [letter({ subject: "SUBJECT-MARKER-4471", body: "BODY-MARKER-9023 and more" })],
       rows: [{ personId: "p1", email: "a@example.in" }, { personId: "p2", email: "b@example.in" }, { personId: "p3", email: "c@example.in" }],
       remaining: [{ pending: 3, sending: 0 }, { pending: 0, sending: 1 }],
-      claims: [{ personId: "old", claimedAt: hoursAgo(1), firstAttemptedAt: hoursAgo(30) }],
+      claims: [{ personId: "old", claimedAt: hoursAgo(1), firstAttemptedAt: hoursAgo(30), state: "sending" }],
       door: (to) => (to === "a@example.in" ? { outcome: "suppressed" } : to === "b@example.in" ? { outcome: "failed" } : { outcome: "sent", id: "provider-id-77" }),
     });
     await run(w);

@@ -88,31 +88,39 @@ revoke all on all tables in schema announcements from public, anon, authenticate
 -- The availability list promised exactly one email ("One email, nothing else", on the sign-up form).
 -- A trigger, not a convention: the console refusing is a second line of defence, not the only one.
 --
--- It counts a SEND, not a letter. If it counted any letter that had been queued, then stopping one
--- would spend the list for good — including a letter stopped before a single delivery went out, so
--- an operator who queues it, spots a typo in the first line and stops it has destroyed their one
--- use of the list. That is the opposite of what a Stop is for: a Stop must cost nothing but the mail
--- already sent. So: stopped with nothing sent leaves the list available; stopped after some went out
--- spends it, because those readers cannot be un-mailed.
+-- It counts a SEND, not merely a letter. If it counted any letter that had been queued, then
+-- stopping one would spend the list for good — including a letter stopped before a single delivery
+-- went out, so an operator who queues it, spots a typo in the first line and stops it has destroyed
+-- their one use of the list. That is the opposite of what a Stop is for: a Stop must cost nothing
+-- but the mail already sent. So: stopped with nothing sent leaves the list available; stopped after
+-- some went out spends it, because those readers cannot be un-mailed.
 --
--- It also only looks when a letter is being CREATED or made live. Moving one to `stopped` or `done`
--- is never refused, or the second of two open letters could not even be stopped once the first sent.
+-- It ALSO counts a letter that is currently LIVE — `queued` or `sending` — and that is not tidiness.
+-- Without it two availability letters could both be queued while neither had sent, and then the
+-- refusal would land inside the send path: A sends, the next run picks B, and B's `queued` ->
+-- `sending` transition raises, so the announce job fails every day until a human stops B. A data
+-- condition would have become a crash in the worst place there is. Counting a live letter puts the
+-- refusal at QUEUE time, where the console can show it and nothing is mid-flight.
+--
+-- It only looks when a letter is being CREATED or made live. Moving one to `stopped` or `done` is
+-- never refused: a Stop must always be allowed to land.
 create or replace function announcements.one_availability_letter() returns trigger
 language plpgsql security definer set search_path = '' as $$
-declare v_live boolean := false;
+declare v_going_live boolean := false;
 begin
   if new.list <> 'availability' then return new; end if;
   -- `old` is unassigned on an insert, and SQL does not promise to short-circuit an `or`, so this is
   -- branched rather than written as one condition.
   if tg_op = 'INSERT' then
-    v_live := true;
+    v_going_live := true;
   elsif new.state is distinct from old.state and new.state in ('queued', 'sending') then
-    v_live := true;
+    v_going_live := true;
   end if;
-  if v_live and exists (
+  if v_going_live and exists (
     select 1 from announcements.letters l
-      join announcements.deliveries d on d.letter_id = l.id
-     where l.list = 'availability' and l.id <> new.id and d.state = 'sent'
+     where l.list = 'availability' and l.id <> new.id
+       and (l.state in ('queued', 'sending')
+            or exists (select 1 from announcements.deliveries d where d.letter_id = l.id and d.state = 'sent'))
   ) then
     raise exception 'the availability list is spent: it promised exactly one email';
   end if;
@@ -173,9 +181,20 @@ end $$;
 -- Claiming the first batch is also what moves the letter from `queued` to `sending`. Nothing else
 -- knows that work has started, and a letter left `queued` for ever would keep coming back from
 -- `announce_open_letters` after its last send.
+--
+-- Nothing is claimed on a letter that is not open. The runner reads the state before it claims, but
+-- a Stop that lands in between would otherwise move forty rows to `sending` with fresh clocks on a
+-- STOPPED letter: nothing is mailed, but `announce_finish` will never move them and the stuck report
+-- excludes stopped letters, so those rows would sit unsettled for ever, invisible to every check.
 create or replace function public.announce_claim(p_letter uuid, p_limit int) returns setof jsonb
 language plpgsql security definer set search_path = '' as $$
 begin
+  if not exists (
+    select 1 from announcements.letters l where l.id = p_letter and l.state in ('queued', 'sending')
+  ) then
+    return;
+  end if;
+
   update announcements.letters set state = 'sending' where id = p_letter and state = 'queued';
 
   return query
@@ -336,13 +355,28 @@ language sql stable security definer set search_path = '' as $$
    where d.letter_id = p_letter;
 $$;
 
--- Done, and only from `queued` or `sending`. The `where` clause is the whole point: a Stop that
--- landed mid-run must stay a Stop, and a blind update would quietly resurrect it to `done`.
+-- Done, and only from `queued` or `sending`, and only while NOTHING IS UNKNOWN. Both halves of that
+-- `where` clause are the whole point of this function.
+--
+-- A Stop that landed mid-run must stay a Stop, and a blind update would quietly resurrect it.
+--
+-- And a letter with an `unknown` delivery is not finished, because `unknown` means we cannot say
+-- whether that person received it — so we do not know that the letter is done. Without this the row
+-- is buried the moment it is written: `announce_remaining` counts an `unknown` as neither pending
+-- nor sending, so the same run that marks it reports nothing left and finishes the letter, and the
+-- stuck report reads open letters only and never sees it again. The rule that exists to surface an
+-- unknown would name nothing, ever, for any letter inside one day's allowance.
+--
+-- So the letter stays open and the report names it every day until a human settles that row — to
+-- `sent` or to `skipped` — and the daily run stays red until they do. That is intended: `unknown` is
+-- never normal, and a red run is the only state anyone notices.
 create or replace function public.announce_finish(p_letter uuid) returns void
 language sql security definer set search_path = '' as $$
   update announcements.letters
      set state = 'done', finished_at = now()
-   where id = p_letter and state in ('queued', 'sending');
+   where id = p_letter and state in ('queued', 'sending')
+     and not exists (
+       select 1 from announcements.deliveries d where d.letter_id = p_letter and d.state = 'unknown');
 $$;
 
 -- ---------------------------------------------------------------------------

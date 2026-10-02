@@ -16,7 +16,8 @@
 //      safely — 24 hours is Resend's idempotency window, past which a repeat may duplicate — so it
 //      is marked `unknown` and never touched again. THIS RUN IS THE ONLY WRITER OF `unknown`:
 //      nothing else moves those rows, and a row left `sending` forever makes a finished letter look
-//      permanently in flight.
+//      permanently in flight. Only rows still `sending` are considered — `openClaims` answers with
+//      everything UNSETTLED, and a row already `unknown` is settled as far as this run goes.
 //   3. `suppressed` IS A SKIP, never a failure. The row is marked `skipped`. Retrying a suppressed
 //      address every day forever would spend the day's budget on mail that will never go.
 //   4. A `failed` SEND LEAVES THE ROW `sending`, unmarked, for the next run to retry inside the
@@ -30,6 +31,12 @@
 //
 // Also decided here, and worth knowing: a letter is `done` only when nothing is pending AND nothing
 // is still `sending`. A failed row waiting for its retry is not finished mail.
+//
+// AND THE DATABASE HAS A CONDITION OF ITS OWN: `announce_finish` refuses while any delivery is
+// `unknown`, because `unknown` means we cannot say whether that person received the letter, so we do
+// not know the letter is done. The letter stays open and the stuck report names it every day until a
+// human settles the row. This run cannot tell the difference — it calls `finish` and says the letter
+// is done — so BELIEVE THE STORE, not the line this prints, on a letter that carries an unknown.
 //
 // WHAT THIS CANNOT SEE. It never learns whether a `sent` message was delivered: that is the webhook's
 // business, not the runner's. A send whose mark then failed is left `sending` and retried under the
@@ -57,7 +64,7 @@ const BATCHES_MAX = 50;
 
 /**
  * @typedef {{ id: string, list: "news" | "availability", subject: string, body: string, state: string, queuedAt: string }} OpenLetter
- * @typedef {{ personId: string, claimedAt: string, firstAttemptedAt?: string | null }} OpenClaim
+ * @typedef {{ personId: string, claimedAt: string | null, firstAttemptedAt?: string | null, state?: string }} OpenClaim
  */
 
 /**
@@ -202,8 +209,14 @@ export async function drain(world, { origin, from, batchMax }) {
   summary.letterId = letter.id;
   world.say(`[announce] letter ${letter.id} (${letter.list} list) is the oldest open one.`);
 
-  // Before anything is claimed: see decision 2.
-  for (const personId of staleClaims(await world.openClaims(letter.id), world.now())) {
+  // Before anything is claimed: see decision 2. Only the rows that are still `sending`, because
+  // `openClaims` answers with everything UNSETTLED, and an `unknown` row is already settled. The
+  // filter is not tidiness: `announce_finish` deliberately leaves a letter open while any delivery
+  // is `unknown`, so that row comes back on every run from now until a human settles it, and
+  // without the filter each run would mark it `unknown` again, count it in `stale`, and print
+  // "N claimed over 24 hours ago, so they are now unknown" — work it did not do, every day.
+  const unsettled = (await world.openClaims(letter.id)).filter((row) => row.state === "sending");
+  for (const personId of staleClaims(unsettled, world.now())) {
     await world.mark(letter.id, personId, "unknown", null);
     summary.stale += 1;
   }

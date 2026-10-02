@@ -53,7 +53,7 @@ const reason = (error) => (error instanceof Error ? error.message : "unknown err
  * tolerates a bad row on purpose, and a report that dies on one is a report that stops reporting.
  * Skipped makes the run incomplete, so it exits 2 whatever else was found: see `exitCodeFor`.
  *
- * @param {{ openLetters: () => Promise<readonly { id: string, state: string, queuedAt: string }[]>, remainingFor: (id: string) => Promise<{ pending: number, sending: number, lastSentAt?: string | null }>, openClaims: (id: string) => Promise<readonly { personId: string, claimedAt: string, firstAttemptedAt: string | null, state?: string }[]> }} reads
+ * @param {{ openLetters: () => Promise<readonly { id: string, state: string, queuedAt: string }[]>, remainingFor: (id: string) => Promise<{ pending: number, sending: number, lastSentAt?: string | null }>, openClaims: (id: string) => Promise<readonly { personId: string, claimedAt: string | null, firstAttemptedAt: string | null, state: string }[]> }} reads
  * @param {{ now: () => Date, say: (line: string) => void }} world
  * @returns {Promise<number>}
  */
@@ -71,11 +71,13 @@ export async function report(reads, { now, say }) {
       const [remaining, claims] = await Promise.all([reads.remainingFor(one.id), reads.openClaims(one.id)]);
       if (typeof remaining?.pending !== "number" || typeof remaining.sending !== "number") throw new Error("the store gave no counts");
       if (!Array.isArray(claims)) throw new Error("the store gave no list of claims");
-      // Each row's OWN state, never a constant. `openClaims` returns the deliveries that are not
-      // settled, which is `sending` and `unknown` alike, and the unknown rule is fed by exactly
-      // this field: written as `"sending"` the rule passes its own tests and names nothing for ever.
-      // A stand-in store that supplies no state is read as `sending`, which is what every row was.
-      const claimRows = claims.map((claim) => ({ letterId: one.id, personId: claim.personId, state: claim.state ?? "sending", claimedAt: claim.claimedAt, firstAttemptedAt: claim.firstAttemptedAt }));
+      // Each row's OWN state, never a constant and never a default. `openClaims` returns the
+      // deliveries that are not settled, which is `sending` and `unknown` alike, and the unknown
+      // rule is fed by exactly this field: written as `"sending"` the rule passes its own tests and
+      // names nothing for ever. Defaulting an absent one to `"sending"` would keep that path alive,
+      // so a store that does not answer it SKIPS the letter and says so, like any other wrong shape.
+      if (!claims.every((claim) => typeof claim.state === "string")) throw new Error("the store gave a claim with no state");
+      const claimRows = claims.map((claim) => ({ letterId: one.id, personId: claim.personId, state: claim.state, claimedAt: claim.claimedAt, firstAttemptedAt: claim.firstAttemptedAt }));
       // Absent and null both mean "has never sent", and the verdict reads them the same. Only the
       // note below tells them apart, for a store old enough not to answer the field at all.
       if (remaining.lastSentAt === undefined) unmeasured += 1;
