@@ -503,6 +503,16 @@ Found after J6 (2026-10-02): the live pin's sticky top after a resize is its lab
   and 90%, both ways and with anchoring on and off, in Chromium and WebKit, the drawing live or still: within 1 px
   (0.0003 of its range). Its guard needed no change; `place.spec.ts` now holds both there.
 
+Found after J6 (2026-10-02): 02's guard reads the reader's place as 02 itself decides to pin or to let its pin go.
+- The guard learns the reader's scroll from "scroll" events, and none once #how has changed size until it has settled
+  (such an event may be the browser's own move). A reader below a plain 02 who jumps to the top can have 02 pin (its
+  refit's timer, a "resize") before that jump's event is told: judged from the place before it, they were "past 02" and
+  thrown back down by the pin's growth, to the run, where the drawing stays still (1 run in 30 at 6× CPU, and in 1 of 60
+  measured again).
+- `chapters.ts` now says when 02 is about to pin or to try its fit again (`tt:how-before`), and the guard reads the
+  reader's place and #how's box then, as it does on `tt:layout` and before Motion's switch. The rules for a resize, a
+  change of shape, the split resize and the Back restore are unchanged.
+
 Found after J6, finishing 200% text (2026-09-29; 100% text unchanged throughout):
 - the masthead keeps one row at 390×844 with 200% text: below 16.5rem of its inner query container SIGN IN keeps only
   its icon (its name stays, visually hidden), as it already does below xs; 16.5rem is 264px at 100% text, inside xs.
