@@ -22,7 +22,7 @@ export interface ConsoleLetter {
  */
 export async function sendConsoleEmail(letter: ConsoleLetter): Promise<SendOutcome> {
   try {
-    const outcome = await sendEmail({ from: env().CONSOLE_EMAIL_FROM, ...letter });
+    const { outcome } = await sendEmail({ from: env().CONSOLE_EMAIL_FROM, ...letter });
     // Counted, never gated. Console mail takes from the same daily allowance a sign-up confirmation
     // does, so a busy console leaves fewer confirmations — but an operator locked out because
     // travellers signed up would be the wrong failure, so nothing here can refuse a console letter.

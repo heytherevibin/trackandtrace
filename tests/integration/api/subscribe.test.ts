@@ -14,7 +14,7 @@ const { store, sendEmail } = vi.hoisted(() => ({
     rejoinRow: vi.fn(async () => "done"),
     personId: vi.fn(),
   },
-  sendEmail: vi.fn(async () => "sent" as const),
+  sendEmail: vi.fn(async () => ({ outcome: "sent", id: "msg_1" }) as const),
 }));
 vi.mock("@/services/subscriptions/store", () => store);
 vi.mock("@/services/email/send", () => ({ sendEmail }));

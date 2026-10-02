@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { messages } from "@/messages";
-import type { Letter, SendOutcome } from "@/services/email/send";
+import type { Letter, SendResult } from "@/services/email/send";
 import { AppError } from "@/services/errors";
 import { addressKey, type RateLimiter } from "@/services/rate-limit";
 import { SUBSCRIBE_RATE_LIMIT } from "./limits";
@@ -24,7 +24,7 @@ export interface SubscribeDeps {
   readonly limiter: RateLimiter;
   readonly allowance: () => Promise<"ok" | "spent" | "unknown">;
   readonly signUp: (ask: SubscribeAsk, tokenHash: Buffer) => Promise<"send" | "quiet">;
-  readonly send: (letter: Letter) => Promise<SendOutcome>;
+  readonly send: (letter: Letter) => Promise<SendResult>;
   readonly origin: string;
   readonly from: string;
   readonly token: () => string;
@@ -70,5 +70,5 @@ export async function subscribe(ask: SubscribeAsk, ip: string, deps: SubscribeDe
   });
   // A send that failed leaves a pending row, which the seven-day purge removes. Saying so is better
   // than the alternative: "check your inbox" for an email that was never sent.
-  if (sent === "failed") throw new AppError("SOURCE_UNAVAILABLE", m.errors.failed);
+  if (sent.outcome === "failed") throw new AppError("SOURCE_UNAVAILABLE", m.errors.failed);
 }
