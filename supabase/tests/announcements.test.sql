@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(131);
+select plan(137);
 
 -- Announcements (06-B). The schema is private: nothing reaches it except through the
 -- security-definer functions, and only service_role may call those.
@@ -313,16 +313,58 @@ select is(
      from public.announce_claim(p_letter => 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1', p_limit => 10) j),
   '["77777777-7777-4777-8777-777777777777", "99999999-9999-4999-8999-999999999999"]'::jsonb,
   'the claim takes EXACTLY the two still subscribed: a withdrawal on this list stops the send, and one on another list does not');
+-- The withdrawn reader's row is SETTLED, with its own reason. Not left `pending`: a row that can
+-- never be claimed would stop the letter's pending count ever reaching zero, so `drain` would never
+-- finish it and the report would name it from 48 hours on for ever — and somebody unsubscribing is
+-- an ordinary event, so the common case would produce a finding that never clears.
+--
+-- And not `suppressed`, which is a different fact: one is the reader's choice, the other is the
+-- provider refusing the address. The nulls are asserted too, because a claim that actually SENT to
+-- them and then marked the row would otherwise look much the same from the state alone.
 select is(
-  (select state from announcements.deliveries
+  (select array[state, skip_reason, coalesce(sent_at::text, 'no send time'), coalesce(provider_id, 'no provider id')]
+     from announcements.deliveries
     where letter_id = 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1' and person_id = '88888888-8888-4888-8888-888888888888'),
-  'pending', 'and the withdrawn reader''s row is left exactly as it was: a claim either takes a row or does not touch it');
--- Said out loud because it is the cost of the rule above, and because a letter that can never finish
--- is a report that is red for ever, which is a report nobody reads. A withdrawn reader's row stays
--- `pending`, so this letter's `pending` count never reaches zero and `drain` never finishes it. Who
--- settles that row is not decided here; see the report.
-select is(public.announce_remaining(p_letter => 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1') -> 'pending',
-  '1'::jsonb, 'the declined row still counts as pending, so nothing finishes this letter on its own');
+  array['skipped', 'consent withdrawn', 'no send time', 'no provider id'],
+  'the withdrawn reader''s row is skipped, says WHY in its own words, and carries no send time and no provider id');
+-- A reader who withdraws AFTER her row was claimed. Settling cannot help here — a row in flight may
+-- already have been accepted by Resend, so calling it skipped could be a lie about what she
+-- received — so the refusal has to come from the claim's own select. This is the ONLY assertion that
+-- holds that check: with the settling above in place, a withdrawn `pending` row is never offered to
+-- the claim at all, so removing the check would pass every other assertion here.
+update subscriptions.consents set withdrawn_at = now()
+ where person_id = '77777777-7777-4777-8777-777777777777' and list = 'news';
+update announcements.deliveries
+   set claimed_at = now() - interval '30 minutes', first_attempted_at = now() - interval '30 minutes'
+ where letter_id = 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1'
+   and person_id in ('77777777-7777-4777-8777-777777777777', '99999999-9999-4999-8999-999999999999');
+select is(
+  (select jsonb_agg(j ->> 'personId' order by j ->> 'personId')
+     from public.announce_claim(p_letter => 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1', p_limit => 10) j),
+  '["99999999-9999-4999-8999-999999999999"]'::jsonb,
+  'a re-claim takes only the reader who is still subscribed: both rows are past the 15-minute floor, and consent is what separates them');
+select is(
+  (select array[state, coalesce(skip_reason, 'no reason')] from announcements.deliveries
+    where letter_id = 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1' and person_id = '77777777-7777-4777-8777-777777777777'),
+  array['sending', 'no reason'],
+  'and her in-flight row is left `sending`, never rewritten as skipped: Resend may already have accepted it, and `unknown` is the honest route for it');
+
+-- And the property that actually matters: the letter finishes by itself. The rows are settled the way
+-- a real run settles them — hers as a send, because it was already on its way when she withdrew.
+select lives_ok(
+  $$select public.announce_mark(p_letter => 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1',
+      p_person => '77777777-7777-4777-8777-777777777777', p_state => 'sent', p_provider_id => 'resend-3')$$,
+  'the first consented reader is sent to');
+select lives_ok(
+  $$select public.announce_mark(p_letter => 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1',
+      p_person => '99999999-9999-4999-8999-999999999999', p_state => 'sent', p_provider_id => 'resend-4')$$,
+  'and so is the one who only left another list');
+select is(public.announce_remaining(p_letter => 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1') - 'lastSentAt',
+  '{"pending": 0, "sending": 0}'::jsonb,
+  'nothing is left: the withdrawn row is not holding the letter open');
+select lives_ok($$select public.announce_finish(p_letter => 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1')$$, 'so the run finishes it');
+select is(public.announce_letter_state(p_letter => 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1'), 'done',
+  'and it is done, with no hand remedy and no permanent report finding');
 
 -- ---------------------------------------------------------------------------
 -- announce_open_claims: unsettled means sending OR unknown, and each row says which it is. Without
@@ -443,7 +485,7 @@ insert into announcements.letters (id, list, subject, body, state, created_by, q
   ('d0ddddd0-dddd-4ddd-8ddd-dddddddddd02', 'news', 's', 'b', 'done',    gen_random_uuid(), now());
 select is(
   (select array_agg(j ->> 'id' order by j ->> 'id') from public.announce_open_letters() j)::text,
-  '{a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1,aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa,bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb,eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee}',
+  '{aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa,bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb,eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee}',
   'only the queued and the sending letters are open: not the draft, the stopped ones or the done one');
 select is(
   (select array_agg(k order by k) from public.announce_open_letters() j, jsonb_object_keys(j) k

@@ -2,6 +2,15 @@
 -- no policies, and every read and write through a security-definer function granted to service_role
 -- alone, exactly as `20260930090000_subscriptions.sql` has it.
 --
+-- CHANGING A FUNCTION'S SIGNATURE HERE NEEDS A `drop function if exists` FOR THE OLD ONE FIRST.
+-- `create or replace function` cannot replace a signature: it creates a SECOND OVERLOAD and leaves
+-- the first one alive, granted to service_role and callable. That is not theoretical — it happened
+-- while this file was being written, and the stale `announce_queue(uuid)` was a function that
+-- skipped the test-send guard and recorded no member, with PostgREST resolving a one-argument call
+-- straight to it. What caught it was the pgTAP assertion that COUNTS the functions granted to
+-- service_role, which is why that assertion is worth keeping even though it looks redundant beside
+-- the ones that name functions individually.
+--
 -- THE CONTRACT for the eleven functions is `src/services/announcements/store.ts` and
 -- `src/services/announcements/drain-store.ts`. The TypeScript wrappers destructure camelCase keys,
 -- so every returned object is built with `jsonb_build_object('personId', …)` and a snake_case key
@@ -247,6 +256,26 @@ begin
 
   update announcements.letters set state = 'sending' where id = p_letter and state = 'queued';
 
+  -- A reader who unsubscribed mid-drain is SETTLED, not left pending. Leaving the row alone would be
+  -- the defensive choice and the wrong end state: the row could never be claimed, so the letter's
+  -- pending count would never reach zero, `drain` would never finish it, and the report would name
+  -- it from 48 hours on for ever. Somebody unsubscribing is an ordinary event, so the common case
+  -- would produce a finding that never clears — and a report with a permanent entry is one nobody
+  -- reads. Marked here it closes itself, and the row still says why that person was never mailed.
+  --
+  -- The reason is its OWN reason, not `suppressed`. A withdrawal and a suppression are different
+  -- facts: one is the reader's choice, the other is the provider refusing the address. An operator
+  -- reading the row deserves the true one, and the console shows it.
+  --
+  -- ONLY a `pending` row, never one already `sending`. A row in flight may have been accepted by
+  -- Resend before the connection dropped, so calling it `skipped` could be a lie about what the
+  -- reader received. Those take the `unknown` route instead, which is the state that says we cannot
+  -- tell, and a person settles it.
+  update announcements.deliveries d
+     set state = 'skipped', skip_reason = 'consent withdrawn'
+   where d.letter_id = p_letter and d.state = 'pending'
+     and not announcements.may_receive(d.person_id, v_list);
+
   return query
   with taken as (
     update announcements.deliveries d
@@ -272,8 +301,9 @@ begin
     from taken t join subscriptions.people p on p.id = t.person_id;
 end $$;
 
--- One delivery's outcome. `skipped` always carries its reason: `suppressed` is the only skip this
--- runner makes, and a skipped row with no stated reason is a row nobody can account for later. A
+-- One delivery's outcome. `skipped` always carries its reason: `suppressed` is the only skip the
+-- SENDER makes — the claim makes the other one, `consent withdrawn` — and a skipped row with no
+-- stated reason is a row nobody can account for later. A
 -- null provider id leaves whatever was there, so marking a sent row `unknown` does not erase the id
 -- the send came back with.
 create or replace function public.announce_mark(p_letter uuid, p_person uuid, p_state text, p_provider_id text)

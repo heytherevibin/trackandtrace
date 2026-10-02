@@ -84,15 +84,19 @@ A run with any of these missing fails, loudly and by name, which is the intended
    is who the letter is for. Someone who subscribes tomorrow does not receive it. Someone who
    **unsubscribes after Queue does not receive it either**: consent is re-checked for every single
    delivery at the moment it is claimed, not only here, so a reader who leaves on day 2 of an
-   eleven-day drain is never sent to on day 7. Their row is left exactly as it was — `pending`, and
-   never claimed — which has a consequence worth knowing; see below. Queue sends nothing. The
+   eleven-day drain is never sent to on day 7. Their delivery is marked `skipped` with
+   `consent withdrawn` as the reason — its own reason, not `suppressed`, because those are different
+   facts — so the letter still finishes on its own and the row says why that person was not mailed.
+   Queue sends nothing. The
    drain starts at the next scheduled run (04:00 UTC, 09:30 India time), or at once if you start the
    workflow by hand (Actions, "Send announcements", "Run workflow"). Letters drain **one at a time,
    oldest queued first**; a letter behind another waits in `queued` until the one ahead is done.
 4. **Watch.** Each run's log prints counts and the letter's id: how many sent, how many skipped as
-   suppressed, how many failed and are left to retry. It never prints an address. The `report` job,
-   below, is the thing that tells you it has stopped advancing; the console's detail view will show
-   **sent, skipped and unknown as three separate counts**, plus what is still pending.
+   suppressed, how many failed and are left to retry. The skips it counts are the **suppressed** ones
+   only — a reader who unsubscribed is settled by the claim before the run counts anything, so those
+   rows appear in the letter's totals and not in the line the run prints. It never prints an address.
+   The `report` job, below, is the thing that tells you it has stopped advancing; the console's detail
+   view will show **sent, skipped and unknown as three separate counts**, plus what is still pending.
 5. **Stop.** Takes effect at the next recipient, not at the end of a batch: the letter's state is read
    before every send. Stopping halts the remainder; what has gone has gone. Until the console has the
    button, a Stop is `select public.announce_stop('<letter id>');` as the service role.
@@ -101,19 +105,12 @@ A run with any of these missing fails, loudly and by name, which is the intended
 go to everyone on the list when *it* is queued, including the people the stopped one already reached.
 Say so in its opening line.
 
-**A letter somebody unsubscribed from mid-drain will not close itself.** The withdrawn reader's
-delivery row stays `pending` for good: a claim that declines a row never rewrites it, so there is no
-state that says "we decided not to send this". The run therefore never sees "nothing left", never
-marks the letter `done`, and the report names it 48 hours after its last delivery — for ever. When a
-run's log shows nothing sent and nothing left to try, close it by hand:
-
-```sql
-select public.announce_finish(p_letter => '<letter id>');
-select public.announce_letter_state(p_letter => '<letter id>');  -- expect 'done'
-```
-
-`announce_finish` still refuses while any delivery is `unknown`, so this is safe to run: if it leaves
-the letter open, an unknown is the reason, and that section below is the one to read.
+**Unsubscribes mid-drain need nothing from you.** The claim settles each withdrawn reader's row as
+`skipped`, reason `consent withdrawn`, so the counts stay honest, the letter reaches "nothing left"
+and finishes itself, and nothing is reported as stuck. The one case that does need a person is a
+delivery that was already in flight when the reader withdrew: that row may have been accepted by
+Resend before the connection dropped, so it is never rewritten as skipped — it takes the `unknown`
+route, below, where a person decides.
 
 **The availability list is single-use, and a Stop before anything sends costs you nothing.** That
 list promised exactly one email, and a database trigger — not just the console — enforces it. What
@@ -177,10 +174,7 @@ Start at the `report` job's log. Each finding is one line with a letter's id and
   queued"). A letter has work left and has sent nothing for two days. The job runs daily, so two runs
   without progress means the job is not running or every send is failing. Look at the `send` job: a
   missing secret, a spent allowance every single day (something else is using the room), or a refusal
-  on every send. The report cannot say which; the run's own log does. **One benign cause:** every row
-  still pending belongs to somebody who has since unsubscribed, so there is nothing left to send and
-  nothing to claim. The send log says `sent 0, skipped 0, failed 0`. Close the letter by hand
-  (above).
+  on every send. The report cannot say which; the run's own log does.
 - **"no work left, but it was never marked done"**. The letter is `queued` or `sending` with nothing
   pending and nothing in flight, 48 hours on. It finished its work and was never closed: the send job
   died between the last send and marking it done, and the next run has not fixed it. Not exotic after
