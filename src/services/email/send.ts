@@ -68,7 +68,7 @@ export async function sendEmail(letter: Letter, idempotencyKey?: string): Promis
     });
     if (response.ok) {
       const id = await sentId(response);
-      if (id) return { outcome: "sent", id };
+      if (id !== null) return { outcome: "sent", id };
       log.warn("[email] resend accepted a send but gave no id");
       return FAILED;
     }

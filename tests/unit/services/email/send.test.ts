@@ -84,6 +84,11 @@ describe("sendEmail", () => {
       expect(await sendEmail(LETTER)).toEqual({ outcome: "failed" });
     });
 
+    it.each([{ id: 5 }, { id: "" }, { id: null }, null, []])("is failed when a 200 body is %j, because only a non-empty string names a send", async (reply) => {
+      vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(reply), { status: 200 })));
+      expect(await sendEmail(LETTER)).toEqual({ outcome: "failed" });
+    });
+
     it("is failed, and does not throw, when the body is not JSON", async () => {
       vi.stubGlobal("fetch", vi.fn(async () => new Response("<html>", { status: 200 })));
       expect(await sendEmail(LETTER)).toEqual({ outcome: "failed" });
