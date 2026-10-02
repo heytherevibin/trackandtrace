@@ -128,6 +128,36 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      announce_claim: {
+        Args: { p_letter: string; p_limit: number }
+        Returns: Json[]
+      }
+      announce_finish: { Args: { p_letter: string }; Returns: undefined }
+      announce_letter_state: { Args: { p_letter: string }; Returns: string }
+      announce_mark: {
+        Args: {
+          p_letter: string
+          p_person: string
+          p_provider_id: string
+          p_state: string
+        }
+        Returns: undefined
+      }
+      announce_open_claims: { Args: { p_letter: string }; Returns: Json[] }
+      announce_open_letters: { Args: never; Returns: Json[] }
+      announce_queue: { Args: { p_letter: string }; Returns: number }
+      announce_remaining: { Args: { p_letter: string }; Returns: Json }
+      announce_stop: { Args: { p_letter: string }; Returns: undefined }
+      announce_suppressed: { Args: { p_email: string }; Returns: string }
+      announce_webhook: {
+        Args: {
+          p_at: string
+          p_email: string
+          p_kind: string
+          p_svix_id: string
+        }
+        Returns: string
+      }
       availability_observation_label: {
         Args: { p_id?: string }
         Returns: number
