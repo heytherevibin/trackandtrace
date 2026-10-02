@@ -33,8 +33,32 @@ export const BUDGETS = { journeyTask: 120, sceneStep: 61, cls: 0.05, desktopP95:
  * bound on how slow the runner may be, not a budget. The page limits only the scene chunk's arrival (20 s), never the
  * engine's build, and on a GPU-less runner the build compiles every shader on the CPU: the nightly's 10× pin had not come
  * after 30 s (run 36406365173), and in a Linux container at 1 CPU the 40× pin came 33 s after the decision. The governor
- * is fed frames only once the chapter is pinned and scrolled, so a wait that ends first judges nothing of it. */
-export const SETTLE_MS = 180_000;
+ * is fed frames only once the chapter is pinned and scrolled, so a wait that ends first judges nothing of it.
+ *
+ * About three times the slowest the nightly has printed ("settled N s after it decided", at 4×, 6×, 10× and the desktop's 1×):
+ *   36451581440 (pull request, 2026-09-28)  1.5, 4.6, 38.9, 0.4 s
+ *   36651308147 (schedule, 2026-09-30)      2.8, 21.0, 25.6, 0.2 s
+ *   36692565952 (pull request, 2026-09-30)  1.5, 3.4, 22.5, 0.2 s
+ *   36797288618 (schedule, 2026-10-01)      2.7, 15.6, 52.0, 0.6 s
+ * The slowest, 52.0 s at 10×, of only four samples whose 10× settles spread 22.5–52.0 s: 150 s (2.9×), where #91 guessed
+ * 180, as a miss turns the nightly red for nothing. Every run waiting out both its waits (DECIDE_MS and this) and its
+ * scroll still leaves a fifth of the production job's 30 minutes spare, a ceiling of 165 s (journey-perf.test.ts holds
+ * both, and that the ceiling refuses 180). */
+export const SETTLE_MS = 150_000;
+
+/** The slowest "settled N s after it decided" the nightly has printed, in seconds. */
+export const SLOWEST_SETTLE_S = 52.0;
+
+/** How long a software run waits for the drawing to decide at all. */
+export const DECIDE_MS = 60_000;
+
+/** The software runs, in order: a phone at 4×, 6× and 10× CPU, and the desktop at 1×. */
+export const SOFTWARE_RUNS = [
+  { width: 390, height: 844, cpu: 4 },
+  { width: 390, height: 844, cpu: 6 },
+  { width: 390, height: 844, cpu: 10 },
+  { width: 1280, height: 800, cpu: 1 },
+];
 
 /** @typedef {{ readonly start: number, readonly duration: number }} Task */
 /** @typedef {{ readonly start: number, readonly duration: number, readonly url: string }} Script */
@@ -226,7 +250,7 @@ async function softwareRun(base, owners, { width, height, cpu }) {
   if (cpu > 1) await cdp.send("Emulation.setCPUThrottlingRate", { rate: cpu });
   await page.addInitScript(observe);
   await page.goto(base);
-  const decided = await page.waitForSelector("html[data-drawing-why]", { state: "attached", timeout: 60_000 }).then(() => true, () => false);
+  const decided = await page.waitForSelector("html[data-drawing-why]", { state: "attached", timeout: DECIDE_MS }).then(() => true, () => false);
   const since = Date.now();
   const settled = decided && (await page.waitForFunction(drawingSettled, undefined, { timeout: SETTLE_MS }).then(() => true, () => false));
   const settling = (Date.now() - since) / 1000;
@@ -267,13 +291,7 @@ async function hardware(base, owners) {
 async function software(base, owners) {
   /** @type {Array<[string, boolean]>} */
   const lines = [];
-  const runs = [
-    { width: 390, height: 844, cpu: 4 },
-    { width: 390, height: 844, cpu: 6 },
-    { width: 390, height: 844, cpu: 10 },
-    { width: 1280, height: 800, cpu: 1 },
-  ];
-  for (const run of runs) {
+  for (const run of SOFTWARE_RUNS) {
     const r = await softwareRun(base, owners, run);
     const scrolled = r.stats ? `scroll median ${r.stats.medianFps} fps, p95 ${r.stats.p95.toFixed(1)} ms, ${r.stats.over33}% > 33 ms` : "not live, so no scroll";
     const drawing = r.why === null ? "undecided" : r.why === "" ? "live" : `still (${r.why})`;

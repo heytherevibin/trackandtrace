@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -117,6 +117,34 @@ describe("ci.yml", () => {
   it("keeps each shard's results as a blob report, for the gate to merge when a shard fails", () => {
     const config = readFileSync(join(process.cwd(), "playwright.config.ts"), "utf8");
     expect(config).toContain('reporter: process.env.CI ? [["github"], ["blob"]] : [["list"]]');
+  });
+
+  // `--shard` cuts the suite, in project order and then by file path, into four runs of equal test counts. The desktop
+  // project, all in a row, filled shards 1 and 2 by itself, and its journey specs drawn live (SwiftShader on the runner)
+  // made shard 2 the slowest of every run: 11.8, 12.3, 11.8, 11.4 and 11.6 minutes against 7.7 for the others' mean (the
+  // five runs to 36746923546). Its later specs run after the phone's, so its live drawing and its run fall to different
+  // shards.
+  it("runs the desktop suite's later specs after the phone's, so live-drawing and run fall to different shards", async () => {
+    const { default: config } = await import("../../playwright.config");
+    const projects = config.projects ?? [];
+    expect(projects.map((p) => p.name)).toEqual(["desktop", "mobile", "desktop", "console-desktop", "console-mobile"]);
+    const matches = (pattern: unknown, file: string) => [pattern].flat().some((re) => re instanceof RegExp && re.test(file));
+    const runs = (i: number, file: string) => {
+      const p = projects[i];
+      return (p?.testMatch === undefined || matches(p.testMatch, file)) && !matches(p?.testIgnore, file);
+    };
+    const specs = readdirSync(join(process.cwd(), "tests/e2e"), { recursive: true, encoding: "utf8" })
+      .filter((f) => f.endsWith(".spec.ts") && !/^(console(-auth)?|production|nightly)\//.test(f))
+      .map((f) => join(process.cwd(), "tests/e2e", f));
+    expect(specs.length).toBeGreaterThan(40);
+    // every spec runs on the phone, and on the desktop exactly once
+    for (const spec of specs) {
+      expect(runs(1, spec), spec).toBe(true);
+      expect([runs(0, spec), runs(2, spec)].filter(Boolean), spec).toHaveLength(1);
+    }
+    const at = (name: string) => specs.find((s) => s.endsWith(`journey/${name}.spec.ts`)) ?? "";
+    expect(runs(0, at("live-drawing"))).toBe(true);
+    expect(runs(2, at("run"))).toBe(true);
   });
 });
 

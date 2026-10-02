@@ -14,6 +14,13 @@ const PORT = Number(process.env.E2E_PORT ?? 4210);
 const remote = process.env.E2E_BASE_URL;
 const baseURL = remote ?? `http://localhost:${PORT}`;
 
+/** Not this config's: the console's suites, the production build's, and the nightly's. */
+const NOT_HERE = /(console(-auth)?|production|nightly)\//;
+/** The desktop suite's later half, as `--shard` orders it (by path): the journey's specs from p on (paper, place, plate
+ * morph, record and clock, route, run, sound, teardown), and every spec after the journey's folder. */
+const DESKTOP_LATER = /tests\/e2e\/(journey\/[p-z][^/]*|[k-z][^/]*)\.spec\.ts$/;
+const DESKTOP = { name: "desktop", use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 } } };
+
 // Fixture mode is the default for e2e: deterministic sample data, no network.
 // Signed-in specs run only when E2E_SUPABASE=1 and a local Supabase stack is up.
 export default defineConfig({
@@ -29,21 +36,24 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   projects: [
-    {
-      name: "desktop",
-      // console/ is this file's own fixture-mode console specs; console-auth/ is
-      // playwright.console.config.ts's real-Supabase suite, run separately (npm run test:e2e:console)
-      // -- neither belongs here. production/ runs against a production build (playwright.production.config.ts),
-      // nightly/ in the nightly's own config (playwright.nightly.config.ts): neither belongs to the fixture-mode
-      // `next dev` run.
-      testIgnore: /(console(-auth)?|production|nightly)\//,
-      use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 } },
-    },
+    // console/ is this file's own fixture-mode console specs; console-auth/ is playwright.console.config.ts's
+    // real-Supabase suite, run separately (npm run test:e2e:console) -- neither belongs here. production/ runs against a
+    // production build (playwright.production.config.ts), nightly/ in the nightly's own config
+    // (playwright.nightly.config.ts): neither belongs to the fixture-mode `next dev` run.
+    //
+    // The desktop suite in two entries of one name, its later specs (DESKTOP_LATER) after the phone's. `--shard` cuts
+    // the suite, in this order and then by file path, into runs of equal test counts; the desktop suite all in a row
+    // filled CI's shards 1 and 2 by itself, and its journey specs drawn live on SwiftShader made shard 2 the slowest of
+    // every run (11.8 minutes against 7.7 for the others' mean, the five runs to 36746923546). Split so, its live
+    // drawing and its run fall to different shards. `--project=desktop` still runs both; the second's results are
+    // test-results/*-desktop1.
+    { ...DESKTOP, testIgnore: [NOT_HERE, DESKTOP_LATER] },
     {
       name: "mobile",
-      testIgnore: /(console(-auth)?|production|nightly)\//,
+      testIgnore: NOT_HERE,
       use: { ...devices["Pixel 7"], viewport: { width: 390, height: 844 } },
     },
+    { ...DESKTOP, testMatch: DESKTOP_LATER },
     // The console host, served by the same dev server: Chromium resolves *.localhost to this machine.
     ...(remote
       ? []

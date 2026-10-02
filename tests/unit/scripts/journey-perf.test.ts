@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { SETTLE_MS, attribute, drawingSettled, frameStats, longest, softwareFailures } from "../../../scripts/journey-perf.mjs";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { DECIDE_MS, SETTLE_MS, SLOWEST_SETTLE_S, SOFTWARE_RUNS, attribute, drawingSettled, frameStats, longest, softwareFailures } from "../../../scripts/journey-perf.mjs";
 
 // The real-GPU budgets' arithmetic (spec §3.H), apart from the browser that feeds it: which long tasks are the
 // journey's (§3.H budgets the longest *journey* task at load, not the page's hydration), which are the scene's steps,
@@ -85,6 +87,36 @@ describe("softwareFailures: what a software GPU's run can fail on (J6-3)", () =>
     expect(softwareFailures({ ...clean, heaviest: true, settled: false })).toEqual([unsettled]);
     expect(softwareFailures({ ...clean, settled: false })).toEqual([unsettled]);
     expect(softwareFailures({ ...clean, why: null, settled: false })).toEqual(["the drawing never decided"]);
+  });
+});
+
+// The software run's wait for the pin, from what the scheduled nightlies printed ("settled N s after it decided"), not a
+// guess: about three times the slowest seen (four samples, the 10× settles spread 22–52 s, and a miss turns the nightly
+// red for nothing), and short enough that every run waiting out its whole decision and pin still leaves the production
+// job a fifth of its time limit spare.
+describe("SETTLE_MS: how long a software run waits for the pin", () => {
+  it("is about three times the slowest settle the nightly has printed", () => {
+    expect(SETTLE_MS / 1000).toBeGreaterThanOrEqual(2.5 * SLOWEST_SETTLE_S);
+    expect(SETTLE_MS / 1000).toBeLessThanOrEqual(3.5 * SLOWEST_SETTLE_S);
+  });
+
+  /** The longest SETTLE_MS the production job can afford: every software run waiting out both its waits and its scroll,
+   * after the steps before them, inside four fifths of the job's timeout-minutes. */
+  const ceiling = () => {
+    const nightly = readFileSync(join(process.cwd(), ".github/workflows/journey-nightly.yml"), "utf8");
+    const limit = Number(/^ {2}production:\n(?: {4}.*\n)*? {4}timeout-minutes: (\d+)$/m.exec(nightly)?.[1]);
+    expect(limit).toBeGreaterThan(0);
+    const before = 5 * 60_000; // install, build, budgets and the smoke: under two minutes on the scheduled runs
+    const scroll = 60_000; // a live run's scroll through the drawing, on the slowest rate
+    return (0.8 * limit * 60_000 - before) / SOFTWARE_RUNS.length - DECIDE_MS - scroll;
+  };
+
+  it("lets every software run wait out both its waits inside the production job's time limit, a fifth of it spare", () => {
+    expect(SETTLE_MS).toBeLessThanOrEqual(ceiling());
+  });
+
+  it("holds a ceiling tight enough to refuse #91's guess of 180 s", () => {
+    expect(ceiling()).toBeLessThan(180_000);
   });
 });
 
