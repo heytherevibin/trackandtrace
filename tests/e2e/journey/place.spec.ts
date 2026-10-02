@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "../fixtures";
 import { REBUILD_EVENT } from "@/components/landing/journey/journey-events";
-import { atRest, drawStill, frames, noAnchoring, pressTab, scrollToId, waitForJourney, waitForLive } from "./journey-helpers";
+import { atRest, drawStill, frames, noAnchoring, pressTab, scrollIntoChapter, scrollToId, waitForJourney, waitForLive } from "./journey-helpers";
 
 // The places the journey keeps (J5-17, J5-19): a change of height above 02 (the live drawing pinning, J5) must never
 // throw a reader inside 02 when Motion then goes off; and Back, Forward, Back finds the reader's place each time.
@@ -368,6 +368,43 @@ test.describe("a resize keeps a reader inside a pinned 02 the same fraction thro
     }
   }
 
+  // A tablet turned: 02 flips between its columns (1024 wide) and its list (768), pinned in both, 330vh tall in one and
+  // 300vh in the other. Still a resize of the same shape (Motion on, pinned): the same fraction through, both ways round.
+  for (const anchoring of ["on", "off"] as const) {
+    for (const held of ["upright", "on its side"] as const) {
+      for (const f of [0.25, 0.6, 0.9] as const) {
+        test(`${f * 100}% through 02 on a tablet held ${held}, turned and turned back (scroll anchoring ${anchoring})`, async ({ page, isMobile }) => {
+          test.skip(isMobile, "a tablet's sizes: the desktop projects run them");
+          const upright = { width: 768, height: 1024 };
+          const side = { width: 1024, height: 768 };
+          const [base, turned] = held === "upright" ? [upright, side] : [side, upright];
+          const chapter = page.locator(`#how li[data-chapter="${Math.floor(f * 3)}"]`);
+          await page.setViewportSize(base);
+          await drawStill(page);
+          if (anchoring === "off") await noAnchoring(page);
+          await page.goto("/");
+          await waitForJourney(page);
+          await expect(page.locator("#how")).toHaveClass(/is-pinned/);
+          const at = await howRange(page);
+          await page.evaluate((y) => window.scrollTo({ top: y, behavior: "instant" }), Math.round(at.start + f * (at.end - at.start)));
+          await expect(chapter).toHaveClass(/is-current/);
+          await frames(page, 3); // the guard has learned the reader's place
+          for (const size of [turned, base]) {
+            const was = await howRange(page);
+            const through = (was.y - was.start) / (was.end - was.start);
+            await resizedTo(page, size);
+            const now = await howRange(page);
+            const target = now.start + through * (now.end - now.start);
+            const where = `${size.width}×${size.height}: ${Math.round(through * 1000) / 10}% through was ${Math.round(target)}, the reader at ${now.y}, ${Math.round(((now.y - target) / (now.end - now.start)) * 10000) / 10000} of the range off`;
+            await expect(page.locator("#how"), where).toHaveClass(/is-pinned/);
+            expect(Math.abs(now.y - target), where).toBeLessThanOrEqual(4);
+            await expect(chapter, where).toHaveClass(/is-current/);
+          }
+        });
+      }
+    }
+  }
+
   // A reader just past 02's end, its foot still in the window's lower half (inside by readerPlace), on its third stop:
   // turned on its side, the foot's distance from the window's top no longer fits the window, and keeping it sent them
   // back into 02, 54% through, on its second stop (review, I1). They stay at its end, or beyond it.
@@ -388,4 +425,54 @@ test.describe("a resize keeps a reader inside a pinned 02 the same fraction thro
     expect(now.y, `02's end at ${Math.round(now.end)}`).toBeGreaterThanOrEqual(now.end - 2);
     await expect(last).toHaveClass(/is-current/);
   });
+});
+
+// A tablet turned: the chapter's labels flip between their columns (1024 wide; the pin sticks under the masthead) and
+// the list (768; it sticks the words' height above that), still live and pinned, so still the same shape: the same
+// fraction through its timeline, and so the same frame. The pin's sticky top after the turn is the one its labels give
+// it once they are laid out for the new window; read before that, it was the old layout's, 202 px away, and the
+// reader landed up to 0.047 of the range off (the nearer the start, the further: 151 px at 25%, 80 at 60%, 20 at 90%).
+test.describe("a tablet turned keeps a reader inside the live chapter the same fraction through it", () => {
+  for (const anchoring of ["on", "off"] as const)
+    for (const held of ["upright", "on its side"] as const)
+      for (const at of [0.25, 0.6, 0.9]) {
+        test(`a reader ${at} through the chapter on a tablet held ${held} stays there as it turns, and turns back (scroll anchoring ${anchoring})`, async ({ page, isMobile }) => {
+          test.skip(isMobile, "a tablet's sizes: the desktop projects run them");
+          test.setTimeout(90_000); // the live drawing's load, and its progress catching up after each turn on a software GPU
+          const upright = { width: 768, height: 1024 };
+          const side = { width: 1024, height: 768 };
+          const [base, turned] = held === "upright" ? [upright, side] : [side, upright];
+          const layoutAt = (size: { readonly width: number }) => (size.width < 1024 ? "list" : "columns");
+          /** The reader's fraction through the chapter's timeline, and the timeline's length in px. */
+          const through = () =>
+            page.evaluate(() => {
+              const section = document.getElementById("anatomy");
+              const pin = section?.querySelector(".anatomy-pin");
+              if (!section || !pin) throw new Error("#anatomy is missing");
+              const stick = Number.parseFloat(getComputedStyle(pin).top) || 0;
+              const start = section.getBoundingClientRect().top + window.scrollY - stick;
+              const reach = section.offsetHeight - window.innerHeight + stick;
+              return { f: (window.scrollY - start) / reach, reach };
+            });
+          await page.setViewportSize(base);
+          if (anchoring === "off") await noAnchoring(page);
+          await page.goto("/");
+          await waitForLive(page);
+          await expect(page.locator(`#anatomy .anatomy-pin[data-live="${layoutAt(base)}"]`)).toHaveCount(1);
+          await scrollIntoChapter(page, at);
+          await frames(page, 3); // the pin has learned the reader's place
+          const { f } = await through();
+          for (const size of [turned, base]) {
+            await page.setViewportSize(size);
+            await frames(page, 20); // the pin's height follows the window; its resize answer, then anything it set going
+            await expect(page.locator("#anatomy")).toHaveClass(/is-live/);
+            await expect(page.locator(`#anatomy .anatomy-pin[data-live="${layoutAt(size)}"]`)).toHaveCount(1);
+            const after = await through();
+            const where = `${size.width}×${size.height}: ${Math.round((after.f - f) * after.reach)} px off in a range ${Math.round(after.reach)} long`;
+            expect(Math.abs(after.f - f) * after.reach, where).toBeLessThanOrEqual(4);
+            // the same frame: the drawing's own progress comes to the same fraction
+            await expect.poll(async () => Math.abs((await page.evaluate(() => window.__ttJourney?.anatomy() ?? -1)) - f), { message: where, timeout: 20_000 }).toBeLessThanOrEqual(0.01);
+          }
+        });
+      }
 });

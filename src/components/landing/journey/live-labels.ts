@@ -53,6 +53,29 @@ export function pinTop(pin: HTMLElement): number {
   return top + Math.round(Number.parseFloat(written)) - copyHeight(copy);
 }
 
+/** How the live drawing lays its labels out again (scene/live.ts's relayout), by its pin, while it runs. */
+const relays = new WeakMap<HTMLElement, () => void>();
+
+/** The live drawing's own relayout for `pin`, kept while it runs: returns what forgets it. */
+export function relayWith(pin: HTMLElement, relayout: () => void): () => void {
+  relays.set(pin, relayout);
+  return () => {
+    if (relays.get(pin) === relayout) relays.delete(pin);
+  };
+}
+
+/**
+ * Where the live pin takes hold once its labels are laid out for the window as it is now: asked for as a resize is
+ * answered, before the scene's own relayout has had its turn. The labels choose their layout by the window (columns from
+ * 64rem while they fit, else the list), and the pin's sticky top follows that choice: a tablet turned flips it, 202 px
+ * from under the masthead to the words' height above it, and read before the flip it left a reader inside the chapter
+ * up to 0.047 of its range off (found 2026-10-02). The scene lays them out again here, as it would a moment later.
+ */
+export function pinTopLaidOut(pin: HTMLElement): number {
+  relays.get(pin)?.();
+  return pinTop(pin);
+}
+
 export function createLiveLabels(section: HTMLElement): LiveLabels | null {
   const pin = section.querySelector<HTMLElement>(".anatomy-pin");
   const copy = pin?.querySelector<HTMLElement>(".anatomy-copy");
@@ -63,7 +86,9 @@ export function createLiveLabels(section: HTMLElement): LiveLabels | null {
   const labels = [...pin.querySelectorAll<HTMLElement>(".callout")];
   const left = labels.filter((l) => l.dataset.side === "left");
   const right = labels.filter((l) => l.dataset.side === "right");
-  const narrow = window.matchMedia(NARROW);
+  // Asked afresh at each layout: WebKit leaves a query made earlier at its old answer through the "resize" that changed
+  // it (until its own change is told), and the labels laid out from it then took the list a 1024 window had outgrown.
+  const narrow = (): boolean => window.matchMedia(NARROW).matches;
   const lines = document.createElementNS(NS, "svg");
   lines.classList.add("live-lines");
   lines.setAttribute("aria-hidden", "true");
@@ -144,7 +169,7 @@ export function createLiveLabels(section: HTMLElement): LiveLabels | null {
       // the labels' boxes are reset, so they stand unplaced until a frame draws them: wiped till then (journey-island.css)
       pin.removeAttribute("data-drawn");
       pin.style.removeProperty("--anatomy-copy-h");
-      const zone = (!narrow.matches ? columns() : null) ?? list();
+      const zone = (!narrow() ? columns() : null) ?? list();
       return zone && zone.b - zone.t >= 150 && zone.r - zone.l >= 200 ? zone : null;
     },
     listMode: () => pin.dataset.live !== "columns",

@@ -6,7 +6,7 @@ import { storedQuality, type Ask, type Begin } from "../drawing";
 import { createGovernor, nextFrame, startLevel } from "../governor";
 import { DEPART_EVENT, LAYOUT_EVENT, THEME_EVENT, emit } from "../journey-events";
 import type { Box } from "../labels-layout";
-import { createLiveLabels, revealOf, wipe } from "../live-labels";
+import { createLiveLabels, relayWith, revealOf, wipe } from "../live-labels";
 import { SMOOTH } from "../motion-tokens";
 import { track } from "../observers";
 import { anatomyPose, terminusPose, type AnatomyPose } from "../pose";
@@ -310,6 +310,7 @@ function startLive(engine: Engine, ask: Ask): Teardown {
   for (const l of labels.labels) ro.observe(l);
   window.addEventListener(LAYOUT_EVENT, relayout);
   window.addEventListener("resize", relayout);
+  const forgetRelay = relayWith(pin, relayout); // drawing.ts answers a resize from the layout the labels then take
   void document.fonts.ready.then(soon);
   relayout();
   engine.frame();
@@ -344,6 +345,7 @@ function startLive(engine: Engine, ask: Ask): Teardown {
     window.removeEventListener(THEME_EVENT, onTheme);
     window.removeEventListener(LAYOUT_EVENT, relayout);
     window.removeEventListener("resize", relayout);
+    forgetRelay();
     stageA.removeEventListener("pointermove", onStageMove);
     stageA.removeEventListener("pointerleave", onStageLeave);
     for (const stop of pointing) stop();

@@ -488,6 +488,21 @@ Decided after J6 (2026-10-02): an in-page link's glide is taken up again, as a T
 - Scroll anchoring is held off (`overflow-anchor: none` on the root) only while a link's glide is watched, and given back
   as the watch lets go. The page keeps its own places without it, as it does on every browser that has none.
 
+Found after J6 (2026-10-02): the live pin's sticky top after a resize is its labels' once laid out for the new window.
+- A tablet turned (768×1024 to 1024×768 and back) flips the live chapter's labels between the list and their columns,
+  and the pin's sticky top with them (202 px: the words' height above the masthead's foot, or under it). The chapter
+  stays live and pinned, its timeline the same: a resize of the same shape, not a change of shape.
+- `drawing.ts` answered the resize before the scene laid its labels out again, so its range after the turn started at
+  the layout before's sticky top, and a reader inside the chapter landed (1 − f) × 202 px off: 151 px at 25%, 80 at
+  60%, 20 at 90% (0.047, 0.025 and 0.006 of the range), the same both ways round and with scroll anchoring on or off.
+  It now asks the scene to lay the labels out first (`pinTopLaidOut`), then reads the sticky top: within 4 px.
+- In WebKit that still failed about 3 turns in 10: the labels chose their layout from a media query made when they
+  were built, which WebKit leaves at its old answer through the "resize" that changed it, so the layout asked for at
+  the answer was the list again and the columns came a frame later. The labels now ask the query afresh at each layout.
+- 02 itself (columns at 64rem and up, its list below; 330vh and 300vh) was measured through the same turn at 25%, 60%
+  and 90%, both ways and with anchoring on and off, in Chromium and WebKit, the drawing live or still: within 1 px
+  (0.0003 of its range). Its guard needed no change; `place.spec.ts` now holds both there.
+
 Found after J6, finishing 200% text (2026-09-29; 100% text unchanged throughout):
 - the masthead keeps one row at 390×844 with 200% text: below 16.5rem of its inner query container SIGN IN keeps only
   its icon (its name stays, visually hidden), as it already does below xs; 16.5rem is 264px at 100% text, inside xs.
