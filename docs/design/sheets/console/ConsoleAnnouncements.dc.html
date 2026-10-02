@@ -140,15 +140,25 @@ The Trakline team</textarea>
 <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 4px;">
 <span class="legend">Test send</span>
 <span style="font-size: 14px; line-height: 20px; color: var(--ink-2);">Sends this letter to asha@example.com, using one email from today's allowance.</span>
-<span style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; line-height: 20px; color: var(--ink-2);"><span class="lamp hollow"></span>Not sent yet</span>
+<sc-if value="{{noTest}}" hint-placeholder-val="{{ true }}"><span style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; line-height: 20px; color: var(--ink-2);"><span class="lamp hollow"></span>Not sent yet</span></sc-if>
+<sc-if value="{{hasTest}}" hint-placeholder-val="{{ false }}"><span style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; line-height: 20px; color: var(--ink-2);"><span class="lamp lit"></span>Sent at 14:20 IST to asha@example.com</span></sc-if>
 </div>
 <button type="button" class="btn btn-secondary">Send a test to me</button>
 </div>
+<sc-if value="{{noTest}}" hint-placeholder-val="{{ true }}">
 <div style="display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 12px 20px; border-top: 1px solid var(--line);">
 <span id="queue-reason" style="flex-grow: 1; font-size: 13px; line-height: 20px; color: var(--ink-2);">A test send has not been made.</span>
 <button type="button" class="btn btn-secondary">Save draft</button>
 <button type="button" class="btn btn-primary" disabled="true" aria-describedby="queue-reason">Queue</button>
 </div>
+</sc-if>
+<sc-if value="{{hasTest}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 12px 20px; border-top: 1px solid var(--line);">
+<span id="queue-ready" style="flex-grow: 1; font-size: 13px; line-height: 20px; color: var(--ink-2);">Queue sends to 431 people over about 11 days.</span>
+<button type="button" class="btn btn-secondary">Save draft</button>
+<button type="button" class="btn btn-primary" aria-describedby="queue-ready">Queue</button>
+</div>
+</sc-if>
 </section>
 <section class="plate" aria-labelledby="how-title">
 <i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
@@ -239,7 +249,7 @@ The Trakline team</textarea>
 <section class="plate" aria-labelledby="supp-title">
 <i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
 <div class="tb"><h2 class="cell title" id="supp-title" style="margin: 0;">Suppressed addresses</h2><span class="cell">5 addresses</span><span class="cell">Sample data</span></div>
-<table class="dt"><caption style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0);">Addresses we no longer send to</caption><thead><tr><th scope="col" style="width: 300px;">Address</th><th scope="col" style="width: 110px;">Scope</th><th scope="col" style="width: 250px;">Reason</th><th scope="col" style="width: 170px;">When</th><th scope="col">Source</th><th scope="col" style="width: 90px;"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0);">Actions</span></th></tr></thead><tbody>
+<table class="dt"><caption style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0);">Addresses we no longer send to</caption><thead><tr><th scope="col" style="width: 290px;">Address</th><th scope="col" style="width: 100px;">Scope</th><th scope="col" style="width: 230px;">Reason</th><th scope="col" style="width: 170px;">When</th><th scope="col">Source</th><th scope="col" style="width: 150px;"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0);">Actions</span></th></tr></thead><tbody>
 <sc-for list="{{supp}}" as="s" hint-placeholder-count="5">
 <tr>
 <td class="first"><span style="display: inline-flex; align-items: center; gap: 10px;"><span>{{s.address}}</span><sc-if value="{{s.operator}}" hint-placeholder-val="{{ false }}"><span class="tag tag-outline">Operator</span></sc-if></span></td>
@@ -247,13 +257,14 @@ The Trakline team</textarea>
 <td>{{s.reason}}</td>
 <td class="tnum">{{s.when}}</td>
 <td>{{s.source}}</td>
-<td style="text-align: right; overflow: visible;"><sc-if value="{{s.masked}}" hint-placeholder-val="{{ true }}"><button type="button" class="btn btn-ghost btn-sm" aria-label="{{s.revealLabel}}">Reveal</button></sc-if></td>
+<td style="text-align: right; overflow: visible;"><sc-if value="{{s.masked}}" hint-placeholder-val="{{ true }}"><button type="button" class="btn btn-ghost btn-sm" aria-label="{{s.revealLabel}}">Reveal</button></sc-if> <button type="button" class="btn btn-ghost btn-sm" aria-label="{{s.liftLabel}}">Lift</button></td>
 </tr>
 </sc-for>
 </tbody></table>
 <ul style="margin: 0; padding: 12px 20px 16px 36px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 4px; font-size: 13px; line-height: 20px; color: var(--ink-2);">
 <li>All stops every email to the address, sign-in and confirmation mail included. List mail stops letters and nothing else.</li>
 <li>Operator marks an address that belongs to a console member.</li>
+<li>Lift ends a suppression, and mail to the address resumes. It asks first, and is written to the audit log.</li>
 </ul>
 </section>
 </sc-if>
@@ -261,9 +272,65 @@ The Trakline team</textarea>
 <sc-if value="{{isNoAccess}}" hint-placeholder-val="{{ false }}"><section class="plate state" style="max-width: 720px;"><i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i><h2 class="state-title">This module isn't part of the Support role.</h2><p class="state-detail">Ask an Owner if you need it.</p><div class="state-actions"><a href="#" class="btn btn-secondary">Back to Overview</a></div></section></sc-if>
 </main>
 </div>
+<sc-if value="{{dlgQueue}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; inset: 0; z-index: 5; background: var(--backdrop); display: flex; align-items: center; justify-content: center; padding: 16px;">
+<section class="plate state" role="alertdialog" aria-modal="true" aria-labelledby="queue-title" style="width: 520px; background: var(--surface-3); box-shadow: var(--elevation-3);">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+<h2 class="state-title" id="queue-title">Queue this letter?</h2>
+<dl class="kv" style="margin-top: 12px; grid-template-columns: 110px 1fr;">
+<dt class="legend">List</dt>
+<dd>News</dd>
+<dt class="legend">Subject</dt>
+<dd>Trakline news: what's coming next</dd>
+<dt class="legend">People</dt>
+<dd>431</dd>
+<dt class="legend">Takes</dt>
+<dd>About 11 days at 40 a day</dd>
+</dl>
+<p class="state-detail">Once queued, the letter goes to real people. You can stop it, but a stopped letter can't be resumed.</p>
+<div class="state-actions" style="justify-content: flex-end; margin-top: 24px;">
+<button type="button" class="btn btn-secondary">Cancel</button>
+<button type="button" class="btn btn-primary">Queue</button>
+</div>
+</section>
+</div>
+</sc-if>
+<sc-if value="{{dlgStop}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; inset: 0; z-index: 5; background: var(--backdrop); display: flex; align-items: center; justify-content: center; padding: 16px;">
+<section class="plate state" role="alertdialog" aria-modal="true" aria-labelledby="stop-title" style="width: 520px; background: var(--surface-3); box-shadow: var(--elevation-3);">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+<h2 class="state-title" id="stop-title">Stop sending?</h2>
+<p style="margin: 10px 0 0; font-size: 17px; line-height: 26px; font-weight: 500;">Trakline news: a clearer chart view</p>
+<p class="state-detail" style="margin-top: 6px;">262 people already have this letter, and that can't be recalled. The 165 still waiting won't get it, and a stopped letter can't be resumed.</p>
+<div class="state-actions" style="justify-content: flex-end; margin-top: 24px;">
+<button type="button" class="btn btn-secondary">Cancel</button>
+<button type="button" class="btn btn-primary">Stop sending</button>
+</div>
+</section>
+</div>
+</sc-if>
+<sc-if value="{{dlgLift}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; inset: 0; z-index: 5; background: var(--backdrop); display: flex; align-items: center; justify-content: center; padding: 16px;">
+<section class="plate state" role="alertdialog" aria-modal="true" aria-labelledby="lift-title" style="width: 520px; background: var(--surface-3); box-shadow: var(--elevation-3);">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+<h2 class="state-title" id="lift-title">Lift this suppression?</h2>
+<dl class="kv" style="margin-top: 12px; grid-template-columns: 110px 1fr;">
+<dt class="legend">Address</dt>
+<dd>kiran@example.com</dd>
+<dt class="legend">Scope</dt>
+<dd>All</dd>
+</dl>
+<p class="state-detail">Mail to this address resumes: sign-in links, confirmations and letters. It was suppressed on 17 Sep 2026 after a hard bounce, so the address may still not work. Lifting is written to the audit log.</p>
+<div class="state-actions" style="justify-content: flex-end; margin-top: 24px;">
+<button type="button" class="btn btn-secondary">Cancel</button>
+<button type="button" class="btn btn-primary">Lift suppression</button>
+</div>
+</section>
+</div>
+</sc-if>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"state":{"editor":"enum","options":["List","Compose","Sending","Stopped","Done","Suppressions","No access"],"default":"List","section":"State"},"role":{"editor":"enum","options":["Owner","Admin"],"default":"Owner","section":"State"},"defaultTheme":{"editor":"enum","options":["system","light","dark"],"default":"system","section":"Appearance"},"$preview":{"width":1440,"height":1300}}'>
+<script type="text/x-dc" data-dc-script data-props='{"state":{"editor":"enum","options":["List","Compose","Queue confirm","Sending","Stop confirm","Stopped","Done","Suppressions","Lift confirm","No access"],"default":"List","section":"State"},"role":{"editor":"enum","options":["Owner","Admin"],"default":"Owner","section":"State"},"defaultTheme":{"editor":"enum","options":["system","light","dark"],"default":"system","section":"Appearance"},"$preview":{"width":1440,"height":1300}}'>
 class Component extends DCLogic {
   state = { theme: null, sysDark: false };
   componentDidMount() {
@@ -278,6 +345,8 @@ class Component extends DCLogic {
   renderVals() {
     var p = this.props;
     var st = p.state || 'List';
+    // The confirm states are a board underneath with the dialog over it.
+    var base = { 'Queue confirm': 'Compose', 'Stop confirm': 'Sending', 'Lift confirm': 'Suppressions' }[st] || st;
     var noAccess = st === 'No access';
     // Announcements is Owner and Admin only: the no-access state is drawn as Support opening it.
     var who = noAccess ? 'Support' : (p.role || 'Owner');
@@ -357,25 +426,27 @@ class Component extends DCLogic {
       { address: 's•••@example.com', operator: false, masked: true, scope: 'List mail', scopeClass: 'tag tag-grey', reason: 'Spam complaint', when: '15 Sep 2026, 18:03 IST', source: 'Complaint report' },
       { address: 'a•••@example.com', operator: false, masked: true, scope: 'List mail', scopeClass: 'tag tag-grey', reason: 'Delayed three times in 30 days', when: '12 Sep 2026, 07:12 IST', source: 'Delivery reports' },
       { address: 'p•••@example.com', operator: false, masked: true, scope: 'All', scopeClass: 'tag tag-filled', reason: 'Hard bounce', when: '9 Sep 2026, 16:30 IST', source: 'The mail service\'s own list' }
-    ].map(function (s) { s.revealLabel = 'Reveal the address ' + s.address; return s; });
+    ].map(function (s) { s.revealLabel = 'Reveal the address ' + s.address; s.liftLabel = 'Lift the suppression on ' + s.address; return s; });
 
-    var detailKey = st === 'Sending' || st === 'Stopped' || st === 'Done' ? st : 'Sending';
+    var detailKey = base === 'Sending' || base === 'Stopped' || base === 'Done' ? base : 'Sending';
     var heights = { 'List': 900, 'Compose': 1120, 'Sending': 1300, 'Stopped': 1260, 'Done': 1300, 'Suppressions': 900, 'No access': 700 };
     var m = members[who];
     return {
-      face: dark ? 'night' : 'day', faceH: (heights[st] || 1000) + 'px',
+      face: dark ? 'night' : 'day', faceH: (heights[base] || 1000) + 'px',
       modeSystem: mode === 'system', modeDay: mode === 'light', modeNight: mode === 'dark',
       themeLabel: 'Theme: ' + themeNames[mode] + '. Switch to ' + themeNames[themeNext[mode]],
       cycleTheme: () => this.setState({ theme: themeNext[mode] }),
       role: who, initials: m[1], memberLabel: m[0] + ', ' + who + '. Open the member menu',
       groups: groups, letters: letters, supp: supp, d: details[detailKey],
       showMeta: !noAccess,
-      showNew: st === 'List' || st === 'Suppressions',
-      showBack: st === 'Compose' || st === 'Sending' || st === 'Stopped' || st === 'Done',
-      showTabs: st === 'List' || st === 'Suppressions',
-      tabLetters: st === 'List' ? 'true' : 'false', tabSupp: st === 'Suppressions' ? 'true' : 'false',
-      isList: st === 'List', isCompose: st === 'Compose', isDetail: st === 'Sending' || st === 'Stopped' || st === 'Done',
-      isSupp: st === 'Suppressions', isNoAccess: noAccess
+      showNew: base === 'List' || base === 'Suppressions',
+      showBack: base === 'Compose' || base === 'Sending' || base === 'Stopped' || base === 'Done',
+      showTabs: base === 'List' || base === 'Suppressions',
+      tabLetters: base === 'List' ? 'true' : 'false', tabSupp: base === 'Suppressions' ? 'true' : 'false',
+      isList: base === 'List', isCompose: base === 'Compose', isDetail: base === 'Sending' || base === 'Stopped' || base === 'Done',
+      noTest: st !== 'Queue confirm', hasTest: st === 'Queue confirm',
+      dlgQueue: st === 'Queue confirm', dlgStop: st === 'Stop confirm', dlgLift: st === 'Lift confirm',
+      isSupp: base === 'Suppressions', isNoAccess: noAccess
     };
   }
 }

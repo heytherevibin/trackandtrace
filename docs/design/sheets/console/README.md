@@ -53,10 +53,12 @@ Drawn on 2 Oct 2026, **for approval**. Nothing is built from these until the own
 
 | File | Sheet | States (props) |
 |---|---|---|
-| `ConsoleAnnouncements.dc.html`, `ConsoleAnnouncementsPhone.dc.html` | 23 Announcements, Form TC-10 | role (Owner, Admin) · state: List, Compose, Sending, Stopped, Done, Suppressions, No access |
+| `ConsoleAnnouncements.dc.html` | 23 Announcements at 1440, Form TC-10 | role (Owner, Admin) · state: List, Compose, Queue confirm, Sending, Stop confirm, Stopped, Done, Suppressions, Lift confirm, No access |
+| `ConsoleAnnouncementsPhone.dc.html` | 23 Announcements at 390 | role (Owner, Admin) · state: List, Compose (read-only), Sending, Stop confirm, Stopped, Done, Suppressions, No access |
 
 - **Letters** are a table at 1440 and cards at 390. A letter is Draft, Sending, Stopped or Done; its progress reads `Sent 120 · Skipped 3 · Unknown 0 of 418`.
-- **Compose** keeps Queue disabled, with its reason beside it, until a test send has been made. The Availability list is single-use: once its one send has finished it can't be chosen again.
-- **Sending** shows Sent, Skipped and Unknown as separate figures and an estimate at 40 a day, with Stop. **Stopped** states what went and what never will, with no actions. **Done** has final counts and no actions.
-- **Suppressions** lists address, scope (All or List mail), reason, when and source. Addresses are masked until revealed, except an operator's (a console member's), which is marked.
+- **Compose** keeps Queue disabled, with its reason beside it, until a test send has been made. The Availability list is single-use: once its one send has finished it can't be chosen again. **Queue confirm** is Compose after a test send, with a dialog naming the list, subject, recipient count and "About 11 days at 40 a day"; its button reads Queue.
+- **Sending** shows Sent, Skipped and Unknown as separate figures and an estimate at 40 a day, with Stop. **Stop confirm** says how many already have the letter (262, which can't be recalled), how many won't get it, and that a stopped letter can't be resumed; its button reads Stop sending. **Stopped** states what went and what never will, with no actions. **Done** has final counts and no actions.
+- **Suppressions** lists address, scope (All or List mail), reason, when and source. Addresses are masked until revealed, except an operator's (a console member's), which is marked. Each row has Lift; **Lift confirm** names the address and scope and says mail resumes.
+- **On a phone** the console is for reading plus urgent actions: Compose is a read-only view of the draft ("Open on a larger screen to edit this draft, send a test or queue it"), Suppressions has no Lift, and Stop with its confirm is fully available, as a bottom sheet. Queue confirm and Lift confirm are desktop only.
 - **No access** is drawn as Support opening the module; Viewer sees the same with its own role name.
