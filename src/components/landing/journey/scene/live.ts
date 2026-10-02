@@ -308,9 +308,21 @@ function startLive(engine: Engine, ask: Ask): Teardown {
   const ro = new ResizeObserver(soon);
   ro.observe(pin);
   for (const l of labels.labels) ro.observe(l);
+  // drawing.ts answers a resize from the layout the labels then take, asking for it from its own "resize" listener,
+  // heard before this one: laid out once for that resize, not again here in the same frame.
+  let answered = false;
+  const onResize = () => {
+    if (!answered) relayout();
+  };
+  const forgetRelay = relayWith(pin, () => {
+    relayout();
+    answered = true;
+    requestAnimationFrame(() => {
+      answered = false;
+    });
+  });
   window.addEventListener(LAYOUT_EVENT, relayout);
-  window.addEventListener("resize", relayout);
-  const forgetRelay = relayWith(pin, relayout); // drawing.ts answers a resize from the layout the labels then take
+  window.addEventListener("resize", onResize);
   void document.fonts.ready.then(soon);
   relayout();
   engine.frame();
@@ -344,7 +356,7 @@ function startLive(engine: Engine, ask: Ask): Teardown {
     forced.removeEventListener("change", onTheme);
     window.removeEventListener(THEME_EVENT, onTheme);
     window.removeEventListener(LAYOUT_EVENT, relayout);
-    window.removeEventListener("resize", relayout);
+    window.removeEventListener("resize", onResize);
     forgetRelay();
     stageA.removeEventListener("pointermove", onStageMove);
     stageA.removeEventListener("pointerleave", onStageLeave);

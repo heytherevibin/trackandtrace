@@ -370,6 +370,9 @@ test.describe("a resize keeps a reader inside a pinned 02 the same fraction thro
 
   // A tablet turned: 02 flips between its columns (1024 wide) and its list (768), pinned in both, 330vh tall in one and
   // 300vh in the other. Still a resize of the same shape (Motion on, pinned): the same fraction through, both ways round.
+  // Guards, never red against main: 02 keeps this place there (within 1 px), and the turn's 3% was the live chapter's
+  // above it (below). Each of the twelve does fail once the flip counts as a change of shape (the guard's shapeOf made
+  // to tell columns from the list: the reader lands on 02's start), which is the rule they hold.
   for (const anchoring of ["on", "off"] as const) {
     for (const held of ["upright", "on its side"] as const) {
       for (const f of [0.25, 0.6, 0.9] as const) {
