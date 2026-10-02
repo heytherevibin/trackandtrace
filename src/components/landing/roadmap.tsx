@@ -20,8 +20,8 @@ export function Roadmap() {
         {m.items.map((item, i) => (
           <li key={item.num} className={`flex flex-wrap items-baseline gap-x-4 gap-y-2 px-6 py-3.5 ${i > 0 ? "border-t border-line" : ""}`}>
             <span className={`min-w-8 ${ROW_NUM}`}>{item.num}</span>
-            <span className="min-w-[200px] font-display text-lg font-semibold uppercase leading-normal tracking-head">{item.title}</span>
-            <span className="min-w-[220px] flex-1 text-sm leading-normal text-ink-1/74">{item.note}</span>
+            <span className="min-w-[min(200px,100%)] font-display text-lg font-semibold uppercase leading-normal tracking-head">{item.title}</span>
+            <span className="min-w-[min(220px,100%)] flex-1 text-sm leading-normal text-ink-1/74">{item.note}</span>
             {/* Accent for what a reader can go and use today, outline for what is still to come:
                 the difference is visible down the column without reading each chip. */}
             <SheetTag variant={item.status === "live" ? "accent" : "outline"}>{m.status[item.status]}</SheetTag>

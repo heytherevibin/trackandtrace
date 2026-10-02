@@ -315,7 +315,12 @@ development, behind `?journey-hud`; production never renders it.
   quality floor); the check on every sample scenario with the journey on and off; run keyboard and station
   links; theme sweep; axe at 12 positions (top, drawing, chapters, record, Night drawing, motion off, phone
   drawing, run, Night run, phone run, Data Saver, Night terminus); focus never obscured; existing home, responsive, axe, CSP,
-  smoothness, press and tap-target specs kept green.
+  smoothness, press and tap-target specs kept green. The responsive sweep (280, 320, 360, 390 and 768) measures the
+  landing as the journey leaves it, the run pinned where it fits; the track the run's pin clips on purpose is left to its
+  own check there (only while the pin clips, never a scroller), which stands each station at rest, every word of it,
+  wholly in the window at every width the run pins at, and nothing sideways. The landing is also swept with its text
+  at 200% at the four phone widths: the departure board then reflows its rows inside its plate, by a container query
+  in rem, so at 100% it stays the table (found 2026-10-01).
 - **Nightly** (`.github/workflows/journey-nightly.yml`, same pinning and permissions rules as CI; J6-3). It runs at
   03:00 IST, by hand, and on the pull request that changes it. It has two jobs:
   - **production**, on this checkout's production build served on the runner with sample data and nothing live
@@ -372,7 +377,9 @@ Decided while planning J5 (2026-09-27):
   the pin when its height changes lands on its start, and since J6 only when it changes shape: a resize keeps them the
   same fraction through it (decided after J6, below);
 - the engine lives for the journey and is reused across rebuilds and restores (J5-4);
-- labels while live wipe in and rise, never fade, with their own writers (J5-5);
+- labels while live wipe in and rise, never fade, with their own writers (J5-5); until a frame has placed them after a
+  layout (the pin's `data-drawn`), they and the dimension figures stay wiped and the leaders hidden, so a jump into the
+  chapter never shows them unplaced over the masthead before the stage's first frame (found 2026-10-01);
 - the palette reads four tokens (J5-8);
 - the frame meter ships with J5, for the owner's real-device check (J5-10).
 
@@ -392,7 +399,10 @@ Decided while planning J6 (2026-09-28):
 - `fit` judged before the scene is fetched, by a trial layout (J6-5);
 - the run's frame is server markup, its lines drawn by `run.ts` (J6-6; a departure from §3.B, accepted at J6's
   pre-flight); it pins by `#run.is-running` inside `keepPlace`, only while the reader is not below it (J6-7); links
-  to 06 and 07 bring their stations to the window (J6-8);
+  to 06 and 07 bring their stations to the window (J6-8). Its fit (found 2026-10-01): every station stands above the
+  line diagram, and every station at its resting point, centred on the train, stands wholly inside the pin. The train
+  holds a third in (the middle on a phone), moved in only as far as the widest station needs (`trainFor`; at 768 wide,
+  07's figure ran 96 px past the pin's left side a third in); where no place holds it, the run does not pin;
 - J5-17 amended (the owner, 2026-09-28), amended again (the owner, 2026-09-29): the reader taking over cancels the
   Back restore. That is a mostly vertical wheel that is not a pinch-zoom, a finger dragging, a scroll key (the arrows,
   Page Up and Down, Home, End, Space) outside a text field with no Alt, Ctrl or Meta, and Tab or Shift+Tab, and
@@ -435,8 +445,12 @@ Found while building J6 (2026-09-28):
 
 Decided after J6 (the owner, 2026-09-29): a resize keeps a reader inside a piece the same fraction through it; a change
 of shape still lands on its start.
-- The fraction runs as each timeline's range does, from its top under the masthead to its foot at the large viewport's
-  foot (100lvh, as anime's scroll observers measure it, a phone's toolbar shown or not). The timelines are linear, so it
+- The fraction runs as each timeline's range does, from its top where the timeline starts to its foot at the large
+  viewport's foot (100lvh, as anime's scroll observers measure it, a phone's toolbar shown or not). The timeline starts
+  under the masthead, but for the live pin it starts where the pin takes hold, its sticky top (`pinTop`): in the list
+  layout on a phone that is the words' height above the masthead's foot, which moves with the window (their top padding
+  is in vh), so it is kept with the place in the window the reader read in and measured afresh after the resize, before
+  the labels write it (found 2026-10-01: from the masthead, 844 to 660 left the reader 0.0106 of the range off). The timelines are linear, so it
   is their progress: the same stop and frame come back. "Its start", for a change of shape, is where it always was (02's
   scroll margin, 1rem lower than its timeline's start).
 - A reader beyond that range's end, its foot still in the window, keeps their distance from the foot, but never goes

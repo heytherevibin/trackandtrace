@@ -126,6 +126,38 @@ test.describe("the live labels (J5-5)", () => {
     await expect(page.locator("#anatomy .live-lines line")).toHaveCount(10);
   });
 
+  // Placed only by the scene's frames, which start once the stage is seen on screen: after a jump into the chapter the
+  // page painted every label unplaced and unwiped, stacked at the pin's top over the masthead, until that first frame
+  // (WebKit, a cold server; the upkeep's 1b). Held here: the stage is not observed until released, so no frame comes.
+  test("after a jump into the chapter, no label shows until the first frame places it", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.addInitScript(() => {
+      const Native = window.IntersectionObserver;
+      const held: Array<() => void> = [];
+      window.IntersectionObserver = class extends Native {
+        override observe(target: Element): void {
+          if (target.matches(".anatomy-stage")) held.push(() => super.observe(target));
+          else super.observe(target);
+        }
+      };
+      Reflect.set(window, "__ttReleaseStage", () => held.splice(0).forEach((go) => go()));
+    });
+    await page.goto("/");
+    await waitForLive(page);
+    // laid out afresh with the stage off screen, as a cold load lays it out: no frame can place the labels there
+    await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+    await frames(page, 2);
+    await page.evaluate(() => window.dispatchEvent(new Event("tt:layout")));
+    await scrollIntoChapter(page, 0.3);
+    await frames(page, 4);
+    const labels = page.locator("#anatomy .callout");
+    expect(await collisionsInView(page), "held before the first frame").toEqual([]);
+    expect(await labels.evaluateAll((els) => els.filter((el) => el.getBoundingClientRect().top < (document.querySelector("header")?.getBoundingClientRect().bottom ?? 0) && getComputedStyle(el).clipPath === "none").length)).toBe(0);
+    await page.evaluate(() => (Reflect.get(window, "__ttReleaseStage") as () => void)());
+    await expect(page.locator("#anatomy .anatomy-pin")).toHaveAttribute("data-drawn", ""); // the first frame placed them
+    expect(await collisionsInView(page), "placed").toEqual([]);
+  });
+
   test("a label under a fine pointer lights its part, and the part lights its label", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/");
@@ -253,6 +285,52 @@ test.describe("the live drawing at its edges", () => {
       expect(Math.abs((await through()) - f), `${to.width}×${to.height}`).toBeLessThanOrEqual(0.002);
     }
   });
+
+  // On a phone the chapter pins in its list layout, its sticky top the copy's height above the masthead's foot, and that
+  // height moves with the window (its top padding is in vh): the timeline starts where the pin takes hold, not under the
+  // masthead. Measured from the masthead, a resize from 844 to 660 left a reader 0.0106 of the range off. And measured
+  // from the sticky top as the page stands at "resize", before the labels write the words' new height, 1.3 to 2.5 px
+  // off (0.0025 of the range a seventh of the way in): so the first leg is judged in px of the new range, at most 1.5
+  // (the place is a whole px, so half of one is rounding), and off-centre too. The way back is judged from the place
+  // kept since, to 0.001.
+  for (const [from, to, at] of [
+    [{ width: 390, height: 844 }, { width: 390, height: 660 }, 0.5],
+    [{ width: 390, height: 844 }, { width: 390, height: 660 }, 0.13],
+    [{ width: 390, height: 660 }, { width: 390, height: 844 }, 0.5],
+    [{ width: 412, height: 915 }, { width: 412, height: 700 }, 0.5],
+    [{ width: 360, height: 780 }, { width: 360, height: 640 }, 0.5],
+  ] as const) {
+    test(`a reader ${at} through the chapter on a phone stays there through a resize from ${from.width}×${from.height} to ${to.width}×${to.height}`, async ({ page, isMobile }) => {
+      test.skip(!isMobile, "a phone's list layout");
+      /** The reader's fraction through the chapter's timeline, and the timeline's length in px. */
+      const through = () =>
+        page.evaluate(() => {
+          const section = document.getElementById("anatomy");
+          const pin = section?.querySelector(".anatomy-pin");
+          if (!section || !pin) throw new Error("#anatomy is missing");
+          const stick = Number.parseFloat(getComputedStyle(pin).top) || 0;
+          const start = section.getBoundingClientRect().top + window.scrollY - stick;
+          const reach = section.offsetHeight - window.innerHeight + stick;
+          return { f: (window.scrollY - start) / reach, reach };
+        });
+      await page.setViewportSize(from);
+      await page.goto("/");
+      await waitForLive(page);
+      await dismissInstall(page);
+      await expect(page.locator('#anatomy .anatomy-pin[data-live="list"]')).toHaveCount(1);
+      await scrollIntoChapter(page, at);
+      await frames(page, 3); // the pin has learned the reader's place
+      const { f } = await through();
+      await page.setViewportSize(to);
+      await frames(page, 20); // the pin's height follows the window (520vh); its resize answer, then anything it set going
+      await expect(page.locator("#anatomy")).toHaveClass(/is-live/);
+      const after = await through();
+      expect(Math.abs(after.f - f) * after.reach, `${from.height} to ${to.height}: px off in a range ${Math.round(after.reach)} long`).toBeLessThanOrEqual(1.5);
+      await page.setViewportSize(from); // and back, judged from the place kept since
+      await frames(page, 20);
+      expect(Math.abs((await through()).f - f), `${to.height} back to ${from.height}`).toBeLessThanOrEqual(0.001);
+    });
+  }
 
   // WebKit lays a resize out in two steps, in either order (journey-helpers.ts, holdLate): the pin (520vh) in one, the
   // large viewport its timeline ends at in the other. Answered at "resize", between them, the reader landed 14% off with

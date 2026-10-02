@@ -42,6 +42,28 @@ html:has(#how):not([data-journey]) { scroll-behavior: auto; }
   .board-code { width: 3rem; }
   .board-status { width: 6.75rem; }
 }
+/* Text made larger than the board's width holds (200% on a phone): the table, which cannot wrap a word, reflows inside
+   its plate instead of running past it. Each row is a grid: the code beside the destination, the status under the
+   destination; and where even the two cannot stand side by side, each on its own line. A container query in rem, so
+   only text grown against the plate's width reflows it: at 100% the board is never under 15rem, and stays the table.
+   The container is declared below sm only, where a phone's text can outgrow it: a size container's style and size
+   containment on the desktop page disturbed WebKit's scroll anchoring under a resize mid-glide (run.spec.ts; round 3 of
+   the fit fixes). */
+@media (max-width: 39.99rem) {
+  .board { container: board / inline-size; }
+}
+@container board (max-width: 11rem) {
+  .board-table tr { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 12px; padding: 6px 12px; }
+  .board-table thead tr { border-bottom: 1px solid var(--line); }
+  .board-table tbody tr + tr { border-top: 1px solid var(--line); }
+  .board-table :is(th, td) { width: auto; padding: 0; border: 0; }
+  .board-table .board-status { grid-column: 2; white-space: normal; }
+  .board-table tr.is-here { background: var(--accent-wash); } /* the whole row, as its cells are on the table */
+}
+@container board (max-width: 7rem) {
+  .board-table tr { grid-template-columns: minmax(0, 1fr); }
+  .board-table .board-status { grid-column: 1; }
+}
 /* A finger is not a cursor: on touch screens each row is at least 44px, so every destination answers across 44px. */
 @media (pointer: coarse) {
   .board-table td { padding-top: 12px; padding-bottom: 12px; }

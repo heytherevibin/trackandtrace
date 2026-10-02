@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PARALLAX, anchorOf, band, fitsRun, hereAt, kmAt, layers, leanStep, mast, offsets, runLayout, trainAt } from "@/components/landing/journey/geometry/run";
+import { PARALLAX, anchorOf, band, fitsRun, hereAt, kmAt, layers, leanStep, mast, offsets, runLayout, trainAt, trainFor } from "@/components/landing/journey/geometry/run";
 
 // The window-seat run's geometry (spec §3.A; prototype v3's run.js), pure.
 
@@ -30,6 +30,19 @@ describe("the run's window", () => {
   it("holds the train a third in on a wide window, in the middle on a phone", () => {
     expect(trainAt(1440, false)).toBe(432);
     expect(trainAt(390, true)).toBe(195);
+  });
+
+  it("holds the train where every station at the window stands wholly in it, moved in from a third only as far as that needs", () => {
+    // a wide window: a third in holds the widest station (half 300) with room either side
+    expect(trainFor(1440, false, [150, 300])).toBe(432);
+    // 768 wide (a pin 692 across): 07's figure is 608 wide, centred a third in (208) it ran 96 px past the left side;
+    // moved in to 304, it stands at [0, 608]
+    expect(trainFor(692, false, [272, 304])).toBe(304);
+    // a phone: the middle, which already holds it (360 wide, a pin 320 across, a station 302 wide)
+    expect(trainFor(320, true, [144, 151.2])).toBe(160);
+    // no place holds a station wider than the window: the run does not pin
+    expect(trainFor(320, true, [160.5])).toBeNull();
+    expect(trainFor(692, false, [])).toBe(208);
   });
 
   it("measures the stations' centres, and the travel that brings the last to the window", () => {

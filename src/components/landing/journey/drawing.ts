@@ -3,7 +3,7 @@ import { modeOf, placeAfter, readerPlace, startingReasons, wantsScene, whyOf, wi
 import { jumpTo, keepPlace, laidOut, mastheadBottom, viewHeight, watchView } from "./keep-place";
 import { glidesTo, keyboardFocus, watchTab } from "./focus-glide";
 import { DRAWING_EVENT, LAYOUT_EVENT, WEBGL_EVENT, emit, type DrawingDetail, type WebglDetail } from "./journey-events";
-import { createLiveLabels } from "./live-labels";
+import { createLiveLabels, pinTop } from "./live-labels";
 import type { JourneyContext, JourneyModule, Teardown } from "./start-journey";
 import { webgl2 } from "./webgl-probe";
 
@@ -272,7 +272,13 @@ export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2,
     // steps, the pin (520vh) in one and the large viewport its timeline ends at in another, in any order, with "resize"
     // between them. Answered then, the reader landed up to 14% off, and a place learned then put the next resize off
     // too. A "resize" that finds the page between them is answered by the step that completes it (watchView).
-    let held: { readonly top: number; readonly bottom: number; readonly y: number; readonly vh: number; readonly view: number } | null = null;
+    // Its range starts where its timeline does (scene/live.ts's enterAt): where the pin takes hold (pinTop), which is not
+    // the masthead's foot in the list layout on a phone (the words' height above it) and moves with the window there.
+    // Kept with the place, in the window the reader read it in; measured from the masthead, a resize from 844 to 660 left
+    // the reader 0.0106 of the range off.
+    const pinEl = section?.querySelector<HTMLElement>(".anatomy-pin") ?? null;
+    const stick = (): number => (pinEl ? pinTop(pinEl) : mastheadBottom());
+    let held: { readonly top: number; readonly bottom: number; readonly y: number; readonly vh: number; readonly view: number; readonly stick: number } | null = null;
     let owed = false;
     const learn = () => {
       if (!section?.classList.contains(PINNED)) {
@@ -282,7 +288,7 @@ export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2,
       const r = section.getBoundingClientRect();
       if (held && Math.abs(r.height - (held.bottom - held.top)) > 1) return;
       const place = { top: r.top + window.scrollY, bottom: r.bottom + window.scrollY, y: window.scrollY };
-      if (laidOut()) held = { ...place, vh: window.innerHeight, view: viewHeight() };
+      if (laidOut()) held = { ...place, vh: window.innerHeight, view: viewHeight(), stick: stick() };
       else if (held) held = { ...held, ...place };
     };
     const onResize = () => {
@@ -294,7 +300,7 @@ export function drawingModule(loadLive: LoadLive, probe: () => boolean = webgl2,
       const before = { top: was.top - was.y, bottom: was.bottom - was.y, height: was.bottom - was.top };
       const after = { top: r.top + window.scrollY - was.y, height: r.height };
       // a resize keeps the pin's shape: a reader inside it stays the same fraction through it (the owner, 2026-09-29)
-      const to = placeAfter(before, after, { scrollY: was.y, viewport: was.vh, viewportAfter: window.innerHeight, view: was.view, viewAfter: viewHeight(), masthead: mastheadBottom() }, "same");
+      const to = placeAfter(before, after, { scrollY: was.y, viewport: was.vh, viewportAfter: window.innerHeight, view: was.view, viewAfter: viewHeight(), masthead: mastheadBottom(), landing: was.stick, landingAfter: stick() }, "same");
       if (to !== null) jumpTo(to);
       held = null;
       learn();

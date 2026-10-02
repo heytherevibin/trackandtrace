@@ -1,8 +1,15 @@
 import type { Page } from "@playwright/test";
 
+/** Boxes that clip, on purpose, a track the scroll carries sideways through them, each proven elsewhere to bring every
+ * part of it to the window: the window-seat run's pin (overflow: clip, inside the window), whose track runs on past the
+ * window's side by design, never scrolls the page, and stands each station at rest wholly inside the pin (responsive.spec.ts).
+ * What such a box clips is not "past the edge", nor is it content the box "hides", while the box itself clips sideways
+ * (overflow-x: clip, never a scroller) and lies inside the window; everything else in and around it is measured as ever. */
+const CARRIED = ["#run.is-running > .run-pin"] as const;
+
 /** Describes everything that breaks the phone layout on the current page; empty when it fits. */
 export async function layoutBreaks(page: Page): Promise<string[]> {
-  return page.evaluate(() => {
+  return page.evaluate((carried) => {
     const vw = document.documentElement.clientWidth;
     const name = (el: Element) => {
       const text = (el.textContent ?? "").trim().replace(/\s+/g, " ").slice(0, 32);
@@ -25,18 +32,27 @@ export async function layoutBreaks(page: Page): Promise<string[]> {
       const box = el.getBoundingClientRect();
       return box.width > 1 && box.height > 1 && !visuallyHidden(el);
     };
+    /** The carrying box `el` is, or lies inside, while that box clips sideways (never a scroller a reader could move)
+     * and stands inside the window. */
+    const stageOf = (el: Element) => {
+      const stage = carried.length > 0 ? el.closest(carried.join(", ")) : null;
+      if (!stage || getComputedStyle(stage).overflowX !== "clip") return null;
+      const box = stage.getBoundingClientRect();
+      return box.left >= -1 && box.right <= vw + 1 ? stage : null;
+    };
     const breaks: string[] = [];
     if (document.documentElement.scrollWidth > vw) breaks.push(`page scrolls sideways: ${document.documentElement.scrollWidth}px in ${vw}px`);
     for (const el of document.body.querySelectorAll("*")) {
       if (!shown(el)) continue;
+      const stage = stageOf(el);
       const box = el.getBoundingClientRect();
-      if (box.right > vw + 1 || box.left < -1) breaks.push(`past the edge [${Math.round(box.left)}, ${Math.round(box.right)}]: ${name(el)}`);
+      if ((box.right > vw + 1 || box.left < -1) && !(stage && stage !== el)) breaks.push(`past the edge [${Math.round(box.left)}, ${Math.round(box.right)}]: ${name(el)}`);
       const style = getComputedStyle(el);
       const clips = style.overflowX !== "visible" && !["INPUT", "SELECT", "TEXTAREA"].includes(el.tagName) && style.textOverflow !== "ellipsis";
-      if (clips && el.scrollWidth > el.clientWidth + 1) breaks.push(`hides ${el.scrollWidth - el.clientWidth}px of its content: ${name(el)}`);
+      if (clips && el.scrollWidth > el.clientWidth + 1 && stage !== el) breaks.push(`hides ${el.scrollWidth - el.clientWidth}px of its content: ${name(el)}`);
     }
     return breaks.slice(0, 12);
-  });
+  }, CARRIED);
 }
 
 /** Words a reader cannot read to the end (spec §9's 200% text; J6 nightly): a line of text that runs past the window's

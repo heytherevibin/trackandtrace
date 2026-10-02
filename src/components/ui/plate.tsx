@@ -44,6 +44,12 @@ export interface PlateProps extends Omit<HTMLAttributes<HTMLElement>, "title"> {
    * plain `.tb` draws — the meta/action cells still keep their `border-l` hairline. Default `true`.
    */
   readonly stack?: boolean;
+  /**
+   * A meta cell keeps to one line, as drawn; with `metaWraps`, where text grown past the header's width (200% on a
+   * phone) would run it past the plate, it wraps instead. Opt-in, and below sm only: it makes the header a size container
+   * (in rem), and size containers on the desktop page disturbed WebKit's scroll anchoring under a resize (run.spec.ts).
+   */
+  readonly metaWraps?: boolean;
   readonly corners?: boolean;
   readonly bodyClassName?: string;
   readonly children?: ReactNode;
@@ -58,15 +64,16 @@ export function PlateHeader({
   cells = "regular",
   titleMinCh = 16,
   stack = true,
-}: Pick<PlateProps, "title" | "titleId" | "headingLevel" | "meta" | "actions" | "cells" | "titleMinCh" | "stack">) {
+  metaWraps = false,
+}: Pick<PlateProps, "title" | "titleId" | "headingLevel" | "meta" | "actions" | "cells" | "titleMinCh" | "stack" | "metaWraps">) {
   const Heading = headingLevel === 1 ? "h1" : headingLevel === 2 ? "h2" : headingLevel === 3 ? "h3" : "span";
   return (
-    <div className="flex flex-wrap items-stretch border-b border-line">
+    <div className={cn("flex flex-wrap items-stretch border-b border-line", metaWraps && "max-sm:@container")}>
       <Heading id={titleId} className={cn("legend flex-1 leading-6 text-ink-1", MIN_CH[titleMinCh], CELL[cells], stack && (meta.length > 0 || actions) && PLATE_TITLE_STACK)}>
         {title}
       </Heading>
       {meta.map((cell, i) => (
-        <span key={i} className={cn("legend whitespace-nowrap border-l border-line leading-6", CELL[cells], stack && plateCellClass(i))}>
+        <span key={i} className={cn("legend whitespace-nowrap border-l border-line leading-6", metaWraps && "@max-[11rem]:whitespace-normal", CELL[cells], stack && plateCellClass(i))}>
           {cell}
         </span>
       ))}
@@ -86,6 +93,7 @@ export function Plate({
   cells,
   titleMinCh,
   stack,
+  metaWraps,
   corners = true,
   className,
   bodyClassName,
@@ -96,7 +104,7 @@ export function Plate({
   return (
     <Tag className={cn("blueprint", className)} aria-labelledby={hasHeader && titleId && headingLevel ? titleId : undefined} {...rest}>
       {corners ? <Corners /> : null}
-      {hasHeader ? <PlateHeader title={title} titleId={titleId} headingLevel={headingLevel} meta={meta} actions={actions} cells={cells} titleMinCh={titleMinCh} stack={stack} /> : null}
+      {hasHeader ? <PlateHeader title={title} titleId={titleId} headingLevel={headingLevel} meta={meta} actions={actions} cells={cells} titleMinCh={titleMinCh} stack={stack} metaWraps={metaWraps} /> : null}
       {children !== undefined ? <div className={cn(PAD[padding], bodyClassName)}>{children}</div> : null}
     </Tag>
   );
