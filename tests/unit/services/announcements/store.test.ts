@@ -44,16 +44,19 @@ describe("the announcements store", () => {
 describe("the announcements store, beyond the claim", () => {
   beforeEach(() => rpc.mockClear());
 
-  it("queues through announce_queue and returns how many deliveries it made", async () => {
+  it("queues through announce_queue, naming the member, and returns how many deliveries it made", async () => {
+    // The member is passed, not inferred: `queued_by` is what the console's detail view names, and a
+    // column nothing writes here would end up written from somewhere that has no business in a
+    // private schema.
     rpc.mockResolvedValueOnce({ data: 42, error: null });
-    expect(await queueLetter("L")).toBe(42);
-    expect(rpc).toHaveBeenCalledWith("announce_queue", { p_letter: "L" });
+    expect(await queueLetter("L", "m1")).toBe(42);
+    expect(rpc).toHaveBeenCalledWith("announce_queue", { p_letter: "L", p_member: "m1" });
   });
 
-  it("stops through announce_stop", async () => {
+  it("stops through announce_stop, naming the member who pressed it", async () => {
     rpc.mockResolvedValueOnce({ data: null, error: null });
-    await stopLetter("L");
-    expect(rpc).toHaveBeenCalledWith("announce_stop", { p_letter: "L" });
+    await stopLetter("L", "m2");
+    expect(rpc).toHaveBeenCalledWith("announce_stop", { p_letter: "L", p_member: "m2" });
   });
 
   it("asks announce_suppressed about the address it was given", async () => {
@@ -93,10 +96,10 @@ describe("the announcements store, beyond the claim", () => {
   // would report a clean run having sent nothing.
   const down = { data: null, error: { message: "boom" } };
   it.each([
-    ["queueLetter", () => queueLetter("L")],
+    ["queueLetter", () => queueLetter("L", "m1")],
     ["claimDeliveries", () => claimDeliveries("L", 1)],
     ["markDelivery", () => markDelivery("L", "p1", "sent", "id")],
-    ["stopLetter", () => stopLetter("L")],
+    ["stopLetter", () => stopLetter("L", "m2")],
     ["suppressionFor", () => suppressionFor("a@example.in")],
     ["recordWebhook", () => recordWebhook("m", "email.bounced", "a@example.in", "2026-10-02T00:00:00Z")],
   ])("%s throws when the database errors", async (_name, run) => {
@@ -139,7 +142,7 @@ describe("the announcements store, beyond the claim", () => {
 
   it("throws on a queue count or a webhook verdict it does not recognise", async () => {
     rpc.mockResolvedValueOnce({ data: null, error: null });
-    await expect(queueLetter("L")).rejects.toThrow();
+    await expect(queueLetter("L", "m1")).rejects.toThrow();
     rpc.mockResolvedValueOnce({ data: "whatever", error: null });
     await expect(recordWebhook("m", "k", "a@example.in", "2026-10-02T00:00:00Z")).rejects.toThrow();
   });

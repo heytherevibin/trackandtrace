@@ -145,9 +145,15 @@ export type Database = {
       }
       announce_open_claims: { Args: { p_letter: string }; Returns: Json[] }
       announce_open_letters: { Args: never; Returns: Json[] }
-      announce_queue: { Args: { p_letter: string }; Returns: number }
+      announce_queue: {
+        Args: { p_letter: string; p_member: string }
+        Returns: number
+      }
       announce_remaining: { Args: { p_letter: string }; Returns: Json }
-      announce_stop: { Args: { p_letter: string }; Returns: undefined }
+      announce_stop: {
+        Args: { p_letter: string; p_member: string }
+        Returns: undefined
+      }
       announce_suppressed: { Args: { p_email: string }; Returns: string }
       announce_webhook: {
         Args: {

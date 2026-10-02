@@ -7,9 +7,18 @@ import { verifySvix } from "@/services/webhooks/svix";
 
 export const dynamic = "force-dynamic";
 
-// Resend's email events carry the recipients as `data.to`. Anything else about the event is none of
-// this route's business: what an event MEANS is decided in one place, the `announce_webhook` function.
-const NAMES_AN_ADDRESS = /^(email|suppression)\./;
+// Resend's email events carry the recipients as `data.to`, and some events name a single address as
+// `data.email`. Either is read; anything else about the event is none of this route's business, since
+// what an event MEANS is decided in one place, the `announce_webhook` function.
+//
+// ONLY `email.*` IS A FAULT WHEN NO ADDRESS IS FOUND. A `suppression.*` payload is a shape we have
+// never actually seen. If Resend names the address there in some third way, treating it as a fault
+// would make every such event answer non-2xx, Svix would retry it for ever, and **a persistently
+// failing endpoint may be DISABLED by Resend — which would take `email.bounced` down with it**. A
+// guess about a payload we have not seen must not be able to cost us bounce handling. So an
+// unrecognised `suppression.*` takes the quiet 200 path and is logged by type instead.
+const NAMES_AN_ADDRESS = /^email\./;
+const A_SUPPRESSION = /^suppression\./;
 const FAULT = "The webhook could not be processed.";
 
 /**
@@ -21,7 +30,7 @@ class RouteError extends AppError {}
 
 const event = z.object({
   type: z.string().min(1).max(100),
-  data: z.object({ to: z.array(z.string().min(3).max(320)).max(50) }).partial().optional(),
+  data: z.object({ to: z.array(z.string().min(3).max(320)).max(50), email: z.string().min(3).max(320) }).partial().optional(),
 });
 
 /**
@@ -71,12 +80,18 @@ export async function POST(req: Request): Promise<Response> {
     // never suppresses anyone and never shows anywhere, so it is a fault: non-2xx, which Resend's
     // dashboard shows and retries. The TYPE is logged and nothing else; a type is not an address.
     // Event types we do not act on keep their quiet 200 below.
-    const recipients = data?.to ?? [];
+    // `data.to` when it has entries, else a single `data.email`. Not `??`: an explicit empty `to`
+    // must not shadow an address the event gave us under the other name.
+    const recipients = data?.to && data.to.length > 0 ? data.to : data?.email ? [data.email] : [];
     if (recipients.length === 0) {
       if (NAMES_AN_ADDRESS.test(type)) {
         console.error(`[resend-webhook] a verified ${type} event named no recipient`);
         throw new RouteError("INTERNAL", FAULT);
       }
+      // Not fatal, but not silent either: a suppression payload whose recipient field we do not
+      // recognise would otherwise suppress nobody and leave no trace that it arrived. The TYPE is
+      // logged and nothing else; a type is not an address.
+      if (A_SUPPRESSION.test(type)) console.error(`[resend-webhook] a verified ${type} event named no recipient this route recognises, so nothing was recorded`);
       return jsonOk({ ok: true, state: "ignored" });
     }
 

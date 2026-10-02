@@ -49,8 +49,10 @@ import { createAdminSupabase } from "@/services/supabase/admin";
 
 type Rpc = (name: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: unknown }>;
 
-// Cast for the same reason as store.ts: the generated types carry no announce_* signatures until
-// `supabase gen types` is re-run against a database that has the migration.
+// Cast for the same reason as store.ts, and permanently: `gen types` cannot express RPC nullability,
+// so `announce_open_letters` is generated as `Args: never` and `announce_letter_state` as returning
+// `string` though answering null is half its job. The argument names are pinned by the pgTAP suite's
+// named notation instead.
 const call: Rpc = (name, args) => (createAdminSupabase() as unknown as { rpc: Rpc }).rpc(name, args);
 
 const failed = (name: string): AppError =>

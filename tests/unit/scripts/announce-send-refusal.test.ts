@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 // The runner is started for real, as a subprocess with an environment built from nothing, so what is
@@ -63,5 +64,29 @@ describe("the runner's start-up refusals", () => {
   it("gets past it with Upstash's own names as well", () => {
     const out = start({ UPSTASH_REDIS_REST_URL: "https://example.upstash.io", UPSTASH_REDIS_REST_TOKEN: "token" });
     expect(out.stderr).toContain(STORE_REACHED);
+  });
+});
+
+describe("which shared store the run is wired to", () => {
+  // `publicStore()` answers from THIS PROCESS'S MEMORY whenever Upstash errors. Wired here, an
+  // unreadable counter would hand every run a fresh, full day's allowance: three runs would send 120
+  // against a plan of 100 a day. `publicStoreForReading()` has no such fallback, so an unreadable
+  // counter throws, `takeAnnouncements` fails closed to 0, and the run sends nothing.
+  //
+  // This is asserted against the SOURCE because there is no seam to inject: `main` builds its own
+  // `load` from `import()`, and the refusal cases above cover the ABSENT configuration rather than
+  // the erroring one. A behavioural test would need a stand-in Upstash that accepts a connection and
+  // then fails, which this suite has no way to raise. So the line itself is pinned — one word apart
+  // from the hazard, and no other test reaches it.
+  const source = readFileSync("scripts/announce-send.mjs", "utf8");
+
+  it("builds its counter from the reading store, which has no in-memory fallback", () => {
+    expect(source).toMatch(/publicStoreForReading\(environment\)/);
+  });
+
+  it("never CALLS `publicStore`, whose fallback would restart the day's allowance on every run", () => {
+    // The name appears in the comment above that line, explaining why it is not used, so this
+    // matches a call rather than a mention: one `(` is the whole difference.
+    expect(source).not.toMatch(/\bpublicStore\s*\(/);
   });
 });

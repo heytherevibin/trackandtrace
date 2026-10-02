@@ -1,5 +1,23 @@
 # Runbook: announcements
 
+> ## Before you deploy: push the migration FIRST
+>
+> **`npx supabase db push` must land before the application deploy that carries this code, not
+> after.** The order is not a preference; the wrong order stops all email.
+>
+> Every outgoing message now goes through one suppression check, and that includes **console sign-in
+> links**. The check calls `announce_suppressed`, which lives in this migration. Deploy the code
+> while the function is missing and PostgREST answers `PGRST202`; the check throws; and because it
+> **fails closed** — it must, or a suppressed address could be mailed — *nothing is sent at all*.
+>
+> What that looks like: no announcement goes out, no sign-up confirmation goes out, and **nobody can
+> sign in to the console**, because the sign-in link is email. There is no screen left to fix it
+> from. Recovery is a terminal with the database credentials, running `db push` by hand.
+>
+> So: `db push`, confirm `announce_suppressed` exists, then deploy. If a deploy has already gone out
+> ahead of the migration, pushing the migration fixes it with no redeploy — the function appearing is
+> all that is needed.
+
 Module 07 sends one plain-text letter, written by an operator, to the people who asked for updates on
 a list. This is what that operator needs: how a letter goes out, how to tell it has stopped going,
 what each kind of stuck means, and the two decisions only a person can make: what to do with a
@@ -22,6 +40,17 @@ applied yet. Where a step below says "in the console", that is the page that wil
 ships, Compose, Test send and Queue have no screen, and Stop and the suppression lift are done in the
 SQL editor as the service role (each section says what to run). Nothing in the workflow changes when
 the pages arrive.
+
+Until then, a letter is written and proofed by hand. **Queue refuses a letter with no test send
+recorded**, and nothing in PR 2 records one, so after you have mailed yourself a proof say so:
+
+```sql
+update announcements.letters set test_sent_at = now(), test_sent_to = '<the address you read it at>'
+ where id = '<letter id>';
+select public.announce_queue(p_letter => '<letter id>', p_member => '<your console member id>');
+```
+
+PR 3's Test send button is what sets those two columns from then on.
 
 ## Before the first run: the owner's one-time setup
 
@@ -47,12 +76,16 @@ A run with any of these missing fails, loudly and by name, which is the intended
    The sender appends the unsubscribe line and the `List-Unsubscribe` headers itself, worded for the
    list's own promise, so forgetting them is impossible and typing a second one is a mistake.
 2. **Test send.** One real email to an address you can read. It spends one email from the day's
-   allowance and it is required: Queue stays locked until a test has gone. Read it as a subscriber
-   would, in a real inbox: the subject, the line breaks, and that the unsubscribe link at the foot
-   is there and is the site's own address.
+   allowance and it is required: **the database itself refuses to queue a letter with no test send on
+   record**, not just the console, so there is no way round it and no way to forget. Read it as a
+   subscriber would, in a real inbox: the subject, the line breaks, and that the unsubscribe link at
+   the foot is there and is the site's own address.
 3. **Queue.** This writes the recipient set and **freezes it**: whoever is on the list at that moment
-   is who the letter is for. Someone who subscribes tomorrow does not receive it, and someone who
-   unsubscribes after Queue is checked again at send time and skipped. Queue sends nothing. The
+   is who the letter is for. Someone who subscribes tomorrow does not receive it. Someone who
+   **unsubscribes after Queue does not receive it either**: consent is re-checked for every single
+   delivery at the moment it is claimed, not only here, so a reader who leaves on day 2 of an
+   eleven-day drain is never sent to on day 7. Their row is left exactly as it was — `pending`, and
+   never claimed — which has a consequence worth knowing; see below. Queue sends nothing. The
    drain starts at the next scheduled run (04:00 UTC, 09:30 India time), or at once if you start the
    workflow by hand (Actions, "Send announcements", "Run workflow"). Letters drain **one at a time,
    oldest queued first**; a letter behind another waits in `queued` until the one ahead is done.
@@ -66,10 +99,38 @@ A run with any of these missing fails, loudly and by name, which is the intended
 
 **A stopped letter is final.** There is no resume. To send the rest, compose a new letter, which will
 go to everyone on the list when *it* is queued, including the people the stopped one already reached.
-Say so in its opening line. And one consequence to know before pressing Stop on the **availability**
-list: that list promised exactly one email, a database trigger refuses a second letter once one has
-been queued, sending, stopped or done, and a stopped letter counts. Stopping the availability letter
-spends the list for good.
+Say so in its opening line.
+
+**A letter somebody unsubscribed from mid-drain will not close itself.** The withdrawn reader's
+delivery row stays `pending` for good: a claim that declines a row never rewrites it, so there is no
+state that says "we decided not to send this". The run therefore never sees "nothing left", never
+marks the letter `done`, and the report names it 48 hours after its last delivery — for ever. When a
+run's log shows nothing sent and nothing left to try, close it by hand:
+
+```sql
+select public.announce_finish(p_letter => '<letter id>');
+select public.announce_letter_state(p_letter => '<letter id>');  -- expect 'done'
+```
+
+`announce_finish` still refuses while any delivery is `unknown`, so this is safe to run: if it leaves
+the letter open, an unknown is the reason, and that section below is the one to read.
+
+**The availability list is single-use, and a Stop before anything sends costs you nothing.** That
+list promised exactly one email, and a database trigger — not just the console — enforces it. What
+spends the list is a letter that is **live** (`queued` or `sending`) or one that has **sent to at
+least one person**. So:
+
+| The one availability letter is… | A second one can be queued? |
+|---|---|
+| queued or sending | **No.** One at a time; stop it first. |
+| stopped, nothing sent | **Yes.** Nothing was promised to anyone. |
+| stopped after some went out | **No.** Those readers cannot be un-mailed. |
+| done, having sent | **No.** |
+
+So if you queue the availability letter and then spot a broken line, **stop it.** As long as no
+delivery has reached `sent`, the list is free again and you can compose and queue a corrected letter.
+Letting a bad letter send to avoid "wasting" the list is the one thing to avoid: that is the state
+that really does spend it.
 
 ## The daily allowance
 
@@ -116,7 +177,10 @@ Start at the `report` job's log. Each finding is one line with a letter's id and
   queued"). A letter has work left and has sent nothing for two days. The job runs daily, so two runs
   without progress means the job is not running or every send is failing. Look at the `send` job: a
   missing secret, a spent allowance every single day (something else is using the room), or a refusal
-  on every send. The report cannot say which; the run's own log does.
+  on every send. The report cannot say which; the run's own log does. **One benign cause:** every row
+  still pending belongs to somebody who has since unsubscribed, so there is nothing left to send and
+  nothing to claim. The send log says `sent 0, skipped 0, failed 0`. Close the letter by hand
+  (above).
 - **"no work left, but it was never marked done"**. The letter is `queued` or `sending` with nothing
   pending and nothing in flight, 48 hours on. It finished its work and was never closed: the send job
   died between the last send and marking it done, and the next run has not fixed it. Not exotic after

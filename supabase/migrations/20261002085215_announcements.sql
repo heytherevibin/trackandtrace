@@ -135,37 +135,79 @@ end $$;
 create trigger letters_one_availability before insert or update on announcements.letters
   for each row execute function announcements.one_availability_letter();
 
+-- WHO MAY BE SENT TO ON A LIST, in one place, because the answer is needed twice and the two must
+-- never drift apart. `announce_queue` asks it when it makes the delivery rows, and `announce_claim`
+-- asks it AGAIN for every row it is about to hand to the sender.
+--
+-- The second ask is the one that matters and the one that was missing. A letter to 430 readers
+-- drains about eleven days at the day's allowance. A reader who clicks Unsubscribe on day 2 has
+-- their consent withdrawn by `subscriptions_withdraw`, but their delivery row was written on day 1
+-- when they were a subscriber — so without this, the row is claimed on day 7 and the letter goes to
+-- someone who asked us to stop. Nothing else in the send path can refuse it: the sender reads the
+-- suppression table, which withdrawal does not touch, and the claim's own join is to `people`.
+--
+-- It is the SAME condition `announce_queue` uses, deliberately: confirmed, and not withdrawn. A
+-- reader who withdrew and signed up again has `confirmed_at` back to null until they confirm, and
+-- mail to an unconfirmed address is exactly what the double opt-in exists to prevent.
+create or replace function announcements.may_receive(p_person uuid, p_list text) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select exists (
+    select 1 from subscriptions.consents c
+     where c.person_id = p_person and c.list = p_list
+       and c.confirmed_at is not null and c.withdrawn_at is null);
+$$;
+
 -- ---------------------------------------------------------------------------
 -- The six writes: `store.ts`.
 -- ---------------------------------------------------------------------------
 
+-- `create or replace function` cannot change a signature: it creates a second OVERLOAD and leaves
+-- the first one in place. An earlier revision of this file — never pushed to production, but applied
+-- on developer machines while this branch was being written — defined these two with one argument
+-- each. Left behind, `announce_queue(uuid)` is a function service_role may still call that skips the
+-- test-send guard and records no member, and PostgREST would resolve a one-argument call straight to
+-- it. So they are dropped by name, which is a no-op anywhere they were never created.
+drop function if exists public.announce_queue(uuid);
+drop function if exists public.announce_stop(uuid);
+
 -- One pending delivery per CONFIRMED, un-withdrawn consent on the letter's own list. A letter that
 -- is not a draft is refused rather than queued twice: a second pass would be a second delivery row
 -- for everyone who has joined since, on a letter already part-way sent.
-create or replace function public.announce_queue(p_letter uuid) returns int
+--
+-- AND A LETTER NOBODY HAS PROOFED CANNOT BE QUEUED. A test send is the only time anyone sees the
+-- letter as a reader will — the wrapping, the unsubscribe line, the links — and it is the last point
+-- at which a mistake costs nothing. In the database rather than only in the console for the same
+-- reason the availability trigger is: the console refusing is a second line of defence, not the only
+-- one, and this one guards every send rather than one list.
+create or replace function public.announce_queue(p_letter uuid, p_member uuid) returns int
 language plpgsql security definer set search_path = '' as $$
 declare
   v_list  text;
   v_state text;
+  v_test  timestamptz;
   v_made  int;
 begin
-  select l.list, l.state into v_list, v_state from announcements.letters l where l.id = p_letter;
+  select l.list, l.state, l.test_sent_at into v_list, v_state, v_test
+    from announcements.letters l where l.id = p_letter;
   if not found then
     raise exception 'there is no such letter';
   end if;
   if v_state <> 'draft' then
     raise exception 'only a draft may be queued, and this letter is %', v_state;
   end if;
+  if v_test is null then
+    raise exception 'this letter has not been test sent, so nobody has seen it as a reader will';
+  end if;
 
   insert into announcements.deliveries (letter_id, person_id)
   select p_letter, c.person_id
     from subscriptions.consents c
-   where c.list = v_list and c.confirmed_at is not null and c.withdrawn_at is null
+   where c.list = v_list and announcements.may_receive(c.person_id, v_list)
   on conflict (letter_id, person_id) do nothing;
 
   select count(*)::int into v_made from announcements.deliveries d where d.letter_id = p_letter;
   update announcements.letters
-     set state = 'queued', queued_at = now(), recipients_total = v_made
+     set state = 'queued', queued_at = now(), queued_by = p_member, recipients_total = v_made
    where id = p_letter;
   return v_made;
 end $$;
@@ -194,10 +236,12 @@ end $$;
 -- excludes stopped letters, so those rows would sit unsettled for ever, invisible to every check.
 create or replace function public.announce_claim(p_letter uuid, p_limit int) returns setof jsonb
 language plpgsql security definer set search_path = '' as $$
+declare
+  v_list  text;
+  v_state text;
 begin
-  if not exists (
-    select 1 from announcements.letters l where l.id = p_letter and l.state in ('queued', 'sending')
-  ) then
+  select l.list, l.state into v_list, v_state from announcements.letters l where l.id = p_letter;
+  if not found or v_state not in ('queued', 'sending') then
     return;
   end if;
 
@@ -218,6 +262,8 @@ begin
                    and claimed_at < now() - interval '15 minutes'
                    and first_attempted_at is not null
                    and first_attempted_at > now() - interval '24 hours'))
+          -- Consent, again, for every row about to be handed to the sender. See `may_receive`.
+          and announcements.may_receive(person_id, v_list)
         order by person_id
         limit greatest(coalesce(p_limit, 0), 0)
         for update skip locked)
@@ -241,10 +287,13 @@ returns void language sql security definer set search_path = '' as $$
 $$;
 
 -- Only an open letter can be stopped. A done letter stays done, and a draft was never sending.
-create or replace function public.announce_stop(p_letter uuid) returns void
+-- Who stopped it is recorded here, where the state changes, rather than being reconstructed from the
+-- audit log later: the console's detail view names the person, and a column nobody writes is a
+-- column that will be written from the wrong place.
+create or replace function public.announce_stop(p_letter uuid, p_member uuid) returns void
 language sql security definer set search_path = '' as $$
   update announcements.letters
-     set state = 'stopped', stopped_at = now()
+     set state = 'stopped', stopped_at = now(), stopped_by = p_member
    where id = p_letter and state in ('queued', 'sending');
 $$;
 
@@ -289,9 +338,16 @@ begin
      where p.id = c.person_id and p.email = v_email and c.withdrawn_at is null;
 
   elsif p_kind = 'email.delivery_delayed' then
-    -- Soft: three for THIS address inside 30 days suppress list mail; fewer are recorded and left.
-    -- The row above is already inserted, so this count includes the event being handled.
-    if (select count(*) from announcements.webhook_events e
+    -- Soft: three BAD NIGHTS for this address inside 30 days suppress list mail; fewer are recorded
+    -- and left. The row above is already inserted, so this count includes the event being handled.
+    --
+    -- Distinct DAYS, not events, and that is the whole decision. `webhook_events` keeps no message
+    -- id — the route does not carry one — so one slow receiving host retrying a SINGLE message three
+    -- times within an hour is indistinguishable from three separate failures, and counting events
+    -- would suppress a live subscriber for one bad hour. Three different days is the thing the rule
+    -- was written to describe. Whether Resend emits one event per message or one per attempt is not
+    -- something we can see from here, which is exactly why this must not depend on it.
+    if (select count(distinct date_trunc('day', e.received_at)) from announcements.webhook_events e
          where e.email = v_email and e.kind = 'email.delivery_delayed'
            and e.received_at > now() - interval '30 days') >= 3 then
       insert into announcements.suppressions (email, scope, reason, source)
@@ -392,10 +448,10 @@ do $$
 declare f text;
 begin
   foreach f in array array[
-    'public.announce_queue(uuid)',
+    'public.announce_queue(uuid, uuid)',
     'public.announce_claim(uuid, int)',
     'public.announce_mark(uuid, uuid, text, text)',
-    'public.announce_stop(uuid)',
+    'public.announce_stop(uuid, uuid)',
     'public.announce_suppressed(text)',
     'public.announce_webhook(text, text, text, timestamptz)',
     'public.announce_open_letters()',
@@ -409,3 +465,4 @@ begin
   end loop;
 end $$;
 revoke all on function announcements.one_availability_letter() from public, anon, authenticated;
+revoke all on function announcements.may_receive(uuid, text) from public, anon, authenticated;

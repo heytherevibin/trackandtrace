@@ -163,8 +163,8 @@ describe("POST /api/webhooks/resend", () => {
     expect(second?.[2]).toBe("b@example.in");
   });
 
-  it.each(["email.bounced", "email.complained", "email.delivery_delayed", "email.delivered", "suppression.added", "suppression.removed"])(
-    "answers non-2xx and records nothing for a verified %s with no data.to, so the missed event shows in Resend and is retried",
+  it.each(["email.bounced", "email.complained", "email.delivery_delayed", "email.delivered"])(
+    "answers non-2xx and records nothing for a verified %s with no recipient, so the missed event shows in Resend and is retried",
     async (type) => {
       const body = JSON.stringify({ type, data: {} });
       const res = await POST(req(body, signed(body)));
@@ -172,6 +172,42 @@ describe("POST /api/webhooks/resend", () => {
       expect(recordWebhook).not.toHaveBeenCalled();
     },
   );
+
+  it.each(["suppression.added", "suppression.removed"])(
+    "answers 200 and records nothing for a verified %s with no recipient it recognises, because a failing endpoint can be disabled",
+    async (type) => {
+      // A `suppression.*` payload is a shape we have never seen. Faulting on it would mean Svix
+      // retrying for ever, and Resend may DISABLE a persistently failing endpoint — which would take
+      // `email.bounced` down with it. A guess about an unseen payload must not cost us bounce
+      // handling, so this path is quiet, and visible only in the log.
+      const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      const body = JSON.stringify({ type, data: { reason: "something we did not model" } });
+      const res = await POST(req(body, signed(body)));
+      expect(res.status).toBe(200);
+      expect(recordWebhook).not.toHaveBeenCalled();
+      expect(JSON.stringify(error.mock.calls)).toContain(type);
+    },
+  );
+
+  it.each(["suppression.added", "suppression.removed", "email.bounced"])(
+    "records a verified %s that names its address as data.email rather than data.to",
+    async (type) => {
+      const body = JSON.stringify({ type, data: { email: EMAIL } });
+      expect((await POST(req(body, signed(body)))).status).toBe(200);
+      expect(recordWebhook).toHaveBeenCalledWith(ID, type, EMAIL, expect.any(String));
+    },
+  );
+
+  it("prefers data.to over data.email, and is not shadowed by an empty data.to", async () => {
+    // `??` on `data.to` would let an explicit `to: []` hide an address the event did give us.
+    const both = JSON.stringify({ type: "email.bounced", data: { to: ["a@example.in"], email: "b@example.in" } });
+    expect((await POST(req(both, signed(both)))).status).toBe(200);
+    expect(recordWebhook).toHaveBeenCalledWith(ID, "email.bounced", "a@example.in", expect.any(String));
+    recordWebhook.mockClear();
+    const shadowed = JSON.stringify({ type: "suppression.added", data: { to: [], email: "b@example.in" } });
+    expect((await POST(req(shadowed, signed(shadowed)))).status).toBe(200);
+    expect(recordWebhook).toHaveBeenCalledWith(ID, "suppression.added", "b@example.in", expect.any(String));
+  });
 
   it.each([
     ["no data at all", JSON.stringify({ type: "email.complained" })],

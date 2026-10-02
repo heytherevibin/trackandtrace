@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(120);
+select plan(131);
 
 -- Announcements (06-B). The schema is private: nothing reaches it except through the
 -- security-definer functions, and only service_role may call those.
@@ -123,9 +123,9 @@ select throws_ok(
 -- ---------------------------------------------------------------------------
 -- announce_queue: one pending delivery per CONFIRMED, un-withdrawn consent on that letter's list.
 -- ---------------------------------------------------------------------------
-insert into announcements.letters (id, list, subject, body, created_by)
-  values ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'news', 'Subject', 'Body', gen_random_uuid());
-select is(public.announce_queue(p_letter => 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'), 3,
+insert into announcements.letters (id, list, subject, body, created_by, test_sent_at, test_sent_to)
+  values ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'news', 'Subject', 'Body', gen_random_uuid(), now(), 'proof@example.in');
+select is(public.announce_queue(p_member => 'c0ffee01-0000-4000-8000-000000000001', p_letter => 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'), 3,
   'queueing makes one delivery per confirmed subscriber and answers how many');
 select is(
   (select array_agg(person_id::text order by person_id::text) from announcements.deliveries
@@ -138,12 +138,30 @@ select is((select recipients_total from announcements.letters where id = 'bbbbbb
   'and carries the count it answered');
 select ok((select queued_at is not null from announcements.letters where id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'),
   'with the time it was queued, which is what the runner picks the oldest by');
+select is((select queued_by from announcements.letters where id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'),
+  'c0ffee01-0000-4000-8000-000000000001'::uuid, 'and WHO queued it, so the console names a person instead of reconstructing one from the audit log');
 select throws_ok(
-  $$select public.announce_queue(p_letter => 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb')$$,
+  $$select public.announce_queue(p_member => 'c0ffee01-0000-4000-8000-000000000001', p_letter => 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb')$$,
   'P0001', null, 'a letter that is already queued cannot be queued again, so nobody is given a second delivery');
 select throws_ok(
-  $$select public.announce_queue(p_letter => '0f0f0f0f-0f0f-4f0f-8f0f-0f0f0f0f0f0f')$$,
+  $$select public.announce_queue(p_member => 'c0ffee01-0000-4000-8000-000000000001', p_letter => '0f0f0f0f-0f0f-4f0f-8f0f-0f0f0f0f0f0f')$$,
   'P0001', null, 'a letter that does not exist is an error, never a quiet zero');
+-- A test send is the last point at which a mistake costs nothing, so Queue refuses without one.
+insert into announcements.letters (id, list, subject, body, created_by)
+  values ('b2b2b2b2-b2b2-4b2b-8b2b-b2b2b2b2b2b2', 'news', 'Unproofed', 'Body', gen_random_uuid());
+select throws_ok(
+  $$select public.announce_queue(p_member => 'c0ffee01-0000-4000-8000-000000000001', p_letter => 'b2b2b2b2-b2b2-4b2b-8b2b-b2b2b2b2b2b2')$$,
+  'P0001', null, 'a letter nobody has test sent cannot be queued, whatever the console allows');
+update announcements.letters set test_sent_at = now(), test_sent_to = 'proof@example.in'
+ where id = 'b2b2b2b2-b2b2-4b2b-8b2b-b2b2b2b2b2b2';
+select lives_ok(
+  $$select public.announce_queue(p_member => 'c0ffee01-0000-4000-8000-000000000001', p_letter => 'b2b2b2b2-b2b2-4b2b-8b2b-b2b2b2b2b2b2')$$,
+  'and can be queued once the proof has gone out');
+select lives_ok(
+  $$select public.announce_stop(p_member => 'c0ffee02-0000-4000-8000-000000000002', p_letter => 'b2b2b2b2-b2b2-4b2b-8b2b-b2b2b2b2b2b2')$$,
+  'it is stopped again so it does not sit open through the rest of this file');
+select is((select stopped_by from announcements.letters where id = 'b2b2b2b2-b2b2-4b2b-8b2b-b2b2b2b2b2b2'),
+  'c0ffee02-0000-4000-8000-000000000002'::uuid, 'and the Stop records who pressed it, which is what sheet 23 prints');
 
 -- ---------------------------------------------------------------------------
 -- announce_claim: the letter's transition, the two clocks, and both edges of the window.
@@ -248,7 +266,7 @@ insert into announcements.letters (id, list, subject, body, state, created_by, q
   values ('ffffffff-ffff-4fff-8fff-ffffffffffff', 'news', 's', 'b', 'queued', gen_random_uuid(), now());
 insert into announcements.deliveries (letter_id, person_id, state)
   values ('ffffffff-ffff-4fff-8fff-ffffffffffff', '33333333-3333-4333-8333-333333333333', 'pending');
-select lives_ok($$select public.announce_stop(p_letter => 'ffffffff-ffff-4fff-8fff-ffffffffffff')$$, 'the letter is stopped');
+select lives_ok($$select public.announce_stop(p_member => 'c0ffee02-0000-4000-8000-000000000002', p_letter => 'ffffffff-ffff-4fff-8fff-ffffffffffff')$$, 'the letter is stopped');
 select is(
   (select count(*)::int from public.announce_claim(p_letter => 'ffffffff-ffff-4fff-8fff-ffffffffffff', p_limit => 10)),
   0, 'and a claim on a stopped letter takes nothing at all');
@@ -258,6 +276,53 @@ select is(
   'pending', 'its pending row is untouched, not left sending on a letter nothing will ever finish');
 select is(public.announce_letter_state(p_letter => 'ffffffff-ffff-4fff-8fff-ffffffffffff'), 'stopped',
   'and the claim did not quietly put the stopped letter back to sending');
+
+-- ---------------------------------------------------------------------------
+-- CONSENT IS RE-CHECKED AT CLAIM, not only at queue. A letter to 430 people drains about eleven
+-- days. A reader who clicks Unsubscribe on day 2 must not receive it on day 7 — and their delivery
+-- row was made on day 1, when they were a subscriber. Nothing else in the send path can refuse:
+-- `sendToAddress` reads the suppression table only, and the claim's own join is to `people`. The
+-- only consent read anywhere else is `announce_queue`, at queue time. So this is the one place.
+-- ---------------------------------------------------------------------------
+insert into subscriptions.people (id, email, first_source) values
+  ('77777777-7777-4777-8777-777777777777', 'gita@example.in', 'footer'),
+  ('88888888-8888-4888-8888-888888888888', 'hari@example.in', 'footer'),
+  ('99999999-9999-4999-8999-999999999999', 'ila@example.in',  'footer');
+insert into subscriptions.consents (person_id, list, notice_version, source, confirmed_at, withdrawn_at) values
+  ('77777777-7777-4777-8777-777777777777', 'news', '1.1', 'footer', now(), null),
+  ('88888888-8888-4888-8888-888888888888', 'news', '1.1', 'footer', now(), now()),
+  ('99999999-9999-4999-8999-999999999999', 'news', '1.1', 'footer', now(), null),
+  ('99999999-9999-4999-8999-999999999999', 'availability', '1.1', 'footer', now(), now());
+insert into announcements.letters (id, list, subject, body, state, created_by, queued_at, test_sent_at)
+  values ('a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1', 'news', 's', 'b', 'queued', gen_random_uuid(), now(), now());
+insert into announcements.deliveries (letter_id, person_id, state) values
+  ('a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1', '77777777-7777-4777-8777-777777777777', 'pending'),
+  ('a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1', '88888888-8888-4888-8888-888888888888', 'pending'),
+  ('a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1', '99999999-9999-4999-8999-999999999999', 'pending');
+-- The fixture is what it says it is: one withdrawal on THIS letter's list, one on another list.
+-- Without this a mistyped list name would leave the over-reach case untested and the assertion
+-- below green anyway.
+select is(
+  (select array_agg(p.email || ' left ' || c.list order by p.email)
+     from subscriptions.consents c join subscriptions.people p on p.id = c.person_id
+    where c.withdrawn_at is not null and p.email in ('hari@example.in', 'ila@example.in'))::text,
+  '{"hari@example.in left news","ila@example.in left availability"}',
+  'the fixture withdrew exactly one consent each: hari from this letter''s list, ila from the other');
+select is(
+  (select jsonb_agg(j ->> 'personId' order by j ->> 'personId')
+     from public.announce_claim(p_letter => 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1', p_limit => 10) j),
+  '["77777777-7777-4777-8777-777777777777", "99999999-9999-4999-8999-999999999999"]'::jsonb,
+  'the claim takes EXACTLY the two still subscribed: a withdrawal on this list stops the send, and one on another list does not');
+select is(
+  (select state from announcements.deliveries
+    where letter_id = 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1' and person_id = '88888888-8888-4888-8888-888888888888'),
+  'pending', 'and the withdrawn reader''s row is left exactly as it was: a claim either takes a row or does not touch it');
+-- Said out loud because it is the cost of the rule above, and because a letter that can never finish
+-- is a report that is red for ever, which is a report nobody reads. A withdrawn reader's row stays
+-- `pending`, so this letter's `pending` count never reaches zero and `drain` never finishes it. Who
+-- settles that row is not decided here; see the report.
+select is(public.announce_remaining(p_letter => 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1') -> 'pending',
+  '1'::jsonb, 'the declined row still counts as pending, so nothing finishes this letter on its own');
 
 -- ---------------------------------------------------------------------------
 -- announce_open_claims: unsettled means sending OR unknown, and each row says which it is. Without
@@ -378,7 +443,7 @@ insert into announcements.letters (id, list, subject, body, state, created_by, q
   ('d0ddddd0-dddd-4ddd-8ddd-dddddddddd02', 'news', 's', 'b', 'done',    gen_random_uuid(), now());
 select is(
   (select array_agg(j ->> 'id' order by j ->> 'id') from public.announce_open_letters() j)::text,
-  '{aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa,bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb,eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee}',
+  '{a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1,aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa,bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb,eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee}',
   'only the queued and the sending letters are open: not the draft, the stopped ones or the done one');
 select is(
   (select array_agg(k order by k) from public.announce_open_letters() j, jsonb_object_keys(j) k
@@ -392,7 +457,7 @@ select is(public.announce_letter_state(p_letter => 'bbbbbbbb-bbbb-4bbb-8bbb-bbbb
   'one letter''s state, read before every send so a Stop is immediate');
 select is(public.announce_letter_state(p_letter => '0f0f0f0f-0f0f-4f0f-8f0f-0f0f0f0f0f0f'), null::text,
   'and null when there is no such letter');
-select lives_ok($$select public.announce_stop(p_letter => 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb')$$,
+select lives_ok($$select public.announce_stop(p_member => 'c0ffee02-0000-4000-8000-000000000002', p_letter => 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb')$$,
   'a sending letter can be stopped');
 select is(public.announce_letter_state(p_letter => 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'), 'stopped', 'and is');
 -- The `where` clause is the whole point: a blind update would quietly resurrect a stopped letter.
@@ -421,7 +486,7 @@ select lives_ok($$select public.announce_finish(p_letter => 'eeeeeeee-eeee-4eee-
 select is(public.announce_letter_state(p_letter => 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'), 'done', 'and is done');
 select ok((select finished_at is not null from announcements.letters where id = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'),
   'with the time it finished');
-select lives_ok($$select public.announce_stop(p_letter => 'd0ddddd0-dddd-4ddd-8ddd-dddddddddd02')$$,
+select lives_ok($$select public.announce_stop(p_member => 'c0ffee02-0000-4000-8000-000000000002', p_letter => 'd0ddddd0-dddd-4ddd-8ddd-dddddddddd02')$$,
   'stopping a done letter is not an error');
 select is(public.announce_letter_state(p_letter => 'd0ddddd0-dddd-4ddd-8ddd-dddddddddd02'), 'done', 'and leaves it done');
 
@@ -430,39 +495,39 @@ select is(public.announce_letter_state(p_letter => 'd0ddddd0-dddd-4ddd-8ddd-dddd
 -- somebody, and a letter that is LIVE right now. A Stop must cost nothing but the mail already sent,
 -- so a letter stopped with nothing sent frees the list again.
 -- ---------------------------------------------------------------------------
-insert into announcements.letters (id, list, subject, body, created_by)
-  values ('cccccccc-cccc-4ccc-8ccc-cccccccccccc', 'availability', 'One email', 'Body', gen_random_uuid());
+insert into announcements.letters (id, list, subject, body, created_by, test_sent_at)
+  values ('cccccccc-cccc-4ccc-8ccc-cccccccccccc', 'availability', 'One email', 'Body', gen_random_uuid(), now());
 -- Two drafts are fine: neither is live and neither has sent, so nothing is spent yet.
 select lives_ok(
-  $$insert into announcements.letters (id, list, subject, body, created_by)
-    values ('c0cccccc-cccc-4ccc-8ccc-cccccccccc02', 'availability', 'Second draft', 'Body', gen_random_uuid())$$,
+  $$insert into announcements.letters (id, list, subject, body, created_by, test_sent_at)
+    values ('c0cccccc-cccc-4ccc-8ccc-cccccccccc02', 'availability', 'Second draft', 'Body', gen_random_uuid(), now())$$,
   'a second availability DRAFT is allowed, because a draft has neither sent nor started');
-select is(public.announce_queue(p_letter => 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'), 1,
+select is(public.announce_queue(p_member => 'c0ffee01-0000-4000-8000-000000000001', p_letter => 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'), 1,
   'the first is queued to its one subscriber');
 -- Without the live arm of the trigger both of these would queue, and the refusal would land days
 -- later inside the send path: the first sends, the next run picks the second, and its queued ->
 -- sending transition raises, so the announce job fails every day until a human stops it.
 select throws_ok(
-  $$select public.announce_queue(p_letter => 'c0cccccc-cccc-4ccc-8ccc-cccccccccc02')$$,
+  $$select public.announce_queue(p_member => 'c0ffee01-0000-4000-8000-000000000001', p_letter => 'c0cccccc-cccc-4ccc-8ccc-cccccccccc02')$$,
   'P0001', null, 'the second cannot be queued while the first is live, and the refusal lands HERE, where the console can show it');
 select lives_ok($$select public.announce_finish(p_letter => 'cccccccc-cccc-4ccc-8ccc-cccccccccccc')$$,
   'the first letter is finished having sent nothing');
 select is(public.announce_letter_state(p_letter => 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'), 'done', 'and is done');
-select is(public.announce_queue(p_letter => 'c0cccccc-cccc-4ccc-8ccc-cccccccccc02'), 1,
+select is(public.announce_queue(p_member => 'c0ffee01-0000-4000-8000-000000000001', p_letter => 'c0cccccc-cccc-4ccc-8ccc-cccccccccc02'), 1,
   'a DONE letter that sent nothing does not spend the list: the one promised email never went out');
-select lives_ok($$select public.announce_stop(p_letter => 'c0cccccc-cccc-4ccc-8ccc-cccccccccc02')$$,
+select lives_ok($$select public.announce_stop(p_member => 'c0ffee02-0000-4000-8000-000000000002', p_letter => 'c0cccccc-cccc-4ccc-8ccc-cccccccccc02')$$,
   'the second is stopped, still having sent nothing');
 select lives_ok(
-  $$insert into announcements.letters (id, list, subject, body, created_by)
-    values ('c0cccccc-cccc-4ccc-8ccc-cccccccccc03', 'availability', 'Third', 'Body', gen_random_uuid())$$,
+  $$insert into announcements.letters (id, list, subject, body, created_by, test_sent_at)
+    values ('c0cccccc-cccc-4ccc-8ccc-cccccccccc03', 'availability', 'Third', 'Body', gen_random_uuid(), now())$$,
   'so a third may be written');
-select is(public.announce_queue(p_letter => 'c0cccccc-cccc-4ccc-8ccc-cccccccccc03'), 1,
+select is(public.announce_queue(p_member => 'c0ffee01-0000-4000-8000-000000000001', p_letter => 'c0cccccc-cccc-4ccc-8ccc-cccccccccc03'), 1,
   'and queued: a Stop before anything went out costs the operator nothing');
 select lives_ok(
   $$select public.announce_mark(p_letter => 'c0cccccc-cccc-4ccc-8ccc-cccccccccc03',
       p_person => '55555555-5555-4555-8555-555555555555', p_state => 'sent', p_provider_id => 'resend-2')$$,
   'now one person is actually mailed');
-select lives_ok($$select public.announce_stop(p_letter => 'c0cccccc-cccc-4ccc-8ccc-cccccccccc03')$$,
+select lives_ok($$select public.announce_stop(p_member => 'c0ffee02-0000-4000-8000-000000000002', p_letter => 'c0cccccc-cccc-4ccc-8ccc-cccccccccc03')$$,
   'and that letter is stopped afterwards');
 -- Straight at the table, as the owner, bypassing every grant: the console's own check is easy to
 -- bypass and a trigger that only agrees with it is decoration.
@@ -503,8 +568,16 @@ select is(public.announce_webhook(p_svix_id => 'msg_6', p_kind => 'email.deliver
   'recorded', 'a delay for somebody else');
 select is(public.announce_suppressed(p_email => 'cy@example.in'), null::text, 'which does not count against the first address');
 select is(public.announce_webhook(p_svix_id => 'msg_7', p_kind => 'email.delivery_delayed', p_email => 'cy@example.in', p_at => now()),
-  'recorded', 'the third delay for the same address');
-select is(public.announce_suppressed(p_email => 'cy@example.in'), 'list', 'suppresses list mail');
+  'recorded', 'a third delay for the same address, all three within the same day');
+-- One slow receiving host retrying ONE message three times in an hour is three events and one bad
+-- night. The store keeps no message id, so events cannot be told apart; days can.
+select is(public.announce_suppressed(p_email => 'cy@example.in'), null::text,
+  'three delays in one night do NOT suppress a live subscriber, because they may all be one message');
+update announcements.webhook_events set received_at = now() - interval '2 days' where svix_id = 'msg_4';
+update announcements.webhook_events set received_at = now() - interval '1 day'  where svix_id = 'msg_5';
+select is(public.announce_webhook(p_svix_id => 'msg_12', p_kind => 'email.delivery_delayed', p_email => 'cy@example.in', p_at => now()),
+  'recorded', 'but spread across three different days');
+select is(public.announce_suppressed(p_email => 'cy@example.in'), 'list', 'three bad nights do suppress list mail');
 -- Resend lifting its own suppression must never undo one an operator set by hand.
 insert into announcements.suppressions (email, scope, reason, source) values ('fay@example.in', 'list', 'asked us to', 'operator');
 select is(public.announce_webhook(p_svix_id => 'msg_8', p_kind => 'suppression.removed', p_email => 'fay@example.in', p_at => now()),
@@ -519,8 +592,9 @@ select is(public.announce_suppressed(p_email => 'el@example.in'), null::text, 'w
 select is(public.announce_webhook(p_svix_id => 'msg_11', p_kind => 'email.sent', p_email => 'asha@example.in', p_at => now()),
   'recorded', 'an event that changes nobody''s standing is still recorded once, so a replay of it is still a duplicate');
 select is(
-  (select count(*)::int from announcements.webhook_events where email = 'cy@example.in' and kind = 'email.delivery_delayed'),
-  3, 'every event is kept once, which is what the 30-day soft count is counted over');
+  (select array[count(*)::int, count(distinct date_trunc('day', received_at))::int]
+     from announcements.webhook_events where email = 'cy@example.in' and kind = 'email.delivery_delayed'),
+  array[4, 3], 'every event is kept once, and it is the DAYS among them that the threshold counts');
 
 -- ---------------------------------------------------------------------------
 -- Last: a reader with no business here is REFUSED, not answered with an empty set. An empty set is

@@ -12,10 +12,14 @@ import { createAdminSupabase } from "@/services/supabase/admin";
 
 type Rpc = (name: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: unknown }>;
 
-// `src/types/supabase.ts` has no announce_* signatures until `supabase gen types` is re-run against a
-// database that has the migration applied, so the generated client rejects these names at compile
-// time. This is the one place that says so; once the types carry them, delete the cast and let the
-// compiler check the argument names the pgTAP suite already pins.
+// The cast is permanent, and not a placeholder. `supabase gen types` models an RPC's arguments and
+// return as non-nullable, so the generated signatures contradict these functions in ways no amount of
+// regeneration fixes: `announce_open_letters` comes out as `Args: never`, `announce_mark`'s
+// `p_provider_id` as a required string though a send with no provider id passes null, and
+// `announce_letter_state` and `announce_suppressed` as `string` though both answer null — which is
+// the whole point of two of them. The argument NAMES are pinned instead by the pgTAP suite, which
+// calls every function with named notation (`p_letter => …`), because names are what PostgREST
+// resolves on and a rename would otherwise answer PGRST202 on the first real call.
 const call: Rpc = (name, args) => (createAdminSupabase() as unknown as { rpc: Rpc }).rpc(name, args);
 
 const failed = (name: string): AppError =>
@@ -34,9 +38,14 @@ const isClaimed = (row: unknown): row is Claimed =>
   nonEmpty((row as Record<string, unknown>).personId) &&
   nonEmpty((row as Record<string, unknown>).email);
 
-/** Moves a letter to queued and makes one pending delivery per subscriber. Returns how many. */
-export async function queueLetter(id: string): Promise<number> {
-  const { data, error } = await call("announce_queue", { p_letter: id });
+/**
+ * Moves a letter to queued and makes one pending delivery per subscriber. Returns how many.
+ *
+ * The database refuses a letter that is not a draft, and one nobody has test sent: a proof is the
+ * last point at which a mistake costs nothing. `memberId` is recorded as `queued_by`.
+ */
+export async function queueLetter(id: string, memberId: string): Promise<number> {
+  const { data, error } = await call("announce_queue", { p_letter: id, p_member: memberId });
   if (error || typeof data !== "number") throw failed("announce_queue");
   return data;
 }
@@ -67,8 +76,9 @@ export async function markDelivery(
   if (error) throw failed("announce_mark");
 }
 
-export async function stopLetter(id: string): Promise<void> {
-  const { error } = await call("announce_stop", { p_letter: id });
+/** Halts the rest of a letter. `memberId` is recorded as `stopped_by`, which the console names. */
+export async function stopLetter(id: string, memberId: string): Promise<void> {
+  const { error } = await call("announce_stop", { p_letter: id, p_member: memberId });
   if (error) throw failed("announce_stop");
 }
 
