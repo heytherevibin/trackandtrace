@@ -8,6 +8,7 @@ export interface SvixHead {
 
 const PREFIX = "whsec_";
 const TOLERANCE_MS = 5 * 60_000;
+const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
 
 /**
  * Svix's scheme, as Resend sends it: HMAC-SHA256 over `${id}.${timestamp}.${raw body}`.
@@ -25,7 +26,14 @@ export function verifySvix(secret: string, head: SvixHead, body: string, now: Da
     if (!Number.isFinite(seconds)) return false;
     if (Math.abs(now.getTime() - seconds * 1000) > TOLERANCE_MS) return false;
 
-    const key = Buffer.from(secret.slice(PREFIX.length), "base64");
+    // `Buffer.from(x, "base64")` never throws: it silently drops characters that are not base64, so a
+    // mangled secret would decode to a shorter key, or to NONE, and HMAC accepts an empty key. That
+    // would turn a misconfigured env var into a guard that anyone can pass. Refuse instead.
+    const encoded = secret.slice(PREFIX.length);
+    if (!BASE64.test(encoded)) return false;
+    const key = Buffer.from(encoded, "base64");
+    if (key.length === 0) return false;
+
     const expected = Buffer.from(createHmac("sha256", key).update(`${head.id}.${head.timestamp}.${body}`).digest("base64"));
 
     return head.signature
