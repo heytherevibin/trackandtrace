@@ -169,15 +169,22 @@ export function summarise(entries, openLetters, skipped = 0) {
 
 /**
  * Non-zero the moment anything is stuck, so a check wired to this fails on a send that has quietly
- * stopped rather than on nothing at all. 1 means the store was read and something is stuck, and
- * nothing else does: a finding wins over a letter that could not be read, and a letter that could
- * not be read is never a clean 0, because a report that skipped it cannot say it is fine.
+ * stopped rather than on nothing at all. The codes are a SEVERITY LADDER and the highest wins:
+ *
+ *   0  the store was read in full and nothing is stuck.
+ *   1  the store was read in full and something is stuck.
+ *   2  the report is incomplete: a letter could not be read (here), or the store could not be, or
+ *      the script crashed (the runner). An incomplete report with findings is still incomplete.
+ *
+ * A letter we could not read must not be masked by a finding elsewhere: the more serious signal
+ * (part of the report is unassessable) must not lose to the less serious (we know what is wrong
+ * with that letter). Nothing is lost by it, because the output still carries every finding.
  *
  * @param {readonly Stuck[]} entries
- * @param {number} [skipped]
+ * @param {number} [skipped] letters that could not be read
  * @returns {number}
  */
 export function exitCodeFor(entries, skipped = 0) {
-  if (entries.length > 0) return 1;
-  return skipped > 0 ? 2 : 0;
+  if (skipped > 0) return 2;
+  return entries.length > 0 ? 1 : 0;
 }

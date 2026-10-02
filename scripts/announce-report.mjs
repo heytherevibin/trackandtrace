@@ -5,12 +5,16 @@
 //   node --env-file=.env.local scripts/announce-report.mjs
 //   (or: npm run announce:report)
 //
-// Exit: 0 when nothing is stuck · 1 when the store was read and something is stuck, and NOTHING
-// ELSE · 2 when the report could not start, could not read the store, or could not read every
-// letter and found nothing in the rest. A store that cannot be read is not "nothing stuck" and not
-// "something stuck", so it gets its own code; and a crash must never exit 1, because Node's own
-// exit for an uncaught throw is 1 and a check wired to this would read a crash as a finding. So
-// `main` never throws: every step that can, from the first import on, ends in 2.
+// Exit, a severity ladder in which the highest wins (2 beats 1 beats 0):
+//   0  the store was read in full and nothing is stuck.
+//   1  the store was read in full and something is stuck, and NOTHING ELSE.
+//   2  the report is incomplete: it could not start, the store could not be read, a letter could not
+//      be read, or the script crashed. An incomplete report with findings is still incomplete, so a
+//      letter that could not be read is never masked by a finding elsewhere; stdout still carries
+//      the skip and every finding, and only the code names the most severe thing that happened.
+// A crash must never exit 1, because Node's own exit for an uncaught throw is 1 and a check wired to
+// this would read a crash as a finding. So `main` never throws: every step that can, from the first
+// import on, ends in 2.
 //
 // This file is only the wiring. **What counts as stuck, and what this reading cannot see, is
 // `announce-coverage.mjs`; read its header before changing any rule.** Everything there is pure and
@@ -47,7 +51,7 @@ const reason = (error) => (error instanceof Error ? error.message : "unknown err
  * Reads every open letter, assembles what the verdict needs, prints it, and answers the exit code.
  * One letter that cannot be read is SKIPPED and named, and the rest are reported: `openLetters`
  * tolerates a bad row on purpose, and a report that dies on one is a report that stops reporting.
- * Skipped is never clean, though: see `exitCodeFor`.
+ * Skipped makes the run incomplete, so it exits 2 whatever else was found: see `exitCodeFor`.
  *
  * @param {{ openLetters: () => Promise<readonly { id: string, state: string, queuedAt: string }[]>, remainingFor: (id: string) => Promise<{ pending: number, sending: number, lastSentAt?: string | null }>, openClaims: (id: string) => Promise<readonly { personId: string, claimedAt: string, firstAttemptedAt: string | null }[]> }} reads
  * @param {{ now: () => Date, say: (line: string) => void }} world

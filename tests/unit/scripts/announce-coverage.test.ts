@@ -227,11 +227,13 @@ describe("the report", () => {
     expect(exitCodeFor([{ letterId: "L", why: "x" }])).toBe(1);
   });
 
-  it("exits 2 when a letter could not be read and nothing else is stuck, and 1 when something is, skipped or not", () => {
-    // A report that skipped a letter cannot say nothing is stuck, so it must not exit 0; and a
-    // finding is a finding, so it must still exit 1.
+  it("is a severity ladder, highest wins: 2 (incomplete) beats 1 (something stuck) beats 0", () => {
+    // An incomplete report with findings is still incomplete: the letter it could not read must not
+    // be masked by a finding elsewhere, or the more serious signal loses to the less serious.
     expect(exitCodeFor([], 1)).toBe(2);
-    expect(exitCodeFor([{ letterId: "L", why: "x" }], 1)).toBe(1);
+    expect(exitCodeFor([{ letterId: "L", why: "x" }], 1)).toBe(2);
+    expect(exitCodeFor([{ letterId: "L", why: "x" }], 0)).toBe(1);
+    expect(exitCodeFor([], 0)).toBe(0);
   });
 
   it("does not say nothing is stuck when a letter could not be read", () => {

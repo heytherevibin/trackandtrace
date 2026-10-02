@@ -96,13 +96,18 @@ describe("the exit code the runner answers", () => {
     expect(text).not.toMatch(/nothing is stuck/i);
   });
 
-  it("still exits 1 when it skipped one letter and found another stuck", async () => {
+  it("exits 2, not 1, when it skipped one letter and found another stuck, and still names the stuck one", async () => {
+    // Exit 2 says the report is incomplete and outranks a finding elsewhere; stdout loses nothing.
     const out = run({
       letters: [open("BAD"), open("L2")],
       remaining: { BAD: new Error("x"), L2: { pending: 10, sending: 0, lastSentAt: hoursAgo(100) } },
     });
-    expect(await out.result).toBe(1);
-    expect(out.said.join("\n")).toContain("L2");
+    expect(await out.result).toBe(2);
+    const text = out.said.join("\n");
+    expect(text).toContain("L2");
+    expect(text).toContain("no delivery in 48 hours, 10 still pending");
+    expect(text).toContain("BAD");
+    expect(text).toMatch(/could not be read/);
   });
 });
 
