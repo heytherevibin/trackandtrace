@@ -1,4 +1,5 @@
 import { messages } from "@/messages";
+import type { SubscribeList } from "@/services/subscriptions/subscribe";
 
 /**
  * What a list email says: the operator's body, then the unsubscribe line and the human page's link.
@@ -11,7 +12,7 @@ import { messages } from "@/messages";
  * reader they asked for news. `humanUrl` is the /unsubscribe page, which is a GET; the one-click POST endpoint belongs in the
  * headers (see `listHeaders`), not here.
  */
-export function letterText(body: string, humanUrl: string, list: "news" | "availability"): string {
+export function letterText(body: string, humanUrl: string, list: SubscribeList): string {
   return `${body.trimEnd()}\n\n${messages.subscribe.email.unsubscribeLine[list]}\n${humanUrl}\n`;
 }
 
