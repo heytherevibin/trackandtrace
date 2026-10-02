@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuditEntryDetail } from "@/console/audit/audit";
@@ -58,14 +58,41 @@ const SYSTEM: AuditEntryDetail = {
   after: null,
 };
 
+/**
+ * Answers the read the way the network does: on a later task, never in the render's own microtask.
+ *
+ * `mockResolvedValue` resolves inside the same flush as the render that asked, so the drawer's
+ * `loading` state was usually skipped entirely here and the race in `open()` only surfaced when the
+ * machine was busy. Resolving on a macrotask makes the drawer paint `loading` first on EVERY run,
+ * exactly as it does in a browser -- so a caller that forgets to wait for the answer fails every
+ * time instead of one run in three, and this bug cannot come back quietly.
+ */
 function answering(entry: AuditEntryDetail | null) {
-  apiRequest.mockResolvedValue({ ok: true, data: { ok: true, entry } });
+  apiRequest.mockImplementation(
+    () => new Promise((resolve) => setTimeout(() => resolve({ ok: true, data: { ok: true, entry } }), 0)),
+  );
 }
 
+/**
+ * Opens the drawer and waits for the read to have ANSWERED, not merely for the dialog to exist.
+ *
+ * The drawer opens in its `loading` state on the first render and the entry arrives a tick later,
+ * when the mocked read resolves. `findByRole("dialog")` is satisfied by the shell alone, so every
+ * synchronous `getByText` below it was racing that read -- and losing only when the machine was
+ * busy enough to put a macrotask between the two. That is why this file passed on its own and
+ * failed inside `npm run check`: four times in one day, on three different tests, which is the
+ * signature of a shared race rather than a wrong assertion.
+ *
+ * Waiting for the loading placeholder to GO, rather than for a field, is what makes this hold for
+ * all of `ready`, `missing` and `error` alike -- the three states whose tests call this -- without
+ * naming a field that only some of them draw.
+ */
 async function open(entry: AuditEntryDetail | null = ASHA) {
   answering(entry);
   render(<EntryDrawer entryId={entry?.id ?? "00000000-0000-4000-8000-00000000dead"} onClose={vi.fn()} />);
-  return screen.findByRole("dialog");
+  const dialog = await screen.findByRole("dialog");
+  await waitFor(() => expect(within(dialog).queryByLabelText(m.entry.loading)).toBeNull());
+  return dialog;
 }
 
 /** The drawer's own labels, in the order it draws them. */
