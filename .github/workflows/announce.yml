@@ -1,0 +1,142 @@
+# The announcement sender, once a day, and the check that says whether it is working.
+#
+# **What this is.** Module 07 sends an operator's plain-text letter to the people who asked for
+# updates. A letter never goes out in one blast: Resend's free plan allows 100 emails a day for the
+# whole deployment, announcements may take only 40 of them, and so a letter to a real list drains
+# across several days. This is the thing that drains it — one run takes what the day's allowance
+# still covers, sends that many, and stops. The next day's run takes the next batch. Without a
+# schedule a queued letter would sit `queued` for ever and nothing would say so.
+#
+# **Two jobs, on purpose, and this is NOT how `crawl.yml` does it.** The crawler prints its coverage
+# in a step marked `continue-on-error`, and can afford to: its rows are already written and its
+# cursor already saved by the time that step runs, so a store it cannot read back is a reporting
+# problem and not a lost run. A letter is not like that. `announce:report` fails when a letter has
+# sent nothing in 48 hours while rows are pending, when a delivery has been claimed for more than 24
+# hours and never marked, and when the report itself could not be read in full. Every one of those
+# means **mail is not going out**, and a step that fails under `continue-on-error: true` leaves the
+# job green: nobody would find out. `crawl.yml`'s own last line says it — a silenced check is worse
+# than no check.
+#
+# So the check is its own job, `report`, with no `continue-on-error`, and it is allowed to turn the
+# whole run red. Red is the one state anyone notices. The `send` job's own result stays separately
+# readable on the run page, so "this run's sending failed" and "a letter is stuck" are two different
+# things to look at. If you are about to add `continue-on-error` to `report` to quiet it, or fold it
+# back into `send` to match the crawler: that is the defect this layout exists to prevent.
+#
+# Operating it — what each failure means, and what a person does about it — is
+# docs/runbooks/announcements.md.
+name: Send announcements
+
+on:
+  schedule:
+    # 04:00 UTC is 09:30 IST. Not the crawler's `0 0 * * *`: GitHub delays scheduled runs under
+    # load, and the top of the day is the busiest slot there is, which is where the crawler already
+    # sits. Two scheduled jobs from one repository should not ask for the same minute. It is also
+    # four hours after Resend's day rolls over at 00:00 UTC, so a late start still lands inside the
+    # day it was meant for rather than straddling the reset.
+    #
+    # The schedule is a daily one on purpose. A delivery's 24 hours are measured from its FIRST
+    # attempt (Resend forgets an Idempotency-Key after a day), and a strictly daily run lands exactly
+    # on that boundary; scripts/announce-plan.mjs treats the boundary as inclusive for that reason.
+    # Moving this to every few hours is a decision about that clock, not only about speed.
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One run at a time, and a scheduled run is never cancelled for a manual one: a half-finished send
+# has already spent allowance, and cancelling it does not give the allowance back.
+concurrency:
+  group: announce
+  cancel-in-progress: false
+
+jobs:
+  send:
+    # Never from a fork, which would be someone else's pull request sending mail from this domain.
+    if: github.repository == 'heytherevibin/trackandtrace'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+
+      # The script reads `process.env` directly and validates it with the app's own schema, so a
+      # missing secret fails here with the field named rather than halfway through a send. It prints
+      # counts and a letter's id, never an address, a signature or a body: this log is not as private
+      # as the database.
+      - name: Send
+        env:
+          # **Not cosmetic**, for the reason `crawl.yml` gives. Every shared key is prefixed
+          # `tt:${VERCEL_ENV ?? NODE_ENV}`, so without this the day's allowance counter would be
+          # read under `tt:development` and not under the `tt:production` one the live site's
+          # sign-in and confirmation mail is spending. Two senders of one 100-a-day plan, neither
+          # able to see the other's count: the exact failure a shared counter exists to prevent.
+          VERCEL_ENV: production
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          # **The runner refuses to start without this** (exit 2), and it is deliberate. A per-process
+          # key would sign unsubscribe links that nothing could ever verify, so a run without it
+          # would send mail whose one-click links are all dead. Leave it unset and this workflow
+          # fails on every single run. It must be the SAME key the site runs with.
+          DATA_KEY: ${{ secrets.DATA_KEY }}
+          # **Also required, also refused without.** The day's allowance is one counter, in Upstash,
+          # shared with sign-up confirmations and operator mail. The runner reads it through a store
+          # that THROWS when it cannot answer, rather than falling back to this process's memory,
+          # because memory would hand every run a fresh, full allowance and send past the plan's
+          # 100 a day while reporting success. These names, as in `crawl.yml`, because they are what
+          # Vercel's integration injects.
+          KV_REST_API_URL: ${{ secrets.KV_REST_API_URL }}
+          KV_REST_API_TOKEN: ${{ secrets.KV_REST_API_TOKEN }}
+          # The schema pairs the URL with the publishable key and refuses one without the other. The
+          # runner reads and writes with the SECRET key and never uses this one; it is here to
+          # satisfy the pair, as in `crawl.yml`.
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          # Optional: a repository variable, and blank means the schema's own default. Set it if the
+          # site sends from anything other than that default, so a letter does not arrive from a
+          # different name than the confirmation that preceded it.
+          SUBSCRIBE_EMAIL_FROM: ${{ vars.SUBSCRIBE_EMAIL_FROM }}
+        run: node scripts/announce-send.mjs
+
+  report:
+    # `always()`, because the report exists for the day the send job FAILED: a send that crashed is
+    # exactly when a letter is most likely to be stuck, and a report that skipped itself then would
+    # be silent when it is needed. `always()` replaces the implicit "previous job succeeded", so
+    # the fork guard is repeated here and not inherited.
+    #
+    # No `continue-on-error`, here or on its step. Exit 1 (something is stuck) and exit 2 (the
+    # report itself is incomplete: the store could not be read, a letter could not be read, or the
+    # script crashed) both fail this job and so turn the run red. That is the whole point of the
+    # layout; see the header.
+    needs: send
+    if: ${{ always() && github.repository == 'heytherevibin/trackandtrace' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+
+      # Reads our own database through the same three reads the sender uses and asks Resend for
+      # nothing, so it costs no allowance. It needs only the Supabase trio, and it deliberately has
+      # NO `VERCEL_ENV`: the schema refuses a production deployment that lacks DATA_KEY and the
+      # Upstash pair, and this job has no use for either. Setting it here would make the report fail
+      # validation on every run, over a counter it never reads.
+      - name: Is anything stuck
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          # Paired with the URL in this job as in `send`, for the same reason: the env schema
+          # refuses one without the other. `crawl.yml`'s Coverage step once lacked it, so its report
+          # failed validation on every run and `continue-on-error` called that success. Do not
+          # recreate that: this job must stay red when it cannot run.
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: npm run announce:report
