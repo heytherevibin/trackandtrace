@@ -47,7 +47,7 @@ export function SavedPlate({
           </span>
         ) : null}
       </div>
-      <ScrollRegion labelledBy={TITLE_ID}>
+      <ScrollRegion name="watchlist" labelledBy={TITLE_ID}>
         <table role={R.table} aria-labelledby={TITLE_ID} className={`w-full border-collapse text-body leading-normal lg:min-w-[720px] ${S.table}`}>
           <thead role={R.rowgroup} className={S.head}>
             <tr role={R.row}>

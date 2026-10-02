@@ -175,7 +175,9 @@ export function PreBookingForm() {
           </h2>
           <span className={cn(CELL, "whitespace-nowrap border-l border-line px-5 py-2.5 text-ink-1/70", plateCellClass(0))}>{m.form.sheet}</span>
         </div>
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,180px),1fr))] items-end gap-4 p-5">
+        {/* The fields' padding from the plate is 20px as drawn and does not grow with the text: at 200% the date field needs
+            every pixel of its column to show a whole date. */}
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,180px),1fr))] items-end gap-4 p-[20px]">
           {/* From, swap, To as ONE cell of the outer grid: the pair belongs together, and the arrow
               has to sit between them at every width rather than wrapping off on its own. One row while each
               field keeps 4rem (64px as drawn: a 280px phone gives them 70px); with the text made larger than

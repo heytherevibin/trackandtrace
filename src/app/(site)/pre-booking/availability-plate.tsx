@@ -142,7 +142,8 @@ export function AvailabilityPlate({
           </div>
         </>
       )}
-      <ScrollRegion label={m.title}>
+      {/* Named for its train: several rows can be open at once, and each is a region of its own. */}
+      <ScrollRegion name="availability" label={`${m.title} · ${answer.train.no} ${answer.train.name}`}>
         <table role={R.table} aria-label={m.title} className={cn("tnum w-full border-collapse text-sm", S.table)}>
           <thead role={R.rowgroup} className={S.head}>
             <tr role={R.row}>

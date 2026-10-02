@@ -6,8 +6,10 @@ import { UNSUBSCRIBE } from "./subscribe-link";
 import { report, undersizedTargets } from "./targets";
 
 // Every traveller page with its text at 200% (WCAG 1.4.4 Resize Text, 1.4.10 Reflow), at every width from a 280px phone
-// to a 1440px desk: nothing scrolls sideways, no text is cut or broken mid-word, every control still answers a finger
-// across 44px, and no field is squeezed below a width a reader can type in. responsive.spec.ts runs three of the widths
+// to a 1440px desk: nothing scrolls sideways, no text is cut, no word is broken where its line could have held it (a
+// word longer than its whole line does break, and that is allowed: "Karnatak/a" in a 280px window), every control still
+// answers a finger across 44px, and no field is squeezed below a width a reader can type in or too narrow for the
+// value it holds. responsive.spec.ts runs three of the widths
 // on every PR; the nightly (nightly/text-200.spec.ts) runs all nine.
 
 /** The widths the sweep knows: the phones, the first width past each of the layout's breakpoints, and the desks. */
@@ -166,7 +168,8 @@ export const STATES: readonly State[] = [
  * floor subscribe-layout.spec.ts holds the email field to. */
 const FIELD_MIN = 120;
 
-/** Fields too narrow to type in: every drawn text field, select and text area under FIELD_MIN. */
+/** Fields too narrow to type in, or to show what they hold: every drawn text field, select and text area under
+ * FIELD_MIN, and every field whose value is wider than the field (its content scrolls inside it: a date cut to "0/2026"). */
 export async function narrowFields(page: Page): Promise<string[]> {
   return page.evaluate((min) => {
     const found: string[] = [];
@@ -176,6 +179,17 @@ export async function narrowFields(page: Page): Promise<string[]> {
       if (box.width <= 1 || box.height <= 1) continue; // a proxy, clipped to nothing
       const label = el.getAttribute("aria-label") ?? el.labels?.[0]?.textContent?.trim() ?? el.getAttribute("name") ?? el.tagName.toLowerCase();
       if (box.width < min) found.push(`the field "${label.slice(0, 32)}" is ${Math.round(box.width)}px wide, under ${min}px`);
+      if (!("value" in el) || el.value === "" || el.tagName === "SELECT") continue;
+      // A date field draws its value in parts of its own, which its scroll width does not count: the value's width is
+      // measured as the field's own type draws it (ten figures and two separators, whatever the order).
+      const style = getComputedStyle(el);
+      const room = el.clientWidth - Number.parseFloat(style.paddingLeft) - Number.parseFloat(style.paddingRight);
+      const pen = document.createElement("canvas").getContext("2d");
+      if (!pen) throw new Error("no canvas to measure with");
+      pen.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+      const shown = el.type === "date" ? "00/00/0000" : style.textTransform === "uppercase" ? el.value.toUpperCase() : el.value;
+      const cut = Math.max(el.scrollWidth - el.clientWidth, Math.ceil(pen.measureText(shown).width - room));
+      if (cut > 1) found.push(`the field "${label.slice(0, 32)}" cuts ${cut}px off the value it holds`);
     }
     return found;
   }, FIELD_MIN);
@@ -183,9 +197,11 @@ export async function narrowFields(page: Page): Promise<string[]> {
 
 /** Words broken across two lines anywhere on the page, where their line could have held them: each word a reader sees,
  * read as a range. A word may turn the line where the language lets it (after a hyphen, a dash or a slash, each part
- * read as a word of its own), a word longer than the whole line its block gives it has to break somewhere (an address,
- * a hash), and a box that hyphenates (hyphens: auto, the principles sheet) breaks at a syllable with a hyphen drawn;
- * nothing else may. layout.ts's brokenWords is the same reading without those allowances, for headings. */
+ * read as a word of its own), and a word as long as the whole line its block gives it, or longer, has to break
+ * somewhere (an address, a hash, "Karnataka" in a 280px window at 200%). A box that hyphenates (hyphens: auto, the
+ * principles sheet) may turn a word at a syllable, which is read here as the browser does it: a word of five letters
+ * or more, two or more of them on each line, in a box that does not also break anywhere (word-break, overflow-wrap:
+ * anywhere). Nothing else may. layout.ts's brokenWords is the same reading without those allowances, for headings. */
 export async function wordsBrokenMidWord(page: Page, scope = "body"): Promise<string[]> {
   return page.evaluate((root) => {
     const found: string[] = [];
@@ -203,13 +219,26 @@ export async function wordsBrokenMidWord(page: Page, scope = "body"): Promise<st
       const parent = node.parentElement;
       const value = node.textContent ?? "";
       if (!parent || value.trim() === "" || parent.closest(".sr-only, [aria-hidden='true'], svg, noscript, script, style, nextjs-portal") || !parent.checkVisibility()) continue;
-      if (getComputedStyle(parent).hyphens === "auto") continue;
+      const style = getComputedStyle(parent);
+      const hyphenates = style.hyphens === "auto" && !["break-all", "break-word"].includes(style.wordBreak) && style.overflowWrap !== "anywhere";
       for (const word of value.matchAll(/[^\s\-\u2010-\u2015/]+[\-\u2010-\u2015/]*/g)) {
         const range = document.createRange();
         range.setStart(node, word.index);
         range.setEnd(node, word.index + word[0].length);
         const rects = [...range.getClientRects()].filter((r) => r.width > 0);
         if (new Set(rects.map((r) => Math.round(r.top))).size <= 1) continue;
+        if (hyphenates) {
+          // letters a line, read one letter at a time: a syllable's turn leaves two or more on every line
+          const lines = new Map<number, number>();
+          for (let i = 0; i < word[0].length; i += 1) {
+            const letter = document.createRange();
+            letter.setStart(node, word.index + i);
+            letter.setEnd(node, word.index + i + 1);
+            const top = Math.round(letter.getBoundingClientRect().top);
+            lines.set(top, (lines.get(top) ?? 0) + 1);
+          }
+          if (word[0].length >= 5 && [...lines.values()].every((letters) => letters >= 2)) continue;
+        }
         const whole = rects.reduce((sum, r) => sum + r.width, 0);
         const line = lineOf(parent);
         if (whole > line - 1) continue; // as long as its whole line, or longer

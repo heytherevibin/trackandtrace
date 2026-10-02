@@ -11,7 +11,8 @@ import { cn } from "@/utils/cn";
 // into a record: the passenger across the top, booked, current, and coach · berth labelled beneath, side by side while
 // the plate is 13rem wide (always, as drawn: 238px at its narrowest) and one under another when larger text makes it
 // narrower than that. From sm the table is a table; where it is wider than its plate (text at 200%), it scrolls in a
-// named region a reader can reach (ScrollRegion).
+// named region a reader can reach (ScrollRegion). The region's name is the check plate's caption for the same table
+// ("Passengers on this booking"), not the plate's own heading: two landmarks with one name tell a reader nothing apart.
 
 const S = stackedTable("sm");
 const EDGE = "px-3.5 first:pl-5 last:pr-5";
@@ -29,7 +30,7 @@ export function PassengerTable({ pax, className }: { readonly pax: readonly Pass
   const m = messages.result.passengers;
   return (
     <Plate title={m.legend} titleId="passengers-title" headingLevel={2} meta={[m.count(pax.length)]} cells="tight" padding="none" className={className}>
-      <ScrollRegion labelledBy="passengers-title" className="@container">
+      <ScrollRegion name="passengers" label={messages.check.result.passengers.caption} className="@container">
         <table role={R.table} className={cn("tnum w-full border-collapse text-sm", S.table)} aria-labelledby="passengers-title">
           <thead role={R.rowgroup} className={S.head}>
             <tr role={R.row}>

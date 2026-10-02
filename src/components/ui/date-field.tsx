@@ -189,7 +189,12 @@ export function DateField({
       <label htmlFor={id} className={labelClassName}>
         {label}
       </label>
-      <div className="relative">
+      {/* A query container (never on the landing: this field is the pre-booking form's). In a field under 8rem wide
+          (never as drawn: 198px, 12.4rem, at its narrowest; with the text at 200% on a 280px or 320px phone it is), the
+          date's ten figures and the calendar button cannot share the line: the button takes a line of its own under
+          the field, the field's whole width. The field's padding and the button's width are in px, so larger text
+          keeps all the room the well has. */}
+      <div className="@container relative">
         {/* The INPUT carries the well, rather than a wrapper around it.
 
             A wrapper's own hairline leaves the field 38px of content box, and a field two pixels
@@ -206,7 +211,7 @@ export function DateField({
           aria-invalid={invalid || undefined}
           aria-describedby={describedBy}
           onChange={(event) => onChange(event.target.value)}
-          className="well h-10 w-full pl-[10px] pr-[40px] [&::-webkit-calendar-picker-indicator]:hidden"
+          className="well h-10 w-full pl-[10px] pr-[40px] @max-[8rem]:pr-[10px] [&::-webkit-calendar-picker-indicator]:hidden"
         />
         <button
           ref={toggle}
@@ -216,7 +221,7 @@ export function DateField({
           aria-expanded={open}
           aria-controls={open ? dialogId : undefined}
           onClick={() => (open ? close() : openCalendar())}
-          className="press absolute inset-y-px right-px inline-flex w-[36px] cursor-pointer items-center justify-center text-ink-1/70 hover:text-ink-1"
+          className="press absolute inset-y-px right-px inline-flex w-[36px] cursor-pointer items-center justify-center text-ink-1/70 hover:text-ink-1 @max-[8rem]:static @max-[8rem]:mt-1.5 @max-[8rem]:h-10 @max-[8rem]:w-full @max-[8rem]:border @max-[8rem]:border-line"
         >
           <svg viewBox="0 0 16 16" aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.25">
             <rect x="2" y="3.5" width="12" height="11" />

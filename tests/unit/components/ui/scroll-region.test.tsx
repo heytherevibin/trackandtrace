@@ -1,4 +1,4 @@
-import { act, render } from "@testing-library/react";
+import { act, fireEvent, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ScrollRegion } from "@/components/ui/scroll-region";
 
@@ -33,7 +33,7 @@ afterEach(() => {
 describe("ScrollRegion", () => {
   it("is a plain box while its content fits: no role, no name, no stop in the Tab order", () => {
     const { container } = render(
-      <ScrollRegion label="Passengers">
+      <ScrollRegion name="passengers" label="Passengers">
         <table />
       </ScrollRegion>,
     );
@@ -48,7 +48,7 @@ describe("ScrollRegion", () => {
 
   it("becomes a named region in the Tab order once its content is wider than it, and a plain box again when it fits", () => {
     const { container } = render(
-      <ScrollRegion label="Passengers">
+      <ScrollRegion name="passengers" label="Passengers">
         <table />
       </ScrollRegion>,
     );
@@ -66,7 +66,7 @@ describe("ScrollRegion", () => {
 
   it("takes its name from a heading when given one's id", () => {
     const { container } = render(
-      <ScrollRegion labelledBy="passengers-title">
+      <ScrollRegion name="passengers" labelledBy="passengers-title">
         <table />
       </ScrollRegion>,
     );
@@ -79,10 +79,49 @@ describe("ScrollRegion", () => {
 
   it("watches its content as well as itself: a table that grows inside an unchanged box is seen", () => {
     render(
-      <ScrollRegion label="Passengers">
+      <ScrollRegion name="passengers" label="Passengers">
         <table />
       </ScrollRegion>,
     );
     expect(observed).toHaveLength(2);
+  });
+
+  it("says which scroller it is, and whether it has measured itself yet: pending until its observer first reports, then fits or scrolls", () => {
+    const { container } = render(
+      <ScrollRegion name="passengers" label="Passengers">
+        <table />
+      </ScrollRegion>,
+    );
+    const box = container.firstElementChild as HTMLElement;
+    expect(box).toHaveAttribute("data-scroll-region", "passengers");
+    expect(box).toHaveAttribute("data-scrolls", "pending");
+    widths(box, 620, 300);
+    resize();
+    expect(box).toHaveAttribute("data-scrolls", "yes");
+    widths(box, 300, 300);
+    resize();
+    expect(box).toHaveAttribute("data-scrolls", "no");
+  });
+
+  it("keeps its place in the Tab order while it holds focus, though it has stopped overflowing, and gives it up on blur", () => {
+    const { container } = render(
+      <ScrollRegion name="passengers" label="Passengers">
+        <table />
+      </ScrollRegion>,
+    );
+    const box = container.firstElementChild as HTMLElement;
+    widths(box, 620, 300);
+    resize();
+    act(() => box.focus());
+    expect(document.activeElement).toBe(box);
+    widths(box, 300, 300);
+    resize();
+    // still focusable, so focus has not dropped to the body; no longer announced as a region that scrolls
+    expect(box).toHaveAttribute("tabindex", "0");
+    expect(document.activeElement).toBe(box);
+    expect(box).toHaveAttribute("data-scrolls", "no");
+    fireEvent.blur(box);
+    expect(box).not.toHaveAttribute("tabindex");
+    expect(box).not.toHaveAttribute("role");
   });
 });

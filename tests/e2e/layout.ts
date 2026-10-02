@@ -13,14 +13,34 @@ const CARRIED = ["#run.is-running > .run-pin"] as const;
  * that clips it is measured without it, so real content that box hides is still found. */
 const DRAWN_BEHIND = [".hero-dial"] as const;
 
-/** A reader's own scroller: a region with a name, in the Tab order, that scrolls sideways (WCAG 1.4.10's exception for
- * a table that cannot reflow). What it holds is brought into view by the reader, so it neither "hides" content nor runs
- * "past the edge" while the region itself stands inside the window. All four, or it is measured as any box. */
-const READERS_SCROLLER = '[role="region"][tabindex="0"]:is([aria-label], [aria-labelledby])';
+/** A reader's own scroller (WCAG 1.4.10's exception for a table that cannot reflow): one of the site's three named
+ * scroll regions (scroll-region.tsx), and only from the width where its table is a table. Below that width the same
+ * table is stacked records and must fit; there, and anywhere else, a scroller is a break, at any text size:
+ * - passengers: the /pnr record's passenger table, from sm (40rem);
+ * - availability: /pre-booking's date table, from sm (40rem);
+ * - watchlist: /watchlist's saved-PNR table, from lg (64rem).
+ * The landing has none. The width is a media query in rem, as the tables' own breakpoints are. */
+const READERS_SCROLLERS = { passengers: "40rem", availability: "40rem", watchlist: "64rem" } as const;
+
+/** Every scroll region on the page has measured itself, and says what is so: `data-scrolls` is "yes" exactly where the
+ * region's content is wider than it. A region names itself in a ResizeObserver's callback and the commit after it, so
+ * a reading taken before that sees an unnamed box that hides its content. A state to wait for, never a time. */
+export async function scrollRegionsSettled(page: Page): Promise<void> {
+  await page.waitForFunction(
+    () =>
+      [...document.querySelectorAll<HTMLElement>("[data-scroll-region]")].every((el) => {
+        const scrolls = el.scrollWidth > el.clientWidth + 1;
+        return el.dataset.scrolls === (scrolls ? "yes" : "no") && (!scrolls || el.getAttribute("role") === "region");
+      }),
+    undefined,
+    { timeout: 10_000 },
+  );
+}
 
 /** Describes everything that breaks the phone layout on the current page; empty when it fits. */
 export async function layoutBreaks(page: Page): Promise<string[]> {
-  return page.evaluate(({ carried, behind, scroller }) => {
+  await scrollRegionsSettled(page);
+  return page.evaluate(({ carried, behind, scrollers }) => {
     const vw = document.documentElement.clientWidth;
     const name = (el: Element) => {
       const text = (el.textContent ?? "").trim().replace(/\s+/g, " ").slice(0, 32);
@@ -51,14 +71,21 @@ export async function layoutBreaks(page: Page): Promise<string[]> {
       const box = stage.getBoundingClientRect();
       return box.left >= -1 && box.right <= vw + 1 ? stage : null;
     };
-    /** The reader's scroller `el` lies inside, while it scrolls sideways and stands inside the window. */
-    const scrollerOf = (el: Element) => {
-      const region = el.parentElement?.closest(scroller) ?? null;
-      if (!region || !["auto", "scroll"].includes(getComputedStyle(region).overflowX)) return null;
-      const box = region.getBoundingClientRect();
-      return box.left >= -1 && box.right <= vw + 1 ? region : null;
+    /** `el` is a reader's own scroller: named, in the Tab order, one of the listed regions at a width it is listed for. */
+    const isScroller = (el: Element) => {
+      if (!(el instanceof HTMLElement) || !el.matches('[data-scroll-region][role="region"][tabindex="0"]:is([aria-label], [aria-labelledby])')) return false;
+      const from = (scrollers as Record<string, string | undefined>)[el.dataset.scrollRegion ?? ""];
+      return from !== undefined && window.matchMedia(`(min-width: ${from})`).matches && ["auto", "scroll"].includes(getComputedStyle(el).overflowX);
     };
-    const isScroller = (el: Element) => el.matches(scroller) && ["auto", "scroll"].includes(getComputedStyle(el).overflowX);
+    /** The reader's scroller `el` lies inside, while that scroller stands inside the window. */
+    const scrollerOf = (el: Element) => {
+      for (let region = el.parentElement?.closest("[data-scroll-region]") ?? null; region; region = region.parentElement?.closest("[data-scroll-region]") ?? null) {
+        if (!isScroller(region)) continue;
+        const box = region.getBoundingClientRect();
+        if (box.left >= -1 && box.right <= vw + 1) return region;
+      }
+      return null;
+    };
     /** How far `el`'s content runs past its box, the drawings behind the page taken out for the reading. */
     const hidden = (el: Element) => {
       const drawn = [...el.querySelectorAll<HTMLElement>(behind.join(", "))];
@@ -84,7 +111,7 @@ export async function layoutBreaks(page: Page): Promise<string[]> {
       }
     }
     return breaks.slice(0, 12);
-  }, { carried: CARRIED, behind: DRAWN_BEHIND, scroller: READERS_SCROLLER });
+  }, { carried: CARRIED, behind: DRAWN_BEHIND, scrollers: READERS_SCROLLERS });
 }
 
 /** Words a reader cannot read to the end (spec §9's 200% text; J6 nightly): a line of text that runs past the window's
