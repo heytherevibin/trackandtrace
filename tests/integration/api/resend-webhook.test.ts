@@ -122,8 +122,11 @@ describe("POST /api/webhooks/resend", () => {
     vi.stubEnv("RESEND_WEBHOOK_SECRET", "");
     resetEnvCache();
     const body = event("email.bounced");
-    expect((await POST(req(body, signed(body)))).status).toBe(500);
+    const res = await POST(req(body, signed(body)));
+    expect(res.status).toBe(500);
     expect(recordWebhook).not.toHaveBeenCalled();
+    // The likeliest failure on a first production run, so it must not read like a database outage.
+    expect(await res.text()).toContain("The webhook is not configured.");
   });
 
   it.each([
@@ -216,6 +219,30 @@ describe("POST /api/webhooks/resend", () => {
     expect(text).not.toContain(EMAIL);
     expect(text).not.toContain("announce_webhook");
     expect(text).not.toContain("SOURCE_UNAVAILABLE");
+  });
+
+  it("does not mistake a foreign error for its own refusal, whatever code it carries", async () => {
+    // The store cannot throw INVALID_INPUT today. The route must not depend on that: only an error
+    // the route itself made goes out as it is.
+    recordWebhook.mockRejectedValueOnce(new AppError("INVALID_INPUT", `announce_webhook rejected ${EMAIL}`));
+    const body = event("email.bounced");
+    const res = await POST(req(body, signed(body)));
+    expect(res.status).toBe(500);
+    const text = await res.text();
+    expect(text).not.toContain("announce_webhook");
+    expect(text).not.toContain(EMAIL);
+  });
+
+  it("logs a fixed line when the store fails, so the two kinds of 500 can be told apart, and nothing from the event", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    recordWebhook.mockRejectedValueOnce(new AppError("SOURCE_UNAVAILABLE", `announce_webhook failed for ${EMAIL}`));
+    const body = event("email.bounced");
+    const head = signed(body);
+    await POST(req(body, head));
+    expect(error).toHaveBeenCalledTimes(1);
+    const logged = JSON.stringify(error.mock.calls);
+    expect(logged).toContain("resend-webhook");
+    for (const forbidden of ["@", "announce_webhook", head.signature, head.id]) expect(logged).not.toContain(forbidden);
   });
 
   it("gives the same ids in the same order to an identical retry, which is what makes the replay a no-op", async () => {

@@ -12,6 +12,13 @@ export const dynamic = "force-dynamic";
 const NAMES_AN_ADDRESS = /^(email|suppression)\./;
 const FAULT = "The webhook could not be processed.";
 
+/**
+ * An error this route made on purpose, as opposed to one thrown from beneath it. The catch tells the
+ * two apart by this type and nothing else: a code or a message is a fact about some other module,
+ * and a store error that happened to carry `INVALID_INPUT` would otherwise go out as a 400.
+ */
+class RouteError extends AppError {}
+
 const event = z.object({
   type: z.string().min(1).max(100),
   data: z.object({ to: z.array(z.string().min(3).max(320)).max(50) }).partial().optional(),
@@ -40,7 +47,7 @@ export async function POST(req: Request): Promise<Response> {
     const secret = env().RESEND_WEBHOOK_SECRET;
     // Fail closed, and say so as a fault rather than a refusal: an unconfigured secret is ours to fix,
     // and Svix retrying until it is fixed is the right outcome.
-    if (!secret) throw new AppError("INTERNAL", "The webhook is not configured.");
+    if (!secret) throw new RouteError("INTERNAL", "The webhook is not configured.");
 
     const raw = await req.text();
     const head = {
@@ -49,12 +56,12 @@ export async function POST(req: Request): Promise<Response> {
       signature: req.headers.get("svix-signature") ?? "",
     };
     if (!head.id || !verifySvix(secret, head, raw, new Date())) {
-      throw new AppError("INVALID_INPUT", "The webhook could not be verified.");
+      throw new RouteError("INVALID_INPUT", "The webhook could not be verified.");
     }
 
     // Verified from here on, so the body is ours to read.
     const parsed = event.safeParse(parseJson(raw));
-    if (!parsed.success) throw new AppError("INVALID_INPUT", "The webhook body was not an event.");
+    if (!parsed.success) throw new RouteError("INVALID_INPUT", "The webhook body was not an event.");
     const { type, data } = parsed.data;
 
     // The verified svix timestamp, not a date from the body: it is the one date we know was inside the tolerance.
@@ -68,7 +75,7 @@ export async function POST(req: Request): Promise<Response> {
     if (recipients.length === 0) {
       if (NAMES_AN_ADDRESS.test(type)) {
         console.error(`[resend-webhook] a verified ${type} event named no recipient`);
-        throw new AppError("INTERNAL", FAULT);
+        throw new RouteError("INTERNAL", FAULT);
       }
       return jsonOk({ ok: true, state: "ignored" });
     }
@@ -83,10 +90,13 @@ export async function POST(req: Request): Promise<Response> {
     );
     return jsonOk({ ok: true, state: results.includes("recorded") ? "recorded" : "duplicate" });
   } catch (err) {
-    // Only this route's own refusal (400) goes out as it is. Everything else, a store AppError
-    // included, becomes one fixed 500: the store's message names a SQL function, and a thrown
-    // message may name an address.
-    return jsonError(err instanceof AppError && err.code === "INVALID_INPUT" ? err : new AppError("INTERNAL", FAULT));
+    // The route's own refusals and faults go out as they are, each with its own status and message.
+    if (err instanceof RouteError) return jsonError(err);
+    // Everything else came from beneath: a store AppError names a SQL function and a thrown message
+    // may name an address, so the caller gets one fixed 500 and the log gets one fixed line. The line
+    // is what tells this 500 from the others in Resend's dashboard; it carries nothing from the event.
+    console.error("[resend-webhook] recording the event failed");
+    return jsonError(new AppError("INTERNAL", FAULT));
   }
 }
 
