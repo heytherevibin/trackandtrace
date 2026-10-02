@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(115);
+select plan(120);
 
 -- Announcements (06-B). The schema is private: nothing reaches it except through the
 -- security-definer functions, and only service_role may call those.
@@ -85,6 +85,32 @@ select throws_ok(
   $$insert into announcements.deliveries (letter_id, person_id, state)
     values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '11111111-1111-4111-8111-111111111111', 'pending')$$,
   '23505', null, 'one delivery per person per letter, enforced by the database');
+-- Every state a delivery is ever written in, one assertion each, BEFORE any function is called.
+-- `sending` was missing from this constraint, and because the only thing that writes it is
+-- `announce_claim`, the gap showed up as the claim assertion ABORTING the whole file on a check
+-- violation rather than as a red line naming the value. These fail cleanly and say which one.
+select lives_ok(
+  $$insert into announcements.deliveries (letter_id, person_id, state)
+    values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '22222222-2222-4222-8222-222222222222', 'sending')$$,
+  'a delivery may be sending, which is what announce_claim moves every row into');
+select lives_ok(
+  $$insert into announcements.deliveries (letter_id, person_id, state)
+    values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '33333333-3333-4333-8333-333333333333', 'sent')$$,
+  'or sent');
+select lives_ok(
+  $$insert into announcements.deliveries (letter_id, person_id, state)
+    values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '44444444-4444-4444-8444-444444444444', 'unknown')$$,
+  'or unknown');
+select lives_ok(
+  $$insert into announcements.deliveries (letter_id, person_id, state)
+    values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '55555555-5555-4555-8555-555555555555', 'skipped')$$,
+  'or skipped');
+-- And nothing else. `failed` belongs here only if something stored it: a failed send leaves the row
+-- `sending` and unmarked for the next run, so it is a counter label in the runner and never a row.
+select throws_ok(
+  $$insert into announcements.deliveries (letter_id, person_id, state)
+    values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '66666666-6666-4666-8666-666666666666', 'failed')$$,
+  '23514', null, 'a delivery is never `failed`, because nothing writes that state');
 select throws_ok(
   $$insert into announcements.suppressions (email, scope, reason, source)
     values ('A@Example.IN', 'all', 'hard bounce', 'resend')$$,

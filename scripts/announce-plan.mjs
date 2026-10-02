@@ -35,8 +35,10 @@
 // AND THE DATABASE HAS A CONDITION OF ITS OWN: `announce_finish` refuses while any delivery is
 // `unknown`, because `unknown` means we cannot say whether that person received the letter, so we do
 // not know the letter is done. The letter stays open and the stuck report names it every day until a
-// human settles the row. This run cannot tell the difference — it calls `finish` and says the letter
-// is done — so BELIEVE THE STORE, not the line this prints, on a letter that carries an unknown.
+// human settles the row — `docs/runbooks/announcements.md` says how. It refuses SILENTLY, so this
+// run reads the letter's state back after calling `finish` rather than assuming it worked, and says
+// plainly that the letter is being held open. A run that printed "the letter is done" over a letter
+// the store left open would be the one thing worse than leaving it open.
 //
 // WHAT THIS CANNOT SEE. It never learns whether a `sent` message was delivered: that is the webhook's
 // business, not the runner's. A send whose mark then failed is left `sending` and retried under the
@@ -223,6 +225,8 @@ export async function drain(world, { origin, from, batchMax }) {
   if (summary.stale > 0) world.say(`[announce] ${summary.stale} claimed over 24 hours ago, so ${summary.stale === 1 ? "it is" : "they are"} now unknown and will not be retried.`);
 
   let first = true;
+  // Nothing left to send, and yet not finished: the store is holding the letter open for a person.
+  let heldOpen = false;
   for (let batch = 0; batch < BATCHES_MAX; batch += 1) {
     // Decision 6, the first half: a Stop that landed since the last batch ends the run before it spends a thing.
     if (!mayContinue(await world.stateOf(letter.id))) {
@@ -232,7 +236,12 @@ export async function drain(world, { origin, from, batchMax }) {
     const left = await world.remaining(letter.id);
     if (left.pending + left.sending === 0) {
       await world.finish(letter.id);
-      summary.finished = true;
+      // `announce_finish` is a no-op while any delivery is `unknown`, and it says nothing about
+      // having refused, so the letter's own state is the only truth about whether it finished.
+      // Asserting `finished` here would print "every recipient is settled, so the letter is done"
+      // over a letter the store deliberately left open for a person to settle.
+      summary.finished = (await world.stateOf(letter.id)) === "done";
+      heldOpen = !summary.finished;
       break;
     }
     // The first batch may also retry rows a previous run left `sending`. After it, only `pending`
@@ -284,5 +293,8 @@ export async function drain(world, { origin, from, batchMax }) {
   if (summary.stopped) world.say("[announce] the letter was stopped, so nothing more was sent.");
   if (summary.budgetSpent) world.say("[announce] the day's announcement allowance is spent; the rest goes out on a later day.");
   if (summary.finished) world.say("[announce] every recipient is settled, so the letter is done.");
+  if (heldOpen) {
+    world.say("[announce] there is nothing left to send, but the letter is NOT done: a delivery whose outcome is unknown keeps it open until a person settles it. See docs/runbooks/announcements.md.");
+  }
   return summary;
 }

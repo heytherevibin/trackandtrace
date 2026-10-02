@@ -63,6 +63,8 @@ function world(over: {
   states?: Array<string | null>;
   /** The letter whose rows these are; a call about any other letter finds nothing. */
   owner?: string;
+  /** The store refuses to finish the letter, as it does while any delivery is `unknown`. */
+  finishRefuses?: boolean;
 } = {}) {
   const log: string[] = [];
   const seen: Record<string, string[]> = {};
@@ -74,6 +76,7 @@ function world(over: {
   const owner = over.owner ?? "L1";
   const rows = over.rows ?? AB;
   let given = 0;
+  let done = false;
 
   const kv = new MemoryKv();
   const spent = ANNOUNCEMENT_CEILING - (over.budget ?? ANNOUNCEMENT_CEILING);
@@ -86,9 +89,13 @@ function world(over: {
     now: () => AT,
     say: (line: string) => void said.push(line),
     openLetters: async () => over.letters ?? [letter()],
+    // A letter that was finished answers `done` from then on. The runner reads the state back after
+    // calling `finish`, because the store refuses silently for a letter holding an `unknown`, so a
+    // fake whose `finish` and `stateOf` disagreed would hide exactly that.
     stateOf: async (id: string) => {
       note("stateOf", id);
-      return states.length > 0 ? (states.shift() as string | null) : "sending";
+      if (states.length > 0) return states.shift() as string | null;
+      return done ? "done" : "sending";
     },
     openClaims: async (id: string) => {
       note("openClaims", id);
@@ -123,6 +130,9 @@ function world(over: {
     finish: async (id: string) => {
       note("finish", id);
       log.push(`finish ${id}`);
+      // `finishRefuses` stands in for the store holding the letter open: `announce_finish` is a
+      // no-op while any delivery is `unknown`, and it does not say so.
+      if (!over.finishRefuses) done = true;
     },
     send: async (mail: { to: string; text: string; headers: Record<string, string>; subject: string; from: string }, kind: string, idempotencyKey?: string) => {
       sends.push({ ...mail, kind, key: idempotencyKey });
@@ -348,10 +358,27 @@ describe("what each outcome becomes", () => {
   });
 
   it("finishes the letter when nothing is pending or waiting", async () => {
-    const { w, log } = world();
+    const { w, log, said } = world();
     const summary = await run(w);
     expect(log.at(-1)).toBe("finish L1");
     expect(summary.finished).toBe(true);
+    expect(said.join("\n")).toContain("the letter is done");
+  });
+
+  it("does NOT call the letter done when the store refused to finish it, and says it is being held open", async () => {
+    // `announce_finish` is a no-op while any delivery is `unknown`, and it does not say so. The
+    // letter's own state is the only truth, so the runner reads it back. Asserting `finished` from
+    // the call alone would print "every recipient is settled, so the letter is done" over a letter
+    // the store deliberately left open — a log that contradicts the store, which is worse than
+    // either outcome on its own, because it is the line a person would believe.
+    const { w, log, said } = world({ finishRefuses: true });
+    const summary = await run(w);
+    expect(log.at(-1)).toBe("finish L1");
+    expect(summary.finished).toBe(false);
+    const text = said.join("\n");
+    expect(text).not.toContain("the letter is done");
+    expect(text).toContain("a delivery whose outcome is unknown keeps it open");
+    expect(text).toContain("docs/runbooks/announcements.md");
   });
 
   it("gives each recipient its own idempotency key, inside Resend's length limit", async () => {

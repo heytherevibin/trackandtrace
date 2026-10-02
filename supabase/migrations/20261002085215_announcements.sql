@@ -45,7 +45,13 @@ create table announcements.letters (
 create table announcements.deliveries (
   letter_id          uuid not null references announcements.letters (id) on delete cascade,
   person_id          uuid not null references subscriptions.people (id) on delete cascade,
-  state              text not null default 'pending' check (state in ('pending', 'sent', 'unknown', 'skipped')),
+  -- Five states, and `sending` is one of them: it is what `announce_claim` moves a row into and the
+  -- only state a row is in while its letter is being sent. Leaving it out made the first real claim
+  -- fail on a check violation, which is the whole feature dead on arrival, and contradicted the
+  -- partial index below that selects on it. `failed` is deliberately NOT here: a failed send leaves
+  -- the row `sending` and unmarked for the next run to retry, so `failed` is only a counter label
+  -- in the runner and no row ever carries it.
+  state              text not null default 'pending' check (state in ('pending', 'sending', 'sent', 'unknown', 'skipped')),
   claimed_at         timestamptz,
   -- Set once, by the first claim. See the header: this, and not `claimed_at`, is the 24-hour clock.
   first_attempted_at timestamptz,

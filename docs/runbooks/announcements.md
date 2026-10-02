@@ -128,16 +128,17 @@ Start at the `report` job's log. Each finding is one line with a letter's id and
   "young" for ever on a row that keeps failing. The send run is the only thing that turns such a row
   `unknown`; one still `sending` means the runner is not reaching it. The same fix as above: run the
   send job and read its log.
-- **"N unknown: we cannot say whether it was sent"**. Never normal. See the next section. Be aware
-  the report cannot see these today (below), so you will usually learn of them from the send log or
-  the console, not from here.
+- **"N unknown: we cannot say whether it was sent"**. Never normal, and the one finding that will not
+  clear itself: the letter is held open until a person settles the row, so this line comes back every
+  day until someone does. **This is the only finding with a manual step** — see the next section.
 
-**What the report cannot see, so a green one is not a clean bill.** It does not read `unknown`
-deliveries today: the only per-delivery read it has returns rows that are `sending`, so the rule that
-names `unknown` is proven in tests and is fed nothing, and the report's own last line says so. It
-cannot tell why a letter is stuck. It does not say a letter is going slowly (100 a day against a long
-list is slow by design). Until the store supplies each letter's last-delivery time, a letter is
-measured from when it was queued. It reads no address, no body and no signature.
+**What the report cannot see, so a green one is not a clean bill.** It cannot tell you **why** a
+letter is stuck: "no delivery in 48 hours" reads the same whether the job is not running, the
+allowance is spent every day by something else, or every send is refused. The run's own log says
+which. It does not say a letter is going slowly (100 a day against a long list is slow by design). It
+cannot say which way an `unknown` delivery actually went — only that it exists, which is the point.
+It reads no address, no body and no signature, so a finding is a letter's id and a reason and you
+will always need a query or Resend's logs to act on it.
 
 If the report job fails and the log says "the environment is not valid", a secret is missing or
 mis-pasted: fix the secret, do not silence the job.
@@ -157,12 +158,74 @@ not sent and it is not failed; it is its own count and is never folded into eith
 the only thing that writes it, and the run says so: "N claimed over 24 hours ago, so they are now
 unknown and will not be retried."
 
-A person decides. For each, in Resend's own logs, find out whether that address's message from that
-day was accepted. If it was, it is a send: leave it. If it was not, the options are to leave it (one
-subscriber misses one letter) or to send them a note by hand. **Never set an `unknown` row back to
-`pending`.** It would be sent under the same key Resend has forgotten, which is the duplicate this
-rule exists to prevent. A handful over the life of a letter is a fact of life; a rising number means
-sends are timing out, and that is the thing to find.
+**The letter is held open until you settle it, and nothing settles it for you.** `announce_finish`
+refuses to mark a letter `done` while any of its deliveries is `unknown`, because `unknown` means we
+cannot say whether that person received it — so we do not know the letter is done. The send run reads
+the state back and says so rather than claiming success:
+
+```
+[announce] there is nothing left to send, but the letter is NOT done: a delivery whose outcome is
+unknown keeps it open until a person settles it. See docs/runbooks/announcements.md.
+```
+
+The letter therefore stays `sending`, the report names it every day, and **the daily workflow stays
+red until a person acts.** That is deliberate: `unknown` is never normal, and a red run is the only
+state anyone notices. It also means an unsettled row is noise within a week, so settle it the day it
+appears.
+
+### Settling one, step by step
+
+**1. Find out which deliveries.** The report prints a letter's id and a count, never a person: it
+reads no address on purpose. So ask the database, with the letter id from the report:
+
+```sql
+select p.email, d.person_id, d.first_attempted_at, d.provider_id
+  from announcements.deliveries d
+  join subscriptions.people p on p.id = d.person_id
+ where d.letter_id = '<the letter the report named>' and d.state = 'unknown'
+ order by d.first_attempted_at;
+```
+
+**2. Decide, from Resend's own logs, not from ours.** For each address, look up that address's
+message from around `first_attempted_at`. There are exactly two answers, and `provider_id` is your
+thread back if we ever got one:
+
+- **Resend accepted it.** The person has the letter. Settle it as a send, and give it the provider's
+  id if the log shows one, so a later bounce can still be tied back to this delivery:
+
+  ```sql
+  select public.announce_mark(
+    p_letter => '<letter id>', p_person => '<person id>',
+    p_state  => 'sent',        p_provider_id => '<the id from Resend, or null>');
+  ```
+
+- **Resend never accepted it.** The person did not get this letter and must not be sent it again
+  under the same key. Settle it as a skip, with a reason that says what actually happened — do **not**
+  use `announce_mark` here, because it writes `suppressed` as the reason and that would be untrue:
+
+  ```sql
+  update announcements.deliveries
+     set state = 'skipped', skip_reason = 'unknown outcome, settled by hand'
+   where letter_id = '<letter id>' and person_id = '<person id>' and state = 'unknown';
+  ```
+
+  The `and state = 'unknown'` is not decoration: it means a mistyped id changes nothing instead of
+  clobbering a row that was already settled. If you want that person to have the letter, send them a
+  note by hand from your own mail — not through this job.
+
+**3. Close the letter.** Once the last `unknown` is settled, the next daily run finds nothing pending
+and finishes it. To close it now:
+
+```sql
+select public.announce_finish(p_letter => '<letter id>');
+select public.announce_letter_state(p_letter => '<letter id>');  -- expect 'done'
+```
+
+If the second query still answers `sending`, a row is still `unknown`: go back to step 1.
+
+**Never set an `unknown` row back to `pending`.** It would be sent under the same key Resend has
+forgotten, which is the duplicate this whole rule exists to prevent. A handful over the life of a
+letter is a fact of life; a rising number means sends are timing out, and that is the thing to find.
 
 ## Suppression: lifting one by hand
 
