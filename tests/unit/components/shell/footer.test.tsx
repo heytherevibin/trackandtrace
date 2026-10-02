@@ -1,9 +1,9 @@
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { render, screen, within } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import { messages } from "@/messages";
 
-vi.mock("next/navigation", () => ({ usePathname: () => "/" }));
+const at = vi.hoisted(() => ({ path: "/" }));
+vi.mock("next/navigation", () => ({ usePathname: () => at.path }));
 // The status line follows the deployment's configuration, which a test run does not have; pin it so the line's presence is what is asserted.
 vi.mock("@/services/service-status", () => ({
   serviceStatus: () => ({ overall: "operational", checks: "operational", accounts: "operational" }),
@@ -11,41 +11,35 @@ vi.mock("@/services/service-status", () => ({
 
 import { Footer } from "@/components/shell/footer";
 
-const m = messages.subscribe;
+const m = messages.shell.footer;
 
-afterEach(() => vi.unstubAllGlobals());
-
-describe("the landing footer's sign-up", () => {
-  it("gives the landing an Updates by email column", () => {
+describe.each(["/", "/watchlist", "/login"])("the footer on %s", (path) => {
+  it("is the full footer: brand and disclaimer, then Sections, Product and Company, four columns", () => {
+    at.path = path;
     render(<Footer />);
-    expect(screen.getByText(m.places.footerColumn)).toBeInTheDocument();
-    expect(screen.getByLabelText(m.form.label)).toBeInTheDocument();
+    const footer = screen.getByRole("contentinfo");
+    expect(within(footer).getByText(messages.common.footerDisclaimer)).toBeInTheDocument();
+    for (const head of [m.sections, m.product, m.company]) expect(within(footer).getByText(head, { selector: "p" })).toBeInTheDocument();
+    expect(footer.querySelectorAll("[data-footer-column]")).toHaveLength(4);
   });
 
-  it("keeps the disclaimer, the status line and the clock, which the column must never push out", () => {
+  it("carries no sign-up: no form, no field, no Updates by email column", () => {
+    at.path = path;
     render(<Footer />);
-    expect(screen.getByText(messages.common.footerDisclaimer)).toBeInTheDocument();
-    expect(screen.getByText(messages.service.overall.operational)).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: /IST/ })).toBeInTheDocument();
+    const footer = screen.getByRole("contentinfo");
+    expect(footer.querySelector("form")).toBeNull();
+    // The switches carry hidden inputs of their own; the sign-up's is the email field.
+    expect(footer.querySelector("input[name='email'], input[type='email']")).toBeNull();
+    expect(within(footer).queryByText(messages.subscribe.places.footerColumn)).not.toBeInTheDocument();
   });
 
-  it("uses the stacked column layout: the button sits directly in the form, under the field", () => {
+  it("keeps the bar: copyright, the status line, the clock and the Motion switch", () => {
+    at.path = path;
     render(<Footer />);
-    const button = screen.getByRole("button", { name: m.form.subscribe });
-    expect(button.parentElement).toBe(button.closest("form"));
-  });
-
-  it("records the sign-up as coming from the landing, not from the footer", async () => {
-    // first_source is what 06-B's Leads list reads: the full footer is only ever the landing.
-    const fetchMock = vi.fn(
-      async () => new Response(JSON.stringify({ ok: true, message: m.sent }), { status: 200, headers: { "content-type": "application/json" } }),
-    );
-    vi.stubGlobal("fetch", fetchMock);
-    render(<Footer />);
-    await userEvent.type(screen.getByLabelText(m.form.label), "asha@example.in");
-    await userEvent.click(screen.getByRole("button", { name: m.form.subscribe }));
-    expect(await screen.findByRole("status")).toHaveTextContent(m.sent);
-    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect(JSON.parse(String(init.body))).toEqual({ email: "asha@example.in", list: "news", source: "landing" });
+    const footer = screen.getByRole("contentinfo");
+    expect(within(footer).getByText(m.copyright(new Date().getFullYear()))).toBeInTheDocument();
+    expect(within(footer).getByText(messages.service.overall.operational)).toBeInTheDocument();
+    expect(within(footer).getByRole("img", { name: /IST/ })).toBeInTheDocument();
+    expect(within(footer).getByRole("switch", { name: m.motion })).toBeInTheDocument();
   });
 });

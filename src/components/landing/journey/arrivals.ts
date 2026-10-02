@@ -1,4 +1,5 @@
 import { animate, splitText, stagger, utils, type TextSplitter } from "animejs";
+import { UPDATES_BAND_ID } from "@/components/shell/band-rule";
 import { ease } from "./ease";
 import { STAGGER, T } from "./motion-tokens";
 import { watchEntrances, type Entrance } from "./observers";
@@ -15,6 +16,9 @@ const ROWS: readonly (readonly [targets: string, section: string])[] = [
   ["#roadmap li", "#roadmap"],
   ["#features article", "#features"],
   ["#faq details", "#faq"],
+  // The Updates by email band, under the terminus and outside <main> (the shell's, updates-band.tsx): not a station,
+  // but its two halves rise once like any section's rows.
+  [`#${UPDATES_BAND_ID} [data-rise]`, `#${UPDATES_BAND_ID}`],
 ];
 
 type Styled = HTMLElement | SVGElement;

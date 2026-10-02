@@ -9,7 +9,7 @@ const m = messages.subscribe;
 
 function draw(over: Partial<React.ComponentProps<typeof SignupCapture>> = {}) {
   const signUp = vi.fn(async () => "sent" as const);
-  render(<SignupCapture place="footer-column" list="news" source="footer" signUp={signUp} {...over} />);
+  render(<SignupCapture place="band" list="news" source="footer" signUp={signUp} {...over} />);
   return signUp;
 }
 
@@ -28,13 +28,21 @@ describe("the sign-up capture", () => {
     expect(screen.queryByText(m.places.preBooking)).not.toBeInTheDocument();
   });
 
-  it("names only the compact row's form: the column has a heading of its own, the plate has its intro", () => {
-    const { container, unmount } = render(<SignupCapture place="footer-row" list="news" source="footer" />);
+  it("names the band's form for what it subscribes to; the plate has its own intro and stays unnamed", () => {
+    const { container, unmount } = render(<SignupCapture place="band" list="news" source="footer" />);
     expect(container.querySelector("form")).toHaveAttribute("aria-label", m.places.footerColumn);
     unmount();
-    for (const place of ["footer-column", "pre-booking"] as const) {
+    const plate = render(<SignupCapture place="pre-booking" list="availability" source="pre-booking" />);
+    expect(plate.container.querySelector("form")).not.toHaveAttribute("aria-label");
+  });
+
+  it("draws the field and the button in one row, in both places", () => {
+    for (const place of ["band", "pre-booking"] as const) {
       const drawn = render(<SignupCapture place={place} list="news" source="footer" />);
-      expect(drawn.container.querySelector("form")).not.toHaveAttribute("aria-label");
+      const button = drawn.container.querySelector("button");
+      const field = drawn.container.querySelector("input");
+      expect(button?.parentElement, place).not.toBe(button?.closest("form"));
+      expect(button?.parentElement, place).toContainElement(field as HTMLElement);
       drawn.unmount();
     }
   });

@@ -17,6 +17,19 @@ export async function gotoReady(page: Page, path: string): Promise<void> {
   await page.locator("html[data-hydrated]").waitFor({ timeout: 15_000 });
 }
 
+/**
+ * Keeps the landing's journey from starting, from before the page's first script: the page stays as the server drew it.
+ * The journey starts when the page is first idle (JourneyLoader's requestIdleCallback; a 1 ms timer where a browser has
+ * none), and once it has, the window-seat run's scenery is a strip thousands of pixels wide inside a clipping window,
+ * which layoutBreaks reads as hidden content. A sweep of the still page that does not hold it passes or fails by
+ * whether it measured before that moment. Defining the callback also takes WebKit off its timer.
+ */
+export async function holdJourney(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    window.requestIdleCallback = () => 0;
+  });
+}
+
 export async function enterPnr(page: Page, pnr: string): Promise<void> {
   await page.getByLabel("PNR number").first().fill(pnr);
 }

@@ -4,8 +4,9 @@ import { SiteNoticeSlot } from "./site-notice-slot";
 import { Footer } from "./footer";
 import { SkipLink } from "./skip-link";
 import { TopNav } from "./top-nav";
+import { UpdatesBand } from "./updates-band";
 
-/** Masthead, page, footer: the B sheets' frame on every route. */
+/** Masthead, page, the Updates by email band where a page has it, footer: the frame on every traveller route. */
 export function AppShell({ children }: { readonly children: ReactNode }) {
   return (
     <div className="flex min-h-dvh flex-col text-ink-1">
@@ -18,6 +19,7 @@ export function AppShell({ children }: { readonly children: ReactNode }) {
       <main id="main" className="flex-1">
         {children}
       </main>
+      <UpdatesBand />
       <Footer />
       <InstallPrompt />
     </div>

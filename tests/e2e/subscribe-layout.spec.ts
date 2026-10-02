@@ -6,22 +6,18 @@ import { UNSUBSCRIBE } from "./subscribe-link";
 
 // What responsive.spec.ts's sweep cannot see. `layoutBreaks` reports sideways scroll, boxes past the
 // edge and boxes that HIDE content; a form squeezed to a few pixels beside its consent line is none of
-// those, so the compact footer's width is measured here directly, as boxes.
+// those, so the slim band's form is measured here directly, as boxes.
 
 /**
- * The compact footer's rule is `min-w-[240px]` on the FORM (and on the consent line). A min-width is
- * font-independent, so the form's box is what is asserted: at least FORM_MIN wide at every width.
- * That is what collapsed to 22px at 390px when the class was removed.
+ * The sign-up left the footer on 2026-10-01 and is the "Updates by email" band above it; on an app page that is the
+ * slim band, one column on a phone. The compact footer's rule was `min-w-[240px]` on its form, which collapsed to 22px
+ * at 390px when the class was removed. The band has no such rule to lose: its form is a block in a one-column grid, so
+ * it is asserted as that, the band's column wide, and never under FORM_MIN.
  *
  * The field's own width is the form minus the button and the gap, and the button's width depends on how
  * the display font draws "Subscribe", so it is only sanity-checked, against one loose floor for all
- * widths: it guards against the button eating the row, and sits well clear of every measured width
- * (about 190 to 265px on the two machines seen) and far above the 22px collapse. Per-width floors fitted
- * to one machine's font metrics (194, 234, 264px) were here first; they failed on CI by 3px, where the
- * field measured 227 and 257 at 360 and 390px, and were removed.
- *
- * What removing the class defends: see the fix report; at 320 and 360 the consent line's own min-width
- * already forces the wrap, so the collapse is only visible at the widths where both fit on one row.
+ * widths: it guards against the button eating the row. Per-width floors fitted to one machine's font
+ * metrics were here first; they failed on CI by 3px and were removed.
  */
 const FORM_MIN = 240;
 const FIELD_MIN = 120;
@@ -32,18 +28,20 @@ test.describe("sign-up and unsubscribe layout on a phone", () => {
   test.skip(({ isMobile }) => !isMobile, "runs once, on the phone project, across the widths");
 
   for (const width of PHONES) {
-    test(`the compact footer's field keeps its width and the consent line sits below it at ${width}px`, async ({ page }) => {
+    test(`the slim band's field keeps its width and the consent line sits below it at ${width}px`, async ({ page }) => {
       await page.setViewportSize({ width, height: 844 });
-      // Any path but "/": the landing draws the full footer, whose sign-up is a column.
+      // Any shown path but "/": the landing draws the full band.
       await gotoReady(page, "/accuracy");
-      const form = page.locator("footer form").filter({ has: page.locator("input[name='email']") });
+      const band = page.locator("#updates");
+      const form = band.locator("form").filter({ has: page.locator("input[name='email']") });
       const field = form.locator("input[name='email']");
-      const consent = page.locator("footer p", { has: page.locator("a[href='/privacy']") });
+      const consent = band.locator("p", { has: page.locator("a[href='/privacy']") });
       await expect(field).toBeVisible();
-      const [f, c, o] = await Promise.all([field.boundingBox(), consent.boundingBox(), form.boundingBox()]);
-      if (!f || !c || !o) throw new Error("the compact footer's form, field or consent line is not drawn");
+      const [f, c, o, column] = await Promise.all([field.boundingBox(), consent.boundingBox(), form.boundingBox(), band.locator("hr").boundingBox()]);
+      if (!f || !c || !o || !column) throw new Error("the slim band's form, field, consent line or rule is not drawn");
       const measured = `form ${Math.round(o.width)}x${Math.round(o.height)}, field ${Math.round(f.width)}x${Math.round(f.height)} at y ${Math.round(f.y)}, consent ${Math.round(c.width)}x${Math.round(c.height)} at y ${Math.round(c.y)}`;
-      expect(o.width, `the form is under its ${FORM_MIN}px minimum: ${measured}`).toBeGreaterThanOrEqual(FORM_MIN);
+      expect(o.width, `the form is under ${FORM_MIN}px: ${measured}`).toBeGreaterThanOrEqual(FORM_MIN);
+      expect(Math.round(o.width), `the form is not the band's column wide: ${measured}`).toBe(Math.round(column.width));
       expect(f.width, `the button is eating the row, the field is under ${FIELD_MIN}px: ${measured}`).toBeGreaterThanOrEqual(FIELD_MIN);
       expect(c.y, `the consent line sits beside the form, not below it: ${measured}`).toBeGreaterThanOrEqual(f.y + f.height);
     });
