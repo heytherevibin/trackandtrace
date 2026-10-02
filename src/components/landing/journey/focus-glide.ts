@@ -1,3 +1,4 @@
+import { followGlide, type GlideFollower } from "./glide-follower";
 import { JUMP_EVENT, LAYOUT_EVENT } from "./journey-events";
 import { mastheadBottom } from "./keep-place";
 import { HAND, ownScroll } from "./place-memory";
@@ -50,69 +51,18 @@ import type { JourneyContext, Teardown } from "./start-journey";
 const START = 6;
 /** The same for a link's glide: the router's own link glides frames after its click, the page a few after that. */
 const START_LINK = 30;
+/** Frames a link's glide just taken up may leave the page still before it is asked for again: WebKit, its own glide
+ * stopped by the journey's rebuild in that frame, now and then takes the page to stand at that glide's end already and
+ * begins none toward it (9 runs in 120, the reader left up to 6,100 px short of 08; a glide by 300 px from there ended
+ * 300 px past the target). An instant scroll to where the page does stand puts that right; then asked again as a cut
+ * is, within the same three takes. */
+const UNBEGUN = 6;
 /** Frames after the last place-keeping jump before a cut glide is taken up. */
 const QUIET = 2;
 /** Frames the page holds still before a glide counts as over, landed or not. */
 const HELD = 10;
 /** The most times one glide is taken up. */
 const TAKES = 3;
-
-/** Frames in a row that are not a glide's (followGlide) before the page counts as the reader's. One or two can be the
- * machine's (a frame the scroll did not advance in, under load). */
-const DOUBTS = 3;
-/** How near its end a glide may slow or stop without that being doubted: its own easing out, px. */
-const NEAR = 64;
-/** A frame's speed below this share of the last sound frame's, far from the end, is a crawl: no glide slows so there. */
-const CRAWL = 0.25;
-
-export interface GlideFollower {
-  /** The page stands at `y` at `now` (ms): false once it is the reader's own move, not the glide's. */
-  step(y: number, now: number): boolean;
-  /** A place-keeping jump moved the page: its move is no one's, and the glide ended with it. */
-  jumped(): void;
-}
-
-/** Follows a glide the browser is making from `from` to `end`, a frame at a time (rules above). */
-export function followGlide(from: number, end: number, at: number): GlideFollower {
-  const dir = end >= from ? 1 : -1;
-  let lastY = from;
-  let lastT = at;
-  let speed = 0; // the last sound frame's, px per ms
-  let moving = false;
-  let doubts = 0;
-  let skip = false;
-  return {
-    step(y, now) {
-      const d = (y - lastY) * dir;
-      const dt = Math.max(1, now - lastT);
-      lastY = y;
-      lastT = now;
-      if (skip) {
-        skip = false;
-        moving = false;
-        doubts = 0;
-        return true;
-      }
-      if (Math.abs(end - y) < NEAR) {
-        doubts = 0;
-        return true;
-      }
-      const sound = d >= 1 && !(moving && d / dt < speed * CRAWL);
-      if (sound) {
-        moving = true;
-        speed = d / dt;
-        doubts = 0;
-        return true;
-      }
-      // back up the page; or, once it was moving, stopped or crawling far from its end
-      if (d <= -1 || moving) doubts += 1;
-      return doubts < DOUBTS;
-    },
-    jumped() {
-      skip = true;
-    },
-  };
-}
 
 /** The events that let go of a glide: the reader's own scroll (place-memory's rule), and a press of the pointer. */
 const OWN = [...HAND, "pointerdown"] as const;
@@ -206,6 +156,7 @@ export function watchGlide(retake: () => number | void): GlideWatch {
   let frame = 0;
   let unanchored = false;
   let follower: GlideFollower | null = null; // a link's glide, followed
+  let unbegun = -1; // frames a link's glide just taken up has left the page still; -1 once it moves, or with none asked
 
   /** Scroll anchoring held off (<html style="overflow-anchor: none">), or given back. */
   const anchoring = (off: boolean) => {
@@ -220,6 +171,7 @@ export function watchGlide(retake: () => number | void): GlideWatch {
     cancelAnimationFrame(frame);
     frame = 0;
     follower = null;
+    unbegun = -1;
     anchoring(false);
   };
   const tick = (now: number) => {
@@ -234,7 +186,13 @@ export function watchGlide(retake: () => number | void): GlideWatch {
     const y = window.scrollY;
     if (follower && !follower.step(y, now)) return disarm(); // the reader's own hand on the page (a scrollbar's drag)
     held = y === lastY ? held + 1 : 0;
+    if (unbegun >= 0) unbegun = y === lastY ? unbegun + 1 : -1;
     lastY = y;
+    if (unbegun >= UNBEGUN) {
+      unbegun = -1;
+      window.scrollTo({ top: y, behavior: "instant" });
+      onCut();
+    }
     if (cut) {
       quiet += 1;
       if (quiet >= QUIET) {
@@ -246,7 +204,10 @@ export function watchGlide(retake: () => number | void): GlideWatch {
         const end = retake();
         if (!armed) return; // the last take, or the retake let go
         lastY = window.scrollY;
-        if (follower && typeof end === "number") follower = followGlide(lastY, end, now);
+        if (follower && typeof end === "number") {
+          follower = followGlide(lastY, end, now);
+          unbegun = 0;
+        }
       }
     } else if (held >= HELD) {
       disarm();

@@ -499,6 +499,11 @@ Decided after J6 (2026-10-02): an in-page link's glide is taken up again, as a T
   takes nothing up while the address names something else. The run's take-up held to where focus was, which a rebuild
   moves; it holds to the address now, and a link's glide to 06 or 07 is handed through the journey's rebuild as
   `focus-glide.ts` hands its own.
+- A take-up the browser does not begin is asked for again. WebKit, its own glide stopped by the journey's rebuild in
+  that frame, now and then takes the page to stand at that glide's end already, and makes no glide toward it (9 runs
+  in 120 to 08 on a phone; a glide by 300 px from there ended 300 px past the target). After six still frames an
+  instant scroll to where the page does stand puts that right, and the glide is asked for again, as a cut is, within
+  the same three takes (none short in 120 after).
 - A link the router handles (the masthead's to the terminal, a Next `<Link>`: its click arrives with its default
   prevented, and the router glides to the fragment a few frames later) is watched from its click too, with half a
   second for the glide to begin (30 frames, where a Tab's has six).

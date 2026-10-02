@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { followGlide, startFocusGlide } from "@/components/landing/journey/focus-glide";
+import { startFocusGlide } from "@/components/landing/journey/focus-glide";
+import { followGlide } from "@/components/landing/journey/glide-follower";
 import { at, frames, glide, jump, modality, policy, pressTab, relayout, reveal, tabOnto, setUpGlideRig } from "./focus-glide-rig";
 import { testContext } from "./journey-context";
 
@@ -248,6 +249,38 @@ describe("an in-page link's glide", () => {
     tapLinkTo04();
     jump();
     frames(3);
+    expect(reveal).toHaveBeenCalledTimes(1);
+    stop();
+  });
+
+  // WebKit, its glide stopped by the journey's rebuild in that frame, now and then begins none for the take-up asked of
+  // it: the page stays where it was, 4,600 px short of 08. Asked again, as a cut is, within the three takes.
+  it("is asked for again when the browser begins no glide for a take-up: six still frames, and never past three takes", () => {
+    const stop = startFocusGlide(testContext());
+    tapLinkTo04();
+    jump();
+    frames(3);
+    expect(reveal).toHaveBeenCalledTimes(1);
+    frames(6); // the page has not moved since
+    frames(2);
+    expect(reveal).toHaveBeenCalledTimes(2);
+    frames(8);
+    expect(reveal).toHaveBeenCalledTimes(3);
+    frames(30);
+    expect(reveal).toHaveBeenCalledTimes(3);
+    expect(anchoring()).toBe("");
+    stop();
+  });
+
+  it("is asked for once when the browser does begin the glide it was asked for", () => {
+    const stop = startFocusGlide(testContext());
+    tapLinkTo04();
+    jump();
+    frames(3);
+    for (let k = 0; k < 12; k += 1) {
+      glide();
+      frames(1);
+    }
     expect(reveal).toHaveBeenCalledTimes(1);
     stop();
   });
