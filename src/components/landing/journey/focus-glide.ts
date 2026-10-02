@@ -43,9 +43,9 @@ import type { JourneyContext, Teardown } from "./start-journey";
 // A link's glide runs the whole way to its target, so "between the two" says nothing of who is moving the page: a
 // scrollbar's drag (no wheel, touch, key or press) anywhere short of the target stood on its course, and a resize then
 // carried that reader on to the target (the review, 2026-10-02). So a link's glide is followed frame by frame against
-// the end the browser set for it (followGlide): the browser's own goes on toward that end every frame, never back,
-// never stopping short of it, never dropping to a crawl far from it. Three frames in a row that do any of those are
-// the reader's own hand, and the glide is let go. A Tab's glide is not followed so: its rules are as they were.
+// the end the browser set for it (glide-follower.ts): a page that stands still short of that end, or goes back, is the
+// reader's own hand, nothing is taken up while that is in doubt, and the span rule is not asked. A Tab's glide is not
+// followed so: its rules are as they were.
 
 /** Frames a glide must begin in (its first scroll, or a jump that cuts it) after the focus that asks for it. */
 const START = 6;
@@ -176,7 +176,7 @@ export function watchGlide(retake: () => number | void): GlideWatch {
     unbegun = -1;
     anchoring(false);
   };
-  const tick = (now: number) => {
+  const tick = () => {
     frame = 0;
     if (!armed) return;
     if (!started) {
@@ -186,7 +186,7 @@ export function watchGlide(retake: () => number | void): GlideWatch {
       return;
     }
     const y = window.scrollY;
-    if (follower && !follower.step(y, now)) return disarm(); // the reader's own hand on the page (a scrollbar's drag)
+    if (follower && !follower.step(y)) return disarm(); // the reader's own hand on the page (a scrollbar's drag)
     held = y === lastY ? held + 1 : 0;
     if (unbegun >= 0) unbegun = y === lastY ? unbegun + 1 : -1;
     lastY = y;

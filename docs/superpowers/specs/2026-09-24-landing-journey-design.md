@@ -491,27 +491,26 @@ Decided after J6 (2026-10-02): an in-page link's glide is taken up again, as a T
   from a reader's own hand: a scrollbar's drag (no wheel, touch, key or press) short of the target, then a resize,
   carried the reader on to the target (the review, 2026-10-02; main leaves them where they put the page). A link's
   glide is therefore followed frame by frame against the end the browser set for it (`followGlide`): the browser's own
-  goes on toward that end every frame, never back, never stopping more than 64 px short of it, never dropping below a
-  quarter of its last speed there. Three frames in a row that do any of those are the reader's, and the glide is let
-  go. One or two are forgiven (a frame the scroll did not advance in, on a loaded machine), so a drag younger than
-  three frames when the resize lands is not yet known. A Tab's glide is not followed so; its course rule stands.
+  goes on toward that end, never back, and does not stop more than 64 px short of it. A page that does either for five
+  frames in a row is the reader's, and the glide is let go. A Tab's glide is not followed so; its course rule stands.
 - Back mid-glide is the reader's: the watch lets go for good as the address stops naming the target (`popstate`), and
   takes nothing up while the address names something else. The run's take-up held to where focus was, which a rebuild
   moves; it holds to the address now, and a link's glide to 06 or 07 is handed through the journey's rebuild as
   `focus-glide.ts` hands its own.
-- Nothing is taken up while a frame's doubt stands (the re-review, 2026-10-02): the take-up came two frames after a
-  cut and the third doubt a frame later, so a hand that stopped as the cut landed was carried to 07. A real glide
-  clears its doubt with its next frame; a held hand reaches three and is let go.
-  What the follower cannot tell, stated as the bound: a hand that moves the page steadily on toward the target reads
-  as the glide for as long as it moves, at any speed (a glide's speed is not constant, but WebKit's is nearly so
-  through its middle, and a test of its shape would let real glides go on a slow machine); it is known once it stops
-  short of the end. So a hand still moving so in the very frame a cut lands is taken up once, and its next move
-  cancels that glide. And a place-keeping jump ends the glide, the page standing still after it whoever was moving
-  it: one that lands on a page already stopped short, or going back, once the glide had begun, is settled for the
-  reader (a glide does neither); one that lands on a crawl is not (WebKit's glide, slowing through the resize's own
-  long frame 1,800 px from its end, crawls for that frame, and the run's place-keeping jump lands in it: settled for
-  the reader too, 3 real glides in 3,440 were let go). So a hand moving like a glide until the frame of such a jump
-  is carried.
+- Nothing is taken up while a doubt stands (the re-review, 2026-10-02): the take-up came two frames after a cut,
+  before the doubt was settled, so a hand that stopped as the cut landed was carried to 07. A real glide clears its
+  doubt with its next moving frame; a held hand reaches five and is let go. The wait costs a held reader nothing, so
+  the count is generous: a loaded machine holds the page still for the two frames of a resize, then the glide goes on.
+  The glide's speed is not judged. A frame much slower than the last was a doubt for a while (measured between
+  frames' own times), and let real glides go: frames bunch on a slow device, so one looked five times too fast and
+  the next ones a crawl (8 runs in 560 at 6× CPU), and WebKit's glide slows through a resize's long frame (3 runs in
+  3,440).
+  What the follower cannot tell, stated as the bound: a hand that moves the page on toward the target, at any speed,
+  reads as the glide for as long as it moves, and is known once it stops short of the end. So a hand still moving in
+  the very frame a cut lands is taken up once, and its next move cancels that glide. And a place-keeping jump ends the
+  glide, the page standing still after it whoever was moving it: one that lands on a page already stopped short, or
+  going back, once the glide had begun, is settled for the reader (a glide does neither before a jump); a hand moving
+  like a glide until the frame of such a jump is carried.
 - The span rule ("the page stood between where the glide began and its target") no longer applies to a link's glide:
   the follower says whose hand is on the page. It let a dragged reader through, and it dropped a real glide: WebKit's
   scroll anchoring moves the page 40 to 70 px back as the click changes the address, before the glide begins, which

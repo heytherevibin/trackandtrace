@@ -123,7 +123,7 @@ describe("an in-page link's glide", () => {
     at.y = 6000; // far past 04: a scrollbar drag, which sends no wheel, touch or key
     window.dispatchEvent(new Event("scroll"));
     relayout(-240, "resize");
-    frames(5);
+    frames(7);
     expect(reveal).not.toHaveBeenCalled();
     expect(anchoring()).toBe("");
     stop();
@@ -159,7 +159,7 @@ describe("an in-page link's glide", () => {
     tapLinkTo04();
     at.y = 400; // the bar, dragged on toward 04 and held there
     window.dispatchEvent(new Event("scroll"));
-    frames(4);
+    frames(6);
     expect(anchoring()).toBe("");
     relayout(-240, "resize");
     frames(3);
@@ -172,7 +172,7 @@ describe("an in-page link's glide", () => {
     tapLinkTo04();
     glide(300);
     frames(1);
-    for (let k = 0; k < 3; k += 1) {
+    for (let k = 0; k < 5; k += 1) {
       glide(-7);
       frames(1);
     }
@@ -192,7 +192,7 @@ describe("an in-page link's glide", () => {
     window.dispatchEvent(new Event("scroll"));
     frames(1);
     relayout(-240, "resize");
-    frames(6);
+    frames(8);
     expect(reveal).not.toHaveBeenCalled();
     expect(anchoring()).toBe("");
     stop();
@@ -318,12 +318,11 @@ describe("an in-page link's glide", () => {
 });
 
 describe("a glide, followed frame by frame (followGlide)", () => {
-  /** A glide of `frames` frames from 1,000 to 9,000, eased in and out, 16 ms a frame: where it stands at each. */
+  /** A glide of `frames` frames from 1,000 to 9,000, eased in and out: where it stands at each. */
   const eased = (frames: number): readonly number[] => Array.from({ length: frames }, (_, k) => 1000 + 8000 * (0.5 - Math.cos((Math.PI * (k + 1)) / frames) / 2));
-  const follow = (ys: readonly number[], ms = 16): readonly boolean[] => {
+  const follow = (ys: readonly number[]): readonly boolean[] => {
     const follower = followGlide(1000, 9000);
-    follower.step(1000, 0); // the frame it began in
-    return ys.map((y, k) => follower.step(y, (k + 1) * ms));
+    return ys.map((y) => follower.step(y));
   };
 
   it("follows the browser's own glide to its end, slow (150 frames) or quick (10), easing in and out", () => {
@@ -331,80 +330,75 @@ describe("a glide, followed frame by frame (followGlide)", () => {
     expect(follow(eased(10)).every(Boolean)).toBe(true);
   });
 
-  it("follows it through a frame or two the scroll did not advance in, and a frame three times as long", () => {
+  // A loaded machine holds the page still through a resize's frames, then the glide goes on, faster for a frame and
+  // slower after: at 6x CPU, two still frames, and frames that bunch. Its speed is not judged.
+  it("follows it through frames the scroll did not advance in (four in a row), and through any change of pace", () => {
     const ys = eased(60);
-    const stalled = [...ys.slice(0, 20), ys[19]!, ys[19]!, ...ys.slice(22)];
+    const stalled = [...ys.slice(0, 20), ys[19]!, ys[19]!, ys[19]!, ys[19]!, ...ys.slice(24)];
     expect(follow(stalled).every(Boolean)).toBe(true);
-    const follower = followGlide(1000, 9000);
-    const times = ys.map((_, k) => (k + 1) * 16 + (k >= 30 ? 32 : 0)); // frame 30 took 48 ms, and the glide went on through it
-    const late = ys.map((y, k) => (k === 29 ? ys[27]! : y)); // what the page saw before it
-    expect(late.map((y, k) => follower.step(y, times[k]!)).every(Boolean)).toBe(true);
+    expect(follow([1183, 1261, 1261, 1261, 1566, 1611, 1685, 1803, 2533]).every(Boolean)).toBe(true); // the trace it was let go on
   });
 
-  it("knows a drag on toward the end by its crawl far from it: three frames, and the page is the reader's", () => {
-    // three frames of the glide, then the bar: 400 px on in a frame, then 7 px a frame
-    const ys = [...eased(150).slice(0, 3), 1400, 1407, 1414, 1421];
-    expect(follow(ys)).toEqual([true, true, true, true, true, true, false]);
+  it("knows a page held still short of the end, and a drag back up the page: five frames, and it is the reader's", () => {
+    expect(follow([1300, 1300, 1300, 1300, 1300, 1300])).toEqual([true, true, true, true, true, false]);
+    expect(follow([1300, 1293, 1286, 1279, 1272, 1265])).toEqual([true, true, true, true, true, false]);
   });
 
-  it("knows a drag back up the page, and a page held still short of the end", () => {
-    expect(follow([1300, 1293, 1286, 1279])).toEqual([true, true, true, false]);
-    expect(follow([1300, 1300, 1300, 1300])).toEqual([true, true, true, false]);
+  it("takes a hand that moves on toward the end for the glide while it moves, and knows it once it stops", () => {
+    // three frames of the glide, then the bar: 400 px on in a frame, 7 px a frame after, and held
+    const ys = [...eased(150).slice(0, 3), 1400, 1407, 1414, 1421, 1421, 1421, 1421, 1421, 1421];
+    expect(follow(ys)).toEqual([true, true, true, true, true, true, true, true, true, true, true, false]);
   });
 
   it("doubts nothing near the end: the glide's own easing out, and its rest there", () => {
-    expect(follow([5000, 8950, 8950.2, 8950.3, 8950.3, 8950.3, 9000, 9000]).every(Boolean)).toBe(true);
+    expect(follow([5000, 8950, 8950.2, 8950.3, 8950.3, 8950.3, 8950.3, 8950.3, 9000, 9000]).every(Boolean)).toBe(true);
   });
 
   it("says while a doubt stands, and that it clears with the next frame of the glide", () => {
     const follower = followGlide(1000, 9000);
-    follower.step(1300, 16);
+    follower.step(1300);
     expect(follower.doubting()).toBe(false);
-    follower.step(1300, 32);
+    follower.step(1300);
     expect(follower.doubting()).toBe(true);
-    follower.step(1900, 48);
+    follower.step(1340);
     expect(follower.doubting()).toBe(false);
   });
 
   it("says once the page has moved toward the end: a glide did begin", () => {
     const follower = followGlide(1000, 9000);
-    follower.step(1000, 16);
+    follower.step(1000);
     expect(follower.begun()).toBe(false);
-    follower.step(1002, 32);
+    follower.step(1002);
     expect(follower.begun()).toBe(true);
   });
 
-  // A place-keeping jump lands on a doubt. On a page stopped short (or going back) it is the reader's: a glide does
-  // neither, and a hand that stopped a frame or two before the jump was carried. On a crawl it is not: WebKit's glide,
-  // slowing through the resize's long frame far from its end, crawls for that frame, and the run's jump lands in it.
+  // A place-keeping jump lands on a doubt: the page was already stopped short, or going back, before it. A glide does
+  // neither, and a hand that stopped a frame or two before the jump was carried (6 runs in 80 on desktop WebKit).
   it("settles a jump that lands on a page stopped short, or going back, for the reader", () => {
     const held = followGlide(1000, 9000);
-    held.step(1300, 16);
-    held.step(1300, 32); // stopped: a doubt
+    held.step(1300);
+    held.step(1300); // stopped: a doubt
     held.jumped();
-    expect(held.step(700, 48)).toBe(false);
+    expect(held.step(700)).toBe(false);
     const back = followGlide(1000, 9000);
-    back.step(1300, 16);
-    back.step(1290, 32);
+    back.step(1300);
+    back.step(1290);
     back.jumped();
-    expect(back.step(700, 48)).toBe(false);
+    expect(back.step(700)).toBe(false);
   });
 
-  it("ends a crawl's doubt with the jump that lands on it: the glide's own slowing through a long frame", () => {
+  // WebKit's scroll anchoring moves the page back as the click changes the address, before the glide has begun.
+  it("takes a step back before the glide has begun for the browser's own, a jump landing on it or not", () => {
     const follower = followGlide(1000, 9000);
-    follower.step(2200, 16);
-    follower.step(3400, 32);
-    follower.step(3870, 96); // a long frame, the glide a third as fast through it: a crawl, 5,000 px from its end
-    expect(follower.doubting()).toBe(true);
+    expect(follower.step(960)).toBe(true);
     follower.jumped();
-    expect([follower.step(3200, 112), follower.step(3200, 128), follower.step(3200, 144), follower.step(3200, 160)]).toEqual([true, true, true, true]);
-    expect(follower.doubting()).toBe(false);
+    expect([follower.step(700), follower.step(700), follower.step(1400)]).toEqual([true, true, true]);
   });
 
   it("takes a place-keeping jump's move for no one's: the glide ended with it, and the page standing still is no drag", () => {
     const follower = followGlide(1000, 9000);
-    expect(follower.step(1300, 16)).toBe(true);
+    expect(follower.step(1300)).toBe(true);
     follower.jumped();
-    expect([follower.step(700, 32), follower.step(700, 48), follower.step(700, 64), follower.step(700, 80), follower.step(700, 96)]).toEqual([true, true, true, true, true]);
+    expect([follower.step(700), follower.step(700), follower.step(700), follower.step(700), follower.step(700), follower.step(700)]).toEqual([true, true, true, true, true, true]);
   });
 });

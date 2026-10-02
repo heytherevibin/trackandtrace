@@ -127,11 +127,11 @@ test.describe("a tapped in-page link's glide (spec §3.G)", () => {
   // A scrollbar's drag sends the page no wheel, touch, key or pointer event: only the page moving, a frame at a time, as
   // set here. The reader took the page mid-glide, somewhere between its start and the link's target (so "between the two"
   // says nothing: the review, 2026-10-02), and a resize follows: they stay where they put it, as place-keeping leaves
-  // them, never carried on to the target. The glide is known from a reader's own move by how it goes: on toward its end
-  // every frame, never back, never stopping short, never slowing to a crawl far from it.
+  // them, never carried on to the target. The glide is known from a reader's own move by how it goes: on toward its end,
+  // never back, never stopping short of it; and nothing is taken up while that is in doubt.
   // Each drag as the page's place frame by frame (`start`: where the page stood at the tap; `y0`: where the glide had
   // taken it as the hand took over). The last three stop as the cut lands, or never look unlike a glide while they move
-  // (the re-review, 2026-10-02: taken up on the second still frame, before the third doubt, each was carried to 07).
+  // (the re-review, 2026-10-02: taken up on the second still frame, while the doubt still stood, each was carried to 07).
   const DRAGS: Readonly<Record<string, (start: number, y0: number) => readonly number[]>> = {
     "on toward the target, six frames": (start) => [0, 1, 2, 3, 4, 5].map((i) => start + 400 + i * 7),
     "back up the page, six frames": (start) => [0, 1, 2, 3, 4, 5].map((i) => start + 600 - i * 7),
