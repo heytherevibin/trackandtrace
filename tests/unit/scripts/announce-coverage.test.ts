@@ -150,12 +150,19 @@ describe("one entry per reason, not one per letter", () => {
 
   it("lists every letter's first reason before any letter's second: reason-major, not letter-major", () => {
     const letters = [letter({ id: "B", lastSentAt: hoursAgo(60) }), letter({ id: "A", lastSentAt: hoursAgo(60) })];
-    const rows = [claim({ letterId: "A" }), claim({ letterId: "B" })];
+    const rows = [
+      claim({ letterId: "A" }),
+      claim({ letterId: "B" }),
+      claim({ letterId: "A", personId: "p2", state: "unknown" }),
+      claim({ letterId: "B", personId: "p2", state: "unknown" }),
+    ];
     expect(stuck(letters, rows, AT).map((entry) => `${entry.letterId}: ${entry.why}`)).toEqual([
       "B: no delivery in 48 hours, 10 still pending",
       "A: no delivery in 48 hours, 10 still pending",
       "B: 1 delivery claimed over 24 hours ago and never marked",
       "A: 1 delivery claimed over 24 hours ago and never marked",
+      "B: 1 unknown: we cannot say whether it was sent",
+      "A: 1 unknown: we cannot say whether it was sent",
     ]);
   });
 

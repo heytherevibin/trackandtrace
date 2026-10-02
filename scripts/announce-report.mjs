@@ -64,20 +64,21 @@ export async function report(reads, { now, say }) {
   const skipped = [];
   let unmeasured = 0;
   for (const one of open) {
-    let remaining;
-    let claims;
+    // Everything that reads or unpacks one letter's answer is inside this one try, so an answer that
+    // is wrong in ANY way (a throw, a null, a count that is not a number, claims that are not a
+    // list) skips that letter and carries on, and never takes the rest of the report with it.
     try {
-      [remaining, claims] = await Promise.all([reads.remainingFor(one.id), reads.openClaims(one.id)]);
+      const [remaining, claims] = await Promise.all([reads.remainingFor(one.id), reads.openClaims(one.id)]);
+      if (typeof remaining?.pending !== "number" || typeof remaining.sending !== "number") throw new Error("the store gave no counts");
+      if (!Array.isArray(claims)) throw new Error("the store gave no list of claims");
+      const claimRows = claims.map((claim) => ({ letterId: one.id, personId: claim.personId, state: "sending", claimedAt: claim.claimedAt, firstAttemptedAt: claim.firstAttemptedAt }));
+      // `lastSentAt` is read straight off the answer: the store does not type it yet. Absent and null
+      // both mean "has never sent", and the verdict reads them the same. Only the note below tells them apart.
+      if (remaining.lastSentAt === undefined) unmeasured += 1;
+      letters.push({ id: one.id, state: one.state, pending: remaining.pending, sending: remaining.sending, lastSentAt: remaining.lastSentAt ?? null, queuedAt: one.queuedAt });
+      rows.push(...claimRows);
     } catch (error) {
       skipped.push(`  letter ${one.id}: skipped, ${reason(error)}`);
-      continue;
-    }
-    // `lastSentAt` is read straight off the answer: the store does not type it yet. Absent and null
-    // both mean "has never sent", and the verdict reads them the same. Only the note below tells them apart.
-    if (remaining.lastSentAt === undefined) unmeasured += 1;
-    letters.push({ id: one.id, state: one.state, pending: remaining.pending, sending: remaining.sending, lastSentAt: remaining.lastSentAt ?? null, queuedAt: one.queuedAt });
-    for (const claim of claims) {
-      rows.push({ letterId: one.id, personId: claim.personId, state: "sending", claimedAt: claim.claimedAt, firstAttemptedAt: claim.firstAttemptedAt });
     }
   }
 
@@ -85,7 +86,7 @@ export async function report(reads, { now, say }) {
   for (const line of summarise(entries, letters.length, skipped.length)) say(line);
   for (const line of skipped) say(line);
   if (unmeasured > 0) {
-    say(`note: the store gave no last-delivery time for ${unmeasured} of ${letters.length} letters, so each was measured from when it was queued; a letter that is sending is named once it is 48 hours old with rows pending.`);
+    say(`note: the store gave no last-delivery time for ${unmeasured} of ${letters.length} letters, so each was measured from when it was queued; a letter is named once it is 48 hours old with rows pending, or with no work left and still open, even if it has been sending steadily.`);
   }
   say("note: deliveries whose outcome is unknown are not read here, so none can be named.");
   return exitCodeFor(entries, skipped.length);

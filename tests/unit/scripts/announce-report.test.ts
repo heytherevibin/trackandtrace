@@ -24,11 +24,11 @@ function stand({ letters, remaining = {}, claims = {} }: World) {
   const reads = {
     openLetters: async () => letters,
     remainingFor: async (id: string) => {
-      const r = remaining[id] ?? { pending: 0, sending: 0, lastSentAt: hoursAgo(1) };
+      const r = id in remaining ? remaining[id] : { pending: 0, sending: 0, lastSentAt: hoursAgo(1) };
       if (r instanceof Error) throw r;
       return r;
     },
-    openClaims: async (id: string) => claims[id] ?? [],
+    openClaims: async (id: string) => (id in claims ? claims[id] : []),
   };
   return async (path: string) => (path.endsWith("env.ts") ? { parseEnv: () => ({ ok: true }) } : reads);
 }
@@ -84,6 +84,69 @@ describe("the exit code the runner answers", () => {
     expect(out.said.join("\n")).toMatch(/no last-delivery time for 1 of 1 letters/);
   });
 
+  it("names a letter that was queued over 48 hours ago and has never sent, from `queuedAt` alone", async () => {
+    // Until the store supplies `lastSentAt`, `queuedAt` is the ONLY clock there is. If the assembly
+    // dropped it, "queued and the job never ran" would report all-clear for ever.
+    const out = run({ letters: [open("L1", { state: "queued", queuedAt: hoursAgo(72) })], remaining: { L1: { pending: 10, sending: 0 } } });
+    expect(await out.result).toBe(1);
+    expect(out.said.join("\n")).toContain("nothing delivered in the 48 hours since it was queued, 10 still pending");
+  });
+
+  it("names nothing for a delivery first attempted 20 minutes ago: a healthy in-flight claim is not a finding", async () => {
+    // If the assembly dropped `firstAttemptedAt`, an absent one counts as stale and EVERY healthy
+    // delivery would be a finding, exit 1 within minutes of a normal send.
+    const out = run({
+      letters: [open("L1")],
+      remaining: { L1: { pending: 10, sending: 1, lastSentAt: hoursAgo(1) } },
+      claims: { L1: [{ personId: "p1", claimedAt: hoursAgo(1 / 3), firstAttemptedAt: hoursAgo(1 / 3) }] },
+    });
+    expect(await out.result).toBe(0);
+    expect(out.said.join("\n")).toMatch(/nothing is stuck/i);
+  });
+
+  it("skips a letter whose counts come back null, reports the others, and puts the run at 2", async () => {
+    // Not a crash of the whole report: one bad letter must not stop it being a report.
+    const out = run({
+      letters: [open("BAD"), open("L2")],
+      remaining: { BAD: null as unknown as Error, L2: { pending: 10, sending: 0, lastSentAt: hoursAgo(100) } },
+    });
+    expect(await out.result).toBe(2);
+    expect(out.complained).toEqual([]);
+    const text = out.said.join("\n");
+    expect(text).toContain("BAD");
+    expect(text).toMatch(/skipped/);
+    expect(text).toContain("L2");
+    expect(text).toContain("no delivery in 48 hours, 10 still pending");
+  });
+
+  it("skips a letter whose claims cannot be read, and reports the rest", async () => {
+    const reads = {
+      openLetters: async () => [open("BAD"), open("L2")],
+      remainingFor: async () => ({ pending: 10, sending: 0, lastSentAt: hoursAgo(100) }),
+      openClaims: async (id: string) => {
+        if (id === "BAD") throw new Error("The announcements store could not complete announce_open_claims.");
+        return [];
+      },
+    };
+    const said: string[] = [];
+    const code = await main({
+      load: async (path: string) => (path.endsWith("env.ts") ? { parseEnv: () => ({ ok: true }) } : reads),
+      now: () => AT,
+      say: (line: string) => said.push(line),
+      complain: () => undefined,
+    });
+    expect(code).toBe(2);
+    expect(said.join("\n")).toContain("L2");
+    expect(said.join("\n")).toContain("BAD");
+  });
+
+  it("skips a letter whose claims come back as something that is not a list", async () => {
+    const out = run({ letters: [open("BAD"), open("L2")], claims: { BAD: null as unknown as object[] } });
+    expect(await out.result).toBe(2);
+    expect(out.complained).toEqual([]);
+    expect(out.said.join("\n")).toContain("BAD");
+  });
+
   it("skips a letter it cannot read, says so, reports the rest, and does not call the run clean", async () => {
     const out = run({
       letters: [open("BAD"), open("L2")],
@@ -129,6 +192,24 @@ describe("a run that cannot start or cannot read is never an exit 1", () => {
     expect(said).toEqual([]);
   });
 
+  it("exits 2 when the app's announcement reads throw on import, which is where a parameter property would", async () => {
+    // `crawl-imports.mjs` names this graph as the hazardous one: a TypeScript parameter property
+    // anywhere in it throws when it loads. The loader throws for THAT module by name; env.ts loads fine.
+    const complained: string[] = [];
+    const said: string[] = [];
+    const code = await main({
+      load: async (path: string) => {
+        if (path === "services/announcements/drain-store.ts") throw new SyntaxError("TypeScript parameter property is not supported in strip-only mode");
+        return { parseEnv: () => ({ ok: true }) };
+      },
+      say: (line: string) => said.push(line),
+      complain: (line: string) => complained.push(line),
+    });
+    expect(code).toBe(2);
+    expect(complained.join("\n")).toMatch(/could not start/);
+    expect(said).toEqual([]);
+  });
+
   it("exits 2 when the environment is not valid", async () => {
     const complained: string[] = [];
     const code = await main({
@@ -165,8 +246,8 @@ describe("what the runner prints", () => {
   };
 
   it("is a letter's id and a reason, never its subject, its body, an address or a person", async () => {
-    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
-    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const doors = (["log", "error", "info", "warn", "debug"] as const).map((name) => vi.spyOn(console, name).mockImplementation(() => undefined));
+    const write = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     const out = run(world);
     expect(await out.result).toBe(1);
 
@@ -174,8 +255,8 @@ describe("what the runner prints", () => {
     expect(text).toContain("L1");
     for (const secret of [SUBJECT, BODY, "@", "example.com", "p1"]) expect(text).not.toContain(secret);
     // Nothing is written except through the one door the runner was handed.
-    expect(log).not.toHaveBeenCalled();
-    expect(error).not.toHaveBeenCalled();
+    for (const door of doors) expect(door).not.toHaveBeenCalled();
+    expect(write).not.toHaveBeenCalled();
   });
 
   it("goes to the console when no door is handed, which is how a test would see a stray write at all", async () => {
