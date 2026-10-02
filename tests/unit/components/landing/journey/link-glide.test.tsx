@@ -351,12 +351,15 @@ describe("a glide, followed frame by frame (followGlide)", () => {
     expect(follower.begun()).toBe(true);
   });
 
-  it("settles a doubt a place-keeping jump lands on for the reader: the page stands still after it either way", () => {
+  // Settled for the reader, it let a real glide go: WebKit's, slowing through the resize's long frame far from its end,
+  // is doubted for that frame, and the run's place-keeping jump lands in it (3 runs in 3,440 left short of 07 and 08).
+  it("ends a doubt a place-keeping jump lands on: the glide ended with the jump, whoever was moving the page", () => {
     const follower = followGlide(1000, 9000);
     follower.step(1300, 16);
     follower.step(1300, 32); // a doubt
     follower.jumped();
-    expect(follower.step(700, 48)).toBe(false);
+    expect(follower.doubting()).toBe(false);
+    expect([follower.step(700, 48), follower.step(700, 64), follower.step(700, 80), follower.step(700, 96)]).toEqual([true, true, true, true]);
   });
 
   it("takes a place-keeping jump's move for no one's: the glide ended with it, and the page standing still is no drag", () => {

@@ -501,13 +501,16 @@ Decided after J6 (2026-10-02): an in-page link's glide is taken up again, as a T
   `focus-glide.ts` hands its own.
 - Nothing is taken up while a frame's doubt stands (the re-review, 2026-10-02): the take-up came two frames after a
   cut and the third doubt a frame later, so a hand that stopped as the cut landed was carried to 07. A real glide
-  clears its doubt with its next frame; a held hand reaches three and is let go. A place-keeping jump that lands on a
-  doubt settles it for the reader, since the page stands still after it either way.
+  clears its doubt with its next frame; a held hand reaches three and is let go.
   What the follower cannot tell, stated as the bound: a hand that moves the page steadily on toward the target reads
   as the glide for as long as it moves, at any speed (a glide's speed is not constant, but WebKit's is nearly so
   through its middle, and a test of its shape would let real glides go on a slow machine); it is known once it stops
   short of the end. So a hand still moving so in the very frame a cut lands is taken up once, and its next move
-  cancels that glide; and a hand moving so until the frame of a place-keeping jump, then held, is carried.
+  cancels that glide. And a place-keeping jump ends every doubt, since the page stands still after it whoever was
+  moving it: a hand that stopped less than three frames before one, or was moving like a glide until it, is carried.
+  Settling a doubt the jump landed on for the reader was tried and let real glides go (WebKit's, slowing through the
+  resize's own long frame 1,800 px from its end, is doubted for that frame, and the run's place-keeping jump lands in
+  it: 3 runs in 3,440 left short of 07 and 08).
 - A click that may glide nowhere (its default prevented, the address naming its target already, so nothing shows it
   went anywhere) is watched, but nothing is taken up for it until the page has moved toward its target. A prevented
   click that does navigate changes the address (the router's), and the address rule holds it either way.
