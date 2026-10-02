@@ -1,4 +1,4 @@
-import { emailDay } from "@/services/email/allowance";
+import { KEPT_MS, key } from "@/services/email/allowance";
 import type { Kv } from "@/services/kv";
 
 // Resend's Free plan allows 100 emails a day for the whole deployment, so an announcement to a list
@@ -12,19 +12,12 @@ import type { Kv } from "@/services/kv";
 // operators' reserve holds. If confirmations arrive first and reach 40, announcements send nothing
 // that day. That is the intended order of sacrifice, not a bug: an announcement can always wait a
 // day, a confirmation link expires in 48 hours, and an operator locked out is the wrong failure.
+//
+// The counter's key and lifetime come from allowance.ts rather than being rebuilt here: a separate
+// key would turn one ceiling of 100 into two, and whichever module writes the key first sets its
+// lifetime, so the two must not be able to disagree.
 
 export const ANNOUNCEMENT_CEILING = 40;
-
-/** Two days, as in allowance.ts, so a key written just before midnight UTC outlives the day it belongs to. */
-const KEPT_MS = 2 * 24 * 60 * 60 * 1000;
-
-/**
- * The same counter confirmations use, on Resend's UTC day. Load-bearing: a separate key would turn
- * one ceiling of 100 into two ceilings of 100 and the whole budget argument collapses.
- */
-function key(prefix: string, at: Date): string {
-  return `${prefix}:email:${emailDay(at)}`;
-}
 
 /** How many announcement emails fit once `countToday` have gone out. Never negative. */
 export function announcementBudget(countToday: number): number {
@@ -34,17 +27,23 @@ export function announcementBudget(countToday: number): number {
 /**
  * Reserves up to `want` announcement emails against today's counter and returns how many it got.
  *
- * Reserves optimistically with one `incrBy(+want)` and gives the unused part back, the order
+ * Reserves optimistically with one `incrBy(+ask)` and gives the unused part back, the order
  * `takeConfirmation` uses: reading the count first and adding after lets two drains read the same
- * number and both be told yes. Fails CLOSED — a counter nobody can read gives 0, because sending
- * blind spends the operators' reserve and the first anyone notices is an operator unable to sign in.
+ * number and both be told yes. The ask is clamped to the ceiling first, so a failed refund can
+ * over-count the day by at most 40 whatever the caller asked for. Fails CLOSED — a counter nobody
+ * can read, or one that answers with a non-number, gives 0, because sending blind spends the
+ * operators' reserve and the first anyone notices is an operator unable to sign in.
  */
 export async function takeAnnouncements(kv: Kv, prefix: string, at: Date, want: number): Promise<number> {
   if (!Number.isSafeInteger(want) || want <= 0) return 0;
+  const ask = Math.min(want, ANNOUNCEMENT_CEILING);
   try {
-    const after = await kv.incrBy(key(prefix, at), KEPT_MS, want);
-    const fit = Math.min(want, announcementBudget(after - want));
-    const unused = want - fit;
+    const after = await kv.incrBy(key(prefix, at), KEPT_MS, ask);
+    // Nothing is refunded for an answer that is not a number: the size of the reservation is unknown,
+    // and a refund of the wrong size under-counts the day, which is the dangerous direction.
+    if (!Number.isFinite(after)) return 0;
+    const fit = Math.min(ask, announcementBudget(after - ask));
+    const unused = ask - fit;
     if (unused > 0) {
       // Give back what did not fit. A refusal must not eat the allowance that confirmations and
       // operators are still counting on. If the refund itself fails the day is over-counted, which

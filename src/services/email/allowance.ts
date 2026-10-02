@@ -12,13 +12,14 @@ import type { Kv } from "@/services/kv";
 export const CONFIRMATION_CEILING = 60;
 
 /** Two days, so a key written just before midnight UTC is still readable through the day it belongs to. */
-const KEPT_MS = 2 * 24 * 60 * 60 * 1000;
+export const KEPT_MS = 2 * 24 * 60 * 60 * 1000;
 
 export function emailDay(at: Date): string {
   return at.toISOString().slice(0, 10);
 }
 
-function key(prefix: string, at: Date): string {
+/** The one counter every kind of email shares. Exported so no other module rebuilds its key or lifetime. */
+export function key(prefix: string, at: Date): string {
   return `${prefix}:email:${emailDay(at)}`;
 }
 

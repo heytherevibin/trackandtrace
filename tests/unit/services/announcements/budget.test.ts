@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { ANNOUNCEMENT_CEILING, announcementBudget, takeAnnouncements } from "@/services/announcements/budget";
-import { takeConfirmation } from "@/services/email/allowance";
+import { KEPT_MS, key, takeConfirmation } from "@/services/email/allowance";
 import { MemoryKv } from "@/services/kv";
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -64,6 +64,33 @@ describe("the announcement budget", () => {
       expect(await takeAnnouncements(kv as never, "t", new Date(), want)).toBe(0);
     }
     expect(kv.incrBy).not.toHaveBeenCalled();
+  });
+
+  it("never reserves more than the ceiling, however large the ask, so a failed refund has a bounded blast radius", async () => {
+    // Over-counting by the caller's number would have every confirmation refused as spent until UTC midnight.
+    const memory = new MemoryKv();
+    const incrBy = vi.fn(async (k: string, ttl: number, by: number) => {
+      if (by < 0) throw new Error("refund down");
+      return memory.incrBy(k, ttl, by);
+    });
+    const kv = { ...memory, incrBy, get: (k: string) => memory.get(k) };
+    const at = new Date("2026-10-02T06:00:00Z");
+    expect(await takeAnnouncements(kv as never, "t", at, 10_000)).toBe(40);
+    expect(incrBy.mock.calls[0]?.[2]).toBe(ANNOUNCEMENT_CEILING);
+    expect(Number(await memory.get("t:email:2026-10-02"))).toBeLessThanOrEqual(ANNOUNCEMENT_CEILING);
+  });
+
+  it("takes nothing when the counter answers with something that is not a number", async () => {
+    for (const answer of [Number.NaN, Number.POSITIVE_INFINITY, "41" as unknown as number]) {
+      const kv = { incrBy: vi.fn(async () => answer), get: vi.fn(), set: vi.fn(), del: vi.fn(), incr: vi.fn(), ttl: vi.fn() };
+      expect(await takeAnnouncements(kv as never, "t", new Date(), 10)).toBe(0);
+    }
+  });
+
+  it("starts the day's counter with the lifetime confirmations give it, because whoever writes first sets it", async () => {
+    const kv = new MemoryKv(() => 0);
+    await takeAnnouncements(kv, "t", new Date("2026-10-02T06:00:00Z"), 5);
+    expect(await kv.ttl(key("t", new Date("2026-10-02T06:00:00Z")))).toBe(KEPT_MS);
   });
 
   it("still reports what it reserved when the refund itself fails", async () => {
