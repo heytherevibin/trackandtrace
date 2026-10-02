@@ -1,5 +1,6 @@
 import { countSent } from "@/services/email/allowance";
-import { sendToAddress, type SendOutcome } from "@/services/email/suppression";
+import type { SendOutcome } from "@/services/email/send";
+import { sendToAddress } from "@/services/email/suppression";
 import { env } from "@/services/env";
 import { log } from "@/services/log";
 import { publicStoreForReading } from "@/services/shared-store";
@@ -31,7 +32,9 @@ export async function sendConsoleEmail(letter: ConsoleLetter): Promise<SendOutco
       const store = publicStoreForReading();
       await countSent(store.kv, store.prefix, new Date());
     }
-    return outcome;
+    // The console's callers know three outcomes, and a member whose address is suppressed simply was
+    // not sent to: that is `failed` to them, as it was before the door existed.
+    return outcome === "suppressed" ? "failed" : outcome;
   } catch (err) {
     log.warn("[console] could not send console email", err);
     return "failed";

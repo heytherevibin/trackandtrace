@@ -39,6 +39,12 @@ describe("subscribe", () => {
     expect(d.send).not.toHaveBeenCalled();
   });
 
+  it("answers the same, quietly, when the address is suppressed, so a bounced address cannot be told from any other", async () => {
+    const d = deps({ send: vi.fn(async () => ({ outcome: "suppressed" }) as const) });
+    await expect(subscribe(ASK, "203.0.113.9", d)).resolves.toBeUndefined();
+    expect(d.send).toHaveBeenCalledOnce();
+  });
+
   it("refuses an address that is not one, before anything else", async () => {
     const d = deps();
     await expect(subscribe({ ...ASK, email: "not-an-email" }, "203.0.113.9", d)).rejects.toThrow(m.errors.invalid);

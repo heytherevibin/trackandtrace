@@ -6,7 +6,8 @@ import { MemoryKv } from "@/services/kv";
 
 // Suppression is read from the database before every send; nothing here is suppressed, and the
 // wrapper's own refusals are pinned in tests/unit/services/email/suppression.test.ts.
-vi.mock("@/services/announcements/store", () => ({ suppressionFor: async () => null }));
+const { suppressionFor } = vi.hoisted(() => ({ suppressionFor: vi.fn(async (_email: string) => null as "all" | "list" | null) }));
+vi.mock("@/services/announcements/store", () => ({ suppressionFor }));
 
 // The store console mail is counted against. A real one talks to Upstash; this one is read back
 // below to prove a console letter takes from the same daily allowance a sign-up confirmation does.
@@ -25,6 +26,8 @@ vi.mock("@/services/env", async (importOriginal) => {
 const letter = { to: "asha@trakline.in", subject: "Your Trakline console sign-in link", text: "Open this once: https://admin.trakline.in/auth/confirm?token_hash=x&type=magiclink" };
 
 beforeEach(async () => {
+  suppressionFor.mockReset();
+  suppressionFor.mockResolvedValue(null);
   outbox.clear();
   // The counter is one module-scope store shared by every test here, so a count left by the test
   // before would be read as this one's.
@@ -39,6 +42,15 @@ afterEach(() => {
 });
 
 describe("sendConsoleEmail", () => {
+  it("reports a hard-bounced address as failed, sends nothing and counts nothing", async () => {
+    vi.stubEnv("E2E", "1");
+    resetEnvCache();
+    suppressionFor.mockResolvedValue("all");
+
+    await expect(sendConsoleEmail(letter)).resolves.toBe("failed");
+    expect(outbox.take()).toEqual([]);
+  });
+
   it("captures instead of sending under E2E, and never calls Resend", async () => {
     vi.stubEnv("E2E", "1");
     vi.stubEnv("RESEND_API_KEY", "re_aaaaaaaaaaaaaaaaaaaaaaaa");

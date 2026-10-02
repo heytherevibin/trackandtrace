@@ -2,11 +2,6 @@ import { suppressionFor } from "@/services/announcements/store";
 import { log } from "@/services/log";
 import { sendEmail, type Letter, type SendResult } from "./send";
 
-// The types ride along so a caller that only needs the shape of a letter or an outcome does not have
-// to import from `./send`: the one-door contract test treats every import from there as a way round.
-export type { Letter, SendResult };
-export type { SendOutcome } from "./send";
-
 /**
  * `list` is mail a person did not just ask for (an announcement, an availability alert).
  * `transactional` is mail they explicitly requested at that moment (a sign-up confirmation, a
@@ -14,7 +9,18 @@ export type { SendOutcome } from "./send";
  */
 export type MailKind = "list" | "transactional";
 
-const REFUSED: SendResult = { outcome: "failed" };
+/**
+ * What the door answers: whatever the sender did, or that the address is suppressed.
+ *
+ * `suppressed` is its own outcome and not `failed` because a caller that answers a stranger on the
+ * public web must treat the two differently: a failure is the deployment's, and says nothing about
+ * the address, but a suppression is the address's, and a reply that differs for it lets anyone probe
+ * who has bounced. Only a real suppression is `suppressed`; a lookup that errored is `failed`.
+ */
+export type DoorResult = SendResult | { readonly outcome: "suppressed" };
+
+const SUPPRESSED: DoorResult = { outcome: "suppressed" };
+const BLIND: DoorResult = { outcome: "failed" };
 
 /**
  * The one door all outgoing mail goes through.
@@ -31,14 +37,14 @@ const REFUSED: SendResult = { outcome: "failed" };
  *
  * Like `sendEmail`, it never throws. It logs nothing that names an address.
  */
-export async function sendToAddress(letter: Letter, kind: MailKind, idempotencyKey?: string): Promise<SendResult> {
+export async function sendToAddress(letter: Letter, kind: MailKind, idempotencyKey?: string): Promise<DoorResult> {
   let suppressed: "all" | "list" | null;
   try {
     suppressed = await suppressionFor(letter.to.trim().toLowerCase());
   } catch (err) {
     log.warn("[email] suppression could not be read; not sending", err instanceof Error ? err.name : "");
-    return REFUSED;
+    return BLIND;
   }
-  if (suppressed === "all" || (suppressed === "list" && kind === "list")) return REFUSED;
+  if (suppressed === "all" || (suppressed === "list" && kind === "list")) return SUPPRESSED;
   return sendEmail(letter, idempotencyKey);
 }
