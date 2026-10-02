@@ -2,7 +2,7 @@ import { animate, onScroll, type JSAnimation, type ScrollObserver } from "animej
 import { readerPlace } from "./drawing-mode";
 import { keyboardFocus, watchGlide, watchTab } from "./focus-glide";
 import { anchorOf, band, fitsRun, hereAt, leanStep, offsets, runLayout, trainFor, type RunLayout } from "./geometry/run";
-import { JUMP_EVENT, LAYOUT_EVENT, emit } from "./journey-events";
+import { LAYOUT_EVENT, emit } from "./journey-events";
 import { keepPlace, laidOut, mastheadBottom, viewHeight, watchView, type ReadPlace } from "./keep-place";
 import { SMOOTH } from "./motion-tokens";
 import { keepUp, refreshObserver, track } from "./observers";
@@ -56,9 +56,8 @@ export function startRun({ motion }: JourneyContext): Teardown {
   let placeFrame = 0;
   let layoutFrame = 0;
   let aimed = -1; // the station a Tab stop's glide is bringing to the window, while watch is armed for it
-  // The station a link glides to the window, while watch is armed for it; `from`: the page as it began, was cut or taken up.
-  let linked: { readonly i: number; readonly section: HTMLElement; readonly from: number; readonly goal: number } | null = null;
-  let lastY = window.scrollY; // the page's scroll as the last scroll event found it: a relayout's own move comes after it
+  // The station a link glides to the window, while watch is armed for it, and where that glide ends.
+  let linked: { readonly i: number; readonly section: HTMLElement; readonly goal: number } | null = null;
 
   /** The scroll at which station i stands at the window: the run's start (its top under the masthead) plus its anchor. */
   const stationY = (i: number, layout: RunLayout): number =>
@@ -288,7 +287,6 @@ export function startRun({ motion }: JourneyContext): Teardown {
     measuredIn = { w: window.innerWidth, h: window.innerHeight };
   };
   const onScrolled = () => {
-    lastY = window.scrollY;
     if (!read) return;
     if (window.innerWidth === measuredIn.w && window.innerHeight === measuredIn.h) read = { ...read, y: window.scrollY };
     else if (steady()) learn(); // the window changed (a toolbar, a zoom, a resize still to land): measured afresh
@@ -380,7 +378,7 @@ export function startRun({ motion }: JourneyContext): Teardown {
       // only while the address still names its section: Back mid-glide is the reader's, and theirs to keep (the review)
       if (window.location.hash !== `#${link.section.id}`) return;
       const goal = goalOf(link.i, link.section);
-      linked = { ...link, from: window.scrollY, goal };
+      linked = { ...link, goal };
       window.scrollTo({ top: goal });
       return goal;
     }
@@ -410,7 +408,7 @@ export function startRun({ motion }: JourneyContext): Teardown {
     const goal = goalOf(i, section);
     window.scrollTo({ top: goal });
     aimed = -1;
-    linked = Math.abs(goal - from) < 1 ? null : { i, section, from, goal };
+    linked = Math.abs(goal - from) < 1 ? null : { i, section, goal };
     if (linked) watch.arm(taken, goal);
   }
   /** Where a link to `section` takes the page: station i at the window while the run is pinned; while it is not (a rebuild
@@ -426,24 +424,15 @@ export function startRun({ motion }: JourneyContext): Teardown {
     linked = null;
     watch.disarm();
   };
-  /** A place-keeping jump cut the link's glide (the watch hears it too): its course starts again from where it put the page. */
-  const onJump = () => {
-    if (!linked || !watch.armed()) return;
-    lastY = window.scrollY;
-    linked = { ...linked, from: lastY };
-  };
   /** A relayout moved the station a link's glide is bringing to the window, with no jump to say so (a resize re-laying the
-   * run, or 02 above it refit): a cut, taken up as a jump's is, if the page stood on the glide's course until then; a
-   * reader a drag took off it keeps their place (focus-glide.ts's rule for a relayout). */
+   * run, 02 above it refit, the run pinned or unpinned): a cut, taken up as a jump's is. Whose hand is on the page is the
+   * watch's to say, frame by frame (glide-follower.ts), not a span's: "between where it began and its station" let a
+   * dragged reader through, and dropped a glide WebKit's own scroll anchoring had moved 40 px back before it began (the
+   * address changing as the click lands: 7 runs in 1,920 left 345 px short of 07). */
   function retarget(): void {
     const link = linked;
     const goal = link && watch.armed() ? goalOf(link.i, link.section) : null;
     if (!link || goal === null || Math.abs(goal - link.goal) < 1) return;
-    if (!between(lastY, link.from, link.goal)) {
-      linked = null;
-      watch.disarm();
-      return;
-    }
     linked = { ...link, goal };
     watch.cut();
   }
@@ -460,7 +449,6 @@ export function startRun({ motion }: JourneyContext): Teardown {
   window.addEventListener("scroll", onScrolled, { passive: true });
   window.addEventListener("resize", onResize);
   window.addEventListener(LAYOUT_EVENT, retarget);
-  window.addEventListener(JUMP_EVENT, onJump);
   window.addEventListener("popstate", onPop);
   trackEl.addEventListener("focusin", onFocus);
   document.addEventListener("click", onClick);
@@ -473,7 +461,6 @@ export function startRun({ motion }: JourneyContext): Teardown {
     window.removeEventListener("scroll", onScrolled);
     window.removeEventListener("resize", onResize);
     window.removeEventListener(LAYOUT_EVENT, retarget);
-    window.removeEventListener(JUMP_EVENT, onJump);
     window.removeEventListener("popstate", onPop);
     pinObserver.disconnect();
     stopView();

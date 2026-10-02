@@ -117,20 +117,43 @@ describe("an in-page link's glide", () => {
     stop();
   });
 
-  it("keeps a reader a drag took off its course where they are", () => {
+  it("keeps a reader a drag took far past its target where they are: the page held there is no glide's", () => {
     const stop = startFocusGlide(testContext());
     tapLinkTo04();
     at.y = 6000; // far past 04: a scrollbar drag, which sends no wheel, touch or key
     window.dispatchEvent(new Event("scroll"));
     relayout(-240, "resize");
-    frames(3);
+    frames(5);
     expect(reveal).not.toHaveBeenCalled();
     expect(anchoring()).toBe("");
     stop();
   });
 
-  // A scrollbar's drag sends no wheel, touch, key or press, and anywhere short of the target it stands "on the glide's
-  // course": told from the glide by how the page moves (followGlide), three frames of it (the review, 2026-10-02).
+  // WebKit's scroll anchoring moves the page back 40 px as the click lands (the address changing), before the glide has
+  // begun: the browser's, not the reader's. The span rule ("between where it began and its target") dropped the glide for
+  // it, 7 runs in 1,920; a link's glide is told from a hand by how the page moves instead.
+  it("is taken up though the browser moved the page back a little before the glide began", () => {
+    const stop = startFocusGlide(testContext());
+    const section = document.getElementById("reliability")!;
+    section.style.scrollMarginTop = "80px";
+    section.getBoundingClientRect = () => ({ top: at.box.top - at.y, bottom: at.box.bottom - at.y }) as DOMRect;
+    section.scrollIntoView = reveal;
+    vi.spyOn(document.documentElement, "scrollHeight", "get").mockReturnValue(20_000);
+    const link = document.createElement("a");
+    link.href = "#reliability";
+    document.body.prepend(link);
+    window.location.hash = "#reliability";
+    at.y = 100;
+    link.click();
+    at.y = 60; // back, by the browser's own adjustment
+    window.dispatchEvent(new Event("scroll"));
+    frames(1);
+    relayout(-240, "resize");
+    gliding(3);
+    expect(reveal).toHaveBeenCalledTimes(1);
+    stop();
+  });
+
   it("is the reader's once a scrollbar's drag holds the page still short of its end: a resize then takes nothing up", () => {
     const stop = startFocusGlide(testContext());
     tapLinkTo04();
@@ -351,15 +374,31 @@ describe("a glide, followed frame by frame (followGlide)", () => {
     expect(follower.begun()).toBe(true);
   });
 
-  // Settled for the reader, it let a real glide go: WebKit's, slowing through the resize's long frame far from its end,
-  // is doubted for that frame, and the run's place-keeping jump lands in it (3 runs in 3,440 left short of 07 and 08).
-  it("ends a doubt a place-keeping jump lands on: the glide ended with the jump, whoever was moving the page", () => {
+  // A place-keeping jump lands on a doubt. On a page stopped short (or going back) it is the reader's: a glide does
+  // neither, and a hand that stopped a frame or two before the jump was carried. On a crawl it is not: WebKit's glide,
+  // slowing through the resize's long frame far from its end, crawls for that frame, and the run's jump lands in it.
+  it("settles a jump that lands on a page stopped short, or going back, for the reader", () => {
+    const held = followGlide(1000, 9000);
+    held.step(1300, 16);
+    held.step(1300, 32); // stopped: a doubt
+    held.jumped();
+    expect(held.step(700, 48)).toBe(false);
+    const back = followGlide(1000, 9000);
+    back.step(1300, 16);
+    back.step(1290, 32);
+    back.jumped();
+    expect(back.step(700, 48)).toBe(false);
+  });
+
+  it("ends a crawl's doubt with the jump that lands on it: the glide's own slowing through a long frame", () => {
     const follower = followGlide(1000, 9000);
-    follower.step(1300, 16);
-    follower.step(1300, 32); // a doubt
+    follower.step(2200, 16);
+    follower.step(3400, 32);
+    follower.step(3870, 96); // a long frame, the glide a third as fast through it: a crawl, 5,000 px from its end
+    expect(follower.doubting()).toBe(true);
     follower.jumped();
+    expect([follower.step(3200, 112), follower.step(3200, 128), follower.step(3200, 144), follower.step(3200, 160)]).toEqual([true, true, true, true]);
     expect(follower.doubting()).toBe(false);
-    expect([follower.step(700, 48), follower.step(700, 64), follower.step(700, 80), follower.step(700, 96)]).toEqual([true, true, true, true]);
   });
 
   it("takes a place-keeping jump's move for no one's: the glide ended with it, and the page standing still is no drag", () => {

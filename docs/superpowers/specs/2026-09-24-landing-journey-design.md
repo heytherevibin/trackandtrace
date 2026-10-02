@@ -506,11 +506,17 @@ Decided after J6 (2026-10-02): an in-page link's glide is taken up again, as a T
   as the glide for as long as it moves, at any speed (a glide's speed is not constant, but WebKit's is nearly so
   through its middle, and a test of its shape would let real glides go on a slow machine); it is known once it stops
   short of the end. So a hand still moving so in the very frame a cut lands is taken up once, and its next move
-  cancels that glide. And a place-keeping jump ends every doubt, since the page stands still after it whoever was
-  moving it: a hand that stopped less than three frames before one, or was moving like a glide until it, is carried.
-  Settling a doubt the jump landed on for the reader was tried and let real glides go (WebKit's, slowing through the
-  resize's own long frame 1,800 px from its end, is doubted for that frame, and the run's place-keeping jump lands in
-  it: 3 runs in 3,440 left short of 07 and 08).
+  cancels that glide. And a place-keeping jump ends the glide, the page standing still after it whoever was moving
+  it: one that lands on a page already stopped short, or going back, once the glide had begun, is settled for the
+  reader (a glide does neither); one that lands on a crawl is not (WebKit's glide, slowing through the resize's own
+  long frame 1,800 px from its end, crawls for that frame, and the run's place-keeping jump lands in it: settled for
+  the reader too, 3 real glides in 3,440 were let go). So a hand moving like a glide until the frame of such a jump
+  is carried.
+- The span rule ("the page stood between where the glide began and its target") no longer applies to a link's glide:
+  the follower says whose hand is on the page. It let a dragged reader through, and it dropped a real glide: WebKit's
+  scroll anchoring moves the page 40 to 70 px back as the click changes the address, before the glide begins, which
+  put the page "off course" at the resize (7 runs in 1,920 on desktop WebKit, 345 px short of 07). A Tab's glide keeps
+  the span rule.
 - A click that may glide nowhere (its default prevented, the address naming its target already, so nothing shows it
   went anywhere) is watched, but nothing is taken up for it until the page has moved toward its target. A prevented
   click that does navigate changes the address (the router's), and the address rule holds it either way.

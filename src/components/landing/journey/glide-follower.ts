@@ -8,10 +8,11 @@
 // is taken up while a doubt stands (doubting): a real glide clears it with its next frame, a held hand reaches three.
 // What is left:
 // - a hand still moving like a glide in the very frame a cut lands is taken up once, and its next move cancels that glide;
-// - a place-keeping jump ends every doubt, since the page stands still after it whoever was moving it: a hand that
-//   stopped less than three frames before one, or was moving like a glide until it, is carried. (Settling a doubt the
-//   jump landed on for the reader let a real glide go instead: WebKit's, slowing through the resize's own long frame
-//   1,800 px from its end, is doubted for that frame, and the run's place-keeping jump lands in it: 3 runs in 3,440.)
+// - a place-keeping jump ends the glide, and the page stands still after it whoever was moving it. One that lands on a
+//   page already stopped, or going back (a doubt of that kind standing), is settled for the reader: a glide does
+//   neither. One that lands on a crawl is not: WebKit's glide, slowing through the resize's own long frame 1,800 px
+//   from its end, crawls for that frame, and the run's place-keeping jump lands in it (settled for the reader too, 3
+//   real glides in 3,440 were let go). So a hand moving like a glide until the frame of such a jump is carried.
 
 /** Frames in a row that are not a glide's (followGlide) before the page counts as the reader's. One or two can be the
  * machine's (a frame the scroll did not advance in, under load). */
@@ -24,7 +25,8 @@ const CRAWL = 0.25;
 export interface GlideFollower {
   /** The page stands at `y` at `now` (ms): false once it is the reader's own move, not the glide's. */
   step(y: number, now: number): boolean;
-  /** A place-keeping jump moved the page: its move is no one's, and the glide ended with it, any doubt with it. */
+  /** A place-keeping jump moved the page: its move is no one's, and the glide ended with it. One that lands on a page
+   * stopped short or going back is the reader's (the next step says so); one that lands on a crawl ends that doubt. */
   jumped(): void;
   /** A frame or two have not been a glide's, and the next will say whose they were: nothing is taken up meanwhile. */
   doubting(): boolean;
@@ -43,12 +45,15 @@ export function followGlide(from: number, end: number): GlideFollower {
   let doubts = 0;
   let skip = false;
   let begun = false;
+  let stopped = false; // the doubt standing is a stop or a move back, not a crawl
+  let lost = false; // a jump landed on such a doubt
   return {
     step(y, now) {
       const d = (y - lastY) * dir;
       const v = lastT === null ? 0 : d / Math.max(1, now - lastT);
       lastY = y;
       lastT = now;
+      if (lost) return false;
       if (skip) {
         skip = false;
         moving = false;
@@ -57,6 +62,7 @@ export function followGlide(from: number, end: number): GlideFollower {
       }
       if (Math.abs(end - y) < NEAR) {
         doubts = 0;
+        stopped = false;
         return true;
       }
       const sound = d >= 1 && !(moving && v < speed * CRAWL);
@@ -65,13 +71,18 @@ export function followGlide(from: number, end: number): GlideFollower {
         moving = true;
         speed = v;
         doubts = 0;
+        stopped = false;
         return true;
       }
       // back up the page; or, once it was moving, stopped or crawling far from its end
-      if (d <= -1 || moving) doubts += 1;
+      if (d <= -1 || moving) {
+        doubts += 1;
+        stopped = d < 1;
+      }
       return doubts < DOUBTS;
     },
     jumped() {
+      if (doubts > 0 && stopped && begun) lost = true; // before it has moved, a step back is the browser's (anchoring)
       skip = true;
       doubts = 0;
     },

@@ -11,11 +11,16 @@ import { atRest, atTheWindow, dismissInstall, drawStill, frames, from07, noAncho
 // glide to a fragment: focus-glide.ts).
 test.describe("a tapped in-page link's glide (spec §3.G)", () => {
   const sizes = (isMobile: boolean) => (isMobile ? { tall: { width: 390, height: 844 }, short: { width: 390, height: 764 } } : { tall: { width: 1440, height: 900 }, short: { width: 1440, height: 820 } });
+  /** The board's rows have flipped in (their entrance, once a load): a tap while a name's letters are still being
+   * replaced can land on a letter that is gone by the click and go nowhere. (2 taps in 1,720 on the nightly's WebKit left
+   * the address as it was; this is the likeliest cause, not a proven one.) */
+  const boardAtRest = (page: Page) => expect.poll(() => page.locator("#departures .board-name .flap-char").count(), { timeout: 6_000 }).toBe(0);
   /** Taps (a touch screen) or clicks the board's link named `name`, as the reader would. */
   const tapLink = async (page: Page, isMobile: boolean, name: string) => {
     const link = page.locator(".board").getByRole("link", { name });
     await link.scrollIntoViewIfNeeded();
     await atRest(page);
+    await boardAtRest(page);
     if (isMobile) await link.tap();
     else await link.click();
   };
@@ -105,6 +110,7 @@ test.describe("a tapped in-page link's glide (spec §3.G)", () => {
     const link = page.locator(".board").getByRole("link", { name });
     await link.scrollIntoViewIfNeeded();
     await atRest(page);
+    await boardAtRest(page);
     const start = await page.evaluate(() => window.scrollY);
     if (isMobile) await link.tap();
     else await link.click();

@@ -412,7 +412,8 @@ export function startFocusGlide({ motion }: JourneyContext): Teardown {
     if (runs(el)) return letGo();
     const place = el.getBoundingClientRect().top + window.scrollY;
     if (Math.abs(place - was.place) < 1) return; // the link stands where it did: the glide still ends at it
-    if (!onCourse(lastY, was)) {
+    // a link's glide is told from the reader's hand frame by frame, not by its span (glide-follower.ts)
+    if (!linked && !onCourse(lastY, was)) {
       // off the glide's course before the page moved: the reader took the page there, and it stays theirs
       return letGo();
     }
