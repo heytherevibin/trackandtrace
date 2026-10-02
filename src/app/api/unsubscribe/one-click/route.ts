@@ -10,6 +10,8 @@ export const dynamic = "force-dynamic";
 // The same shapes /api/unsubscribe takes, read from the query because that is where the
 // List-Unsubscribe header put them. The body is not read: RFC 8058 fixes it to
 // "List-Unsubscribe=One-Click", which carries nothing, and a mail client's form encoding is not JSON.
+// Deliberately not .strict(): mail providers rewrite URLs and append tracking parameters, and rejecting
+// an extra one would break one-click for the readers whose provider is most aggressive.
 const query = z.object({
   p: z.uuid(),
   l: z.enum(["news", "availability"]),
