@@ -18,6 +18,8 @@ export const subscribe = {
     subject: "Confirm your Trakline updates",
     body: (promise: string, link: string) =>
       `You asked for Trakline updates by email.\n\n${promise}\n\nConfirm here:\n${link}\n\nThe link works for 48 hours. If you didn't ask for this, ignore it — we delete the address in 7 days.\n`,
+    /** Appended by the sender to every list email, never typed by the operator; the link follows on the next line. */
+    unsubscribeLine: "You are getting this because you asked for news about Trakline. Stop at any time:",
   },
   form: {
     label: "Email",
