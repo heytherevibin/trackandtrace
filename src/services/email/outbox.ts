@@ -1,4 +1,4 @@
-import type { Letter } from "./send";
+import type { Letter } from "./suppression";
 
 // Under E2E=1 (never in production -- the environment check refuses it) email goes to an in-memory
 // outbox the end-to-end run reads instead of to Resend. One dev server, one module instance, so a
