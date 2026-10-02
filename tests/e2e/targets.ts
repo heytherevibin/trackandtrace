@@ -18,9 +18,9 @@ export interface Undersized {
  * ends the walk — an overlay that swallows its neighbour shortens the neighbour, and shows up here.
  * A walk that leaves the viewport also ends: the reader cannot reach there either.
  */
-export async function undersizedTargets(page: Page, within = "body"): Promise<readonly Undersized[]> {
+export async function undersizedTargets(page: Page, within = "body", except?: string): Promise<readonly Undersized[]> {
   return page.evaluate(
-    ({ min, within }) => {
+    ({ min, within, except }) => {
       const SELECTOR = 'a[href], button, [role="button"], [role="switch"], input:not([type="hidden"]), select, textarea, summary';
       const reach = min; // how far the walk may go from the centre before giving up
       const root = document.querySelector(within);
@@ -29,6 +29,7 @@ export async function undersizedTargets(page: Page, within = "body"): Promise<re
       for (const el of root.querySelectorAll<HTMLElement>(SELECTOR)) {
         if (!el.checkVisibility({ checkVisibilityCSS: true, opacityProperty: true })) continue;
         if (el.closest(".sr-only")) continue; // the skip link, revealed only on focus
+        if (except && el.matches(except)) continue; // measured by its caller, by a rule of its own
         // A form proxy hidden from everyone (Base UI's checkbox beside a switch: aria-hidden, out of the tab
         // order, clipped to nothing) is not a target. The finger aims at the switch, which is measured.
         if (el.matches('input[aria-hidden="true"][tabindex="-1"]')) continue;
@@ -75,7 +76,7 @@ export async function undersizedTargets(page: Page, within = "body"): Promise<re
       }
       return out;
     },
-    { min: MIN, within },
+    { min: MIN, within, except },
   );
 }
 

@@ -13,7 +13,7 @@ for (const width of WIDTHS_AT_200) {
         test.setTimeout(120_000);
         await text200(page);
         await state.open(page);
-        expect(await breaksAt200(page)).toEqual([]);
+        expect(await breaksAt200(page, state.popup)).toEqual([]);
       });
     }
   });

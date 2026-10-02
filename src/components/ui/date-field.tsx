@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { messages } from "@/messages";
 import { cn } from "@/utils/cn";
 
@@ -19,10 +19,14 @@ const c = messages.common.calendar;
 /** Sunday first, and in that order: the grid is built from `getDay()`, which counts from Sunday. */
 const WEEKDAYS = [c.weekdays.sun, c.weekdays.mon, c.weekdays.tue, c.weekdays.wed, c.weekdays.thu, c.weekdays.fri, c.weekdays.sat] as const;
 
+// A day cell is 36px wide on a desk and 44px on a phone, as drawn, and never wider than a seventh of the window less
+// the calendar's own frame (--day, set on the popup): seven 44px cells do not fit a window under 352px, nor seven
+// cells of doubled text a phone, and a calendar wider than the window loses its Saturdays. The month's two buttons
+// follow the same measure. Heights keep to the text, and to 44px on a phone.
 const CELL =
-  "relative flex h-9 w-9 cursor-pointer select-none items-center justify-center border border-transparent font-data text-sm leading-none text-ink-1 hover:border-line disabled:cursor-not-allowed disabled:text-ink-1/25 disabled:hover:border-transparent max-sm:h-11 max-sm:w-11";
+  "relative flex h-9 w-[min(2.25rem,var(--day))] cursor-pointer select-none items-center justify-center border border-transparent font-data text-sm leading-none text-ink-1 hover:border-line disabled:cursor-not-allowed disabled:text-ink-1/25 disabled:hover:border-transparent max-sm:h-11 max-sm:w-[min(2.75rem,var(--day))]";
 const NAV =
-  "press inline-flex h-8 w-8 cursor-pointer items-center justify-center border border-line text-ink-1 hover:bg-ink-1/7 disabled:cursor-not-allowed disabled:opacity-40 max-sm:h-11 max-sm:w-11";
+  "press inline-flex h-8 w-[min(2rem,var(--day))] shrink-0 cursor-pointer items-center justify-center border border-line text-ink-1 hover:bg-ink-1/7 disabled:cursor-not-allowed disabled:opacity-40 max-sm:h-11 max-sm:w-[min(2.75rem,var(--day))]";
 
 /**
  * ISO for a local date, built field by field.
@@ -181,6 +185,26 @@ export function DateField({
     }
   }
 
+  // The calendar opens from the field's left edge, as drawn. Where that would run it past the window's right side (a
+  // phone; a field far to the right; larger text), it is moved left by as much as it runs over, never past the window's
+  // left side: 8px of the window is kept on each side, which --day's 48px counts (with the frame's 2px of hairline,
+  // its 24px of padding and the grid's six 1px gaps). Where it fits it is not touched, and stays where it was drawn.
+  useLayoutEffect(() => {
+    if (!open) return undefined;
+    const place = () => {
+      const el = popover.current;
+      if (!el) return;
+      el.style.left = "";
+      const box = el.getBoundingClientRect();
+      const edge = document.documentElement.clientWidth;
+      // only a calendar that runs past the window is moved: one that ends at its very edge (within a pixel) is as drawn
+      el.style.left = box.right > edge + 1 ? `${-Math.min(box.right - (edge - 8), Math.max(0, box.left - 8))}px` : "";
+    };
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [open]);
+
   const days = gridOf(month);
   const today = todayIso ?? "";
 
@@ -238,7 +262,7 @@ export function DateField({
             aria-label={c.open}
             tabIndex={-1}
             onKeyDown={onKeyDown}
-            className="popup-motion absolute left-0 top-full z-popover mt-1 w-max border border-line bg-surface-2 p-3 shadow-2 outline-none"
+            className="popup-motion absolute left-0 top-full z-popover mt-1 w-max max-w-[calc(100vw-16px)] border border-line bg-surface-2 p-[12px] shadow-2 outline-none [--day:calc((100vw-48px)/7)]"
           >
             <div className="mb-2 flex items-center justify-between gap-3">
               <button type="button" aria-label={c.previousMonth} className={NAV} onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}>
@@ -246,7 +270,7 @@ export function DateField({
                   <path d="M10 3L5 8l5 5" strokeLinecap="square" />
                 </svg>
               </button>
-              <span className="font-display text-label font-semibold uppercase tracking-caps">{monthName(month)}</span>
+              <span className="min-w-0 text-center font-display text-label font-semibold uppercase tracking-caps">{monthName(month)}</span>
               <button type="button" aria-label={c.nextMonth} className={NAV} onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}>
                 <svg viewBox="0 0 16 16" aria-hidden="true" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.5">
                   <path d="M6 3l5 5-5 5" strokeLinecap="square" />
@@ -254,8 +278,9 @@ export function DateField({
               </button>
             </div>
             <div className="grid grid-cols-7 gap-px">
+              {/* A weekday's name takes its column's width and never sets it: the day cells do. */}
               {WEEKDAYS.map((weekday) => (
-                <span key={weekday} className="flex h-6 items-center justify-center text-2xs uppercase tracking-caps text-ink-1/60">
+                <span key={weekday} className="flex h-6 w-0 min-w-full items-center justify-center text-2xs uppercase tracking-caps text-ink-1/60">
                   {weekday}
                 </span>
               ))}

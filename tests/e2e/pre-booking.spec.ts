@@ -175,3 +175,42 @@ test("the chart's values start on one line when the rows stack", async ({ page, 
   });
   expect(drift, drift.join("\n")).toEqual([]);
 });
+
+// The calendar opens under the date field, from the field's left edge, seven day cells wide. On a phone under 382px
+// that ran past the window's right side (101px at 280, 61px at 320, 21px at 360): the Saturday column was half off.
+// It now stays inside the window: moved left when there is no room to its right, its day cells sharing the window's
+// width where seven 44px cells cannot fit it (under 352px). Where it always fitted, it is where it always was.
+for (const width of [280, 320, 360, 390] as const) {
+  test(`the calendar stays inside a ${width}px window, every day of the week in view`, async ({ page, isMobile }) => {
+    test.skip(!isMobile, "a phone's widths");
+    await page.setViewportSize({ width, height: 844 });
+    await gotoReady(page, "/pre-booking");
+    await page.getByRole("button", { name: "Choose a date" }).click();
+    const calendar = page.getByRole("dialog");
+    await expect(calendar).toBeVisible();
+    const at = await calendar.evaluate((el) => {
+      const box = el.getBoundingClientRect();
+      const days = [...el.querySelectorAll("button[aria-label]")].map((d) => d.getBoundingClientRect());
+      const field = el.parentElement?.querySelector("input")?.getBoundingClientRect();
+      return {
+        vw: document.documentElement.clientWidth,
+        sideways: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        left: Math.round(box.left),
+        right: Math.round(box.right),
+        field: Math.round(field?.left ?? -1),
+        dayRight: Math.round(Math.max(...days.map((d) => d.right))),
+        dayWidth: Math.round(Math.min(...days.map((d) => d.width))),
+        dayHeight: Math.round(Math.min(...days.map((d) => d.height))),
+      };
+    });
+    expect(at.left, JSON.stringify(at)).toBeGreaterThanOrEqual(0);
+    expect(at.right, JSON.stringify(at)).toBeLessThanOrEqual(at.vw);
+    expect(at.dayRight, "the Saturday column").toBeLessThanOrEqual(at.vw);
+    expect(at.sideways, "the page does not scroll sideways for it").toBe(0);
+    expect(at.dayHeight).toBeGreaterThanOrEqual(44);
+    // seven 44px cells where the window holds them; under that, an equal share of it, never under 32px
+    expect(at.dayWidth).toBeGreaterThanOrEqual(width >= 352 ? 44 : 32);
+    // where it fitted before, it has not moved: under the field, from the field's left edge
+    if (width >= 390) expect(at.left).toBe(at.field);
+  });
+}

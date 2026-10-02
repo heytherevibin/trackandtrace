@@ -47,6 +47,10 @@ const WATCHLIST_KEY = "tt.watchlist.v2";
 export interface State {
   readonly name: string;
   readonly open: (page: Page) => Promise<void>;
+  /** A popup the state has open: the 44px targets are read inside it (it covers the controls under it, which answer
+   * no finger until it closes). `shared` names controls that share one row of the window between them and cannot each
+   * be 44px wide below `below` px of window: there they are held to 44px of height and 32px of width instead. */
+  readonly popup?: { readonly within: string; readonly shared?: { readonly selector: string; readonly below: number } };
 }
 
 const at = (path: string): State => ({ name: path, open: (page) => gotoReady(page, path) });
@@ -80,10 +84,8 @@ async function introOver(page: Page): Promise<void> {
  * in the database, which that server has none of: it draws the invalid link, on the page frame the unsubscribe page
  * shares (SubscriptionPage), whose Before and After are both here.
  *
- * Not here: popups a reader opens over the page. The route popover and the account menu are the nightly's
- * (sizes.spec.ts). The date field's calendar is not swept at all, and does not fit: it is seven 44px cells wide from
- * the field's left edge, which runs past a 280px to 360px window at 100% text already, and past every window up to
- * 1024px at 200%. Holding it to the window is positioning work in date-field.tsx, not reflow. */
+ * One popup is here, the date field's calendar. The route popover and the account menu are the nightly's
+ * (sizes.spec.ts). */
 export const STATES: readonly State[] = [
   {
     name: "/",
@@ -126,6 +128,17 @@ export const STATES: readonly State[] = [
       await searchTrains(page);
       await page.getByTestId("train-row").first().getByRole("button").last().click();
     },
+  },
+  {
+    // Seven day cells cannot each be 44px wide in a window under 352px (7 × 44, the frame and the 8px kept each side):
+    // there they share the window's width.
+    name: "/pre-booking, the calendar open",
+    open: async (page) => {
+      await gotoReady(page, "/pre-booking");
+      await page.getByRole("button", { name: "Choose a date" }).click();
+      await expect(page.getByRole("dialog")).toBeVisible();
+    },
+    popup: { within: '[role="dialog"]', shared: { selector: '[role="dialog"] button', below: 352 } },
   },
   at("/accuracy"),
   at("/login"),
@@ -249,13 +262,26 @@ export async function wordsBrokenMidWord(page: Page, scope = "body"): Promise<st
   }, scope);
 }
 
+/** Controls that share a row of the window too narrow for 44px each: every one still 44px tall and 32px wide. */
+async function sharedTargets(page: Page, selector: string): Promise<string[]> {
+  return page.locator(selector).evaluateAll((controls) =>
+    controls.flatMap((el) => {
+      const box = el.getBoundingClientRect();
+      const name = (el.getAttribute("aria-label") ?? el.textContent ?? el.tagName).trim().slice(0, 32);
+      return box.width > 0 && (box.height < 44 || box.width < 32) ? [`${name} [${Math.round(box.width)}x${Math.round(box.height)}] is under 32x44, sharing its row`] : [];
+    }),
+  );
+}
+
 /** Everything wrong with the page as it stands, in the reader's words; empty when it reflows. */
-export async function breaksAt200(page: Page): Promise<string[]> {
+export async function breaksAt200(page: Page, popup?: State["popup"]): Promise<string[]> {
   // A page still loading shows skeletons, whose sheen slides past each block's clipped edge (responsive.spec.ts).
   await expect(page.locator(".skeleton")).toHaveCount(0, { timeout: 30_000 });
   const size = await page.evaluate(() => Number.parseFloat(getComputedStyle(document.documentElement).fontSize));
   if (size < 31.5) throw new Error(`the page's text is at ${size}px, not at 200%: this sweep would measure the page at 100%`);
-  return [...(await layoutBreaks(page)), ...(await cutText(page)), ...(await wordsBrokenMidWord(page)), ...(await narrowFields(page)), ...report(await undersizedTargets(page))];
+  const shared = popup?.shared && (page.viewportSize()?.width ?? 0) < popup.shared.below ? popup.shared.selector : undefined;
+  const targets = [...report(await undersizedTargets(page, popup?.within ?? "body", shared)), ...(shared ? await sharedTargets(page, shared) : [])];
+  return [...(await layoutBreaks(page)), ...(await cutText(page)), ...(await wordsBrokenMidWord(page)), ...(await narrowFields(page)), ...targets];
 }
 
 /** Opens every state at the window's present width and gathers what breaks, state by state; empty when all reflow. */
@@ -263,7 +289,7 @@ export async function sweepAt200(page: Page, states: readonly State[] = STATES):
   const failures: string[] = [];
   for (const state of states) {
     await state.open(page);
-    const breaks = await breaksAt200(page);
+    const breaks = await breaksAt200(page, state.popup);
     if (breaks.length > 0) failures.push(`${state.name}\n  ${breaks.join("\n  ")}`);
   }
   return failures;
