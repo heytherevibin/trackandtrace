@@ -215,7 +215,9 @@ describe("a run, in order", () => {
   it("asks the counter once and stops when the day is spent, rather than asking again and again", async () => {
     // `break` to `continue` here would spin to the loop's guard making fifty pointless reservations
     // against a counter every other kind of mail shares.
-    const { w, log } = world({ budget: 0 });
+    // `remaining` keeps answering 2 pending, so only the break can end the loop: a default that went
+    // on to say "none left" would end it by finishing the letter and hide the mutation.
+    const { w, log } = world({ budget: 0, remaining: [{ pending: 2, sending: 0 }] });
     await run(w);
     expect(takes(log)).toEqual([2]);
   });

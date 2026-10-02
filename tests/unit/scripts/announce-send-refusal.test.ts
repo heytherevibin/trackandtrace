@@ -19,7 +19,9 @@ const STORE_REACHED = "Account deletion is not configured";
 function start(extra: Record<string, string>) {
   const result = spawnSync(process.execPath, ["scripts/announce-send.mjs"], {
     cwd: process.cwd(),
-    env: { PATH: process.env.PATH ?? "", DATA_KEY, RESEND_API_KEY, ...extra },
+    // Built from nothing, so no credential of the developer's reaches the child. NODE_ENV is the
+    // schema's own default, named only because the typings of `ProcessEnv` require it.
+    env: { PATH: process.env.PATH ?? "", NODE_ENV: "development", DATA_KEY, RESEND_API_KEY, ...extra },
     encoding: "utf8",
     timeout: 30_000,
   });
