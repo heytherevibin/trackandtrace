@@ -117,6 +117,26 @@ describe("the announcements store, beyond the claim", () => {
     await expect(claimDeliveries("L", 2)).rejects.toThrow();
   });
 
+  // Each field is checked on its own: a validator that looked at only one would pass the others.
+  const good = { personId: "p1", email: "a@example.in" };
+  it.each([
+    ["a row with no email", { personId: "p2" }],
+    ["a row with no personId", { email: "b@example.in" }],
+    ["a non-string email", { personId: "p2", email: 42 }],
+    ["a non-string personId", { personId: 42, email: "b@example.in" }],
+    ["an empty email, which is a send to nothing", { personId: "p2", email: "" }],
+    ["an empty personId", { personId: "", email: "b@example.in" }],
+    ["a null row", null],
+  ])("rejects the whole claim when it holds %s", async (_name, bad) => {
+    rpc.mockResolvedValueOnce({ data: [good, bad], error: null });
+    await expect(claimDeliveries("L", 2)).rejects.toBeInstanceOf(AppError);
+  });
+
+  it("answers null to a suppression that is not a string at all, not only to a wrong string", async () => {
+    rpc.mockResolvedValueOnce({ data: 42, error: null });
+    expect(await suppressionFor("a@example.in")).toBe(null);
+  });
+
   it("throws on a queue count or a webhook verdict it does not recognise", async () => {
     rpc.mockResolvedValueOnce({ data: null, error: null });
     await expect(queueLetter("L")).rejects.toThrow();

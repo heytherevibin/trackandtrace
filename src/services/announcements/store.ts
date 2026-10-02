@@ -24,11 +24,15 @@ const failed = (name: string): AppError =>
 export type Claimed = { readonly personId: string; readonly email: string };
 export type DeliveryOutcome = "sent" | "unknown" | "skipped";
 
+const nonEmpty = (v: unknown): v is string => typeof v === "string" && v.length > 0;
+
+// Both fields, non-empty: an empty address is a send to nothing, and would travel all the way to the
+// sender before failing there.
 const isClaimed = (row: unknown): row is Claimed =>
   typeof row === "object" &&
   row !== null &&
-  typeof (row as Record<string, unknown>).personId === "string" &&
-  typeof (row as Record<string, unknown>).email === "string";
+  nonEmpty((row as Record<string, unknown>).personId) &&
+  nonEmpty((row as Record<string, unknown>).email);
 
 /** Moves a letter to queued and makes one pending delivery per subscriber. Returns how many. */
 export async function queueLetter(id: string): Promise<number> {
