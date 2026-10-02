@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { startFocusGlide } from "@/components/landing/journey/focus-glide";
+import { followGlide, startFocusGlide } from "@/components/landing/journey/focus-glide";
 import { at, frames, glide, jump, modality, policy, pressTab, relayout, reveal, tabOnto, setUpGlideRig } from "./focus-glide-rig";
 import { testContext } from "./journey-context";
 
@@ -221,6 +221,7 @@ describe("an in-page link's glide", () => {
     section.style.scrollMarginTop = "80px";
     section.getBoundingClientRect = () => ({ top: at.box.top - at.y, bottom: at.box.bottom - at.y }) as DOMRect;
     section.scrollIntoView = reveal;
+    vi.spyOn(document.documentElement, "scrollHeight", "get").mockReturnValue(20_000); // a page long enough to land it
     const link = document.createElement("a");
     link.href = "#reliability";
     document.body.prepend(link);
@@ -295,6 +296,37 @@ describe("an in-page link's glide", () => {
     stop();
   });
 
+  // A scrollbar's drag sends no wheel, touch, key or press, and anywhere short of the target it stands "on the glide's
+  // course": told from the glide by how the page moves (followGlide), three frames of it (the review, 2026-10-02).
+  it("is the reader's once a scrollbar's drag holds the page still short of its end: a resize then takes nothing up", () => {
+    const stop = startFocusGlide(testContext());
+    tapLinkTo04();
+    at.y = 400; // the bar, dragged on toward 04 and held there
+    window.dispatchEvent(new Event("scroll"));
+    frames(4);
+    expect(anchoring()).toBe("");
+    relayout(-240, "resize");
+    frames(3);
+    expect(reveal).not.toHaveBeenCalled();
+    stop();
+  });
+
+  it("is the reader's once a scrollbar's drag takes the page back up it, on its course or not", () => {
+    const stop = startFocusGlide(testContext());
+    tapLinkTo04();
+    glide(300);
+    frames(1);
+    for (let k = 0; k < 3; k += 1) {
+      glide(-7);
+      frames(1);
+    }
+    expect(anchoring()).toBe("");
+    relayout(-240, "resize");
+    frames(3);
+    expect(reveal).not.toHaveBeenCalled();
+    stop();
+  });
+
   it("leaves a link to a section of the running run to run.ts, and a modified click to the browser", () => {
     const stop = startFocusGlide(testContext());
     const features = document.getElementById("features")!;
@@ -333,5 +365,51 @@ describe("an in-page link's glide", () => {
     stop();
     frames(1);
     expect(anchoring()).toBe("");
+  });
+});
+
+describe("a glide, followed frame by frame (followGlide)", () => {
+  /** A glide of `frames` frames from 1,000 to 9,000, eased in and out, 16 ms a frame: where it stands at each. */
+  const eased = (frames: number): readonly number[] => Array.from({ length: frames }, (_, k) => 1000 + 8000 * (0.5 - Math.cos((Math.PI * (k + 1)) / frames) / 2));
+  const follow = (ys: readonly number[], ms = 16): readonly boolean[] => {
+    const follower = followGlide(1000, 9000, 0);
+    return ys.map((y, k) => follower.step(y, (k + 1) * ms));
+  };
+
+  it("follows the browser's own glide to its end, slow (150 frames) or quick (10), easing in and out", () => {
+    expect(follow(eased(150)).every(Boolean)).toBe(true);
+    expect(follow(eased(10)).every(Boolean)).toBe(true);
+  });
+
+  it("follows it through a frame or two the scroll did not advance in, and a frame three times as long", () => {
+    const ys = eased(60);
+    const stalled = [...ys.slice(0, 20), ys[19]!, ys[19]!, ...ys.slice(22)];
+    expect(follow(stalled).every(Boolean)).toBe(true);
+    const follower = followGlide(1000, 9000, 0);
+    const times = ys.map((_, k) => (k + 1) * 16 + (k >= 30 ? 32 : 0)); // frame 30 took 48 ms, and the glide went on through it
+    const late = ys.map((y, k) => (k === 29 ? ys[27]! : y)); // what the page saw before it
+    expect(late.map((y, k) => follower.step(y, times[k]!)).every(Boolean)).toBe(true);
+  });
+
+  it("knows a drag on toward the end by its crawl far from it: three frames, and the page is the reader's", () => {
+    // three frames of the glide, then the bar: 400 px on in a frame, then 7 px a frame
+    const ys = [...eased(150).slice(0, 3), 1400, 1407, 1414, 1421];
+    expect(follow(ys)).toEqual([true, true, true, true, true, true, false]);
+  });
+
+  it("knows a drag back up the page, and a page held still short of the end", () => {
+    expect(follow([1300, 1293, 1286, 1279])).toEqual([true, true, true, false]);
+    expect(follow([1300, 1300, 1300, 1300])).toEqual([true, true, true, false]);
+  });
+
+  it("doubts nothing near the end: the glide's own easing out, and its rest there", () => {
+    expect(follow([5000, 8950, 8950.2, 8950.3, 8950.3, 8950.3, 9000, 9000]).every(Boolean)).toBe(true);
+  });
+
+  it("takes a place-keeping jump's move for no one's: the glide ended with it, and the page standing still is no drag", () => {
+    const follower = followGlide(1000, 9000, 0);
+    expect(follower.step(1300, 16)).toBe(true);
+    follower.jumped();
+    expect([follower.step(700, 32), follower.step(700, 48), follower.step(700, 64), follower.step(700, 80), follower.step(700, 96)]).toEqual([true, true, true, true, true]);
   });
 });

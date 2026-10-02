@@ -39,15 +39,80 @@ import type { JourneyContext, Teardown } from "./start-journey";
 // resize, stopped the glide where it stood with no jump, no "resize" and nothing else to hear (short of 07 by 2,100 px in
 // 10 of 115 runs, none in 105 with it held off). The page keeps its own places without it, as on every browser that has
 // none, and it comes back as the watch lets go.
+// A link's glide runs the whole way to its target, so "between the two" says nothing of who is moving the page: a
+// scrollbar's drag (no wheel, touch, key or press) anywhere short of the target stood on its course, and a resize then
+// carried that reader on to the target (the review, 2026-10-02). So a link's glide is followed frame by frame against
+// the end the browser set for it (followGlide): the browser's own goes on toward that end every frame, never back,
+// never stopping short of it, never dropping to a crawl far from it. Three frames in a row that do any of those are
+// the reader's own hand, and the glide is let go. A Tab's glide is not followed so: its rules are as they were.
 
 /** Frames a glide must begin in (its first scroll, or a jump that cuts it) after the focus that asks for it. */
 const START = 6;
+/** The same for a link's glide: the router's own link glides frames after its click, the page a few after that. */
+const START_LINK = 30;
 /** Frames after the last place-keeping jump before a cut glide is taken up. */
 const QUIET = 2;
 /** Frames the page holds still before a glide counts as over, landed or not. */
 const HELD = 10;
 /** The most times one glide is taken up. */
 const TAKES = 3;
+
+/** Frames in a row that are not a glide's (followGlide) before the page counts as the reader's. One or two can be the
+ * machine's (a frame the scroll did not advance in, under load). */
+const DOUBTS = 3;
+/** How near its end a glide may slow or stop without that being doubted: its own easing out, px. */
+const NEAR = 64;
+/** A frame's speed below this share of the last sound frame's, far from the end, is a crawl: no glide slows so there. */
+const CRAWL = 0.25;
+
+export interface GlideFollower {
+  /** The page stands at `y` at `now` (ms): false once it is the reader's own move, not the glide's. */
+  step(y: number, now: number): boolean;
+  /** A place-keeping jump moved the page: its move is no one's, and the glide ended with it. */
+  jumped(): void;
+}
+
+/** Follows a glide the browser is making from `from` to `end`, a frame at a time (rules above). */
+export function followGlide(from: number, end: number, at: number): GlideFollower {
+  const dir = end >= from ? 1 : -1;
+  let lastY = from;
+  let lastT = at;
+  let speed = 0; // the last sound frame's, px per ms
+  let moving = false;
+  let doubts = 0;
+  let skip = false;
+  return {
+    step(y, now) {
+      const d = (y - lastY) * dir;
+      const dt = Math.max(1, now - lastT);
+      lastY = y;
+      lastT = now;
+      if (skip) {
+        skip = false;
+        moving = false;
+        doubts = 0;
+        return true;
+      }
+      if (Math.abs(end - y) < NEAR) {
+        doubts = 0;
+        return true;
+      }
+      const sound = d >= 1 && !(moving && d / dt < speed * CRAWL);
+      if (sound) {
+        moving = true;
+        speed = d / dt;
+        doubts = 0;
+        return true;
+      }
+      // back up the page; or, once it was moving, stopped or crawling far from its end
+      if (d <= -1 || moving) doubts += 1;
+      return doubts < DOUBTS;
+    },
+    jumped() {
+      skip = true;
+    },
+  };
+}
 
 /** The events that let go of a glide: the reader's own scroll (place-memory's rule), and a press of the pointer. */
 const OWN = [...HAND, "pointerdown"] as const;
@@ -114,8 +179,9 @@ function seen(el: Element): boolean {
 
 export interface GlideWatch {
   /** A glide has begun: watch it for a place-keeping jump that cuts it short. `taken`: the takes it has already had (one
-   * carried through the journey's rebuild). `link`: an in-page link's glide, scroll anchoring held off while it is watched. */
-  arm(taken?: number, link?: boolean): void;
+   * carried through the journey's rebuild). `end`: where the browser is gliding the page to, for an in-page link's
+   * glide: followed frame by frame (followGlide), scroll anchoring held off while it is watched. */
+  arm(taken?: number, end?: number): void;
   /** Still watching the glide it was armed for: not let go by the reader's own scroll or pointer, nor by the page. */
   armed(): boolean;
   /** Something other than a jump cut the glide short (a relayout): taken up as a jump's cut is. */
@@ -127,8 +193,8 @@ export interface GlideWatch {
 }
 
 /** Watches one glide at a time; `retake` is called each time a jump cut the glide short, at most TAKES times (rules
- * above). */
-export function watchGlide(retake: () => void): GlideWatch {
+ * above). For a link's glide it returns the end of the glide it began, or nothing when it began none. */
+export function watchGlide(retake: () => number | void): GlideWatch {
   let armed = false;
   let takes = 0;
   let started = false;
@@ -139,6 +205,7 @@ export function watchGlide(retake: () => void): GlideWatch {
   let lastY = 0;
   let frame = 0;
   let unanchored = false;
+  let follower: GlideFollower | null = null; // a link's glide, followed
 
   /** Scroll anchoring held off (<html style="overflow-anchor: none">), or given back. */
   const anchoring = (off: boolean) => {
@@ -152,18 +219,20 @@ export function watchGlide(retake: () => void): GlideWatch {
     cut = false;
     cancelAnimationFrame(frame);
     frame = 0;
+    follower = null;
     anchoring(false);
   };
-  const tick = () => {
+  const tick = (now: number) => {
     frame = 0;
     if (!armed) return;
     if (!started) {
       waited += 1;
-      if (waited >= START) disarm();
+      if (waited >= (follower ? START_LINK : START)) disarm();
       else frame = requestAnimationFrame(tick);
       return;
     }
     const y = window.scrollY;
+    if (follower && !follower.step(y, now)) return disarm(); // the reader's own hand on the page (a scrollbar's drag)
     held = y === lastY ? held + 1 : 0;
     lastY = y;
     if (cut) {
@@ -174,9 +243,10 @@ export function watchGlide(retake: () => void): GlideWatch {
         quiet = 0;
         held = 0;
         if (takes >= TAKES) disarm();
-        retake();
+        const end = retake();
         if (!armed) return; // the last take, or the retake let go
         lastY = window.scrollY;
+        if (follower && typeof end === "number") follower = followGlide(lastY, end, now);
       }
     } else if (held >= HELD) {
       disarm();
@@ -184,11 +254,15 @@ export function watchGlide(retake: () => void): GlideWatch {
     }
     frame = requestAnimationFrame(tick);
   };
-  const onJump = () => {
+  const onCut = () => {
     if (!armed) return;
     started = true;
     cut = true;
     quiet = 0;
+  };
+  const onJump = () => {
+    onCut();
+    follower?.jumped();
   };
   const onScroll = () => {
     if (!armed || started) return;
@@ -203,8 +277,9 @@ export function watchGlide(retake: () => void): GlideWatch {
   window.addEventListener("scroll", onScroll, { passive: true });
   for (const type of OWN) window.addEventListener(type, onOwn, { capture: true, passive: true });
   return {
-    arm: (taken = 0, link = false) => {
-      anchoring(link);
+    arm: (taken = 0, end) => {
+      anchoring(end !== undefined);
+      follower = end === undefined ? null : followGlide(window.scrollY, end, performance.now());
       armed = true;
       takes = taken;
       started = false;
@@ -216,7 +291,7 @@ export function watchGlide(retake: () => void): GlideWatch {
       if (!frame) frame = requestAnimationFrame(tick);
     },
     armed: () => armed,
-    cut: onJump,
+    cut: onCut,
     taken: () => takes,
     disarm,
     stop: () => {
@@ -258,6 +333,8 @@ interface Course {
   readonly low: number;
   readonly high: number;
   readonly place: number;
+  /** Where the browser glides the page to: a link's target at its landing, or as near as the page scrolls. */
+  readonly end: number;
 }
 /** Whether the page, at `y`, still stood on the glide's course. */
 function onCourse(y: number, course: Course): boolean {
@@ -268,15 +345,16 @@ function courseTo(el: Element): Course {
   const r = el.getBoundingClientRect();
   const from = window.scrollY;
   const to = from + (r.bottom > window.innerHeight ? r.top - mastheadBottom() : r.bottom - window.innerHeight);
-  return { low: Math.min(from, to), high: Math.max(from, to), place: r.top + from };
+  return { low: Math.min(from, to), high: Math.max(from, to), place: r.top + from, end: to };
 }
 
 /** An in-page link's glide to `el`: from where the page stands to `el`'s top at its landing. */
 function courseToStart(el: Element): Course {
   const top = el.getBoundingClientRect().top;
   const from = window.scrollY;
-  const to = from + top - landingOf(el);
-  return { low: Math.min(from, to), high: Math.max(from, to), place: top + from };
+  const foot = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+  const to = Math.min(foot, Math.max(0, from + top - landingOf(el)));
+  return { low: Math.min(from, to), high: Math.max(from, to), place: top + from, end: to };
 }
 
 export function startFocusGlide({ motion }: JourneyContext): Teardown {
@@ -286,9 +364,11 @@ export function startFocusGlide({ motion }: JourneyContext): Teardown {
   let course: Course | null = null; // the glide's, from the Tab, the last jump or the last take
   let lastY = 0; // the page's scroll as the last scroll event found it: a relayout's own anchoring comes after it
 
-  const aim = (el: Element) => {
-    course = linked ? courseToStart(el) : courseTo(el);
+  const aim = (el: Element): Course => {
+    const next = linked ? courseToStart(el) : courseTo(el);
+    course = next;
     lastY = window.scrollY;
+    return next;
   };
   /** The run's own to bring to the window: a Tab stop in a running station, a link's target in the running run. */
   const runs = (el: Element) => el.closest(linked ? RUN : RUNNING) !== null;
@@ -298,8 +378,12 @@ export function startFocusGlide({ motion }: JourneyContext): Teardown {
     if (!el || runs(el)) return; // the run pinned under the glide: run.ts's
     if (linked) {
       // its target back to its landing, while the address still names it (the reader has not gone elsewhere)
-      if (el.isConnected && window.location.hash === `#${el.id}` && Math.abs(el.getBoundingClientRect().top - landingOf(el)) >= 1) el.scrollIntoView({ block: "start" });
-    } else if (el === document.activeElement && !seen(el)) el.scrollIntoView({ block: "center", inline: "nearest" });
+      const to = aim(el).end;
+      if (!el.isConnected || window.location.hash !== `#${el.id}` || Math.abs(to - window.scrollY) < 1) return;
+      el.scrollIntoView({ block: "start" });
+      return to;
+    }
+    if (el === document.activeElement && !seen(el)) el.scrollIntoView({ block: "center", inline: "nearest" });
     aim(el);
   });
   const onFocus = (event: FocusEvent) => {
@@ -320,21 +404,25 @@ export function startFocusGlide({ motion }: JourneyContext): Teardown {
     watch.disarm();
     target = null;
   };
-  /** A click on an in-page link, unmodified, that the browser glides to its target: watched from the click, as a Tab's
-   * glide is from its focus. */
+  /** A click on an in-page link, unmodified, that glides the page to its target: watched from the click, as a Tab's glide
+   * is from its focus. Its default prevented or not: the router's own link (the masthead's to the terminal) prevents it
+   * and glides to the fragment itself; a click that glides nowhere is let go half a second on (START_LINK). */
   const onClick = (event: MouseEvent) => {
-    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     const link = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>(IN_PAGE) : null;
     const el = link ? document.getElementById(link.hash.slice(1)) : null;
     if (!el || el.closest(RUN)) return; // nowhere in this page, or the running run's (run.ts)
     watch.disarm();
     target = el;
     linked = true;
-    aim(el);
-    watch.arm(0, true);
+    watch.arm(0, aim(el).end);
   };
   const onScroll = () => {
     lastY = window.scrollY;
+  };
+  /** Back mid-glide (a link's own navigation tells popstate too, the address naming its target): let go for good. */
+  const onPop = () => {
+    if (linked && target && window.location.hash !== `#${target.id}`) letGo();
   };
   /** A place-keeping jump: watchGlide's cut. The glide's course starts again from where it put the page. */
   const onJump = () => {
@@ -375,14 +463,15 @@ export function startFocusGlide({ motion }: JourneyContext): Teardown {
   ) {
     target = passed.target;
     linked = passed.linked;
-    aim(passed.target);
-    watch.arm(passed.taken, passed.linked);
+    const end = aim(passed.target).end;
+    watch.arm(passed.taken, passed.linked ? end : undefined);
     watch.cut();
   }
 
   document.addEventListener("focusin", onFocus);
   document.addEventListener("focusout", onBlur);
   document.addEventListener("click", onClick);
+  window.addEventListener("popstate", onPop);
   window.addEventListener("scroll", onScroll, { passive: true });
   window.addEventListener(JUMP_EVENT, onJump);
   window.addEventListener(LAYOUT_EVENT, onLayout);
@@ -400,6 +489,7 @@ export function startFocusGlide({ motion }: JourneyContext): Teardown {
     document.removeEventListener("focusin", onFocus);
     document.removeEventListener("focusout", onBlur);
     document.removeEventListener("click", onClick);
+    window.removeEventListener("popstate", onPop);
     window.removeEventListener("scroll", onScroll);
     window.removeEventListener(JUMP_EVENT, onJump);
     window.removeEventListener(LAYOUT_EVENT, onLayout);

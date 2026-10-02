@@ -487,6 +487,21 @@ Decided after J6 (2026-10-02): an in-page link's glide is taken up again, as a T
   its first station while focus is where the click put it (`run.ts`). No rule for a Tab's glide changed.
 - Scroll anchoring is held off (`overflow-anchor: none` on the root) only while a link's glide is watched, and given back
   as the watch lets go. The page keeps its own places without it, as it does on every browser that has none.
+- A link's glide runs the whole way to its target, so "between where it began and its target" cannot tell the glide
+  from a reader's own hand: a scrollbar's drag (no wheel, touch, key or press) short of the target, then a resize,
+  carried the reader on to the target (the review, 2026-10-02; main leaves them where they put the page). A link's
+  glide is therefore followed frame by frame against the end the browser set for it (`followGlide`): the browser's own
+  goes on toward that end every frame, never back, never stopping more than 64 px short of it, never dropping below a
+  quarter of its last speed there. Three frames in a row that do any of those are the reader's, and the glide is let
+  go. One or two are forgiven (a frame the scroll did not advance in, on a loaded machine), so a drag younger than
+  three frames when the resize lands is not yet known. A Tab's glide is not followed so; its course rule stands.
+- Back mid-glide is the reader's: the watch lets go for good as the address stops naming the target (`popstate`), and
+  takes nothing up while the address names something else. The run's take-up held to where focus was, which a rebuild
+  moves; it holds to the address now, and a link's glide to 06 or 07 is handed through the journey's rebuild as
+  `focus-glide.ts` hands its own.
+- A link the router handles (the masthead's to the terminal, a Next `<Link>`: its click arrives with its default
+  prevented, and the router glides to the fragment a few frames later) is watched from its click too, with half a
+  second for the glide to begin (30 frames, where a Tab's has six).
 
 Found after J6 (2026-10-02): the live pin's sticky top after a resize is its labels' once laid out for the new window.
 - A tablet turned (768×1024 to 1024×768 and back) flips the live chapter's labels between the list and their columns,

@@ -1,14 +1,13 @@
 import { animate, onScroll, type JSAnimation, type ScrollObserver } from "animejs";
-import { messages } from "@/messages";
 import { readerPlace } from "./drawing-mode";
 import { keyboardFocus, watchGlide, watchTab } from "./focus-glide";
-import { anchorOf, band, fitsRun, hereAt, layers, leanStep, offsets, runLayout, trainFor, type RunLayout } from "./geometry/run";
+import { anchorOf, band, fitsRun, hereAt, leanStep, offsets, runLayout, trainFor, type RunLayout } from "./geometry/run";
 import { JUMP_EVENT, LAYOUT_EVENT, emit } from "./journey-events";
 import { keepPlace, laidOut, mastheadBottom, viewHeight, watchView, type ReadPlace } from "./keep-place";
 import { SMOOTH } from "./motion-tokens";
 import { keepUp, refreshObserver, track } from "./observers";
+import { drawRun } from "./run-draw";
 import type { JourneyContext, Teardown } from "./start-journey";
-import { STATIONS, kmFigure } from "./stations";
 
 // 06–07, the window-seat run (spec §3.A; prototype v3's run.js). The run pins (#run.is-running) and the scroll carries
 // both sections sideways past a window along a line diagram: the rails, the kilometre posts and a platform per station
@@ -20,24 +19,18 @@ import { STATIONS, kmFigure } from "./stations";
 // J6-7). Motion off, a window too short, or a reader below it: the two sections read as they always did.
 
 const RUNNING = "is-running";
-const NS = "http://www.w3.org/2000/svg";
 const PHONE = "(max-width: 47.99rem)";
 const COARSE = "(pointer: coarse)";
 const PLACE_EVENTS = ["scroll", "resize", LAYOUT_EVENT] as const;
-const kmOf = (id: string): number => STATIONS.find((s) => s.id === id)?.km ?? 0;
-const KM = { from: kmOf("features"), to: kmOf("use") };
 
 /** y lies within a pixel of the span from `a` to `b`, either way round. */
 function between(y: number, a: number, b: number): boolean {
   return y >= Math.min(a, b) - 1 && y <= Math.max(a, b) + 1;
 }
 
-function stroke(cls: string, d: string): SVGPathElement {
-  const path = document.createElementNS(NS, "path");
-  path.setAttribute("class", cls);
-  path.setAttribute("d", d);
-  return path;
-}
+/** A link's glide to a section of the run, watched as the journey rebuilds: left by the teardown, taken by the start in
+ * the same task (start-journey.ts starts every module before the rebuild returns), and dropped after it. */
+let handover: { readonly id: string; readonly taken: number } | null = null;
 
 export function startRun({ motion }: JourneyContext): Teardown {
   const run = document.getElementById("run");
@@ -87,42 +80,13 @@ export function startRun({ motion }: JourneyContext): Teardown {
     return trainX === null ? null : runLayout(boxes, { w, h, trainX });
   };
 
-  const draw = (layout: RunLayout) => {
-    const drawn = layers(layout, KM);
-    const pairs = [
-      [far, drawn.far],
-      [line, drawn.line],
-      [near, drawn.near],
-    ] as const;
-    for (const [svg, layer] of pairs) {
-      svg.setAttribute("viewBox", `0 0 ${layer.span} ${layout.h}`);
-      svg.style.width = `${layer.span}px`;
-      svg.replaceChildren(...layer.strokes.map((s) => stroke(s.cls, s.d)));
-    }
-    for (const post of drawn.line.posts) {
-      const label = document.createElementNS(NS, "text");
-      label.setAttribute("class", "run-km");
-      label.setAttribute("x", String(post.x));
-      label.setAttribute("y", String(post.y));
-      label.textContent = messages.journey.run.km(kmFigure(post.km));
-      line.append(label);
-    }
-    drawn.line.stops.forEach((stop, i) => {
-      const g = document.createElementNS(NS, "g");
-      g.setAttribute("class", "run-stop");
-      g.dataset.i = String(i);
-      g.append(stroke("run-stroke is-platform", stop.platform), stroke("run-stroke is-tick", stop.tick));
-      line.append(g);
-    });
-  };
-
   /** Everything the pinned run writes but its motion: its height, the train's place, the window's lines, where each
    * section stands, and on touch screens a resting point per station. */
   const place = (layout: RunLayout) => {
     const head = mastheadBottom();
     run.style.setProperty("--run-h", `${Math.round(layout.h + layout.travel)}px`);
     train.style.left = `${layout.trainX}px`;
-    draw(layout);
+    drawRun(layout, { far, line, near });
     current = -1; // the stops were drawn afresh: light them again
     for (const section of sections) {
       const i = stations.findIndex((s) => section.contains(s));
@@ -414,11 +378,12 @@ export function startRun({ motion }: JourneyContext): Teardown {
     const layout = at;
     const link = linked;
     if (link) {
-      if (!layout || document.activeElement !== link.section) return;
+      // only while the address still names its section: Back mid-glide is the reader's, and theirs to keep (the review)
+      if (!layout || window.location.hash !== `#${link.section.id}`) return;
       const goal = stationY(link.i, layout);
       linked = { ...link, from: window.scrollY, goal };
       window.scrollTo({ top: goal });
-      return;
+      return goal;
     }
     const i = aimed;
     const station = stations[i];
@@ -434,15 +399,27 @@ export function startRun({ motion }: JourneyContext): Teardown {
     if (!section || i < 0) return;
     event.preventDefault();
     window.history.pushState(null, "", `#${section.id}`);
+    glideTo(section, i, layout);
+    section.focus({ preventScroll: true });
+  };
+  /** Glides station i to the window for a link to `section`, watched from here as a Tab's glide is from its focus, and
+   * followed to its end (focus-glide.ts's watch, and its bounds): a phone's toolbar resizes the window a few frames in,
+   * the glide's end set as it began (short of 07 in 4 runs in 10). `taken`: the takes a glide carried through the
+   * journey's rebuild has had. */
+  function glideTo(section: HTMLElement, i: number, layout: RunLayout, taken = 0): void {
     const from = window.scrollY;
     const goal = stationY(i, layout);
     window.scrollTo({ top: goal });
-    section.focus({ preventScroll: true });
-    // Watched from the click, as a Tab's glide is from its focus, and taken up while focus is where the click put it: a
-    // phone's toolbar resizes the window a few frames in, the glide's end set as it began (short of 07 in 4 runs in 10).
     aimed = -1;
     linked = Math.abs(goal - from) < 1 ? null : { i, section, from, goal };
-    if (linked) watch.arm(0, true);
+    if (linked) watch.arm(taken, goal);
+  }
+  /** Back mid-glide (the address names the section no more): the reader's own way through the history, and the browser's
+   * to scroll. Let go for good, Forward or not. */
+  const onPop = () => {
+    if (!linked || window.location.hash === `#${linked.section.id}`) return;
+    linked = null;
+    watch.disarm();
   };
   /** A place-keeping jump cut the link's glide (the watch hears it too): its course starts again from where it put the page. */
   const onJump = () => {
@@ -467,12 +444,19 @@ export function startRun({ motion }: JourneyContext): Teardown {
   }
 
   decide();
+  // The rebuild's teardown left a link's glide it watched (the unpin cut it short, and the run has pinned again): taken
+  // up by this start, in the same task, while the address still names its section.
+  const passed = handover;
+  handover = null;
+  const section = passed && at ? sections.find((s) => s.id === passed.id && window.location.hash === `#${s.id}`) : undefined;
+  if (passed && at && section) glideTo(section, stations.findIndex((s) => section.contains(s)), at, passed.taken);
   window.addEventListener(LAYOUT_EVENT, soon);
   window.addEventListener(LAYOUT_EVENT, learn); // after a piece above moved the reader by its own change
   window.addEventListener("scroll", onScrolled, { passive: true });
   window.addEventListener("resize", onResize);
   window.addEventListener(LAYOUT_EVENT, retarget);
   window.addEventListener(JUMP_EVENT, onJump);
+  window.addEventListener("popstate", onPop);
   trackEl.addEventListener("focusin", onFocus);
   document.addEventListener("click", onClick);
   return () => {
@@ -485,12 +469,20 @@ export function startRun({ motion }: JourneyContext): Teardown {
     window.removeEventListener("resize", onResize);
     window.removeEventListener(LAYOUT_EVENT, retarget);
     window.removeEventListener(JUMP_EVENT, onJump);
+    window.removeEventListener("popstate", onPop);
     pinObserver.disconnect();
     stopView();
     trackEl.removeEventListener("focusin", onFocus);
     document.removeEventListener("click", onClick);
     window.clearTimeout(again);
     tab.stop();
+    if (linked && watch.armed()) {
+      const left = { id: linked.section.id, taken: watch.taken() };
+      handover = left;
+      queueMicrotask(() => {
+        if (handover === left) handover = null;
+      });
+    }
     watch.stop();
     if (!at) return;
     unpin();
