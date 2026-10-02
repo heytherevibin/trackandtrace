@@ -504,9 +504,10 @@ Decided after J6 (2026-10-02): the landing at 200% text, beyond the phone widths
 - The departure board's destinations are boxes (inline-block), so a wrapped destination answers a finger across its
   whole 44px; the specimen record's cell and plate padding do not grow with the text, so its four columns fit a 640px
   window at 200%.
-- The check plate's in-place record holds its passenger table in a named, focusable region that scrolls sideways where
-  the plate is narrower than the table (a phone under 352px at 100%; larger text anywhere): the one place on the
-  landing a table scrolls instead of reflowing. No size container was added to the landing.
+- The check plate's in-place record is the drawn table at 100% text at every width (under 352px the page clips its
+  last column, as it always has; no scroller, no extra Tab stop). With the text larger than drawn and the frame narrower
+  than the table needs (19.5rem), each passenger stacks into a labelled record. The switch is a ResizeObserver
+  (`useOutgrown`), not CSS: no size container was added to the landing, and a media query does not see a text-only zoom.
 - The hero's dial runs past the window by design and `main` clips it, at 100% as at 200%: the sweep's layout reading
   leaves it out by name (layout.ts) and still measures everything else `main` clips.
 
