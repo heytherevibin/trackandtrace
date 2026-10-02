@@ -49,7 +49,14 @@ export interface State {
 
 const at = (path: string): State => ({ name: path, open: (page) => gotoReady(page, path) });
 
+/** A route search is rationed at six a minute an address (ROUTE_AVAILABILITY_RATE_LIMIT), and a worker shares one
+ * address across its tests (fixtures.ts). The sweep searches twice a width, so each search asks from an address of its
+ * own: refused, the page draws the refusal instead of the list this state is here to measure (the nightly met it at
+ * 1280px, about one run in three). TEST-NET-2, as the fixtures' addresses are TEST-NET-3. */
+let searches = 0;
 async function searchTrains(page: Page): Promise<void> {
+  searches += 1;
+  await page.setExtraHTTPHeaders({ "x-forwarded-for": `198.51.100.${((process.pid + searches) % 250) + 1}` });
   await gotoReady(page, "/pre-booking");
   await page.getByLabel("From", { exact: true }).fill("SBC");
   await page.getByLabel("To", { exact: true }).fill("NDLS");
