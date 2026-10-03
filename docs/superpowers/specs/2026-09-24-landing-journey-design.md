@@ -508,9 +508,14 @@ Decided after J6 (2026-10-02): an in-page link's glide is taken up again, as a T
   What the follower cannot tell, stated as the bound: a hand that moves the page on toward the target, at any speed,
   reads as the glide for as long as it moves, and is known once it stops short of the end. So a hand still moving in
   the very frame a cut lands is taken up once, and its next move cancels that glide. And a place-keeping jump ends the
-  glide, the page standing still after it whoever was moving it: one that lands on a page already stopped short, or
-  going back, once the glide had begun, is settled for the reader (a glide does neither before a jump); a hand moving
-  like a glide until the frame of such a jump is carried.
+  glide, the page standing still after it whoever was moving it, and any doubt with it: only five frames of a page
+  stopped short or going back say it is the reader's. So a hand that moved the page on toward the target, then held it
+  fewer than five frames before such a jump, is carried. Settling a doubt the jump landed on for the reader was tried
+  and dropped real glides (the re-review, 2026-10-03): a resize holds Chromium's glide still for a frame, and the
+  place-keeping jump of the piece the reader is passing through lands on that one doubt, 24 runs in 24 left short of
+  07, 08 or the terminal with the resize late in the glide. The tests had resized only two or eight frames in, while
+  the page still stood above every piece that keeps its place; they now resize late too (40, 60 and 90 frames in for
+  Chromium's long glide, 4 and 6 for WebKit's ten-frame one).
 - The span rule ("the page stood between where the glide began and its target") no longer applies to a link's glide:
   the follower says whose hand is on the page. It let a dragged reader through, and it dropped a real glide: WebKit's
   scroll anchoring moves the page 40 to 70 px back as the click changes the address, before the glide begins, which

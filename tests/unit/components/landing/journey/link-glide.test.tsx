@@ -372,27 +372,34 @@ describe("a glide, followed frame by frame (followGlide)", () => {
     expect(follower.begun()).toBe(true);
   });
 
-  // A place-keeping jump lands on a doubt: the page was already stopped short, or going back, before it. A glide does
-  // neither, and a hand that stopped a frame or two before the jump was carried (6 runs in 80 on desktop WebKit).
-  it("settles a jump that lands on a page stopped short, or going back, for the reader", () => {
+  // A place-keeping jump lands on a doubt. Settled for the reader, it dropped real glides: a resize holds Chromium's
+  // glide still for a frame, and the jump of the piece the reader is passing through lands on that doubt (the trace:
+  // 5,985, still, then a jump to 5,641). The jump ends the doubt; only five frames say a hand.
+  it("ends a doubt a place-keeping jump lands on: a frame the resize held the glide still in", () => {
+    const follower = followGlide(1000, 9000);
+    follower.step(5985);
+    follower.step(5985); // the resize's still frame: a doubt
+    follower.jumped();
+    expect(follower.doubting()).toBe(false);
+    expect([follower.step(5641), follower.step(5641), follower.step(5700), follower.step(5800)]).toEqual([true, true, true, true]);
+  });
+
+  it("knows a held hand after a jump only by its own five frames", () => {
+    const follower = followGlide(1000, 9000);
+    follower.step(1300);
+    follower.step(1300);
+    follower.jumped();
+    expect([1, 2, 3, 4, 5, 6].map(() => follower.step(700))).toEqual([true, true, true, true, true, true]); // moving: false after a jump
     const held = followGlide(1000, 9000);
     held.step(1300);
-    held.step(1300); // stopped: a doubt
-    held.jumped();
-    expect(held.step(700)).toBe(false);
-    const back = followGlide(1000, 9000);
-    back.step(1300);
-    back.step(1290);
-    back.jumped();
-    expect(back.step(700)).toBe(false);
+    expect([1, 2, 3, 4, 5].map(() => held.step(1300))).toEqual([true, true, true, true, false]);
   });
 
   // WebKit's scroll anchoring moves the page back as the click changes the address, before the glide has begun.
-  it("takes a step back before the glide has begun for the browser's own, a jump landing on it or not", () => {
+  it("takes a step back before the glide has begun for the browser's own", () => {
     const follower = followGlide(1000, 9000);
     expect(follower.step(960)).toBe(true);
-    follower.jumped();
-    expect([follower.step(700), follower.step(700), follower.step(1400)]).toEqual([true, true, true]);
+    expect([follower.step(960), follower.step(1400)]).toEqual([true, true]);
   });
 
   it("takes a place-keeping jump's move for no one's: the glide ended with it, and the page standing still is no drag", () => {

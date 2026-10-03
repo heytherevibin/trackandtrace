@@ -14,9 +14,12 @@
 // - a hand that moves the page on toward the target, at any speed, steady or slowing, reads as the glide for as long as
 //   it moves; it is known once it stops short of the end. If a cut lands while it still moves, the glide is taken up
 //   once, and the hand's next move cancels it;
-// - a place-keeping jump ends the glide, the page standing still after it whoever was moving it. One that lands on a
-//   page already stopped short or going back, once the glide had begun, is settled for the reader (a glide does
-//   neither before a jump); a hand moving like a glide until the very frame of the jump is carried.
+// - a place-keeping jump ends the glide, the page standing still after it whoever was moving it, and any doubt with
+//   it: only five frames of a page stopped short or going back say it is the reader's. So a hand that moved the page on
+//   toward the target, then held it fewer than five frames before such a jump, is carried. Settling a doubt the jump
+//   landed on for the reader was tried and dropped real glides: a resize holds Chromium's glide still for a frame, and
+//   the place-keeping jump of the piece the reader is passing through lands on that one doubt (the re-review,
+//   2026-10-03: 24 runs in 24 left short of 07, 08 or the terminal, the resize late in the glide).
 
 /** Frames in a row the page stands still short of its end, or goes back, before it counts as the reader's. Fewer can be
  * the machine's: two at a resize under 6x CPU. Nothing is taken up meanwhile, so the wait costs a held reader nothing. */
@@ -27,8 +30,7 @@ const NEAR = 64;
 export interface GlideFollower {
   /** The page stands at `y` this frame: false once it is the reader's own move, not the glide's. */
   step(y: number): boolean;
-  /** A place-keeping jump moved the page: its move is no one's, and the glide ended with it. One that lands on a doubt,
-   * once the glide had begun, is the reader's (the next step says so). */
+  /** A place-keeping jump moved the page: its move is no one's, and the glide ended with it, any doubt with it. */
   jumped(): void;
   /** A frame or more have not been a glide's, and the next will say whose they were: nothing is taken up meanwhile. */
   doubting(): boolean;
@@ -44,12 +46,10 @@ export function followGlide(from: number, end: number): GlideFollower {
   let doubts = 0;
   let skip = false;
   let begun = false;
-  let lost = false; // a jump landed on a doubt
   return {
     step(y) {
       const d = (y - lastY) * dir;
       lastY = y;
-      if (lost) return false;
       if (skip) {
         skip = false;
         moving = false;
@@ -66,7 +66,6 @@ export function followGlide(from: number, end: number): GlideFollower {
       return doubts < DOUBTS;
     },
     jumped() {
-      if (doubts > 0 && begun) lost = true; // before it has moved, a step back is the browser's (scroll anchoring)
       skip = true;
       doubts = 0;
     },
