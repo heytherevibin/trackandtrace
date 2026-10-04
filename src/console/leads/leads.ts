@@ -4,9 +4,10 @@ import { ACCOUNT_STATUSES, LEAD_ID, LEAD_PAGE_SIZE, LEAD_SOURCES, NEWS_STATUSES,
 import { consoleMessages } from "@/console/messages";
 import { AppError } from "@/services/errors";
 
-// The console's five calls over leads (20261005090000_console_leads.sql), each through the member's
-// own session: the database re-checks the Support floor and masks every address it returns. The
-// whole address reaches this code only from `revealLead`, which the database records.
+// The console's calls over leads (20261005090000_console_leads.sql, and 20261006090000 for tags
+// and notes), each through the member's own session: the database re-checks the Support floor and
+// masks every address it returns. The whole address reaches this code only from `revealLead`, which
+// the database records.
 //
 // A database error THROWS: "no leads" and "the database is down" are different pages.
 
@@ -27,9 +28,13 @@ const rowShape = z.object({
   account: z.enum(ACCOUNT_STATUSES),
   source: z.enum(LEAD_SOURCES),
   campaign: z.object({ source: z.string().nullable(), medium: z.string().nullable(), name: z.string().nullable() }).nullable(),
+  tags: z.array(z.string().min(1)),
   firstSeen: when,
   lastActivity: when,
 });
+
+const tagsShape = z.array(z.string().min(1));
+const notesShape = z.array(z.object({ id: z.guid(), author: z.string().min(1), at: when, body: z.string().min(1) }));
 
 const pageShape = z.object({ total: count, rows: z.array(rowShape) });
 
@@ -65,12 +70,15 @@ const detailShape = z.object({
       reason: z.string().nullable(),
     }),
   ),
+  tags: tagsShape,
+  notes: notesShape,
 });
 
 export type LeadRow = z.infer<typeof rowShape>;
 export type LeadPage = z.infer<typeof pageShape>;
 export type LeadFigures = z.infer<typeof figuresShape>;
 export type LeadDetail = z.infer<typeof detailShape>;
+export type LeadNote = z.infer<typeof notesShape>[number];
 
 const unavailable = (): AppError => new AppError("SOURCE_UNAVAILABLE", m.database);
 
@@ -79,6 +87,10 @@ function fromError(error: { readonly message: string }): AppError {
   if (text.includes("no access")) return new AppError("INVALID_INPUT", m.noAccess, { status: 403 });
   if (text.includes("no such lead") || text.includes("not a lead id")) return new AppError("NOT_FOUND", m.gone);
   if (text.includes("not an address")) return new AppError("INVALID_INPUT", m.notAddress);
+  if (text.includes("not a tag")) return new AppError("INVALID_INPUT", m.notTag);
+  if (text.includes("too many tags")) return new AppError("INVALID_INPUT", m.tooManyTags);
+  if (text.includes("empty note")) return new AppError("INVALID_INPUT", m.emptyNote);
+  if (text.includes("note too long")) return new AppError("INVALID_INPUT", m.noteTooLong);
   return unavailable();
 }
 
@@ -102,6 +114,7 @@ export async function readLeads(db: ConsoleDb, filters: LeadFilters, now: Date):
     ...(filters.news ? { p_news: filters.news } : {}),
     ...(filters.account ? { p_account: filters.account } : {}),
     ...(filters.source ? { p_source: filters.source } : {}),
+    ...(filters.tag ? { p_tag: filters.tag } : {}),
     ...(since ? { p_since: since } : {}),
     p_limit: LEAD_PAGE_SIZE,
     p_offset: (filters.page - 1) * LEAD_PAGE_SIZE,
@@ -129,4 +142,31 @@ export async function findLead(db: ConsoleDb, environment: string, email: string
   const { data, error } = await db.rpc("console_find_lead", { p_environment: environment, p_email: email });
   if (error) throw fromError(error);
   return data === null ? null : parsed(rowShape, data);
+}
+
+/** Every tag in use, in order: the Tag filter's choices and the record's suggestions. */
+export async function readTags(db: ConsoleDb): Promise<readonly string[]> {
+  const { data, error } = await db.rpc("console_lead_tags");
+  if (error) throw fromError(error);
+  return parsed(tagsShape, data);
+}
+
+/** Adds a tag and answers the lead's tags. The database lowers and trims it, and records the act. */
+export async function tagLead(db: ConsoleDb, environment: string, leadId: string, tag: string): Promise<readonly string[]> {
+  const { data, error } = await db.rpc("console_tag_lead", { p_environment: environment, p_id: leadId, p_tag: tag });
+  if (error) throw fromError(error);
+  return parsed(tagsShape, data);
+}
+
+export async function untagLead(db: ConsoleDb, environment: string, leadId: string, tag: string): Promise<readonly string[]> {
+  const { data, error } = await db.rpc("console_untag_lead", { p_environment: environment, p_id: leadId, p_tag: tag });
+  if (error) throw fromError(error);
+  return parsed(tagsShape, data);
+}
+
+/** Adds a note and answers the lead's notes AS STORED: the database scrubs the words before it keeps them. */
+export async function noteLead(db: ConsoleDb, environment: string, leadId: string, body: string): Promise<readonly LeadNote[]> {
+  const { data, error } = await db.rpc("console_note_lead", { p_environment: environment, p_id: leadId, p_body: body });
+  if (error) throw fromError(error);
+  return parsed(notesShape, data);
 }

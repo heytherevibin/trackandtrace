@@ -36,6 +36,7 @@ export const leads = {
     news: "News",
     account: "Account",
     source: "Source",
+    tag: "Tag",
     seen: "First seen",
     all: "All",
     anyTime: "Any time",
@@ -59,6 +60,9 @@ export const leads = {
     account: "Account",
     source: "Source",
     campaign: "Campaign",
+    tags: "Tags",
+    /** The tags a row has no room to draw, after its first. */
+    moreTags: (n: number) => `+${n}`,
     firstSeen: "First seen",
     lastActivity: "Last activity",
     actions: "Actions",
@@ -138,6 +142,21 @@ export const leads = {
       /** Undrawn. */
       suppressed: "Suppressed: mail can no longer reach this address",
     },
+    tags: "Tags",
+    /** Undrawn. */
+    noTags: "No tags.",
+    addTag: "Add a tag",
+    add: "Add",
+    tagHint: "Letters, numbers and hyphens, up to 24. A new tag is created the first time it is used.",
+    removeTag: (tag: string) => `Remove the tag ${tag}`,
+    notes: "Notes",
+    noNotes: "No notes yet.",
+    noteBy: (author: string, when: string) => `${author} · ${when} IST`,
+    addNote: "Add a note",
+    noteHint: "Don't include PNRs, emails or IP addresses; they're removed. Up to 500 characters. A note can't be changed afterwards.",
+    addNoteButton: "Add note",
+    /** The phone board's closing line. Deleting a lead joins it when that is built. */
+    largerScreen: "Open on a larger screen to add a tag or a note.",
     retention: "A sign-up that is never confirmed is deleted after 7 days.",
     /** Undrawn. */
     unavailable: "This lead's record is unavailable: the database didn't answer.",
@@ -149,6 +168,10 @@ export const leads = {
     noAccess: "Your role can't do that.",
     gone: "That lead is no longer here.",
     notAddress: "Enter the whole email address, like name@example.com.",
+    notTag: "A tag is letters, numbers and hyphens, up to 24.",
+    tooManyTags: "A lead can have 10 tags. Remove one first.",
+    emptyNote: "Write the note first.",
+    noteTooLong: "A note can be up to 500 characters.",
     database: "That didn't go through: the database didn't answer. Nothing changed.",
   },
 } as const;

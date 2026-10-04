@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ConsoleDb } from "@/console/auth/db";
 import { LEAD_PAGE_SIZE, leadQuery, parseLeadFilters, sinceFor } from "@/console/leads/filters";
-import { findLead, readFigures, readLead, readLeads, revealLead } from "@/console/leads/leads";
+import { findLead, noteLead, readFigures, readLead, readLeads, readTags, revealLead, tagLead, untagLead } from "@/console/leads/leads";
 import { consoleMessages } from "@/console/messages";
 import { AppError } from "@/services/errors";
 
@@ -12,7 +12,7 @@ import { AppError } from "@/services/errors";
 
 const m = consoleMessages.leads.errors;
 const ID = "p:a1111111-1111-4111-8111-111111111111";
-const ROW = { id: ID, email: "a•••@example.com", news: "subscribed", availability: false, account: "has", source: "footer", campaign: { source: "google", medium: "cpc", name: "diwali-2026" }, firstSeen: "2026-09-02T04:44:00+00:00", lastActivity: "2026-09-18T15:42:00+00:00" };
+const ROW = { id: ID, email: "a•••@example.com", news: "subscribed", availability: false, account: "has", source: "footer", campaign: { source: "google", medium: "cpc", name: "diwali-2026" }, tags: ["travel-desk"], firstSeen: "2026-09-02T04:44:00+00:00", lastActivity: "2026-09-18T15:42:00+00:00" };
 const FIGURES = { total: 1612, pending: 37, subscribed: 431, unsubscribed: 58, suppressed: 4, accounts: 1204, availability: 217 };
 const DETAIL = {
   id: ID, email: "a•••@example.com", firstSeen: "2026-09-02T04:44:00+00:00",
@@ -20,7 +20,10 @@ const DETAIL = {
   account: { createdAt: "2026-09-05T04:00:00+00:00", lastSignInAt: "2026-09-18T15:42:00+00:00", disabled: false, emailLink: true, google: false, passkeys: 1, savedPnrs: 3 },
   campaign: { source: "google", medium: "cpc", name: "diwali-2026", firstPage: "/pre-booking" },
   timeline: [{ at: "2026-09-18T15:42:00+00:00", kind: "signed_in", list: null, source: null, subject: null, reason: null }],
+  tags: ["travel-desk"],
+  notes: [{ id: "b1111111-1111-4111-8111-111111111111", author: "Kiran Das", at: "2026-09-12T11:10:00+00:00", body: "Asked about group bookings. Wrote from [removed]." }],
 };
+const NOTES = DETAIL.notes;
 
 function db(answer: { data?: unknown; error?: { message: string } | null }): { db: ConsoleDb; rpc: ReturnType<typeof vi.fn> } {
   const rpc = vi.fn(async () => ({ data: answer.data ?? null, error: answer.error ?? null }));
@@ -43,9 +46,9 @@ describe("reading", () => {
   it("asks for one page with the filters that are on, and leaves out each that is off", async () => {
     const { db: client, rpc } = db({ data: { total: 1, rows: [ROW] } });
     const now = new Date("2026-09-19T09:02:00Z");
-    const page = await readLeads(client, { news: "subscribed", account: null, source: null, seen: "30d", page: 2, lead: null }, now);
+    const page = await readLeads(client, { news: "subscribed", account: null, source: null, tag: "travel-desk", seen: "30d", page: 2, lead: null }, now);
     expect(page).toEqual({ total: 1, rows: [ROW] });
-    expect(rpc).toHaveBeenCalledWith("console_leads", { p_news: "subscribed", p_since: "2026-08-20T09:02:00.000Z", p_limit: LEAD_PAGE_SIZE, p_offset: LEAD_PAGE_SIZE });
+    expect(rpc).toHaveBeenCalledWith("console_leads", { p_news: "subscribed", p_tag: "travel-desk", p_since: "2026-08-20T09:02:00.000Z", p_limit: LEAD_PAGE_SIZE, p_offset: LEAD_PAGE_SIZE });
   });
 
   it("throws on a database error rather than answering no leads, and on a row of the wrong shape", async () => {
@@ -92,10 +95,44 @@ describe("reveal and find", () => {
   });
 });
 
+describe("tags and notes", () => {
+  it("reads every tag in use", async () => {
+    const { db: client, rpc } = db({ data: ["beta", "press"] });
+    expect(await readTags(client)).toEqual(["beta", "press"]);
+    expect(rpc).toHaveBeenCalledWith("console_lead_tags");
+  });
+
+  it("adds and removes a tag by the lead's id, and answers the lead's tags", async () => {
+    const added = db({ data: ["press", "travel-desk"] });
+    expect(await tagLead(added.db, "production", ID, "press")).toEqual(["press", "travel-desk"]);
+    expect(added.rpc).toHaveBeenCalledWith("console_tag_lead", { p_environment: "production", p_id: ID, p_tag: "press" });
+    const removed = db({ data: ["travel-desk"] });
+    expect(await untagLead(removed.db, "production", ID, "press")).toEqual(["travel-desk"]);
+    expect(removed.rpc).toHaveBeenCalledWith("console_untag_lead", { p_environment: "production", p_id: ID, p_tag: "press" });
+  });
+
+  it("adds a note, and answers the lead's notes as the database stored them", async () => {
+    const { db: client, rpc } = db({ data: NOTES });
+    expect(await noteLead(client, "production", ID, "Asked about group bookings. Wrote from someone@example.com.")).toEqual(NOTES);
+    expect(rpc).toHaveBeenCalledWith("console_note_lead", { p_environment: "production", p_id: ID, p_body: "Asked about group bookings. Wrote from someone@example.com." });
+  });
+
+  it.each([
+    ["not a tag", m.notTag],
+    ["too many tags", m.tooManyTags],
+    ["empty note", m.emptyNote],
+    ["note too long", m.noteTooLong],
+    ["no such lead", m.gone],
+    ["no access", m.noAccess],
+  ])("turns the database's %j into the console's words", async (raised, shown) => {
+    expect(await message(tagLead(db({ error: { message: raised } }).db, "production", ID, "press"))).toBe(shown);
+  });
+});
+
 describe("the filters in the page's address", () => {
-  it("reads the four filters, the page and the open lead, and drops anything it does not know", () => {
-    expect(parseLeadFilters({ news: "pending", account: "has", source: "pre-booking", seen: "7d", page: "3", lead: ID })).toEqual({ news: "pending", account: "has", source: "pre-booking", seen: "7d", page: 3, lead: ID });
-    expect(parseLeadFilters({ news: "everyone", account: "x", source: "billboard", seen: "forever", page: "-2", lead: "nope" })).toEqual({ news: null, account: null, source: null, seen: "any", page: 1, lead: null });
+  it("reads the five filters, the page and the open lead, and drops anything it does not know", () => {
+    expect(parseLeadFilters({ news: "pending", account: "has", source: "pre-booking", tag: "travel-desk", seen: "7d", page: "3", lead: ID })).toEqual({ news: "pending", account: "has", source: "pre-booking", tag: "travel-desk", seen: "7d", page: 3, lead: ID });
+    expect(parseLeadFilters({ news: "everyone", account: "x", source: "billboard", tag: "Two Words", seen: "forever", page: "-2", lead: "nope" })).toEqual({ news: null, account: null, source: null, tag: null, seen: "any", page: 1, lead: null });
     expect(parseLeadFilters({ news: ["pending", "subscribed"] })).toMatchObject({ news: "pending" });
   });
 
@@ -105,8 +142,8 @@ describe("the filters in the page's address", () => {
 
   it("writes only what differs from the defaults, so the plain page has a plain address", () => {
     expect(leadQuery(parseLeadFilters({}))).toBe("/leads");
-    expect(leadQuery({ news: "pending", account: null, source: null, seen: "any", page: 1, lead: null })).toBe("/leads?news=pending");
-    expect(leadQuery({ news: null, account: "has", source: "footer", seen: "30d", page: 2, lead: ID })).toBe(`/leads?account=has&source=footer&seen=30d&page=2&lead=${encodeURIComponent(ID)}`);
+    expect(leadQuery({ news: "pending", account: null, source: null, tag: null, seen: "any", page: 1, lead: null })).toBe("/leads?news=pending");
+    expect(leadQuery({ news: null, account: "has", source: "footer", tag: "travel-desk", seen: "30d", page: 2, lead: ID })).toBe(`/leads?account=has&source=footer&tag=travel-desk&seen=30d&page=2&lead=${encodeURIComponent(ID)}`);
   });
 
   it("turns First seen into a moment, or none", () => {

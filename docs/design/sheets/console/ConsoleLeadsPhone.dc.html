@@ -51,6 +51,9 @@ body{margin:0}
 <sc-if value="{{showMeta}}" hint-placeholder-val="{{ true }}">
 <p class="legend ph-meta" style="margin-bottom: 0;">Updated 14:32 IST · Sample data</p>
 </sc-if>
+<sc-if value="{{canExport}}" hint-placeholder-val="{{ true }}">
+<p style="margin: 12px 0 0; font-size: 13px; line-height: 20px; color: var(--ink-3);">Open on a larger screen to export.</p>
+</sc-if>
 </div>
 
 <sc-if value="{{isNoAccess}}" hint-placeholder-val="{{ false }}"><section class="plate state" style="flex: none;"><i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i><h2 class="state-title">This module isn't part of the Viewer role.</h2><p class="state-detail">Ask an Owner if you need it.</p><div class="state-actions"><a href="#" class="btn btn-secondary btn-lg">Back to Overview</a></div></section></sc-if>
@@ -77,7 +80,8 @@ body{margin:0}
 <button type="button" class="well pick" style="width: 100%; height: 44px; justify-content: space-between;" aria-haspopup="listbox"><span style="color: var(--ink-3);">News</span><span>{{anyValue}}</span><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" style="color: var(--ink-3);"><path d="M4 6l4 4 4-4"></path></svg></button>
 <button type="button" class="well pick" style="width: 100%; height: 44px; justify-content: space-between;" aria-haspopup="listbox"><span style="color: var(--ink-3);">Account</span><span>{{anyValue}}</span><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" style="color: var(--ink-3);"><path d="M4 6l4 4 4-4"></path></svg></button>
 <button type="button" class="well pick" style="width: 100%; height: 44px; justify-content: space-between;" aria-haspopup="listbox"><span style="color: var(--ink-3);">Source</span><span>{{anyValue}}</span><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" style="color: var(--ink-3);"><path d="M4 6l4 4 4-4"></path></svg></button>
-<button type="button" class="well pick" style="width: 100%; height: 44px; justify-content: space-between;" aria-haspopup="listbox"><span style="color: var(--ink-3);">First seen</span><span>Any time</span><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" style="color: var(--ink-3);"><path d="M4 6l4 4 4-4"></path></svg></button>
+<button type="button" class="well pick" style="width: 100%; height: 44px; justify-content: space-between;" aria-haspopup="listbox"><span style="color: var(--ink-3);">Tag</span><span>{{anyValue}}</span><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" style="color: var(--ink-3);"><path d="M4 6l4 4 4-4"></path></svg></button>
+<button type="button" class="well pick" style="width: 100%; height: 44px; justify-content: space-between; grid-column: 1 / -1;" aria-haspopup="listbox"><span style="color: var(--ink-3);">First seen</span><span>Any time</span><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" style="color: var(--ink-3);"><path d="M4 6l4 4 4-4"></path></svg></button>
 </div>
 </div>
 
@@ -89,6 +93,7 @@ body{margin:0}
 <a href="#" aria-label="{{r.openLabel}}" style="{{r.cardStyle}}">
 <span style="display: flex; align-items: center; gap: 10px;"><span style="flex-grow: 1; min-width: 0; font-size: 15px; line-height: 22px; font-weight: 500; overflow-wrap: anywhere;">{{r.email}}</span><span class="{{r.newsClass}}" style="{{r.newsStyle}}">{{r.news}}</span></span>
 <span style="font-size: 14px; line-height: 20px;">{{r.accountLine}}</span>
+<sc-if value="{{r.hasTag}}" hint-placeholder-val="{{ false }}"><span style="display: flex; flex-wrap: wrap; gap: 6px;"><sc-for list="{{r.tagList}}" as="g" hint-placeholder-count="1"><span class="tag tag-grey">{{g.name}}</span></sc-for></span></sc-if>
 <span class="legend-sm tnum">{{r.when}}</span>
 </a>
 </sc-for>
@@ -108,14 +113,15 @@ body{margin:0}
 <section role="dialog" aria-modal="true" aria-labelledby="lead-title" style="position: absolute; inset: 0; z-index: 5; display: flex; flex-direction: column; background: var(--surface-0);">
 <div style="flex: none; display: flex; align-items: center; gap: 12px; height: 56px; padding: 0 8px 0 16px; border-bottom: 1px solid var(--line);">
 <h2 class="legend" id="lead-title" style="margin: 0; flex-grow: 1; color: var(--ink-1);">Lead</h2>
-<span class="legend-sm">First seen 2 Sep 2026</span>
+<span class="legend-sm">{{dFirstSeen}}</span>
 <button type="button" class="box box-icon box-bare box-lg" aria-label="Close"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9"></path></svg></button>
 </div>
 <div style="display: flex; align-items: center; gap: 12px; padding: 14px 16px;">
 <span style="flex-grow: 1; min-width: 0; font-size: 17px; line-height: 26px; font-weight: 500; overflow-wrap: anywhere;">{{dEmail}}</span>
-<sc-if value="{{dMasked}}" hint-placeholder-val="{{ true }}"><button type="button" class="btn btn-ghost btn-sm" aria-label="Reveal the address a•••@example.com">Reveal</button></sc-if>
+<sc-if value="{{dMasked}}" hint-placeholder-val="{{ true }}"><button type="button" class="btn btn-ghost btn-sm" aria-label="{{dRevealLabel}}">Reveal</button></sc-if>
 </div>
 <sc-if value="{{dRevealed}}" hint-placeholder-val="{{ false }}"><p role="status" style="margin: -6px 0 0; padding: 0 16px 14px; font-size: 13px; line-height: 20px; color: var(--ink-2);">Revealed for this visit, and written to the audit log.</p></sc-if>
+<sc-if value="{{dLeadA}}" hint-placeholder-val="{{ true }}">
 <div style="padding: 14px 16px 16px; border-top: 1px solid var(--line);">
 <h3 class="legend" style="margin: 0 0 10px;">Subscriptions</h3>
 <div style="display: flex; flex-direction: column; gap: 12px;">
@@ -124,7 +130,7 @@ body{margin:0}
 <span style="font-size: 13px; line-height: 20px; color: var(--ink-2);">Consented 2 Sep 2026, 10:14 IST via the footer form · notice v1.1 · confirmed 2 Sep 2026, 10:20 IST</span>
 </div>
 <div style="display: flex; flex-direction: column; gap: 4px;">
-<span style="font-size: 14px; line-height: 20px; font-weight: 500;">Availability</span>
+<span style="display: inline-flex; align-items: center; gap: 10px;"><span style="font-size: 14px; line-height: 20px; font-weight: 500;">Availability</span></span>
 <span style="font-size: 13px; line-height: 20px; color: var(--ink-3);">Not on this list.</span>
 </div>
 </div>
@@ -155,14 +161,72 @@ body{margin:0}
 </sc-for>
 </ol>
 </div>
+<div style="padding: 14px 16px 16px; border-top: 1px solid var(--line);">
+<h3 class="legend" style="margin: 0 0 10px;">Tags</h3>
+<div style="display: flex; flex-wrap: wrap; gap: 8px;"><span class="tag tag-grey">travel-desk</span></div>
+</div>
+<div style="padding: 14px 16px 16px; border-top: 1px solid var(--line);">
+<h3 class="legend" style="margin: 0 0 10px;">Notes</h3>
+<ol style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px;">
+<li style="display: flex; flex-direction: column; gap: 2px;"><span class="legend-sm tnum">Kiran Das · 12 Sep 2026, 16:40 IST</span><span style="font-size: 14px; line-height: 20px;">Asked about group bookings for a travel desk, about 40 a month. Wrote from [removed].</span></li>
+<li style="display: flex; flex-direction: column; gap: 2px;"><span class="legend-sm tnum">Asha Rao · 3 Sep 2026, 11:05 IST</span><span style="font-size: 14px; line-height: 20px;">Came in from the Diwali campaign.</span></li>
+</ol>
+</div>
+<p style="margin: 0; padding: 14px 16px 16px; border-top: 1px solid var(--line); font-size: 13px; line-height: 20px; color: var(--ink-2);">Open on a larger screen to add a tag or a note, or to delete a lead.</p>
+</sc-if>
+<sc-if value="{{dLeadP}}" hint-placeholder-val="{{ false }}">
+<div style="padding: 14px 16px 16px; border-top: 1px solid var(--line);">
+<h3 class="legend" style="margin: 0 0 10px;">Subscriptions</h3>
+<div style="display: flex; flex-direction: column; gap: 12px;">
+<div style="display: flex; flex-direction: column; gap: 4px;">
+<span style="display: inline-flex; align-items: center; gap: 10px;"><span style="font-size: 14px; line-height: 20px; font-weight: 500;">News</span><span class="tag tag-filled" style="border: 1px solid transparent;">Subscribed</span></span>
+<span style="font-size: 13px; line-height: 20px; color: var(--ink-2);">Consented 31 Aug 2026, 08:40 IST via the footer form · notice v1.1 · confirmed 31 Aug 2026, 08:41 IST</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 4px;">
+<span style="display: inline-flex; align-items: center; gap: 10px;"><span style="font-size: 14px; line-height: 20px; font-weight: 500;">Availability</span><span class="tag tag-filled" style="border: 1px solid transparent;">Subscribed</span></span>
+<span style="font-size: 13px; line-height: 20px; color: var(--ink-2);">Consented 30 Aug 2026, 18:02 IST via the pre-booking form · notice v1.1 · confirmed 30 Aug 2026, 18:04 IST</span>
+</div>
+</div>
+</div>
+<div style="padding: 14px 16px 16px; border-top: 1px solid var(--line);">
+<h3 class="legend" style="margin: 0 0 10px;">Account</h3>
+<p style="margin: 0; font-size: 13px; line-height: 20px; color: var(--ink-3);">No account.</p>
+</div>
+<div style="padding: 14px 16px 16px; border-top: 1px solid var(--line);">
+<h3 class="legend" style="margin: 0 0 4px;">Campaign</h3>
+<dl class="kv" style="grid-template-columns: 120px 1fr;">
+<dt class="legend-sm">Source</dt><dd>newsletter</dd>
+<dt class="legend-sm">Medium</dt><dd>email</dd>
+<dt class="legend-sm">Campaign</dt><dd>launch</dd>
+<dt class="legend-sm">First page</dt><dd>/pre-booking</dd>
+</dl>
+</div>
+<div style="padding: 14px 16px 16px; border-top: 1px solid var(--line);">
+<h3 class="legend" style="margin: 0 0 10px;">Timeline</h3>
+<ol style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px;">
+<sc-for list="{{timelineP}}" as="t" hint-placeholder-count="5">
+<li style="display: flex; flex-direction: column; gap: 2px;"><span class="legend-sm tnum">{{t.when}}</span><span style="font-size: 14px; line-height: 20px;">{{t.what}}</span></li>
+</sc-for>
+</ol>
+</div>
+<div style="padding: 14px 16px 16px; border-top: 1px solid var(--line);">
+<h3 class="legend" style="margin: 0 0 10px;">Tags</h3>
+<div style="display: flex; flex-wrap: wrap; gap: 8px;"><span class="tag tag-grey">press</span><span class="tag tag-grey">beta</span></div>
+</div>
+<div style="padding: 14px 16px 16px; border-top: 1px solid var(--line);">
+<h3 class="legend" style="margin: 0 0 10px;">Notes</h3>
+<p style="margin: 0; font-size: 13px; line-height: 20px; color: var(--ink-3);">No notes yet.</p>
+</div>
+<p style="margin: 0; padding: 14px 16px 16px; border-top: 1px solid var(--line); font-size: 13px; line-height: 20px; color: var(--ink-2);">Open on a larger screen to add a tag or a note, or to delete a lead.</p>
+</sc-if>
 <div style="flex-grow: 1;"></div>
 <p style="margin: 0; padding: 14px 16px; border-top: 1px solid var(--line); font-size: 13px; line-height: 20px; color: var(--ink-3);">A sign-up that is never confirmed is deleted after 7 days.</p>
 </section>
 </sc-if>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"state":{"editor":"enum","options":["List","Drawer","Drawer revealed","Empty","No access"],"default":"List","section":"State"},"role":{"editor":"enum","options":["Owner","Admin","Support"],"default":"Owner","section":"State"},"defaultTheme":{"editor":"enum","options":["system","light","dark"],"default":"system","section":"Appearance"},"$preview":{"width":390,"height":1900}}'>
-var heights = {"List": 1880, "Drawer": 1140, "Drawer revealed": 1140, "Empty": 1160, "No access": 844};
+<script type="text/x-dc" data-dc-script data-props='{"state":{"editor":"enum","options":["List","Drawer","Drawer revealed","Record: no account","Empty","No access"],"default":"List","section":"State"},"role":{"editor":"enum","options":["Owner","Admin","Support"],"default":"Owner","section":"State"},"defaultTheme":{"editor":"enum","options":["system","light","dark"],"default":"system","section":"Appearance"},"$preview":{"width":390,"height":1900}}'>
+var heights = {"List": 2050, "Drawer": 1410, "Drawer revealed": 1440, "Record: no account": 1200, "Empty": 1260, "No access": 844};
 class Component extends DCLogic {
   state = { theme: null, sysDark: false };
   componentDidMount() {
@@ -188,9 +252,11 @@ class Component extends DCLogic {
 
     // Sample world: Saturday 19 Sep 2026, 14:32 IST, as the other console sheets. The figures agree
     // with ConsoleAnnouncements: 431 confirmed on News, 217 on the Availability list.
-    var drawer = st === 'Drawer' || st === 'Drawer revealed';
+    var leadP = st === 'Record: no account' || st === 'Delete: confirm';
+    var drawer = st === 'Drawer' || st === 'Drawer revealed' || leadP;
+    var exporting = st === 'Export: confirm' || st === 'Export: preparing' || st === 'Export: ready';
     var search = st === 'Search: one match' || st === 'Search: no match';
-    var base = drawer ? 'List' : st;
+    var base = drawer || exporting ? 'List' : st;
     // Five statuses, five forms, ONE box: every tag carries a 1px edge (clear unless the form is an
     // outline), so no status is taller or wider-set than another and the column reads as one rule.
     // Suppressed is the solid one, in the alert ink: it is the status that means mail cannot reach them.
@@ -212,15 +278,20 @@ class Component extends DCLogic {
       ['k•••@example.com', 'Subscribed', '', 'Disabled', 'Footer', '', '2 Aug 2026', '9 Sep 2026'],
       ['t•••@example.org', 'Pending confirmation', 'Availability', 'No account', 'Pre-booking', '', '17 Sep 2026', '17 Sep 2026']
     ];
+    var tags = { 'a•••@example.com': ['travel-desk'], 'p•••@example.net': ['press', 'beta'], 's•••@example.in': ['beta'] };
     var shown = st === 'Search: one match' ? [all[0]] : all;
+    var openRow = leadP ? 5 : 0;
     var rows = shown.map(function (r, i) {
       return {
         email: r[0], news: r[1], newsClass: tag[r[1]][0], newsStyle: tag[r[1]][1], lists: r[2] || '—',
-        account: r[3], source: r[4], campaign: r[5] || '—', first: r[6], last: r[7],
+        account: r[3], source: r[4], campaign: r[5] ? r[5].split(' / ')[2] : '—', first: r[6], last: r[7],
         when: 'First seen ' + r[6] + ' · ' + r[4],
         accountLine: r[3],
         openLabel: 'Open the lead ' + r[0], revealLabel: 'Reveal the address ' + r[0],
-        rowClass: i === 0 && drawer ? 'hover' : '',
+        rowClass: i === openRow && drawer ? 'hover' : '',
+        tag: (tags[r[0]] || [])[0] || '', hasTag: !!tags[r[0]], noTag: !tags[r[0]],
+        moreTags: (tags[r[0]] || []).length > 1 ? '+' + ((tags[r[0]] || []).length - 1) : '',
+        tagList: (tags[r[0]] || []).map(function (t) { return { name: t }; }),
         cardStyle: 'display: flex; flex-direction: column; gap: 6px; padding: 12px 16px; text-decoration: none; color: var(--ink-1);' + (i === 0 ? '' : ' border-top: 1px solid var(--line);')
       };
     });
@@ -235,6 +306,14 @@ class Component extends DCLogic {
       ['2 Sep 2026, 10:20 IST', 'Confirmed News'],
       ['2 Sep 2026, 10:14 IST', 'Signed up for News via the footer form']
     ].map(function (t) { return { when: t[0], what: t[1] }; });
+    var timelineP = [
+      ['6 Sep 2026, 09:31 IST', 'Received “Trakline news: the new look”'],
+      ['31 Aug 2026, 08:41 IST', 'Confirmed News'],
+      ['31 Aug 2026, 08:40 IST', 'Signed up for News via the footer form'],
+      ['30 Aug 2026, 18:04 IST', 'Confirmed Availability'],
+      ['30 Aug 2026, 18:02 IST', 'Signed up for Availability via the pre-booking form']
+    ].map(function (t) { return { when: t[0], what: t[1] }; });
+    var del = st === 'Delete: confirm';
     var m = members[who];
     return {
       face: dark ? 'night' : 'day', faceH: (heights[st] || 1000) + 'px',
@@ -242,8 +321,16 @@ class Component extends DCLogic {
       themeLabel: 'Theme: ' + themeNames[mode] + '. Switch to ' + themeNames[themeNext[mode]],
       cycleTheme: () => this.setState({ theme: themeNext[mode] }),
       role: who, initials: m[1], memberLabel: m[0] + ', ' + who + '. Open the member menu',
-      rows: rows, figures: figures, timeline: timeline,
-      showMeta: !noAccess, isNoAccess: noAccess, showArea: !noAccess,
+      rows: rows, figures: figures, timeline: timeline, timelineP: timelineP,
+      canExport: !noAccess && who !== 'Support',
+      stPreparing: st === 'Export: preparing', stReady2: st === 'Export: ready',
+      confirmOpen: st === 'Export: confirm' || del,
+      confirmTitle: del ? 'Delete the lead p•••@example.net' : 'Export 1,612 leads',
+      confirmDetail: del ? 'This removes the person, their 2 consents, 2 tags and notes. A suppression on the address stays. They can sign up again.' : 'The file holds whole addresses, with each lead’s status, source, campaign and tags. It works once, in this browser, for 10 minutes.',
+      confirmReason: del ? 'Asked by phone to be removed from our lists.' : 'Monthly review of sign-ups for September.',
+      dLeadA: drawer && !leadP, dLeadP: leadP,
+      dRevealLabel: 'Reveal the address ' + (leadP ? 'p•••@example.net' : 'a•••@example.com'),
+      showMeta: !noAccess, isNoAccess: noAccess, showArea: !noAccess && !drawer,
       anyValue: 'All', searchValue: search ? 'asha.verma@example.com' : '', hasSearch: search,
       totalCell: '1,612 leads',
       countCell: st === 'Search: one match' ? '1 match' : st === 'Search: no match' ? 'No match' : (base === 'Empty' || base === 'Unavailable') ? '—' : '1–50 of 1,612',
@@ -251,8 +338,9 @@ class Component extends DCLogic {
       hasNext: st !== 'Search: one match', noNext: st === 'Search: one match',
       stRows: base === 'List' || st === 'Search: one match',
       stNoMatch: st === 'Search: no match', stEmpty: base === 'Empty', stError: base === 'Unavailable',
-      drawerOpen: drawer, dMasked: st === 'Drawer', dRevealed: st === 'Drawer revealed',
-      dEmail: st === 'Drawer revealed' ? 'asha.verma@example.com' : 'a•••@example.com'
+      drawerOpen: drawer, dMasked: st === 'Drawer' || leadP, dRevealed: st === 'Drawer revealed',
+      dEmail: st === 'Drawer revealed' ? 'asha.verma@example.com' : leadP ? 'p•••@example.net' : 'a•••@example.com',
+      dFirstSeen: 'First seen ' + (leadP ? '30 Aug 2026' : '2 Sep 2026')
     };
   }
 }

@@ -8,7 +8,7 @@ import { NoAccessState } from "@/console/components/frame-states";
 import { consoleHref } from "@/console/href";
 import { FiguresPlate } from "@/console/leads/figures-plate";
 import { parseLeadFilters, type LeadSearchParams } from "@/console/leads/filters";
-import { readFigures, readLead, readLeads, type LeadDetail, type LeadFigures, type LeadPage } from "@/console/leads/leads";
+import { readFigures, readLead, readLeads, readTags, type LeadDetail, type LeadFigures, type LeadPage } from "@/console/leads/leads";
 import { LeadsBrowser } from "@/console/leads/leads-browser";
 import { consoleMessages } from "@/console/messages";
 import { AppError } from "@/services/errors";
@@ -38,7 +38,7 @@ function Header({ updated }: { readonly updated?: string }) {
  * record writes no audit row. Revealing an address and looking one up do, and the database writes
  * them (20261005090000_console_leads.sql).
  *
- * Each of the three reads fails on its own: figures that could not be read are not zeroes, and a
+ * Each of the reads fails on its own: figures that could not be read are not zeroes, and a
  * list that could not be read is not "No leads yet".
  */
 export default async function LeadsPage({ searchParams }: { readonly searchParams: Promise<LeadSearchParams> }) {
@@ -62,9 +62,12 @@ export default async function LeadsPage({ searchParams }: { readonly searchParam
   const filters = parseLeadFilters(await searchParams);
   const db = await createConsoleDb();
   const now = new Date();
-  const [figures, page, detail] = await Promise.all([
+  const [figures, page, tags, detail] = await Promise.all([
     readFigures(db).catch((): LeadFigures | null => null),
     readLeads(db, filters, now).catch((): LeadPage | null => null),
+    // The Tag filter's choices. Without them the picker offers only the tag already in force, and
+    // the list itself is unaffected: a filter is the address's, not the picker's.
+    readTags(db).catch((): readonly string[] => []),
     filters.lead === null
       ? null
       : readLead(db, filters.lead).then(
@@ -79,7 +82,7 @@ export default async function LeadsPage({ searchParams }: { readonly searchParam
       <Header updated={formatTime(now)} />
       <div className="mt-6 flex flex-col gap-6 max-sm:mt-4 max-sm:gap-4">
         <FiguresPlate figures={figures} />
-        <LeadsBrowser page={page} filters={filters} detail={detail} />
+        <LeadsBrowser page={page} filters={filters} detail={detail} tags={tags} />
       </div>
     </ConsoleFrame>
   );

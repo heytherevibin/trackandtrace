@@ -104,15 +104,38 @@ Drawn on 4 Oct 2026 and **approved the same day**, after two changes the owner a
 - **Five News statuses, five tag forms, one box.** Every tag carries a 1px edge, clear unless the form is an outline, so no status is taller or set wider than another: Subscribed is the tint fill, Pending confirmation the steel outline, Unsubscribed the grey fill, Not subscribed a neutral outline, and Suppressed the solid alert ink, because it is the one that means mail cannot reach them. The first drawing had an outline 2px taller than the fills, "Not subscribed" as plain text, and Suppressed looking like Unsubscribed.
 - **People who only have an account are listed**, as "Not subscribed": the brief's lead is "sign-ups and accounts".
 
+### Part two: tags, notes, delete and export (approved 4 Oct 2026)
+
+The same two boards, redrawn with the brief's second part on them and approved the same day. The props gain five desktop states (Record: no account, Delete: confirm, Export: confirm, Export: preparing, Export: ready) and one phone state (Record: no account). The business pipeline is the part after this one and is not drawn.
+
+Decided with the owner before drawing:
+
+- **Tags are free-form**: letters, numbers and hyphens, up to 24 characters, up to 10 on a lead. A tag exists from the first time it is used. They are added and removed on the record, one lead at a time; the list has no selection and no bulk actions.
+- **The export holds whole addresses**, for the filters in force, with each lead's status, source, campaign and tags. Notes are not in it. Owner and Admin, a reason and a key; it works once, in that browser, for 10 minutes.
+- **Delete lead is a plain delete**, only for a lead with no account, with a reason and a key: the person, their consents, tags and notes. A suppression on the address stays, and they can sign up again. "Never email again" is an erasure request's job (module 09).
+
+What the redrawing changes on the first part's boards:
+
+- **The Campaign column shows the campaign's name.** Beside a Tags column there is no room at 1440 for source, medium and name, and the cell was cut. Source and medium are on the record.
+- **The filters take two rows**: the search box with its hint beside it, then News, Account, Source, Tag and First seen.
+- **A Tags column**, the first tag and "+1" for the rest; on a phone, a card's tags in full.
+- **The record ends with Tags, Notes and Delete.** A note is scrubbed as a reason is (the drawn "[removed]"), holds up to 500 characters, and cannot be changed or removed afterwards. A lead with an account says it cannot be deleted here.
+- **Export CSV** in the page header, for Owner and Admin; Support's page has none.
+- **On a phone** tags and notes are read, and nothing is added, deleted or exported: the page says to open it on a larger screen.
+
+Tags and notes need no key and are each written to the audit log, as the brief's table of safeguards sets out. They are built first; export and delete follow in their own change.
+
 ### As built (4 Oct 2026)
 
 The page is `src/app/console/leads/page.tsx`; its parts are in `src/console/leads/`. It matches the boards at 1440 and at 390. Where it departs, it is for one of these reasons, each found by rendering the page rather than reading the sheet:
 
 - **Dates read "02 Sept 2026"**, the app's own format, where the boards write "2 Sep 2026".
 - **The pickers carry their label beside a native select** (above it on a phone), as the audit log's do, where the boards draw the label inside the well.
-- **Below 1360px the table's columns take what their words need** and Campaign takes the rest, with 10px gutters for the drawn 14px. The drawn widths add up to more than the plate at 1280, and the table scrolled sideways with Reveal half off its edge. From 1360px the widths and gutters are the board's.
-- **A revealed address is never cut.** Its column widens and Campaign gives the room; a cut campaign is whole in its tooltip and on the record.
-- **Where the filter row has no room for all four pickers beside the search box** (below about 1420px) they go under it together, First seen still against the right edge.
+- **Below 1360px the table's columns take what their words need**, on 10px gutters for the drawn 14px, and **the Campaign column is not drawn**: ten columns do not fit a 1280 window beside the rail, and the campaign is whole on the record. From 1360px the widths and gutters are the board's.
+- **Tags is the column that gives.** It takes what is left and cuts its tag with an ellipsis; the whole tag is a hover away and on the record. A revealed address is never cut: its column widens and Tags gives the room.
+- **The filters are on two rows at every width from `sm`**, as part two draws them: the search box with its hint beside it, then the five pickers, First seen against the right edge.
+- **Tags and notes are built; Delete and Export are not yet** (their own change). Until then the record ends with Notes, and the phone's closing line reads "Open on a larger screen to add a tag or a note."
+- **A tag in the list is its first, with "+2" for the rest**; the board draws one or two and never more.
 - **The phone's figures are 24px**, the type scale's nearest step to the drawn 26px.
 - **Previous and Next are links**, so a page of the list has an address; where there is nowhere to go they are the drawn disabled buttons.
 - **Undrawn states**, in the module's own words: filters that match nobody, figures or a record that could not be read, a record that is no longer there, and part of an address typed into the search (refused in the form, before any lookup is made or recorded).

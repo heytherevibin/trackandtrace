@@ -5,9 +5,9 @@ import { parseLeadFilters } from "@/console/leads/filters";
 import type { LeadDetail, LeadRow } from "@/console/leads/leads";
 import { consoleMessages } from "@/console/messages";
 
-const { push, requestFind, requestReveal, success, error } = vi.hoisted(() => ({ push: vi.fn(), requestFind: vi.fn(), requestReveal: vi.fn(), success: vi.fn(), error: vi.fn() }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push, refresh: () => {} }) }));
-vi.mock("@/console/leads/leads-client", () => ({ requestFind, requestReveal }));
+const { push, refresh, requestFind, requestReveal, requestTag, requestNote, success, error } = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn(), requestFind: vi.fn(), requestReveal: vi.fn(), requestTag: vi.fn(), requestNote: vi.fn(), success: vi.fn(), error: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push, refresh }) }));
+vi.mock("@/console/leads/leads-client", () => ({ requestFind, requestReveal, requestTag, requestNote }));
 vi.mock("@/components/ui/toast", () => ({ notify: { success, error } }));
 
 import { FiguresPlate } from "@/console/leads/figures-plate";
@@ -22,10 +22,10 @@ import { NewsTag } from "@/console/leads/news-tag";
 
 const m = consoleMessages.leads;
 const ASHA = "p:a1111111-1111-4111-8111-111111111111";
-const row = (over: Partial<LeadRow>): LeadRow => ({ id: ASHA, email: "a•••@example.com", news: "subscribed", availability: false, account: "has", source: "footer", campaign: { source: "google", medium: "cpc", name: "diwali-2026" }, firstSeen: "2026-09-02T04:44:00+00:00", lastActivity: "2026-09-18T15:42:00+00:00", ...over });
+const row = (over: Partial<LeadRow>): LeadRow => ({ id: ASHA, email: "a•••@example.com", news: "subscribed", availability: false, account: "has", source: "footer", campaign: { source: "google", medium: "cpc", name: "diwali-2026" }, tags: [], firstSeen: "2026-09-02T04:44:00+00:00", lastActivity: "2026-09-18T15:42:00+00:00", ...over });
 const ROWS = [
-  row({}),
-  row({ id: "p:a2222222-2222-4222-8222-222222222222", email: "m•••@example.org", news: "pending", account: "none", source: "landing", campaign: null }),
+  row({ tags: ["travel-desk"] }),
+  row({ id: "p:a2222222-2222-4222-8222-222222222222", email: "m•••@example.org", news: "pending", account: "none", source: "landing", campaign: null, tags: ["beta", "press", "vip"] }),
   row({ id: "a:c3333333-3333-4333-8333-333333333333", email: "d•••@example.com", news: "none", account: "disabled", source: "account", campaign: null, availability: true }),
 ];
 const DETAIL: LeadDetail = {
@@ -38,15 +38,21 @@ const DETAIL: LeadDetail = {
     { at: "2026-09-09T04:01:00+00:00", kind: "received", list: "news", source: null, subject: "Trakline news: the new look", reason: null },
     { at: "2026-09-02T04:44:00+00:00", kind: "signed_up", list: "news", source: "footer", subject: null, reason: null },
   ],
+  tags: ["travel-desk"],
+  notes: [
+    { id: "b1111111-1111-4111-8111-111111111111", author: "Kiran Das", at: "2026-09-12T11:10:00+00:00", body: "Asked about group bookings. Wrote from [removed]." },
+    { id: "b2222222-2222-4222-8222-222222222222", author: "Asha Rao", at: "2026-09-03T05:35:00+00:00", body: "Came in from the Diwali campaign." },
+  ],
 };
+const TAGS = ["beta", "press", "travel-desk", "vip"];
 const NONE = parseLeadFilters({});
 
-const browser = (over: Partial<Parameters<typeof LeadsBrowser>[0]> = {}) => render(<LeadsBrowser page={{ total: 3, rows: ROWS }} filters={NONE} detail={null} {...over} />);
+const browser = (over: Partial<Parameters<typeof LeadsBrowser>[0]> = {}) => render(<LeadsBrowser page={{ total: 3, rows: ROWS }} filters={NONE} detail={null} tags={TAGS} {...over} />);
 const table = () => screen.getByRole("table", { name: m.table.caption });
 const tableRow = (text: string) => within(table()).getByRole("row", { name: new RegExp(text.replace(/[.•]/g, "\\$&")) });
 
 beforeEach(() => {
-  for (const fn of [push, requestFind, requestReveal, success, error]) fn.mockReset();
+  for (const fn of [push, refresh, requestFind, requestReveal, requestTag, requestNote, success, error]) fn.mockReset();
 });
 
 describe("NewsTag", () => {
@@ -93,7 +99,14 @@ describe("the list", () => {
     expect(within(asha).getByText(m.news.subscribed)).toBeInTheDocument();
     expect(within(asha).getByText(m.account.has)).toBeInTheDocument();
     expect(within(asha).getByText(m.sources.footer)).toBeInTheDocument();
-    expect(within(asha).getByText("google / cpc / diwali-2026")).toBeInTheDocument();
+    // The campaign by its name, with the whole of it a hover away: beside a Tags column there is no
+    // room for source, medium and name (sheet 22, part two).
+    expect(within(asha).getByText("diwali-2026")).toHaveAttribute("title", "google / cpc / diwali-2026");
+    expect(within(asha).getByText("travel-desk")).toBeInTheDocument();
+    const three = tableRow("m•••@example.org");
+    expect(within(three).getByText("beta")).toBeInTheDocument();
+    expect(within(three).getByText("+2")).toHaveAttribute("title", "beta, press, vip");
+    expect(within(three).queryByText("press")).not.toBeInTheDocument();
     const account = tableRow("d•••@example.com");
     expect(within(account).getByText(m.news.none)).toBeInTheDocument();
     expect(within(account).getByText(m.account.disabled)).toBeInTheDocument();
@@ -115,7 +128,9 @@ describe("the list", () => {
     browser();
     const cards = screen.getByRole("list", { name: m.table.caption });
     expect(within(cards).getAllByRole("listitem")).toHaveLength(3);
-    expect(within(cards).getByRole("link", { name: m.table.open("m•••@example.org") })).toBeInTheDocument();
+    const card = within(cards).getByRole("link", { name: m.table.open("m•••@example.org") });
+    // A card has the room the table's column does not: every tag, in full.
+    for (const tag of ["beta", "press", "vip"]) expect(within(card).getByText(tag)).toBeInTheDocument();
     expect(within(cards).queryByRole("button")).not.toBeInTheDocument();
   });
 
@@ -146,6 +161,17 @@ describe("the filters", () => {
     expect(push).toHaveBeenCalledWith("/leads?news=subscribed");
     await userEvent.selectOptions(screen.getAllByLabelText(m.filters.seen)[0]!, "30d");
     expect(push).toHaveBeenCalledWith("/leads?seen=30d");
+  });
+
+  it("offers every tag in use as a filter, and one in the address that nobody carries any more", async () => {
+    const stale = browser({ filters: parseLeadFilters({ tag: "retired" }) });
+    const picker = screen.getAllByLabelText(m.filters.tag)[0] as HTMLSelectElement;
+    expect(Array.from(picker.options).map((o) => o.value)).toEqual(["", "retired", ...TAGS]);
+    expect(picker.value).toBe("retired");
+    stale.unmount();
+    browser();
+    await userEvent.selectOptions(screen.getAllByLabelText(m.filters.tag)[0]!, "press");
+    expect(push).toHaveBeenCalledWith("/leads?tag=press");
   });
 });
 
@@ -250,5 +276,103 @@ describe("the lead's record", () => {
     failed.unmount();
     browser({ detail: "gone", filters: parseLeadFilters({ lead: ASHA }) });
     expect(within(screen.getByRole("dialog", { name: m.record.title })).getByText(m.record.gone)).toBeInTheDocument();
+  });
+});
+
+describe("tags on the record", () => {
+  const open = () => {
+    browser({ detail: DETAIL, filters: parseLeadFilters({ lead: ASHA }) });
+    return screen.getByRole("dialog", { name: m.record.title });
+  };
+  const addTag = async (record: HTMLElement, text: string) => {
+    await userEvent.type(within(record).getByRole("combobox", { name: m.record.addTag }), text);
+    await userEvent.click(within(record).getByRole("button", { name: m.record.add }));
+  };
+
+  it("adds a tag, lowered, and shows the lead's tags as the server answered them", async () => {
+    requestTag.mockResolvedValue({ kind: "done", tags: ["press", "travel-desk"] });
+    const record = open();
+    await addTag(record, " Press ");
+    expect(requestTag).toHaveBeenCalledWith(ASHA, "press");
+    expect(within(record).getByRole("button", { name: m.record.removeTag("press") })).toBeInTheDocument();
+    expect(within(record).getByRole("combobox", { name: m.record.addTag })).toHaveValue("");
+    // The list behind the record carries tags too, and so does the Tag filter: both are re-read.
+    expect(refresh).toHaveBeenCalled();
+  });
+
+  it("refuses what is not a tag in the form's own words, without a request", async () => {
+    const record = open();
+    await addTag(record, "two words");
+    expect(within(record).getByRole("alert")).toHaveTextContent(m.errors.notTag);
+    expect(requestTag).not.toHaveBeenCalled();
+  });
+
+  it("removes a tag", async () => {
+    requestTag.mockResolvedValue({ kind: "done", tags: [] });
+    const record = open();
+    await userEvent.click(within(record).getByRole("button", { name: m.record.removeTag("travel-desk") }));
+    expect(requestTag).toHaveBeenCalledWith(ASHA, "travel-desk", true);
+    expect(within(record).queryByText("travel-desk")).not.toBeInTheDocument();
+    expect(within(record).getByText(m.record.noTags)).toBeInTheDocument();
+  });
+
+  it("says why a tag was refused, and leaves the tags as they were", async () => {
+    requestTag.mockResolvedValue({ kind: "failed", message: m.errors.tooManyTags });
+    const record = open();
+    await addTag(record, "press");
+    expect(error).toHaveBeenCalledWith(m.errors.tooManyTags);
+    expect(within(record).getByRole("button", { name: m.record.removeTag("travel-desk") })).toBeInTheDocument();
+    expect(within(record).queryByRole("button", { name: m.record.removeTag("press") })).not.toBeInTheDocument();
+  });
+});
+
+describe("notes on the record", () => {
+  const open = (detail: LeadDetail = DETAIL) => {
+    browser({ detail, filters: parseLeadFilters({ lead: ASHA }) });
+    return screen.getByRole("dialog", { name: m.record.title });
+  };
+
+  it("lists the notes, each signed and dated, and says when there are none", () => {
+    const record = open();
+    const notes = within(within(record).getByRole("list", { name: m.record.notes })).getAllByRole("listitem");
+    expect(notes).toHaveLength(2);
+    expect(notes[0]).toHaveTextContent(/^Kiran Das · 12 Sept? 2026, 16:40 ISTAsked about group bookings\. Wrote from \[removed\]\.$/);
+    expect(notes[1]).toHaveTextContent("Came in from the Diwali campaign.");
+  });
+
+  it("says there are no notes yet", () => {
+    const record = open({ ...DETAIL, notes: [] });
+    expect(within(record).getByText(m.record.noNotes)).toBeInTheDocument();
+    expect(within(record).queryByRole("list", { name: m.record.notes })).not.toBeInTheDocument();
+  });
+
+  it("adds a note and shows it as the database stored it, not as it was typed", async () => {
+    const stored = { id: "b3333333-3333-4333-8333-333333333333", author: "Asha Rao", at: "2026-09-19T09:02:00+00:00", body: "Rang back from [removed]." };
+    requestNote.mockResolvedValue({ kind: "done", notes: [stored, ...DETAIL.notes] });
+    const record = open();
+    const box = within(record).getByRole("textbox", { name: m.record.addNote });
+    await userEvent.type(box, "Rang back from someone@example.com.");
+    await userEvent.click(within(record).getByRole("button", { name: m.record.addNoteButton }));
+    expect(requestNote).toHaveBeenCalledWith(ASHA, "Rang back from someone@example.com.");
+    expect(within(record).getByText("Rang back from [removed].")).toBeInTheDocument();
+    expect(within(record).queryByText(/someone@example\.com/)).not.toBeInTheDocument();
+    expect(box).toHaveValue("");
+  });
+
+  it("refuses an empty note in the form's own words, without a request", async () => {
+    const record = open();
+    await userEvent.click(within(record).getByRole("button", { name: m.record.addNoteButton }));
+    expect(within(record).getByRole("alert")).toHaveTextContent(m.errors.emptyNote);
+    expect(requestNote).not.toHaveBeenCalled();
+  });
+
+  it("says why a note was not kept, and keeps what was typed", async () => {
+    requestNote.mockResolvedValue({ kind: "failed", message: m.errors.database });
+    const record = open();
+    const box = within(record).getByRole("textbox", { name: m.record.addNote });
+    await userEvent.type(box, "A note worth keeping.");
+    await userEvent.click(within(record).getByRole("button", { name: m.record.addNoteButton }));
+    expect(error).toHaveBeenCalledWith(m.errors.database);
+    expect(box).toHaveValue("A note worth keeping.");
   });
 });

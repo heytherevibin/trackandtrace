@@ -363,6 +363,7 @@ export type Database = {
       }
       console_lead: { Args: { p_id: string }; Returns: Json }
       console_lead_figures: { Args: never; Returns: Json }
+      console_lead_tags: { Args: never; Returns: Json }
       console_leads: {
         Args: {
           p_account?: string
@@ -371,6 +372,7 @@ export type Database = {
           p_offset?: number
           p_since?: string
           p_source?: string
+          p_tag?: string
         }
         Returns: Json
       }
@@ -388,6 +390,10 @@ export type Database = {
       console_me: { Args: never; Returns: Json }
       console_my_keys: { Args: never; Returns: Json }
       console_my_sessions: { Args: never; Returns: Json }
+      console_note_lead: {
+        Args: { p_body: string; p_environment: string; p_id: string }
+        Returns: Json
+      }
       console_queue_letter: {
         Args: { p_environment: string; p_letter: string }
         Returns: number
@@ -451,6 +457,10 @@ export type Database = {
         Returns: undefined
       }
       console_suppressions: { Args: never; Returns: Json }
+      console_tag_lead: {
+        Args: { p_environment: string; p_id: string; p_tag: string }
+        Returns: Json
+      }
       console_team: { Args: never; Returns: Json }
       console_unblock_address: {
         Args: {
@@ -460,6 +470,10 @@ export type Database = {
           p_value: string
         }
         Returns: undefined
+      }
+      console_untag_lead: {
+        Args: { p_environment: string; p_id: string; p_tag: string }
+        Returns: Json
       }
       subscriptions_confirm: { Args: { p_token_hash: string }; Returns: Json }
       subscriptions_peek: { Args: { p_token_hash: string }; Returns: Json }

@@ -27,7 +27,7 @@ import { POST as reveal } from "@/app/console/api/leads/reveal/route";
 
 const SUPPORT: ConsoleMember = { userId: "a0000000-0000-4000-8000-000000000001", email: "kiran@trakline.in", name: "Kiran Das", role: "support", status: "active" };
 const ID = "p:a1111111-1111-4111-8111-111111111111";
-const ROW = { id: ID, email: "a•••@example.com", news: "subscribed", availability: false, account: "has", source: "footer", campaign: null, firstSeen: "2026-09-02T04:44:00+00:00", lastActivity: "2026-09-18T15:42:00+00:00" };
+const ROW = { id: ID, email: "a•••@example.com", news: "subscribed", availability: false, account: "has", source: "footer", campaign: null, tags: [], firstSeen: "2026-09-02T04:44:00+00:00", lastActivity: "2026-09-18T15:42:00+00:00" };
 const m = consoleMessages.leads;
 
 function post(path: string, body: unknown, origin = "https://admin.trakline.in"): Request {
