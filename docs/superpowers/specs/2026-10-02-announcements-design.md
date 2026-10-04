@@ -133,7 +133,7 @@ A `sendToAddress` wrapper checks suppression and then calls `sendEmail`. What st
 
 Every transition writes to module 14: queued, test sent, stopped, suppression lifted by hand.
 
-**Sheet 23 "Console Announcements" has never been drawn.** It must be drawn and approved before the console half is built — the gate B4 had for the forms.
+**Sheet 23 "Console Announcements" was drawn on 2 Oct 2026 and approved on 4 Oct 2026** (`docs/design/sheets/console/ConsoleAnnouncements.dc.html` and `ConsoleAnnouncementsPhone.dc.html`; the review decisions are in that folder's README). The console half is transcribed from it.
 
 ## 6. Failure behaviour
 

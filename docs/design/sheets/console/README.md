@@ -49,7 +49,7 @@ Approved as drawn. These choices made in the drawing are now the spec:
 
 ## B4
 
-Drawn on 2 Oct 2026, **for approval**. Nothing is built from these until the owner approves them; the console's pages (announcements PR 3) are then transcribed 1:1. Same frame, same `industry.css`, no new classes. The sample world is the other console sheets': Saturday 19 Sep 2026, 14:32 IST.
+Drawn on 2 Oct 2026 and **approved on 4 Oct 2026**, as drawn. The console's pages (announcements PR 3) are transcribed from these files 1:1. Same frame, same `industry.css`, no new classes. The sample world is the other console sheets': Saturday 19 Sep 2026, 14:32 IST.
 
 | File | Sheet | States (props) |
 |---|---|---|
@@ -63,3 +63,13 @@ Drawn on 2 Oct 2026, **for approval**. Nothing is built from these until the own
 - **Letter states.** A letter is `draft`, `queued`, `sending`, `stopped` or `done`. The board draws four; `queued` is not drawn. It is the state from Queue until the letter's first claim, and, because one letter drains at a time, also the state of a letter waiting behind another. PR 3 labels it **Queued** with the light lamp (the Draft lamp is hollow, Sending half, Stopped ringed, Done lit), shows its progress as `Sent 0 · Skipped 0 · Unknown 0 of N` and, on its detail, "Starts when the letter ahead finishes" with the estimate; Stop is offered, as for Sending.
 - **On a phone** the console is for reading plus urgent actions: Compose is a read-only view of the draft ("Open on a larger screen to edit this draft, send a test or queue it"), Suppressions has no Lift, and Stop with its confirm is fully available, as a bottom sheet. Queue confirm and Lift confirm are desktop only.
 - **No access** is drawn as Support opening the module; Viewer sees the same with its own role name.
+
+### Decided at the B4 review (4 Oct 2026)
+
+Approved as drawn, from all 46 rendered states (both boards, Day and Night, Owner and Admin). These choices made in the drawing are now the spec:
+- **Stop works on a phone.** The September brief made the phone view read-only. Writing, test sends, Queue and Lift stay on a larger screen; Stop and its confirm are available at 390, because stopping is the urgent action.
+- **Lift needs Reveal first.** A masked row shows Lift disabled until the address is revealed.
+- **Queued is built from the note above, not from a board**: the label "Queued" with the light lamp, `Sent 0 · Skipped 0 · Unknown 0 of N`, "Starts when the letter ahead finishes", and Stop.
+- The Compose board's sample body ("We write about once a month.") is sample text and stays. It is not product copy: the news sign-up promises no frequency, and nothing in the console may state one.
+
+The backend (PR #115) has no function for lifting a suppression, no audited reveal and no test send that records itself. PR 3 adds all three.
