@@ -185,7 +185,10 @@ export function LeadDrawer({
                 <BaseDialog.Close render={<IconButton className="max-sm:size-11" label={messages.common.close} icon={<DismissRegular className="size-5" aria-hidden="true" />} size="sm" />} />
               </span>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            {/* A stop of its own for a keyboard, as DataTable's scroller is. Until the address is
+                revealed the Reveal button is in here and focus can reach it; afterwards nothing in
+                it takes focus, and a record taller than the window could not be scrolled by keys. */}
+            <div role="region" aria-label={r.details} tabIndex={0} className="min-h-0 flex-1 overflow-y-auto">
               {record === null ? (
                 <p role={detail === "unavailable" ? "alert" : "status"} className="px-5 py-4 text-sm max-sm:px-4">
                   {detail === "unavailable" ? r.unavailable : r.gone}

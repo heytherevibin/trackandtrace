@@ -225,6 +225,19 @@ describe("the lead's record", () => {
     expect(within(record).queryByRole("button", { name: /Reveal/ })).not.toBeInTheDocument();
   });
 
+  // Found by the real-browser run: once the address is revealed nothing in the record's scrolling
+  // part takes focus, so a keyboard had no way to scroll it. The part itself is the stop.
+  it("lets a keyboard reach the record's scrolling part, whether or not Reveal is still in it", async () => {
+    requestReveal.mockResolvedValue({ kind: "done", address: "asha.verma@example.com" });
+    browser({ detail: DETAIL, filters: parseLeadFilters({ lead: ASHA }) });
+    const record = screen.getByRole("dialog", { name: m.record.title });
+    const body = within(record).getByRole("region", { name: m.record.details });
+    expect(body).toHaveAttribute("tabindex", "0");
+    expect(within(body).getByText(m.record.timeline)).toBeInTheDocument();
+    await userEvent.click(within(record).getByRole("button", { name: m.table.revealLabel("a•••@example.com") }));
+    expect(within(record).getByRole("region", { name: m.record.details })).toHaveAttribute("tabindex", "0");
+  });
+
   it("closes to the same list, with the lead gone from the address", async () => {
     browser({ detail: DETAIL, filters: parseLeadFilters({ lead: ASHA, news: "subscribed" }) });
     await userEvent.click(within(screen.getByRole("dialog", { name: m.record.title })).getByRole("button", { name: "Close" }));

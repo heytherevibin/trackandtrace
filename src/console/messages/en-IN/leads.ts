@@ -90,6 +90,8 @@ export const leads = {
 
   record: {
     title: "Lead",
+    /** Undrawn: the name of the record's scrolling part, for a keyboard and a screen reader. */
+    details: "Lead details",
     firstSeen: (date: string) => `First seen ${date}`,
     revealed: "Revealed for this visit, and written to the audit log.",
     subscriptions: "Subscriptions",
