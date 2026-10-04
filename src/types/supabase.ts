@@ -348,12 +348,29 @@ export type Database = {
         Args: { p_environment: string; p_letter: string }
         Returns: undefined
       }
+      console_find_lead: {
+        Args: { p_email: string; p_environment: string }
+        Returns: Json
+      }
       console_invite_member: {
         Args: {
           p_email: string
           p_environment: string
           p_reason: string
           p_role: string
+        }
+        Returns: Json
+      }
+      console_lead: { Args: { p_id: string }; Returns: Json }
+      console_lead_figures: { Args: never; Returns: Json }
+      console_leads: {
+        Args: {
+          p_account?: string
+          p_limit?: number
+          p_news?: string
+          p_offset?: number
+          p_since?: string
+          p_source?: string
         }
         Returns: Json
       }
@@ -394,6 +411,10 @@ export type Database = {
       console_reset_keys: {
         Args: { p_environment: string; p_member: string; p_reason: string }
         Returns: number
+      }
+      console_reveal_lead: {
+        Args: { p_environment: string; p_id: string }
+        Returns: string
       }
       console_reveal_suppression: {
         Args: { p_environment: string; p_id: string }

@@ -166,13 +166,13 @@ describe("today's reality: the rail and its phone trigger render for an Owner an
     expect(railFor("viewer", CONSOLE_MODULES).length > 0).toBe(true);
   });
 
-  // Support signed in to nothing until 01 Overview, which every role may open. Its own three —
-  // 06 Leads, 09 Privacy requests, 10 Wrong-status reports — are still unbuilt, so Overview is the
-  // whole of its rail.
-  it("is true for a Support member too, with Overview the only row in it", () => {
+  // Support signed in to nothing until 01 Overview, which every role may open. 06 Leads joined on
+  // 2026-10-04, the first module that is that role's own; its two queues — 09 Privacy requests,
+  // 10 Wrong-status reports — are still unbuilt.
+  it("is true for a Support member too, with Overview and Leads in it", () => {
     for (const role of ROLES.filter((r) => r === "support")) {
       expect(railFor(role).length > 0, role).toBe(true);
-      expect(railFor(role, CONSOLE_MODULES).flatMap((g) => g.modules.map((mod) => mod.num)), role).toEqual(["01"]);
+      expect(railFor(role, CONSOLE_MODULES).flatMap((g) => g.modules.map((mod) => mod.num)), role).toEqual(["01", "06"]);
     }
   });
 
@@ -202,11 +202,13 @@ describe("today's reality: the rail and its phone trigger render for an Owner an
   // group is rendered, and rendered SHORT — which is the case that would have hidden a bug where a
   // group's presence was inferred from the Owner's copy of it rather than this role's.
   // 07 Announcements joined on 2026-10-04, the first built module in People: Owner and Admin.
+  // 06 Leads joined it on 2026-10-04, above it, as the sheet's map orders the group.
   it("gives an Admin Operate, People, Configure and Record, with Team absent from Configure", () => {
     render(<ConsoleRail groups={railFor("admin")} />);
     const rail = screen.getByRole("navigation", { name: "Console" });
     expect(within(rail).getByText("Operate")).toBeVisible();
     expect(within(rail).getByText("People")).toBeVisible();
+    expect(within(rail).getByRole("link", { name: /Leads/ })).toHaveAttribute("href", "/leads");
     expect(within(rail).getByRole("link", { name: /Announcements/ })).toHaveAttribute("href", "/announcements");
     expect(within(rail).getByText("Record")).toBeVisible();
     expect(within(rail).getByText("Configure")).toBeVisible();
@@ -215,7 +217,7 @@ describe("today's reality: the rail and its phone trigger render for an Owner an
     expect(within(rail).getByRole("link", { name: /Sources/ })).toHaveAttribute("href", "/sources");
     expect(within(rail).getByRole("link", { name: /Abuse/ })).toHaveAttribute("href", "/abuse");
     expect(within(rail).getByRole("link", { name: /Switches/ })).toHaveAttribute("href", "/settings");
-    expect(within(rail).getAllByRole("link")).toHaveLength(6);
+    expect(within(rail).getAllByRole("link")).toHaveLength(7);
   });
 });
 
