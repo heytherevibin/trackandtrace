@@ -182,6 +182,8 @@ describe("the window-seat run (J6-7, J6-8)", () => {
       window.dispatchEvent(new Event(LAYOUT_EVENT));
     };
 
+    const anchoring = () => document.documentElement.style.getPropertyValue("overflow-anchor");
+
     /** The times its station was brought back to the window since the Tab's own glide. */
     const retakes = () => vi.mocked(window.scrollTo).mock.calls.filter((call) => JSON.stringify(call) === '[{"top":700}]').length;
 
@@ -382,6 +384,39 @@ describe("the window-seat run (J6-7, J6-8)", () => {
       expect(run.classList.contains("is-running")).toBe(true);
       expect(window.scrollTo).not.toHaveBeenCalled();
       stop();
+    });
+
+    // WebKit's scroll anchoring follows a row its section's entrance is lifting, and so ends the glide with nothing for
+    // the page to hear (focus-glide.test.tsx): held off while the run's watch holds the Tab's glide.
+    it("holds scroll anchoring off from the Tab until the page has held still for ten frames, then gives it back", () => {
+      vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
+      lay(200);
+      const stop = startRun(testContext());
+      expect(anchoring()).toBe("");
+      tab(watchlist());
+      expect(anchoring()).toBe("none");
+      window.dispatchEvent(new Event("scroll")); // the glide's first
+      frames(5);
+      expect(anchoring()).toBe("none");
+      frames(10);
+      expect(anchoring()).toBe("");
+      stop();
+    });
+
+    it("gives scroll anchoring back as the reader takes the scroll, and when the journey ends mid-glide", () => {
+      vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
+      lay(200);
+      const stop = startRun(testContext());
+      const link = watchlist();
+      tab(link);
+      expect(anchoring()).toBe("none");
+      window.dispatchEvent(new PointerEvent("pointerdown"));
+      expect(anchoring()).toBe("");
+      link.blur();
+      tab(link);
+      expect(anchoring()).toBe("none");
+      stop();
+      expect(anchoring()).toBe("");
     });
 
     it("lets go on the reader's own scroll: a press of the pointer", () => {

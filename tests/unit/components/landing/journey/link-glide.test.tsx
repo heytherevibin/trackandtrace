@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { startFocusGlide } from "@/components/landing/journey/focus-glide";
-import { at, frames, glide, jump, policy, relayout, reveal, tabOnto, setUpGlideRig } from "./focus-glide-rig";
+import { at, frames, glide, jump, relayout, reveal, setUpGlideRig } from "./focus-glide-rig";
 import { testContext } from "./journey-context";
 
 setUpGlideRig();
@@ -391,17 +391,6 @@ describe("an in-page link's glide", () => {
     jump();
     frames(3);
     expect(reveal).not.toHaveBeenCalled();
-    stop();
-  });
-
-  it("leaves a Tab's glide as it was: scroll anchoring stays the browser's", () => {
-    const stop = startFocusGlide(testContext());
-    const set = vi.spyOn(document.documentElement.style, "setProperty");
-    tabOnto(policy());
-    jump();
-    frames(3);
-    expect(reveal).toHaveBeenCalledWith({ block: "center", inline: "nearest" });
-    expect(set).not.toHaveBeenCalledWith("overflow-anchor", "none");
     stop();
   });
 
