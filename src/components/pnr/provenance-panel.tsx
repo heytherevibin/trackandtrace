@@ -25,7 +25,7 @@ export function ProvenancePanel({
     <Plate title={m.legend} titleId="provenance-title" headingLevel={2} cells="tight" padding="none" className={className}>
       <Timeline
         label={m.legend}
-        className="p-5"
+        className="p-[20px]"
         steps={[
           { id: "input", title: m.steps.input, detail: m.details.input(formatPnr(pnr)), state: "done" },
           { id: "validate", title: m.steps.validate, detail: m.details.validate, state: "done" },

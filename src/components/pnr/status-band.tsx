@@ -30,7 +30,7 @@ export function StatusBand({ result, cached, className }: { readonly result: Pnr
       bodyClassName="flex flex-col gap-3.5"
     >
       <ResultTagRow tag={label} source={s.source} pnr={s.pnr} status={result.lead.status} />
-      <p className="font-display text-4xl font-semibold uppercase tracking-display" data-testid="result-status">
+      <p className="font-display status-fit font-semibold uppercase tracking-display" data-testid="result-status">
         {label}
       </p>
       <p className="text-sm text-ink-1/78">{statusDescription(result.lead.status)}</p>

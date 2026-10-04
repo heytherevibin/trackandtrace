@@ -123,7 +123,7 @@ export function PnrResultView({ pnr, initial }: { readonly pnr: string; readonly
         actions={<ResultActions refreshing={refreshing} onRefresh={() => void refresh()} onShare={() => void share()} saved={saved} saving={saving} onToggleSave={() => void toggleSave()} />}
       />
       <StatusBand className="mt-8" result={result} cached={cached} />
-      <div className="mt-[28px] grid items-start gap-[28px] lg:grid-cols-[1.25fr_.75fr]">
+      <div className="mt-[28px] grid grid-cols-[minmax(0,1fr)] items-start gap-[28px] lg:grid-cols-[minmax(0,1.25fr)_minmax(0,.75fr)]">
         <PassengerTable pax={s.pax} />
         <JourneyDetails snapshot={s} quota={result.lead.quota} />
       </div>

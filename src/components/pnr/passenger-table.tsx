@@ -1,4 +1,5 @@
 import { Plate } from "@/components/ui/plate";
+import { ScrollRegion } from "@/components/ui/scroll-region";
 import { STACKED_ROLES as R, stackedTable } from "@/components/ui/stacked-table";
 import { messages } from "@/messages";
 import type { PassengerSeat, TicketStatus } from "@/types/domain";
@@ -7,7 +8,11 @@ import { cn } from "@/utils/cn";
 // The terminal's passenger table on a plate of its own: 11px capital heads, 14px
 // cells on hairline rows, the current status in the heavier weight. Outer cells
 // sit on the header's 20px edge; inner gutters keep the drawn 14px. On a phone each passenger folds
-// into a record: the passenger across the top, booked, current, and coach · berth labelled beneath.
+// into a record: the passenger across the top, booked, current, and coach · berth labelled beneath, side by side while
+// the plate is 13rem wide (always, as drawn: 238px at its narrowest) and one under another when larger text makes it
+// narrower than that. From sm the table is a table; where it is wider than its plate (text at 200%), it scrolls in a
+// named region a reader can reach (ScrollRegion). The region's name is the check plate's caption for the same table
+// ("Passengers on this booking"), not the plate's own heading: two landmarks with one name tell a reader nothing apart.
 
 const S = stackedTable("sm");
 const EDGE = "px-3.5 first:pl-5 last:pr-5";
@@ -25,7 +30,7 @@ export function PassengerTable({ pax, className }: { readonly pax: readonly Pass
   const m = messages.result.passengers;
   return (
     <Plate title={m.legend} titleId="passengers-title" headingLevel={2} meta={[m.count(pax.length)]} cells="tight" padding="none" className={className}>
-      <div className="overflow-x-auto">
+      <ScrollRegion name="passengers" label={messages.check.result.passengers.caption} className="@container">
         <table role={R.table} className={cn("tnum w-full border-collapse text-sm", S.table)} aria-labelledby="passengers-title">
           <thead role={R.rowgroup} className={S.head}>
             <tr role={R.row}>
@@ -45,7 +50,7 @@ export function PassengerTable({ pax, className }: { readonly pax: readonly Pass
           </thead>
           <tbody role={R.rowgroup} className={S.body}>
             {pax.map((p) => (
-              <tr key={p.index} role={R.row} className={cn(S.row, "max-sm:grid-cols-3")}>
+              <tr key={p.index} role={R.row} className={cn(S.row, "max-sm:grid-cols-3 @max-[13rem]:grid-cols-1")}>
                 <td role={R.cell} className={cn(CELL, S.wide, "whitespace-nowrap max-sm:font-semibold")}>
                   {m.nth(p.index)}
                 </td>
@@ -62,7 +67,7 @@ export function PassengerTable({ pax, className }: { readonly pax: readonly Pass
             ))}
           </tbody>
         </table>
-      </div>
+      </ScrollRegion>
     </Plate>
   );
 }

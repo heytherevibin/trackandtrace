@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { Button, buttonClassName } from "@/components/ui/button";
 import { Corners } from "@/components/ui/corners";
 import { PLATE_TITLE_STACK, plateCellClass } from "@/components/ui/plate";
+import { ScrollRegion } from "@/components/ui/scroll-region";
 import { STACKED_ROLES as R, stackedTable } from "@/components/ui/stacked-table";
 import { messages } from "@/messages";
 import type { WatchlistEntry } from "@/types/domain";
@@ -37,7 +38,7 @@ export function SavedPlate({
     <div className="blueprint mt-4">
       <Corners />
       <div className="flex flex-wrap items-stretch border-b border-line">
-        <span id={TITLE_ID} className={`${HEAD_CELL} min-w-[14ch] flex-1 ${sampleData ? PLATE_TITLE_STACK : ""}`}>
+        <span id={TITLE_ID} className={`${HEAD_CELL} min-w-[min(14ch,100%)] flex-1 ${sampleData ? PLATE_TITLE_STACK : ""}`}>
           {title}
         </span>
         {sampleData ? (
@@ -46,7 +47,7 @@ export function SavedPlate({
           </span>
         ) : null}
       </div>
-      <div className="overflow-x-auto">
+      <ScrollRegion name="watchlist" labelledBy={TITLE_ID}>
         <table role={R.table} aria-labelledby={TITLE_ID} className={`w-full border-collapse text-body leading-normal lg:min-w-[720px] ${S.table}`}>
           <thead role={R.rowgroup} className={S.head}>
             <tr role={R.row}>
@@ -73,7 +74,7 @@ export function SavedPlate({
             ))}
           </tbody>
         </table>
-      </div>
+      </ScrollRegion>
     </div>
   );
 }

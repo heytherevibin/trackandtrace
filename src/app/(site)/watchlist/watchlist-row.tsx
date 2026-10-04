@@ -36,7 +36,7 @@ export function WatchlistRow({ entry, busy, onRecheck, onRemove }: WatchlistRowP
   return (
     <tr role={R.row} className={`${S.row} max-lg:grid-cols-2`}>
       <td role={R.cell} className={`${CELL} ${S.wide} font-data text-base leading-normal tracking-wide`}>
-        <Link href={pnrHref(entry.pnr)} className="text-ink-1 no-underline hover:text-ink-1 hover:underline">
+        <Link href={pnrHref(entry.pnr)} className="tap-44 inline-block text-ink-1 no-underline hover:text-ink-1 hover:underline">
           {pnr}
         </Link>
       </td>
@@ -68,7 +68,8 @@ export function WatchlistRow({ entry, busy, onRecheck, onRemove }: WatchlistRowP
           <span className={META}>{m.checksCount(0)}</span>
         )}
       </td>
-      <td role={R.cell} className={`${CELL} ${S.wide} whitespace-nowrap text-right max-lg:text-left`}>
+      {/* One line as a table's cell; as a record's last row the two wrap, where larger text leaves no room for both. */}
+      <td role={R.cell} className={`${CELL} ${S.wide} whitespace-nowrap text-right max-lg:whitespace-normal max-lg:text-left`}>
         <Button variant="secondary" className="mr-2" aria-busy={busy || undefined} onClick={() => onRecheck(entry.pnr)} data-testid="watchlist-recheck">
           {busy ? m.checking : m.recheck}
           <span className="sr-only"> {pnr}</span>

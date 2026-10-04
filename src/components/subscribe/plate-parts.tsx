@@ -5,7 +5,7 @@ export const TEXT = "m-0 text-base text-ink-1/78";
 export const NOTE = "mt-3 m-0 text-sm text-ink-1/70";
 
 const BUTTON =
-  "press relative inline-flex cursor-pointer select-none items-center justify-center gap-1.5 whitespace-nowrap border font-display font-semibold no-underline disabled:cursor-not-allowed disabled:opacity-45 aria-disabled:cursor-not-allowed aria-disabled:opacity-45 px-[12.24px] py-[6.8px] text-sm leading-[1.2] border-accent-strong bg-accent-strong text-accent-ink hover:bg-accent-strong-hover active:bg-accent-strong-active w-full mt-[6.8px] h-11";
+  "press relative inline-flex cursor-pointer select-none items-center justify-center gap-1.5 max-w-full shrink-0 whitespace-normal border font-display font-semibold no-underline disabled:cursor-not-allowed disabled:opacity-45 aria-disabled:cursor-not-allowed aria-disabled:opacity-45 px-[12.24px] py-[6.8px] text-sm leading-[1.2] border-accent-strong bg-accent-strong text-accent-ink hover:bg-accent-strong-hover active:bg-accent-strong-active w-full mt-[6.8px] h-11";
 
 /** A message the page states about itself: a result, a refusal, or a failure. */
 export function Status({ children }: { readonly children: string }) {

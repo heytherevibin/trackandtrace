@@ -12,7 +12,8 @@ export type PlatePadding = "none" | "sm" | "md" | "lg";
 export type PlateCells = "tight" | "regular" | "wide";
 
 const PAD: Record<PlatePadding, string> = { none: "", sm: "p-4", md: "p-5", lg: "p-6" };
-const MIN_CH = { 12: "min-w-[12ch]", 14: "min-w-[14ch]", 16: "min-w-[16ch]" } as const;
+// Never wider than the plate itself: with the text at 200% in a 280px window, 16ch of a title is wider than the page.
+const MIN_CH = { 12: "min-w-[min(12ch,100%)]", 14: "min-w-[min(14ch,100%)]", 16: "min-w-[min(16ch,100%)]" } as const;
 const CELL: Record<PlateCells, string> = { tight: "px-5 py-2.5", regular: "px-5 py-3", wide: "px-6 py-3" };
 
 /** Below sm a title that has cells beside it takes the header's whole first row, never squeezed by them. */

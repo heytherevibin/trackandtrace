@@ -13,7 +13,7 @@ export function Skeleton({
   return (
     <span
       aria-hidden="true"
-      className={cn("skeleton block", variant === "text" && "h-4 w-full", variant === "rect" && "h-8 w-full", variant === "circle" && "size-10 rounded-full", className)}
+      className={cn("skeleton block max-w-full", variant === "text" && "h-4 w-full", variant === "rect" && "h-8 w-full", variant === "circle" && "size-10 rounded-full", className)}
     />
   );
 }

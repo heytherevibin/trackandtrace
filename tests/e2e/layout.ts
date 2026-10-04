@@ -7,9 +7,40 @@ import type { Page } from "@playwright/test";
  * (overflow-x: clip, never a scroller) and lies inside the window; everything else in and around it is measured as ever. */
 const CARRIED = ["#run.is-running > .run-pin"] as const;
 
+/** Drawings behind the page's words that the page clips at its own edge, by design and at every text size: the hero's
+ * dial (journey.css: wider than its column, `main` clips it "as v3 does"), announced to nobody (aria-hidden) and
+ * answering no pointer. Such a drawing is not content a reader loses: it is left out of "past the edge", and the box
+ * that clips it is measured without it, so real content that box hides is still found. */
+const DRAWN_BEHIND = [".hero-dial"] as const;
+
+/** A reader's own scroller (WCAG 1.4.10's exception for a table that cannot reflow): one of the site's three named
+ * scroll regions (scroll-region.tsx), and only from the width where its table is a table. Below that width the same
+ * table is stacked records and must fit; there, and anywhere else, a scroller is a break, at any text size:
+ * - passengers: the /pnr record's passenger table, from sm (40rem);
+ * - availability: /pre-booking's date table, from sm (40rem);
+ * - watchlist: /watchlist's saved-PNR table, from lg (64rem).
+ * The landing has none. The width is a media query in rem, as the tables' own breakpoints are. */
+const READERS_SCROLLERS = { passengers: "40rem", availability: "40rem", watchlist: "64rem" } as const;
+
+/** Every scroll region on the page has measured itself, and says what is so: `data-scrolls` is "yes" exactly where the
+ * region's content is wider than it. A region names itself in a ResizeObserver's callback and the commit after it, so
+ * a reading taken before that sees an unnamed box that hides its content. A state to wait for, never a time. */
+export async function scrollRegionsSettled(page: Page): Promise<void> {
+  await page.waitForFunction(
+    () =>
+      [...document.querySelectorAll<HTMLElement>("[data-scroll-region]")].every((el) => {
+        const scrolls = el.scrollWidth > el.clientWidth + 1;
+        return el.dataset.scrolls === (scrolls ? "yes" : "no") && (!scrolls || el.getAttribute("role") === "region");
+      }),
+    undefined,
+    { timeout: 10_000 },
+  );
+}
+
 /** Describes everything that breaks the phone layout on the current page; empty when it fits. */
 export async function layoutBreaks(page: Page): Promise<string[]> {
-  return page.evaluate((carried) => {
+  await scrollRegionsSettled(page);
+  return page.evaluate(({ carried, behind, scrollers }) => {
     const vw = document.documentElement.clientWidth;
     const name = (el: Element) => {
       const text = (el.textContent ?? "").trim().replace(/\s+/g, " ").slice(0, 32);
@@ -40,19 +71,47 @@ export async function layoutBreaks(page: Page): Promise<string[]> {
       const box = stage.getBoundingClientRect();
       return box.left >= -1 && box.right <= vw + 1 ? stage : null;
     };
+    /** `el` is a reader's own scroller: named, in the Tab order, one of the listed regions at a width it is listed for. */
+    const isScroller = (el: Element) => {
+      if (!(el instanceof HTMLElement) || !el.matches('[data-scroll-region][role="region"][tabindex="0"]:is([aria-label], [aria-labelledby])')) return false;
+      const from = (scrollers as Record<string, string | undefined>)[el.dataset.scrollRegion ?? ""];
+      return from !== undefined && window.matchMedia(`(min-width: ${from})`).matches && ["auto", "scroll"].includes(getComputedStyle(el).overflowX);
+    };
+    /** The reader's scroller `el` lies inside, while that scroller stands inside the window. */
+    const scrollerOf = (el: Element) => {
+      for (let region = el.parentElement?.closest("[data-scroll-region]") ?? null; region; region = region.parentElement?.closest("[data-scroll-region]") ?? null) {
+        if (!isScroller(region)) continue;
+        const box = region.getBoundingClientRect();
+        if (box.left >= -1 && box.right <= vw + 1) return region;
+      }
+      return null;
+    };
+    /** How far `el`'s content runs past its box, the drawings behind the page taken out for the reading. */
+    const hidden = (el: Element) => {
+      const drawn = [...el.querySelectorAll<HTMLElement>(behind.join(", "))];
+      if (drawn.length === 0) return el.scrollWidth - el.clientWidth;
+      const was = drawn.map((d) => d.style.display);
+      for (const d of drawn) d.style.display = "none";
+      const over = el.scrollWidth - el.clientWidth;
+      for (const [i, d] of drawn.entries()) d.style.display = was[i] ?? "";
+      return over;
+    };
     const breaks: string[] = [];
     if (document.documentElement.scrollWidth > vw) breaks.push(`page scrolls sideways: ${document.documentElement.scrollWidth}px in ${vw}px`);
     for (const el of document.body.querySelectorAll("*")) {
-      if (!shown(el)) continue;
+      if (!shown(el) || el.closest(behind.join(", "))) continue;
       const stage = stageOf(el);
       const box = el.getBoundingClientRect();
-      if ((box.right > vw + 1 || box.left < -1) && !(stage && stage !== el)) breaks.push(`past the edge [${Math.round(box.left)}, ${Math.round(box.right)}]: ${name(el)}`);
+      if ((box.right > vw + 1 || box.left < -1) && !(stage && stage !== el) && !scrollerOf(el)) breaks.push(`past the edge [${Math.round(box.left)}, ${Math.round(box.right)}]: ${name(el)}`);
       const style = getComputedStyle(el);
       const clips = style.overflowX !== "visible" && !["INPUT", "SELECT", "TEXTAREA"].includes(el.tagName) && style.textOverflow !== "ellipsis";
-      if (clips && el.scrollWidth > el.clientWidth + 1 && stage !== el) breaks.push(`hides ${el.scrollWidth - el.clientWidth}px of its content: ${name(el)}`);
+      if (clips && el.scrollWidth > el.clientWidth + 1 && stage !== el && !isScroller(el)) {
+        const over = hidden(el);
+        if (over > 1) breaks.push(`hides ${over}px of its content: ${name(el)}`);
+      }
     }
     return breaks.slice(0, 12);
-  }, CARRIED);
+  }, { carried: CARRIED, behind: DRAWN_BEHIND, scrollers: READERS_SCROLLERS });
 }
 
 /** Words a reader cannot read to the end (spec §9's 200% text; J6 nightly): a line of text that runs past the window's

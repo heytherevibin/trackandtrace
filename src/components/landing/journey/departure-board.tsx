@@ -14,7 +14,7 @@ export function DepartureBoard() {
       <div className="blueprint board">
         <Corners />
         <div className="flex flex-wrap items-stretch border-b border-line">
-          <h2 id="board-title" className="legend min-w-[16ch] flex-1 px-5 py-3 leading-6 text-ink-1 max-sm:basis-full">
+          <h2 id="board-title" className="legend min-w-[min(16ch,100%)] flex-1 px-5 py-3 leading-6 text-ink-1 max-sm:basis-full">
             {m.title}
           </h2>
           <span className="legend whitespace-nowrap border-l border-line px-5 py-3 leading-6 max-sm:flex-1 max-sm:border-l-0 max-sm:border-t">{m.scope}</span>

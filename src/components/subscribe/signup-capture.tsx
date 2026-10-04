@@ -12,7 +12,7 @@ const EMAIL = z.email().max(254);
 export type CapturePlace = "band" | "pre-booking";
 
 const BUTTON =
-  "press relative inline-flex cursor-pointer select-none items-center justify-center gap-1.5 whitespace-nowrap border font-display font-semibold no-underline disabled:cursor-not-allowed disabled:opacity-45 aria-disabled:cursor-not-allowed aria-disabled:opacity-45 px-[12.24px] py-[6.8px] text-sm leading-[1.2] border-accent-strong bg-accent-strong text-accent-ink hover:bg-accent-strong-hover active:bg-accent-strong-active";
+  "press relative inline-flex cursor-pointer select-none items-center justify-center gap-1.5 max-w-full shrink-0 whitespace-normal border font-display font-semibold no-underline disabled:cursor-not-allowed disabled:opacity-45 aria-disabled:cursor-not-allowed aria-disabled:opacity-45 px-[12.24px] py-[6.8px] text-sm leading-[1.2] border-accent-strong bg-accent-strong text-accent-ink hover:bg-accent-strong-hover active:bg-accent-strong-active";
 const LINK = "text-accent-text underline underline-offset-4 hover:text-accent-soft-ink";
 
 /** What differs between the two places: the form, the button, and the two lines around it. */

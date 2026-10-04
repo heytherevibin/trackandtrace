@@ -100,6 +100,19 @@
   line-height: 1.125;
 }
 
+/* A plate's capital title (24/28 as drawn) and a record's status (30px as drawn), inside a plate on the page's column:
+   each grows with the text for as long as that column holds its longest word whole (CONNECTION in a 1.5rem-padded
+   plate; CONFIRMED, 4.1em wide, in a 1.25rem-padded one), and never goes below its drawn size. At 100% text the
+   second term is never the smaller one, at any width. */
+@utility title-fit {
+  font-size: min(var(--text-3xl), max(24px, (100vw - 2 * var(--gutter) - 3rem - 2px) / 5.8));
+  line-height: calc(1.75 / 1.5);
+}
+@utility status-fit {
+  font-size: min(var(--text-4xl), max(30px, (100vw - 2 * var(--gutter) - 2.5rem - 2px) / 4.6));
+  line-height: 1.1;
+}
+
 /* Blueprint object: square, hairline, transparent. Pair with <Corners /> for the registration marks. */
 @utility blueprint {
   position: relative;
@@ -216,7 +229,7 @@
 /* Fact cells: a grid of legend-over-figure cells that wraps by available width */
 @utility fact-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 7rem), 1fr));
 }
 
 /* Responsive table: below md, rows stack into labelled key-value pairs */

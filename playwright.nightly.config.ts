@@ -2,7 +2,10 @@ import { defineConfig, devices } from "@playwright/test";
 import base from "./playwright.config";
 
 // The journey's nightly e2e (spec 2026-09-24 §5, §8; J6-3), on the same fixture-mode `next dev` as every PR:
-// - sizes: the landing at fifteen sizes, and at 200% text at the PR's three;
+// - sizes: the landing at fifteen sizes, and at 200% text at five of them; and every traveller page, in each state the
+//   fixture server draws, at 200% text at nine widths (text-200.spec.ts);
+// - text-200-browser: the same pages at three of those widths, the text doubled the other way a reader can: Chromium's
+//   own default font size at 32px, which doubles the rem breakpoints too;
 // - screens: every chapter photographed in Day, Night and on a phone;
 // - webkit and webkit-phone: the journey's place (and place-steps), run (and run-place), Night falls and drawing
 //   specs in WebKit, Safari's engine (§8);
@@ -17,7 +20,13 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [["github"], ["html", { open: "never", outputFolder: "playwright-report-nightly" }]] : [["list"]],
   projects: [
-    { name: "sizes", testMatch: /nightly\/sizes\.spec\.ts$/, use: { ...devices["Desktop Chrome"] } },
+    { name: "sizes", testMatch: /nightly\/(sizes|text-200)\.spec\.ts$/, use: { ...devices["Desktop Chrome"] } },
+    {
+      name: "text-200-browser",
+      testMatch: /nightly\/text-200\.spec\.ts$/,
+      grep: /at (320|768|1280)px/,
+      use: { ...devices["Desktop Chrome"], launchOptions: { args: ["--blink-settings=defaultFontSize=32,defaultFixedFontSize=26"] } },
+    },
     { name: "screens", testMatch: /nightly\/screens\.spec\.ts$/, use: { ...devices["Desktop Chrome"] } },
     { name: "webkit", testMatch: JOURNEY_IN_WEBKIT, use: { ...devices["Desktop Safari"], viewport: { width: 1280, height: 800 } } },
     { name: "webkit-phone", testMatch: JOURNEY_IN_WEBKIT, use: { ...devices["iPhone 13"], viewport: { width: 390, height: 844 } } },

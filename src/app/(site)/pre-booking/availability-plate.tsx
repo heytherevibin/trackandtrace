@@ -1,4 +1,5 @@
 import { Corners } from "@/components/ui/corners";
+import { ScrollRegion } from "@/components/ui/scroll-region";
 import { PLATE_TITLE_STACK, plateCellClass } from "@/components/ui/plate";
 import { stackedTable, STACKED_ROLES as R } from "@/components/ui/stacked-table";
 import { queueMovement } from "@/components/ui/queue-movement";
@@ -116,7 +117,7 @@ export function AvailabilityPlate({
         <>
           <Corners />
           <div className="flex flex-wrap items-stretch border-b border-line">
-            <h2 id="tl02-avail" className={`font-display text-label font-semibold uppercase leading-6 tracking-caps text-pretty min-w-[14ch] flex-1 px-5 py-2.5 ${PLATE_TITLE_STACK}`}>
+            <h2 id="tl02-avail" className={`font-display text-label font-semibold uppercase leading-6 tracking-caps text-pretty min-w-[min(14ch,100%)] flex-1 px-5 py-2.5 ${PLATE_TITLE_STACK}`}>
               {m.title}
             </h2>
             <span className={cn("font-display text-label font-semibold uppercase leading-6 tracking-caps whitespace-nowrap border-l border-line px-5 py-2.5 text-ink-1/70", plateCellClass(0))}>
@@ -141,7 +142,8 @@ export function AvailabilityPlate({
           </div>
         </>
       )}
-      <div className="overflow-x-auto">
+      {/* Named for its train: several rows can be open at once, and each is a region of its own. */}
+      <ScrollRegion name="availability" label={`${m.title} · ${answer.train.no} ${answer.train.name}`}>
         <table role={R.table} aria-label={m.title} className={cn("tnum w-full border-collapse text-sm", S.table)}>
           <thead role={R.rowgroup} className={S.head}>
             <tr role={R.row}>
@@ -164,7 +166,7 @@ export function AvailabilityPlate({
               <tr key={day.date} role={R.row} className={cn(S.row, "max-sm:grid-cols-2")}>
                 {/* Set in caps like every other label on the sheet. `uppercase` is CSS, so the
                     date a screen reader announces is still "Wed, 30 Sep 2026". */}
-                <td role={R.cell} className={cn(CELL, S.wide, "font-data whitespace-nowrap uppercase tracking-caps max-sm:font-semibold")}>
+                <td role={R.cell} className={cn(CELL, S.wide, "font-data whitespace-nowrap uppercase tracking-caps max-sm:whitespace-normal max-sm:font-semibold")}>
                   {readDate(day.date, todayIso)}
                 </td>
                 <td role={R.cell} data-label={m.columns.availability} className={cn(CELL, S.wide)}>
@@ -186,7 +188,7 @@ export function AvailabilityPlate({
             ))}
           </tbody>
         </table>
-      </div>
+      </ScrollRegion>
       <div className="border-t border-line px-5 py-3 text-label text-ink-1/70">{m.window}</div>
     </Frame>
   );

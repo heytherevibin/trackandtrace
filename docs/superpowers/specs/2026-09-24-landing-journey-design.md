@@ -495,6 +495,22 @@ unused, and nothing a traveller can see is inert (a Sound switch with no sound).
 and the e2e suite, ships behind nothing (every PR leaves the landing whole), and merges only with the user's
 go-ahead. Each PR's plan is written when the one before it merges, from the code that actually shipped.
 
+Decided after J6 (2026-10-02): the landing at 200% text, beyond the phone widths #110 fitted.
+- The hero's title grows with the text only while its column holds its longest word whole (`--text-hero`: 3.4em a
+  column, never below the drawn 44px), as the section headings do; at 100% text it is the drawn clamp at every width.
+- The masthead's side margin is held in px on every page, the landing included, so a 360px phone at 200% keeps one
+  row; the landing's own margin stays in rem, because the journey judges what fits from the column it leaves
+  (drawing.ts, run.ts; `drawing-modes.spec.ts` holds a 390px phone at 200% to the still, by fit).
+- The departure board's destinations are boxes (inline-block), so a wrapped destination answers a finger across its
+  whole 44px; the specimen record's cell and plate padding do not grow with the text, so its four columns fit a 640px
+  window at 200%.
+- The check plate's in-place record is the drawn table at 100% text at every width (under 352px the page clips its
+  last column, as it always has; no scroller, no extra Tab stop). With the text larger than drawn and the frame narrower
+  than the table needs (19.5rem), each passenger stacks into a labelled record. The switch is a ResizeObserver
+  (`useOutgrown`), not CSS: no size container was added to the landing, and a media query does not see a text-only zoom.
+- The hero's dial runs past the window by design and `main` clips it, at 100% as at 200%: the sweep's layout reading
+  leaves it out by name (layout.ts) and still measures everything else `main` clips.
+
 ## 7. What only the user can do
 
 - Approve this spec, then each PR's merge.

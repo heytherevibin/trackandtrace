@@ -4,12 +4,14 @@ import { gotoReady } from "../helpers";
 import { brokenWords, cutText } from "../layout";
 import { LANDING_INSTRUMENTS, collisionsInView, collisionsTopToBottom } from "../journey/collisions";
 import { waitForJourney } from "../journey/journey-helpers";
+import { text200 } from "../text-200";
 
-// Nightly (spec §5, §9; J6-13): the landing top to bottom, Motion on, at fifteen sizes, and with its text at 200% at the
-// three sizes every PR checks. The sweep is as dense as the PR's densest (collisions.spec.ts's sweep through 02 pinned:
-// 0.15 of a window a step), here over the whole page, so every stop of the three pinned pieces (the drawing chapter,
-// 02's dial, the run) is looked at. The live drawing draws through the runner's software GPU, which is slow, not wrong
-// (J5-12). A size is a phone's when its short side is under 500px.
+// Nightly (spec §5, §9; J6-13): the landing top to bottom, Motion on, at fifteen sizes, and with its text at 200% at five
+// of them: the sizes every PR checks, and the narrowest common Android phone (360×740). The sweep is as dense as the
+// PR's densest (collisions.spec.ts's sweep through 02 pinned: 0.15 of a window a step), here over the whole page, so
+// every stop of the three pinned pieces (the drawing chapter, 02's dial, the run) is looked at. The live drawing draws
+// through the runner's software GPU, which is slow, not wrong (J5-12). A size is a phone's when its short side is under
+// 500px.
 
 const SIZES = [
   [1440, 900],
@@ -28,12 +30,9 @@ const SIZES = [
   [1920, 1080],
   [2560, 1440],
 ] as const;
-const AT_200 = new Set(["1440×900", "1024×768", "390×844", "844×390"]);
+const AT_200 = new Set(["1440×900", "1024×768", "390×844", "360×740", "844×390"]);
 /** Pages other than the landing that carry the full masthead: it is the same on every page, so it reflows on each. */
 const OTHER_PAGES = ["/pre-booking", "/accuracy", "/watchlist", "/privacy"] as const;
-
-/** Text at 200%, from before the page's first paint (the browser's own text-size setting, as the landing's spec sets it). */
-const text200 = (page: Page) => page.addInitScript(() => document.addEventListener("DOMContentLoaded", () => document.documentElement.style.setProperty("font-size", "200%")));
 
 /** Pieces pinned under the masthead stick at its height as drawn (--header-height, 4rem): a masthead taller than that
  * covers the top of every pinned piece for the whole of its pin (the drawing at 1024×768, text at 200%). */
