@@ -80,15 +80,22 @@ test.describe("section entrances", () => {
     await expectNoReplay(page);
   });
 
+  // Where a reload lands is the browser's own: the top the reader had just scrolled to, or the place it had saved for
+  // the entry a moment before (WebKit, 2 of 10 runs beside the file's other tests: 03 then stands in the window at the
+  // start). Either way the entrance plays again, at the start or when 03 is reached, so the row is watched from before
+  // the page's first script: off its rest in some frame of the new load (a played section never is), then risen.
   test("a reload plays it again", async ({ page }) => {
+    await watchMotion(page, "#record .blueprint");
     await page.goto("/");
     await waitForJourney(page);
     await play03(page);
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
-    await page.reload();
+    await page.reload(); // the watch starts again with the new page, from none
     await waitForJourney(page);
-    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
-    await play03(page);
+    await scrollToId(page, "record", 120);
+    await expect.poll(() => movedFrames(page), { timeout: 5_000 }).toBeGreaterThan(0);
+    await expect.poll(() => transformOf(recordRow(page)), { timeout: 5_000 }).toBe(RISEN);
+    await expect.poll(() => recordKicker(page).evaluate((el) => el.children.length), { timeout: 5_000 }).toBe(0);
   });
 
   test("Motion off, then on: a section already played does not play again", async ({ page }) => {
