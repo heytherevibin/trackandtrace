@@ -76,8 +76,9 @@ All of it is in the console at `admin.trakline.in/announcements` (module 07, Own
 **Queue** are on that draft; a queued letter's address shows its progress and **Stop**. Writing,
 testing and queueing need a larger screen; on a phone the console reads, and stops. A draft can be
 **deleted** from its row in the list; nothing that has been queued can be, because it is the record of
-who received what. Each of test, queue, stop and delete writes a row to the Audit log under Messages. Suppressions are not in the console yet:
-lifting one is still done by hand, as the section further down describes.
+who received what. Each of test, queue, stop and delete writes a row to the Audit log under Messages. The **Suppressions** tab lists
+every address no mail goes to: masked until revealed, except a console member's, with Reveal and Lift
+(both written to the Audit log; Lift is on a larger screen only).
 
 1. **Compose.** Pick a list, write a subject (up to 200 characters) and a body (up to 20,000).
    Plain text only: there is no HTML field, by decision. **Never write an unsubscribe line or link.**
@@ -327,8 +328,12 @@ so the console's suppressions view names operator addresses explicitly.
   route that is not the mail they complained about. Do not lift a complaint because someone on the
   team asks nicely or the list is short.
 
-**How.** In the console the suppressions view has a Lift with its own confirm, and it writes a row to
-the audit log (module 14). Until that exists, as the service role in the SQL editor:
+**How.** In the console: Announcements, the **Suppressions** tab. Find the row, **Reveal** its address
+(a console member's is already shown), then **Lift**, which asks first. Both write a row to the audit
+log (module 14), naming the row by its masked address. Lift is on a larger screen only, and the
+database refuses a lift from anyone who has not been given the address.
+
+Only if the console itself cannot be reached, as the service role in the SQL editor:
 
 ```sql
 delete from announcements.suppressions where email = lower(btrim('<the address>'));

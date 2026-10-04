@@ -25,10 +25,12 @@ function seed(): void {
 test.beforeEach(() => {
   resetConsole();
   seed();
+  // Suppressions are counted and named by their masked form below, so each test starts with none.
+  consoleSql("delete from announcements.suppressions;");
 });
 test.afterAll(() => {
   // The local stack is shared: leave no letter and no seeded reader behind.
-  consoleSql(`delete from announcements.letters; delete from subscriptions.people where id in ('${PEOPLE[0]}', '${PEOPLE[1]}');`);
+  consoleSql(`delete from announcements.letters; delete from announcements.suppressions; delete from subscriptions.people where id in ('${PEOPLE[0]}', '${PEOPLE[1]}');`);
 });
 
 /**
@@ -167,5 +169,57 @@ test.describe("Announcements", () => {
     // Exact: the Stop strip and the dialog both contain this sentence inside a longer one.
     await expect(page.getByText(m.detail.cantResume, { exact: true })).toBeVisible();
     expect(await layoutBreaks(page)).toEqual([]);
+  });
+
+  test("Suppressions: an operator's address is named, a reader's is masked until revealed, and only then can it be lifted", async ({ page, baseURL }) => {
+    const owner = await setUpFirstOwner(page, baseURL ?? BASE);
+    const reader = `e2e-supp-${Date.now() % 100000}@example.in`;
+    const actor = `(select user_id from console.members where email = '${owner.email}')`;
+    const audited = (action: string) => consoleSql(`select count(*) from console.audit_log where category = 'messages' and action = '${action}' and target = 'e•••@example.in' and actor_id = ${actor}`);
+    consoleSql(`
+      insert into announcements.suppressions (email, scope, reason, source, at) values
+        ('${owner.email}', 'all', 'hard bounce', 'resend', now()),
+        ('${reader}', 'all', 'hard bounce', 'resend', now() - interval '1 day');`);
+
+    await gotoReady(page, "/announcements");
+    await page.getByRole("navigation", { name: m.tabs.label }).getByRole("link", { name: m.tabs.suppressions }).click();
+    await expect(page).toHaveURL(/\/announcements\/suppressions$/);
+
+    // An operator whose mail is stopped entirely is said above the table, by address.
+    await expect(page.getByRole("status").filter({ hasText: m.suppressions.bannerOne })).toContainText(owner.email);
+
+    const table = page.getByRole("table", { name: m.suppressions.caption });
+    const masked = table.getByRole("row", { name: /e•••@example\.in/ });
+    await expect(masked.getByRole("button", { name: m.suppressions.liftLabelMasked("e•••@example.in") })).toBeDisabled();
+    await expect(page.getByText(reader)).toHaveCount(0);
+    expect(await page.content(), "a masked address is nowhere in the page, not only off the screen").not.toContain(reader);
+    await expectAxeClean(page, { allowDesignLockedAccent: true });
+
+    // Reveal: the address, and a row in the audit log saying who asked.
+    await masked.getByRole("button", { name: m.suppressions.revealLabel("e•••@example.in") }).click();
+    const revealed = table.getByRole("row", { name: new RegExp(reader.replace(/[.]/g, "\\.")) });
+    await expect(revealed).toBeVisible();
+    expect(audited("Revealed a suppressed address")).toBe("1");
+
+    // Lift: asked first, then gone, and recorded.
+    await revealed.getByRole("button", { name: m.suppressions.liftLabel(reader) }).click();
+    const asking = page.getByRole("alertdialog", { name: m.suppressions.liftDialog.title });
+    await expect(asking.getByText(reader)).toBeVisible();
+    await asking.getByRole("button", { name: m.suppressions.liftDialog.confirm }).click();
+    await expect(page.getByText(m.suppressions.liftDialog.done, { exact: true })).toBeVisible();
+    await expect(table.getByRole("row", { name: new RegExp(reader.replace(/[.]/g, "\\.")) })).toHaveCount(0);
+    expect(consoleSql(`select count(*) from announcements.suppressions where email = '${reader}'`)).toBe("0");
+    expect(audited("Lifted a suppression")).toBe("1");
+
+    // On a phone: cards, Reveal, and no Lift.
+    consoleSql(`insert into announcements.suppressions (email, scope, reason, source) values ('${reader}', 'list', 'complaint', 'resend');`);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await gotoReady(page, "/announcements/suppressions");
+    const cards = page.getByRole("list", { name: m.suppressions.caption });
+    await expect(cards.getByRole("button", { name: m.suppressions.revealLabel("e•••@example.in") })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Lift/ })).toHaveCount(0);
+    await expect(page.getByText(m.suppressions.phoneNotes[0])).toBeVisible();
+    expect(await layoutBreaks(page)).toEqual([]);
+    await expectAxeClean(page, { allowDesignLockedAccent: true });
   });
 });
