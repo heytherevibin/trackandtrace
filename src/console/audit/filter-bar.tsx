@@ -4,7 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { DialogContent, DialogRoot } from "@/components/ui/dialog";
 import { IconButton } from "@/components/ui/icon-button";
-import { NativeSelect, type NativeSelectOption } from "@/components/ui/native-select";
+import { Picker } from "@/console/components/picker";
 import {
   AUDIT_CATEGORIES,
   AUDIT_SEARCH_MAX,
@@ -56,42 +56,6 @@ function RangeTab({ range, current, onPick }: { readonly range: AuditRange; read
     <button type="button" aria-pressed={on} onClick={() => onPick(range)} className={cn(TAB, on ? "bg-accent/16 text-accent-text" : "text-ink-3")}>
       {m.filters.ranges[range]}
     </button>
-  );
-}
-
-/**
- * A picker, with the sheet's own label beside it. `""` is All -- never sent to the database as an
- * empty string (see filters.ts).
- *
- * `stacked` is the same control inside the phone's filter dialog, where a 390px row has no space
- * for a label beside a select: the label goes above it and the select takes the width, at the 44px
- * the phone sheet gives every control. Same label, same options, same `onPick` -- so both widths
- * write the same filter model and the same URL.
- */
-function Picker({
-  label,
-  value,
-  options,
-  onPick,
-  stacked = false,
-}: {
-  readonly label: string;
-  readonly value: string;
-  readonly options: readonly NativeSelectOption[];
-  readonly onPick: (value: string) => void;
-  readonly stacked?: boolean;
-}) {
-  return (
-    <label className={cn("flex gap-2", stacked ? "flex-col" : "items-center")}>
-      <span className="legend whitespace-nowrap text-ink-3">{label}</span>
-      <NativeSelect
-        size={stacked ? "lg" : "md"}
-        className={stacked ? undefined : "w-auto min-w-[10ch]"}
-        value={value}
-        onChange={(event) => onPick(event.target.value)}
-        options={[{ value: "", label: m.filters.all }, ...options]}
-      />
-    </label>
   );
 }
 
@@ -305,6 +269,7 @@ export function FilterBar({
   const pickers = (stacked: boolean) => (
     <>
       <Picker
+        all={m.filters.all}
         stacked={stacked}
         label={m.filters.member}
         value={filters.member ?? ""}
@@ -312,6 +277,7 @@ export function FilterBar({
         onPick={(value) => apply({ member: value || null })}
       />
       <Picker
+        all={m.filters.all}
         stacked={stacked}
         label={m.filters.category}
         value={filters.category ?? ""}
@@ -319,6 +285,7 @@ export function FilterBar({
         onPick={(value) => apply({ category: value || null })}
       />
       <Picker
+        all={m.filters.all}
         stacked={stacked}
         label={m.filters.result}
         value={filters.result ?? ""}
@@ -326,6 +293,7 @@ export function FilterBar({
         onPick={(value) => apply({ result: AUDIT_RESULTS.find((one) => one === value) ?? null })}
       />
       <Picker
+        all={m.filters.all}
         stacked={stacked}
         label={m.filters.environment}
         value={filters.environment ?? ""}
