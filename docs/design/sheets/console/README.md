@@ -155,7 +155,12 @@ The page is `src/app/console/leads/page.tsx`; its parts are in `src/console/lead
 - **Below 1360px the table's columns take what their words need**, on 10px gutters for the drawn 14px, and **the Campaign column is not drawn**: ten columns do not fit a 1280 window beside the rail, and the campaign is whole on the record. From 1360px the widths and gutters are the board's.
 - **Tags is the column that gives.** It takes what is left and cuts its tag with an ellipsis; the whole tag is a hover away and on the record. A revealed address is never cut: its column widens and Tags gives the room.
 - **The filters are on two rows at every width from `sm`**, as part two draws them: the search box with its hint beside it, then the five pickers, First seen against the right edge.
-- **Part three is built in two changes**: adding, marking, moving, assigning and removing a business lead from the record first; the tabs and the board second. Until the board is built a business lead is found in the Lifecycle list, by its source or its tag.
+- **Part three is built in two changes**: adding, marking, moving, assigning and removing a business lead from the record first; the tabs and the board second.
+- **The tabs are two links in a `<nav>`**, not the drawn tablist, for the reason the Announcements tabs give: each is its own address with its own read. The board is at `/leads/pipeline`, and a card opens the record over it (`?lead=`), the same record the list opens.
+- **A card's Stage picker is a native select on its own**, where the board draws the word "Stage" inside the well; its accessible name is "Stage of" and the lead's masked address.
+- **Five columns from 1280px, as drawn; two across below that; one on a phone.** Five do not fit beside the rail below 1280.
+- **A lead nobody owns** is drawn with a dash where the initials go; the boards draw every lead owned.
+- **A board that could not be read** says "Pipeline unavailable", which no board draws.
 - **TC-09 is the console's own dialog**, as the Team's invite form is, where the board draws a plate with a title block; a refusal is said at the foot of the form, since it may be about the address, the line or the owner.
 - **A lead whose owner has left the console** reads "Nobody" in the Owner picker; the boards draw every lead owned.
 - **Part two is built in full**: tags and notes first, then Delete lead and Export CSV in their own change.

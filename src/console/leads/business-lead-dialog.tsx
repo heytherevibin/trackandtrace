@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { notify } from "@/components/ui/toast";
 import { BUSINESS_ABOUT_MAX, BUSINESS_NAME_MAX, type BusinessMember } from "@/console/leads/business";
+import { leadRecordHref } from "@/console/leads/filters";
 import type { LeadBusiness } from "@/console/leads/leads";
 import { requestAddBusiness, requestMarkBusiness, type BusinessForm } from "@/console/leads/leads-client";
 import { businessAddBody, businessMarkBody } from "@/console/leads/routes";
@@ -17,11 +18,6 @@ import { consoleMessages } from "@/console/messages";
 
 const m = consoleMessages.leads;
 const b = m.business;
-
-/** A page's address with one lead's record open over it: `/leads?news=pending` → `/leads?news=pending&lead=…`. */
-export function leadRecordHref(page: Route, leadId: string): Route {
-  return `${page}${page.includes("?") ? "&" : "?"}lead=${encodeURIComponent(leadId)}` as Route;
-}
 
 /** Whose lead the form is about: an address typed by hand, or a lead that is already in the list. */
 export type BusinessFormMode = { readonly kind: "add" } | { readonly kind: "mark"; readonly id: string; readonly email: string };
