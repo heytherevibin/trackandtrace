@@ -1,4 +1,4 @@
-import { KeyValueList, type KeyValueItem } from "@/components/ui/key-value-list";
+import type { ReactNode } from "react";
 import { Plate } from "@/components/ui/plate";
 import { daysFor, finishDate, percent, type Ahead } from "@/console/announcements/estimate";
 import type { LetterDetail } from "@/console/announcements/letters";
@@ -100,7 +100,7 @@ export function LetterPlate({ letter }: { readonly letter: LetterDetail }) {
   const people = formatCount(letter.total);
   const list = m.lists[letter.list];
   const stamped = (at: string | null, name: string | null) => (at === null ? "" : name ? d.by(formatDateTime(at), name) : d.byNobody(formatDateTime(at)));
-  const items: readonly KeyValueItem[] = [
+  const items: readonly { readonly label: string; readonly value: ReactNode }[] = [
     { label: d.subjectRow, value: letter.subject },
     { label: d.listRow, value: d.listWhenQueued(list, people) },
     { label: d.queuedRow, value: stamped(letter.queuedAt, letter.queuedBy) },
@@ -120,7 +120,17 @@ export function LetterPlate({ letter }: { readonly letter: LetterDetail }) {
   ];
   return (
     <Plate as="section" title={d.letter} titleId="an-letter" headingLevel={2} padding="none" meta={[d.listCell(list, people)]}>
-      <KeyValueList items={items} className="px-5 pb-2 pt-1" />
+      {/* The board's own grid (:216): a 180px label column, one hairline under each whole row, labels
+          at the top of their row. Not KeyValueList: its label column is a third of the width and it
+          centres a label against a tall value, which the Message row is. Below `sm` a row stacks. */}
+      <dl className="px-5 pb-2 pt-1">
+        {items.map((item) => (
+          <div key={item.label} className="border-line grid gap-x-4 gap-y-1 border-t py-2.5 first:border-t-0 sm:grid-cols-[180px_minmax(0,1fr)]">
+            <dt className="legend-sm sm:pt-1">{item.label}</dt>
+            <dd className="text-body text-ink-1 min-w-0">{item.value}</dd>
+          </div>
+        ))}
+      </dl>
     </Plate>
   );
 }
