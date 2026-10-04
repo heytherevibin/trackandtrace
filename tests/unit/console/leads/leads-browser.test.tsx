@@ -48,7 +48,7 @@ const DETAIL: LeadDetail = {
 const TAGS = ["beta", "press", "travel-desk", "vip"];
 const NONE = parseLeadFilters({});
 
-const browser = (over: Partial<Parameters<typeof LeadsBrowser>[0]> = {}) => render(<LeadsBrowser page={{ total: 3, rows: ROWS }} filters={NONE} detail={null} tags={TAGS} environment="production" {...over} />);
+const browser = (over: Partial<Parameters<typeof LeadsBrowser>[0]> = {}) => render(<LeadsBrowser page={{ total: 3, rows: ROWS }} filters={NONE} detail={null} tags={TAGS} environment="production" members={[]} me="" {...over} />);
 const table = () => screen.getByRole("table", { name: m.table.caption });
 const tableRow = (text: string) => within(table()).getByRole("row", { name: new RegExp(text.replace(/[.•]/g, "\\$&")) });
 

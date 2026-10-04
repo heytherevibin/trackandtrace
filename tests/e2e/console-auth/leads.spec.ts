@@ -242,12 +242,96 @@ test.describe("Leads", () => {
     }
   });
 
+  test("a business lead is added by hand, moved, taken out of the pipeline and marked again, with no key and every act recorded", async ({ page, baseURL }) => {
+    const owner = await setUpFirstOwner(page, baseURL ?? BASE);
+    const actor = `(select user_id from console.members where email = '${owner.email}')`;
+    const b = m.business;
+    const HAND = { email: "hand@leads-e2e.example", masked: "h•••@leads-e2e.example" } as const;
+    const audited = (action: string) => consoleSql(`select count(*) from console.audit_log where category = 'leads' and action = '${action}' and target = '${HAND.masked}' and actor_id = ${actor}`);
+    const stored = (column: string) => consoleSql(`select b.${column} from console.business_leads b join subscriptions.people p on p.id = b.person_id where p.email = '${HAND.email}'`);
+
+    await gotoReady(page, "/leads");
+    await page.getByRole("button", { name: b.add }).click();
+    const form = page.getByRole("dialog", { name: b.add });
+    await expect(form.getByText(b.form)).toBeVisible();
+    await expectAxeClean(page, { allowDesignLockedAccent: true });
+
+    // A console member's own address is not a lead: said in the form, and nothing is stored.
+    await form.getByLabel(b.email).fill(owner.email);
+    await form.getByLabel(b.about).fill("A colleague");
+    await form.getByRole("button", { name: b.addAction }).click();
+    await expect(form.getByRole("alert")).toHaveText(b.errors.member);
+    expect(consoleSql(`select count(*) from subscriptions.people where email = '${owner.email}'`)).toBe("0");
+
+    // Added, however the address is typed; the line about them is kept without the address in it.
+    await form.getByLabel(b.email).fill("  Hand@Leads-E2E.example ");
+    await form.getByLabel(b.name).fill("Meera Pillai");
+    await form.getByLabel(b.about).fill("Travel desk. Wrote from someone@example.com");
+    await form.getByRole("button", { name: b.addAction }).click();
+    await expect(page.getByText(b.added, { exact: true })).toBeVisible();
+
+    // Its record opens by its id; the typed address is in no address bar and nowhere in the page.
+    const record = page.getByRole("dialog", { name: m.record.title });
+    await expect(record.getByText(HAND.masked)).toBeVisible();
+    await expect(page).toHaveURL(/\/leads\?lead=p(:|%3A)[0-9a-f-]{36}$/);
+    expect(await page.content(), "an address added by hand is masked like any other").not.toContain(HAND.email);
+    await expect(record.getByText(m.record.events.added_by_hand(owner.name))).toBeVisible();
+    await expect(record.getByText("Travel desk. Wrote from [removed]")).toBeVisible();
+    await expect(record.getByText("Meera Pillai")).toBeVisible();
+    await expect(record.getByText(b.kept)).toBeVisible();
+    await expect(record.getByRole("combobox", { name: b.owner })).toHaveValue(consoleSql(`select user_id from console.members where email = '${owner.email}'`));
+    expect(consoleSql(`select first_source || '|' || added_by from subscriptions.people where email = '${HAND.email}'`)).toBe(`added by hand|${owner.name}`);
+    expect(consoleSql(`select count(*) from subscriptions.consents c join subscriptions.people p on p.id = c.person_id where p.email = '${HAND.email}'`), "a business lead is on no list").toBe("0");
+    expect(audited("Added a business lead")).toBe("1");
+    expect(consoleSql(`select count(*) from console.audit_log where category = 'leads' and actor_id = ${actor} and (coalesce(after::text, '') || coalesce(before::text, '')) ~ 'Meera|Travel desk'`), "the log holds nothing that was typed about the lead").toBe("0");
+    await expectAxeClean(page, { allowDesignLockedAccent: true });
+
+    // Moved with the Stage picker, and recorded from and to.
+    await record.getByRole("combobox", { name: b.stage }).selectOption("contacted");
+    await expect.poll(() => stored("stage")).toBe("contacted");
+    await expect(record.getByRole("combobox", { name: b.stage })).toHaveValue("contacted");
+    expect(consoleSql(`select (before ->> 'stage') || '>' || (after ->> 'stage') from console.audit_log where action = 'Moved a business lead' and target = '${HAND.masked}' and actor_id = ${actor}`)).toBe("new>contacted");
+
+    // Taken out of the pipeline, after asking: the lead stays, and is still kept.
+    await record.getByRole("button", { name: b.remove }).click();
+    const asking = page.getByRole("alertdialog", { name: b.removeTitle });
+    await expect(asking.getByText(HAND.masked)).toBeVisible();
+    expect(stored("stage"), "asking removes nothing").toBe("contacted");
+    await asking.getByRole("button", { name: b.removeConfirm }).click();
+    await expect(page.getByText(b.removed, { exact: true })).toBeVisible();
+    await expect(record.getByText(b.notIn)).toBeVisible();
+    await expect(record.getByText(b.kept)).toBeVisible();
+    expect(stored("stage")).toBe("");
+    expect(consoleSql(`select count(*) from subscriptions.people where email = '${HAND.email}'`)).toBe("1");
+    expect(audited("Removed a lead from the pipeline")).toBe("1");
+
+    // Marked again from its record: the same form, with the lead named and no address to type.
+    await record.getByRole("button", { name: b.markAction }).click();
+    const marking = page.getByRole("dialog", { name: b.markTitle });
+    await expect(marking.getByText(HAND.masked)).toBeVisible();
+    await expect(marking.getByLabel(b.email)).toHaveCount(0);
+    await marking.getByLabel(b.about).fill("Back in touch");
+    await marking.getByRole("button", { name: b.markAction }).click();
+    await expect(page.getByText(b.marked, { exact: true })).toBeVisible();
+    await expect(record.getByRole("combobox", { name: b.stage })).toHaveValue("new");
+    expect(stored("about")).toBe("Back in touch");
+    expect(audited("Marked a lead as a business enquiry")).toBe("1");
+
+    // In the Lifecycle list it is a lead like any other: not subscribed, and its source says how it came.
+    await record.getByRole("button", { name: "Close" }).click();
+    const row = page.getByRole("table", { name: m.table.caption }).getByRole("row", { name: named(HAND.masked) });
+    await expect(row).toContainText(m.news.none);
+    await expect(row).toContainText(m.sources["added by hand"]);
+    expect(await layoutBreaks(page)).toEqual([]);
+  });
+
   test("on a phone the list is cards with nothing to reveal, and the record is the whole screen", async ({ page, baseURL }) => {
     const owner = await setUpFirstOwner(page, baseURL ?? BASE);
     // Written behind the console's back: a phone reads tags and notes and writes neither.
     consoleSql(`
       insert into console.lead_tags (person_id, tag) values ('${SUBSCRIBED.id}', 'e2e-phone');
-      insert into console.lead_notes (person_id, body, author_name) values ('${SUBSCRIBED.id}', 'A note read on a phone.', 'Kiran Das');`);
+      insert into console.lead_notes (person_id, body, author_name) values ('${SUBSCRIBED.id}', 'A note read on a phone.', 'Kiran Das');
+      insert into console.business_leads (person_id, stage, about) values ('${SUBSCRIBED.id}', 'qualified', 'A lead read on a phone.');`);
     await page.setViewportSize({ width: 390, height: 844 });
 
     await gotoReady(page, "/leads");
@@ -259,6 +343,7 @@ test.describe("Leads", () => {
     // Nothing is exported from a phone: the page says where to go instead.
     await expect(page.getByText(m.export.phone)).toBeVisible();
     await expect(page.getByRole("button", { name: m.export.action })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: m.business.add })).toHaveCount(0);
     expect(await layoutBreaks(page)).toEqual([]);
     await expectAxeClean(page, { allowDesignLockedAccent: true });
 
@@ -281,6 +366,13 @@ test.describe("Leads", () => {
     await expect(record.getByRole("combobox", { name: m.record.addTag })).toHaveCount(0);
     await expect(record.getByRole("textbox", { name: m.record.addNote })).toHaveCount(0);
     await expect(record.getByRole("button", { name: m.remove.action })).toHaveCount(0);
+    // Its place in the pipeline is read as words: no picker, and no way out of the pipeline.
+    await expect(record.getByText("A lead read on a phone.")).toBeVisible();
+    // `:visible`: the pickers are still in the page, not drawn, and their options hold the same words.
+    await expect(record.locator("dd span:visible").filter({ hasText: new RegExp(`^${m.business.stages.qualified}$`) })).toHaveCount(1);
+    await expect(record.locator("dd span:visible").filter({ hasText: new RegExp(`^${m.business.nobody}$`) })).toHaveCount(1);
+    await expect(record.getByRole("combobox")).toHaveCount(0);
+    await expect(record.getByRole("button", { name: m.business.remove })).toHaveCount(0);
 
     await record.getByRole("button", { name: m.table.revealLabel(SUBSCRIBED.masked) }).click();
     await expect(record.getByText(SUBSCRIBED.email)).toBeVisible();
