@@ -7,13 +7,13 @@ import base from "./playwright.config";
 // - text-200-browser: the same pages at three of those widths, the text doubled the other way a reader can: Chromium's
 //   own default font size at 32px, which doubles the rem breakpoints too;
 // - screens: every chapter photographed in Day, Night and on a phone;
-// - webkit and webkit-phone: the journey's place (and place-steps), run (and run-place), Night falls and drawing
-//   specs in WebKit, Safari's engine (§8);
+// - webkit and webkit-phone: the journey's place (and place-steps), run (and run-place), link glide, Night falls and
+//   drawing specs in WebKit, Safari's engine (§8);
 // - slow-device and slow-device-phone: a device too slow to draw steps quality down, then draws still (§4), at 60× CPU
 //   in Chromium: minutes on a slow core, and machine-bound, so nightly only (its governor's rules are unit-tested).
 // .github/workflows/journey-nightly.yml runs it in three shards:
 //   npx playwright test -c playwright.nightly.config.ts
-const JOURNEY_IN_WEBKIT = /journey\/(place|place-steps|run|run-place|night-falls|drawing-modes|live-drawing)\.spec\.ts$/;
+const JOURNEY_IN_WEBKIT = /journey\/(place|place-steps|run|run-place|link-glide|night-falls|drawing-modes|live-drawing)\.spec\.ts$/;
 
 export default defineConfig({
   ...base,

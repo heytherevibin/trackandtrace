@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createLiveLabels, pinTop, revealOf, wipe } from "@/components/landing/journey/live-labels";
+import { createLiveLabels, pinTop, pinTopLaidOut, relayWith, revealOf, wipe } from "@/components/landing/journey/live-labels";
 
 describe("the labels while the drawing is live (J5-5)", () => {
   afterEach(() => {
@@ -98,6 +98,27 @@ describe("the labels while the drawing is live (J5-5)", () => {
     expect(pinTop(pin)).toBe(-162);
   });
 
+  // A tablet turned flips the labels between columns and the list, and the pin's sticky top with them: read as a resize is
+  // answered, before the scene's own relayout, it was the layout before's.
+  it("say where the pin takes hold once laid out for the window as it is: the live drawing's relayout runs first, while it runs", () => {
+    document.body.innerHTML = `<div class="anatomy-pin" data-live="columns" style="top: 64px"><div class="anatomy-copy"></div></div>`;
+    const pin = document.querySelector<HTMLElement>(".anatomy-pin")!;
+    expect(pinTopLaidOut(pin)).toBe(64); // no live drawing on it: as it stands
+    // the scene's relayout, as the window now wants the list: the pin sticks the words' height above the masthead's foot
+    const relayout = vi.fn(() => {
+      pin.dataset.live = "list";
+      pin.style.top = "-138px";
+    });
+    const forget = relayWith(pin, relayout);
+    expect(pinTop(pin)).toBe(64); // read before the labels are laid out: the columns' still
+    expect(pinTopLaidOut(pin)).toBe(-138);
+    expect(relayout).toHaveBeenCalledTimes(1);
+    forget();
+    pin.style.top = "64px";
+    expect(pinTopLaidOut(pin)).toBe(64);
+    expect(relayout).toHaveBeenCalledTimes(1); // the live drawing has ended: nothing is laid out for it
+  });
+
   it("are drawn only once a frame has placed them: each layout takes that back, until the next draw (the upkeep's 1b)", () => {
     vi.stubGlobal("matchMedia", () => ({ matches: false }));
     document.body.innerHTML = `<section id="anatomy"><div class="anatomy-pin"><div class="anatomy-copy"></div><ol class="callouts"><li class="callout" data-part="shell" data-side="right"></li></ol><ol class="anatomy-legend"></ol><div class="title-block"></div><p class="anatomy-caption"></p></div></section>`;
@@ -112,6 +133,24 @@ describe("the labels while the drawing is live (J5-5)", () => {
     labels?.draw(() => null, () => 0);
     labels?.clear();
     expect(pin.hasAttribute("data-drawn")).toBe(false);
+  });
+
+  // WebKit leaves a media query made earlier at its old answer through the "resize" that changed it: laid out from it, a
+  // tablet turned to 1024 wide kept the list for a frame, and the place kept across the turn was the list's.
+  it("ask whether the window is narrow afresh at each layout, never from a query made before", () => {
+    const narrow = { matches: true };
+    const asked = vi.fn(() => ({ matches: narrow.matches }));
+    vi.stubGlobal("matchMedia", asked);
+    document.body.innerHTML = `<section id="anatomy"><div class="anatomy-pin"><div class="anatomy-copy"></div><ol class="callouts"><li class="callout" data-part="shell" data-side="right"></li></ol><ol class="anatomy-legend"></ol><div class="title-block"></div><p class="anatomy-caption"></p></div></section>`;
+    const labels = createLiveLabels(document.getElementById("anatomy")!);
+    labels?.layout();
+    const before = asked.mock.calls.length;
+    expect(before).toBeGreaterThan(0);
+    narrow.matches = false; // the window grew past 64rem
+    labels?.layout();
+    expect(asked.mock.calls.length).toBeGreaterThan(before);
+    expect(asked).toHaveBeenLastCalledWith("(max-width: 63.99rem)");
+    labels?.clear();
   });
 
   it("are nothing without the chapter's markup", () => {

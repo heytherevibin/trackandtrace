@@ -66,6 +66,13 @@ interface Place {
   readonly shape: string;
 }
 
+/** 02 is about to change its own shape: to pin, or to try its fit again, which lets go of a pin that no longer fits. Its
+ * place guard reads the reader's place then, as it does before Motion rewrites the page: a scroll the reader has made
+ * and no "scroll" event has told yet (an instant jump to the top, this frame) is theirs, and once #how has changed size
+ * the guard learns no scroll until it has settled. Judged from the place before that jump, a reader come up from below
+ * was "past 02", and thrown back down by the pin's growth (5,687 to 7,398 on the page: 1 run in 30 on a slow device). */
+export const HOW_BEFORE_EVENT = "tt:how-before";
+
 /** 02 pinned, by the very selector that pins it (journey-island.css). */
 const PINNED = 'html[data-motion="on"][data-journey="on"] .chapters.is-pinned';
 
@@ -145,6 +152,7 @@ export function startPlaceGuard(): Teardown {
     place = laidOut() ? now : { ...now, vh: place.vh, view: place.view };
   };
   window.addEventListener(LAYOUT_EVENT, refresh);
+  window.addEventListener(HOW_BEFORE_EVENT, refresh); // 02 about to pin or unpin itself: the reader's place as it decides
   // A freshly observed target always delivers one initial notification, even when nothing has actually
   // changed (the spec guarantees it) — this observer never fires on its own just because something above
   // #how changed size and moved it; only #how's own border-box actually changing size does that, or this
@@ -183,6 +191,7 @@ export function startPlaceGuard(): Teardown {
     window.removeEventListener(MOTION_BEFORE_EVENT, learn);
     window.removeEventListener(MOTION_EVENT, settleShape);
     window.removeEventListener(LAYOUT_EVENT, refresh);
+    window.removeEventListener(HOW_BEFORE_EVENT, refresh);
     stopView();
   };
 }
@@ -220,6 +229,7 @@ export function startChapters({ motion }: JourneyContext): Teardown {
       return;
     }
     stopPending();
+    window.dispatchEvent(new Event(HOW_BEFORE_EVENT));
     if (!fitsPinned(section)) return;
     stopDriver = startDriver(section, dial);
     // The growth lands below the reader: only the journey's observers need to measure it again.
@@ -241,8 +251,9 @@ export function startChapters({ motion }: JourneyContext): Teardown {
   const onLayout = () => {
     window.clearTimeout(refitTimer);
     refitTimer = window.setTimeout(() => {
-      if (!stopDriver) decide(true);
-      else if (!fitsPinned(section)) window.dispatchEvent(new Event(REBUILD_EVENT));
+      if (!stopDriver) return decide(true);
+      window.dispatchEvent(new Event(HOW_BEFORE_EVENT));
+      if (!fitsPinned(section)) window.dispatchEvent(new Event(REBUILD_EVENT));
     }, 200);
   };
 
