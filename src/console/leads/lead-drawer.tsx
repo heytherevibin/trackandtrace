@@ -37,6 +37,7 @@ function eventText(e: Event): string {
   if (e.kind === "confirmed") return r.events.confirmed(list);
   if (e.kind === "unsubscribed") return r.events.unsubscribed(list);
   if (e.kind === "received") return r.events.received(e.subject ?? "");
+  if (e.kind === "added_by_hand") return r.events.added_by_hand(e.by ?? null);
   return r.events[e.kind];
 }
 

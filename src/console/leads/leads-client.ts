@@ -2,7 +2,8 @@
 
 import { z } from "zod";
 import { consoleApiMessage } from "@/console/api-message";
-import type { LeadNote, LeadRow } from "@/console/leads/leads";
+import type { BusinessStage } from "@/console/leads/business";
+import type { LeadBusiness, LeadNote, LeadRow } from "@/console/leads/leads";
 import { apiRequest } from "@/services/api-client";
 
 // Module 06's network calls, kept out of the components so their tests mock functions rather
@@ -13,6 +14,9 @@ export type Failed = { readonly kind: "failed"; readonly message: string };
 // The row is checked on the server (leads.ts) before it is sent; here only its presence is.
 const foundSchema = z.object({ ok: z.literal(true), lead: z.custom<LeadRow>((value) => typeof value === "object" && value !== null).nullable() }).strict();
 const revealedSchema = z.object({ ok: z.literal(true), address: z.string() }).strict();
+const addedSchema = z.object({ ok: z.literal(true), id: z.string().min(3), added: z.boolean() }).strict();
+// The entry is checked on the server (leads.ts) before it is sent; here only that there is one.
+const businessSchema = z.object({ ok: z.literal(true), business: z.custom<LeadBusiness>((value) => typeof value === "object" && value !== null) }).strict();
 const doneSchema = z.object({ ok: z.literal(true) }).strict();
 const exportSchema = z.object({ ok: z.literal(true), csv: z.string(), count: z.number().int().nonnegative(), fileName: z.string().regex(/^leads-\d{4}-\d{2}-\d{2}\.csv$/) }).strict();
 const tagsSchema = z.object({ ok: z.literal(true), tags: z.array(z.string()) }).strict();
@@ -63,4 +67,34 @@ export interface PreparedLeadExport {
 export async function requestExport(filters: string, reason: string): Promise<{ readonly kind: "done"; readonly file: PreparedLeadExport } | Failed> {
   const result = await apiRequest("/api/leads/export", post({ filters, reason }), exportSchema, { timeoutMs: 30_000 });
   return result.ok ? { kind: "done", file: { csv: result.data.csv, count: result.data.count, fileName: result.data.fileName } } : { kind: "failed", message: consoleApiMessage(result.error) };
+}
+
+/** What the business lead form sends: empty strings for what was not given. */
+export interface BusinessForm {
+  readonly name: string;
+  readonly organisation: string;
+  readonly about: string;
+  readonly owner: string;
+}
+
+type Entry = { readonly kind: "done"; readonly business: LeadBusiness } | Failed;
+
+async function entry(path: string, body: unknown): Promise<Entry> {
+  const result = await apiRequest(`/api/leads/business/${path}`, post(body), businessSchema);
+  return result.ok ? { kind: "done", business: result.data.business } : { kind: "failed", message: consoleApiMessage(result.error) };
+}
+
+/** Adds a business lead by hand. The address goes in the body; the answer names the lead, never the address. */
+export async function requestAddBusiness(email: string, form: BusinessForm): Promise<{ readonly kind: "done"; readonly id: string; readonly added: boolean } | Failed> {
+  const result = await apiRequest("/api/leads/business/add", post({ email, ...form }), addedSchema);
+  return result.ok ? { kind: "done", id: result.data.id, added: result.data.added } : { kind: "failed", message: consoleApiMessage(result.error) };
+}
+
+export const requestMarkBusiness = (id: string, form: BusinessForm): Promise<Entry> => entry("mark", { id, ...form });
+export const requestMoveBusiness = (id: string, stage: BusinessStage): Promise<Entry> => entry("move", { id, stage });
+export const requestAssignBusiness = (id: string, owner: string): Promise<Entry> => entry("assign", { id, owner });
+
+export async function requestUnmarkBusiness(id: string): Promise<{ readonly kind: "done" } | Failed> {
+  const result = await apiRequest("/api/leads/business/remove", post({ id }), doneSchema);
+  return result.ok ? { kind: "done" } : { kind: "failed", message: consoleApiMessage(result.error) };
 }

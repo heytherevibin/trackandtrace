@@ -141,6 +141,8 @@ export const leads = {
       received: (subject: string) => `Received “${subject}”`,
       /** Undrawn. */
       suppressed: "Suppressed: mail can no longer reach this address",
+      /** The name is whoever added it, as their name stood; undrawn without one. */
+      added_by_hand: (by: string | null) => (by ? `Added by hand by ${by}` : "Added by hand"),
     },
     tags: "Tags",
     /** Undrawn. */
@@ -156,7 +158,7 @@ export const leads = {
     noteHint: "Don't include PNRs, emails or IP addresses; they're removed. Up to 500 characters. A note can't be changed afterwards.",
     addNoteButton: "Add note",
     /** The phone board's closing line. */
-    largerScreen: "Open on a larger screen to add a tag or a note, or to delete a lead.",
+    largerScreen: "Open on a larger screen to make changes to this lead.",
     retention: "A sign-up that is never confirmed is deleted after 7 days.",
     /** Undrawn. */
     unavailable: "This lead's record is unavailable: the database didn't answer.",
@@ -196,6 +198,57 @@ export const leads = {
       `This removes the person, ${consents === 1 ? "their consent" : `their ${consents} consents`}, ${tags === 1 ? "1 tag" : `${tags} tags`} and ${notes === 1 ? "1 note" : `${notes} notes`}. A suppression on the address stays. They can sign up again.`,
     /** Undrawn. */
     done: "Lead deleted.",
+  },
+
+  /**
+   * Business leads (sheet 22, part three). "About" is the brief's "Note": the record already has
+   * Notes, and this is the one line a card shows.
+   */
+  business: {
+    add: "Add a business lead",
+    form: "Form TC-09",
+    markTitle: "Mark as a business enquiry",
+    email: "Email",
+    lead: "Lead",
+    name: "Name (optional)",
+    organisation: "Organisation (optional)",
+    about: "About",
+    aboutHint: "One line, shown on the card. Don't include PNRs, emails or IP addresses; they're removed. Up to 120 characters.",
+    owner: "Owner",
+    addLegend: "Added by hand for a business conversation. Never added to any email list unless they sign up themselves.",
+    markLegend: "Nothing about this lead’s subscriptions changes. It is never added to any email list unless they sign up themselves.",
+    cancel: "Cancel",
+    addAction: "Add lead",
+    markAction: "Mark as a business enquiry",
+    /** Undrawn: the three ways a form can end well. */
+    added: "Business lead added.",
+    marked: "Marked as a business enquiry.",
+    existing: "Already a lead. Marked as a business enquiry.",
+    section: "Business enquiry",
+    notIn: "Not in the pipeline.",
+    stage: "Stage",
+    stages: { new: "New", contacted: "Contacted", qualified: "Qualified", won: "Won", lost: "Lost" },
+    nameLabel: "Name",
+    organisationLabel: "Organisation",
+    /** Undrawn: a lead whose owner has left the console. */
+    nobody: "Nobody",
+    remove: "Remove from pipeline",
+    removeTitle: "Remove from the pipeline?",
+    removeDetail: "The lead stays in Leads, with its tags and notes. Its stage, owner, name, organisation and the line about it are removed.",
+    removeConfirm: "Remove",
+    /** Undrawn. */
+    removed: "Removed from the pipeline.",
+    kept: "A business lead is kept until it is deleted.",
+    /** Undrawn, all of them. */
+    errors: {
+      member: "That address belongs to a console member.",
+      aboutEmpty: "Say one line about this lead.",
+      aboutLong: "The line about a lead can be up to 120 characters.",
+      nameLong: "A name or an organisation can be up to 80 characters.",
+      notOwner: "That member can't own a lead.",
+      already: "That lead is already in the pipeline.",
+      notIn: "That lead is no longer in the pipeline.",
+    },
   },
 
   errors: {
