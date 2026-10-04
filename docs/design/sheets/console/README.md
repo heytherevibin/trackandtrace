@@ -1,4 +1,4 @@
-# Console sheets: B0, B2 and B4
+# Console sheets: B0, B2, B4 and sheet 22
 
 The console's sheets, drawn on the Design canvas. B0 (the frame and its audit log) and B2 (admin core) were approved on 19 Sep 2026. Phase 2 builds from these files. Where they differ from the prompts in `docs/superpowers/specs/phase-1-sheets/b0-calibration.md` and `b2-admin-core.md`, these files win.
 
@@ -78,3 +78,28 @@ Approved as drawn, from all 46 rendered states (both boards, Day and Night, Owne
 - **The tab row is two links, not a tablist.** Each tab is its own address (`/announcements`, `/announcements/suppressions`) with its own server read; it is drawn exactly as the board's tabs and marked with `aria-current`.
 - **What is revealed is not kept.** A revealed address lives in the open page only; a reload masks it again, and looking again is a second audit row.
 - **The store's reasons are shown in the board's words**: hard bounce is "Hard bounce" from a "Delivery report"; a complaint is "Spam complaint" from a "Complaint report"; repeated delays are "Delayed three times in 30 days" from "Delivery reports". A row mirrored from the mail service's own list reads "Suppressed by the mail service", where the board's sample row says "Hard bounce": the store does not record a cause for those. The provider is never named.
+
+## Sheet 22: Leads (first part)
+
+Drawn on 4 Oct 2026 and **approved the same day**, after two changes the owner asked for (below). Module 06's pages are transcribed from these files 1:1. Same frame, same `industry.css`, no new classes. The sample world is the other console sheets'; its figures agree with sheet 23 (431 subscribed to News, 217 on the Availability list).
+
+| File | Sheet | States (props) |
+|---|---|---|
+| `ConsoleLeads.dc.html` | 22 Leads at 1440 | role (Owner, Admin, Support) · state: List, Search: one match, Search: no match, Drawer, Drawer revealed, Empty, Unavailable, No access |
+| `ConsoleLeadsPhone.dc.html` | 22 Leads at 390 | role · state: List, Drawer, Drawer revealed, Empty, No access |
+
+**This is the first of the brief's four parts** (`phase-1-sheets/b4-leads-accounts-privacy.md`): the figures, the list, filters, search, the lead's record and Reveal. Export, tags, notes, deleting a lead and the business pipeline are drawn when they are built, so these boards carry no tabs, no Export and no "Add a business lead".
+
+- **Figures**: Pending confirmation, Subscribed, Unsubscribed, Suppressed, With an account, Availability list. News and Account are separate facts; the plate says so.
+- **Search** takes the whole address, exactly. The match stays masked and the lookup is written to the audit log. A searched address is never put in the page's address.
+- **The list**: Email (masked, opens the record), News, Lists, Account, Source, Campaign, First seen, Last activity, and Reveal. The board draws 8 of a page's 50 rows.
+- **The record** (a drawer at 1440, a full screen at 390): the address with Reveal, each list's consent in full, the account (saved PNRs as a count only), the campaign, and a timeline.
+- **Reveal** shows the address for the visit and writes an audit row. A reload masks it again.
+- **On a phone** the page reads and reveals; it changes nothing.
+- **No access** is drawn as a Viewer opening the module.
+
+### Decided at the review (4 Oct 2026)
+
+- **The Account column says Has account, No account or Disabled, and nothing else.** The first drawing put the last sign-in under it; the owner removed it, since Last activity is its own column. The last sign-in stays on the record.
+- **Five News statuses, five tag forms, one box.** Every tag carries a 1px edge, clear unless the form is an outline, so no status is taller or set wider than another: Subscribed is the tint fill, Pending confirmation the steel outline, Unsubscribed the grey fill, Not subscribed a neutral outline, and Suppressed the solid alert ink, because it is the one that means mail cannot reach them. The first drawing had an outline 2px taller than the fills, "Not subscribed" as plain text, and Suppressed looking like Unsubscribed.
+- **People who only have an account are listed**, as "Not subscribed": the brief's lead is "sign-ups and accounts".
