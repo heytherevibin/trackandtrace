@@ -31,6 +31,14 @@ describe("StopButton", () => {
     expect(requestStop).not.toHaveBeenCalled();
   });
 
+  it("says nobody has it yet, rather than counting zero people, before the first send", async () => {
+    render(<StopButton id={ID} subject="A queued letter" sent={0} waiting={431} />);
+    await userEvent.click(screen.getByRole("button", { name: m.detail.stop }));
+    const dialog = screen.getByRole("alertdialog", { name: m.stopDialog.title });
+    expect(within(dialog).getByText(m.stopDialog.detailNone("431"))).toBeInTheDocument();
+    expect(within(dialog).queryByText(/^0 people/)).not.toBeInTheDocument();
+  });
+
   it("stops on confirm, says so, and redraws the page", async () => {
     requestStop.mockResolvedValue({ kind: "done" });
     button();

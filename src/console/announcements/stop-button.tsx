@@ -41,7 +41,7 @@ export function StopButton({ id, subject, sent, waiting }: { readonly id: string
         onOpenChange={setOpen}
         title={m.stopDialog.title}
         before={<p className="text-body font-medium">{subject}</p>}
-        description={m.stopDialog.detail(formatCount(sent), formatCount(waiting))}
+        description={sent === 0 ? m.stopDialog.detailNone(formatCount(waiting)) : m.stopDialog.detail(formatCount(sent), formatCount(waiting))}
         confirmLabel={m.stopDialog.confirm}
         tone="primary"
         phoneSheet

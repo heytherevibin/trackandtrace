@@ -163,6 +163,8 @@ export const announcements = {
   stopDialog: {
     title: "Stop sending?",
     detail: (sent: string, waiting: string) => `${people(sent)} already have this letter, and that can't be recalled. The ${waiting} still waiting won't get it, and a stopped letter can't be resumed.`,
+    /** Undrawn: stopped before the first send. "0 people already have this letter" is not a sentence. */
+    detailNone: (waiting: string) => `Nobody has this letter yet. The ${waiting} waiting won't get it, and a stopped letter can't be resumed.`,
     confirm: "Stop sending",
     done: "Stopped.",
   },
