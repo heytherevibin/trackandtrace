@@ -103,6 +103,33 @@ test.describe("Announcements", () => {
     ).toBe("Sent a test letter, Queued a letter, Stopped a letter");
   });
 
+  test("a draft is deleted from its row, after a confirm, and nothing that was queued can be", async ({ page, baseURL }) => {
+    await setUpFirstOwner(page, baseURL ?? BASE);
+    const draft = "e2e0c003-0000-4000-8000-000000000001";
+    const queued = "e2e0c003-0000-4000-8000-000000000002";
+    consoleSql(`
+      insert into announcements.letters (id, list, subject, body, created_by) values ('${draft}', 'news', 'A draft to delete', 'Hello', gen_random_uuid());
+      insert into announcements.letters (id, list, subject, body, state, created_by, queued_at, recipients_total, test_sent_at, test_sent_to)
+        values ('${queued}', 'news', 'A queued letter', 'Hello', 'queued', gen_random_uuid(), now(), 1, now(), 'proof@example.in');`);
+
+    await gotoReady(page, "/announcements");
+    const table = page.getByRole("table", { name: m.letters.caption });
+    await expect(table.getByRole("row", { name: /A queued letter/ }).getByRole("button")).toHaveCount(0);
+    await table.getByRole("button", { name: m.letters.deleteLabel("A draft to delete") }).click();
+
+    const asking = page.getByRole("alertdialog", { name: m.deleteDialog.title });
+    await expect(asking.getByText("A draft to delete")).toBeVisible();
+    await expectAxeClean(page, { allowDesignLockedAccent: true });
+    expect(consoleSql(`select count(*) from announcements.letters where id = '${draft}'`), "asking deletes nothing").toBe("1");
+
+    await asking.getByRole("button", { name: m.deleteDialog.confirm }).click();
+    await expect(page.getByText(m.deleteDialog.done, { exact: true })).toBeVisible();
+    await expect(table.getByRole("row", { name: /A draft to delete/ })).toHaveCount(0);
+    await expect(table.getByRole("row", { name: /A queued letter/ })).toBeVisible();
+    expect(consoleSql(`select count(*) from announcements.letters where id = '${draft}'`)).toBe("0");
+    expect(consoleSql(`select count(*) from console.audit_log where category = 'messages' and action = 'Deleted a draft' and target = 'A draft to delete' and result = 'done'`)).toBe("1");
+  });
+
   test("on a phone the list is cards, a draft is read-only, and Stop is a sheet", async ({ page, baseURL }) => {
     await setUpFirstOwner(page, baseURL ?? BASE);
     const draft = "e2e0b002-0000-4000-8000-000000000001";

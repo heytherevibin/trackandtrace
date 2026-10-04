@@ -72,4 +72,6 @@ Approved as drawn, from all 46 rendered states (both boards, Day and Night, Owne
 - **Queued is built from the note above, not from a board**: the label "Queued" with the light lamp, `Sent 0 · Skipped 0 · Unknown 0 of N`, "Starts when the letter ahead finishes", and Stop.
 - The Compose board's sample body ("We write about once a month.") is sample text and stays. It is not product copy: the news sign-up promises no frequency, and nothing in the console may state one.
 
+**Added after the review (4 Oct 2026), not on the boards:** a draft's row in the Letters table ends in **Delete**, under an Actions column whose header is for screen readers only. It opens a plain confirm ("Delete this draft?", the subject, "It has gone to nobody. This can't be undone.", Cancel and Delete draft). The owner asked for it once the first test draft could not be removed, and chose the row over the draft's own page. Drafts only: anything that has been queued is the record of who received what. Not on a phone, where the cards are a single link and the console reads and stops.
+
 The backend (PR #115) has no function for lifting a suppression, no audited reveal and no test send that records itself. PR 3 adds all three.

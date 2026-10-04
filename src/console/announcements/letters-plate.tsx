@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Lamp } from "@/components/ui/led";
 import { Plate } from "@/components/ui/plate";
+import { DeleteDraftButton } from "@/console/announcements/delete-draft-button";
 import type { LetterRow, LetterState } from "@/console/announcements/letters";
 import { consoleHref } from "@/console/href";
 import { consoleMessages } from "@/console/messages";
@@ -48,6 +49,8 @@ function State({ letter }: { readonly letter: LetterRow }) {
  * reader meets one list, never both.
  *
  * `null` is a list that could not be read. It is never drawn as "no letters".
+ *
+ * A draft's row ends in Delete. The cards have none: on a phone the console reads, and stops.
  */
 export function LettersPlate({ letters }: { readonly letters: readonly LetterRow[] | null }) {
   return (
@@ -70,6 +73,10 @@ export function LettersPlate({ letters }: { readonly letters: readonly LetterRow
                       {h}
                     </th>
                   ))}
+                  {/* Not on the sheet: Delete, on a draft's row only. Its header is for screen readers. */}
+                  <th scope="col" className="px-5 py-2 text-right">
+                    <span className="sr-only">{m.letters.actions}</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -84,6 +91,7 @@ export function LettersPlate({ letters }: { readonly letters: readonly LetterRow
                     </td>
                     <td className="tnum whitespace-nowrap px-5 py-2.5">{progressOf(letter)}</td>
                     <td className="tnum whitespace-nowrap px-5 py-2.5">{whenOf(letter)}</td>
+                    <td className="whitespace-nowrap px-5 py-1 text-right">{letter.state === "draft" ? <DeleteDraftButton id={letter.id} subject={letter.subject} /> : null}</td>
                   </tr>
                 ))}
               </tbody>

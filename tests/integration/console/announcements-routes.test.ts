@@ -3,11 +3,12 @@ import type { ConsoleMember } from "@/console/auth/member";
 import { consoleMessages } from "@/console/messages";
 import { AppError } from "@/services/errors";
 
-const { requireConsoleMember, saveLetter, queueLetter, stopLetter, sendTest, consoleEnvironment } = vi.hoisted(() => ({
+const { requireConsoleMember, saveLetter, queueLetter, stopLetter, deleteLetter, sendTest, consoleEnvironment } = vi.hoisted(() => ({
   requireConsoleMember: vi.fn<(least?: string) => Promise<ConsoleMember>>(),
   saveLetter: vi.fn<(db: unknown, letter: unknown) => Promise<string>>(),
   queueLetter: vi.fn<(db: unknown, environment: string, id: string) => Promise<number>>(),
   stopLetter: vi.fn<(db: unknown, environment: string, id: string) => Promise<void>>(async () => {}),
+  deleteLetter: vi.fn<(db: unknown, environment: string, id: string) => Promise<void>>(async () => {}),
   sendTest: vi.fn<(ask: unknown, deps: unknown) => Promise<void>>(async () => {}),
   consoleEnvironment: vi.fn<() => string>(() => "production"),
 }));
@@ -16,10 +17,11 @@ vi.mock("@/console/auth/guard", () => ({ requireConsoleMember }));
 vi.mock("@/console/auth/session", () => ({ consoleEnvironment }));
 vi.mock("@/console/availability", () => ({ assertConsoleAvailable: () => {} }));
 vi.mock("@/console/auth/db", () => ({ createConsoleDb: async () => ({ rpc: vi.fn() }), createConsoleServiceDb: () => ({ rpc: vi.fn() }) }));
-vi.mock("@/console/announcements/letters", async (original) => ({ ...(await original<typeof import("@/console/announcements/letters")>()), saveLetter, queueLetter, stopLetter }));
+vi.mock("@/console/announcements/letters", async (original) => ({ ...(await original<typeof import("@/console/announcements/letters")>()), saveLetter, queueLetter, stopLetter, deleteLetter }));
 vi.mock("@/console/announcements/test-send", () => ({ sendTest }));
 vi.mock("@/services/email/suppression", () => ({ sendToAddress: vi.fn() }));
 
+import { POST as remove } from "@/app/console/api/announcements/delete/route";
 import { POST as queue } from "@/app/console/api/announcements/queue/route";
 import { POST as save } from "@/app/console/api/announcements/save/route";
 import { POST as stop } from "@/app/console/api/announcements/stop/route";
@@ -53,6 +55,7 @@ beforeEach(() => {
   saveLetter.mockReset().mockResolvedValue(ID);
   queueLetter.mockReset().mockResolvedValue(431);
   stopLetter.mockClear();
+  deleteLetter.mockReset().mockResolvedValue(undefined);
   sendTest.mockClear();
 });
 
@@ -158,5 +161,29 @@ describe("POST /api/announcements/queue and /stop", () => {
     expect((await stop(post("/api/announcements/stop", { id: ID }, "https://evil.example"))).status).toBe(403);
     expect(queueLetter).not.toHaveBeenCalled();
     expect(stopLetter).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/announcements/delete", () => {
+  it("deletes by id, under the server's environment, with the Admin floor", async () => {
+    const response = await remove(post("/api/announcements/delete", { id: ID }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true });
+    expect(deleteLetter).toHaveBeenCalledWith(expect.anything(), "production", ID);
+    expect(requireConsoleMember).toHaveBeenCalledWith("admin");
+  });
+
+  it("answers the database's refusal of anything but a draft, in the console's words", async () => {
+    deleteLetter.mockRejectedValueOnce(new AppError("INVALID_INPUT", m.errors.notDeletable));
+    const response = await remove(post("/api/announcements/delete", { id: ID }));
+    expect(response.status).toBe(400);
+    expect(JSON.stringify(await response.json())).toContain(m.errors.notDeletable);
+  });
+
+  it("refuses an id that is not one, a field nobody asked for, and another origin", async () => {
+    expect((await remove(post("/api/announcements/delete", { id: "42" }))).status).toBe(400);
+    expect((await remove(post("/api/announcements/delete", { id: ID, environment: "preview" }))).status).toBe(400);
+    expect((await remove(post("/api/announcements/delete", { id: ID }, "https://evil.example"))).status).toBe(403);
+    expect(deleteLetter).not.toHaveBeenCalled();
   });
 });

@@ -37,6 +37,10 @@ export const announcements = {
     stopped: (date: string) => `Stopped ${date}`,
     finished: (date: string) => `Finished ${date}`,
     open: (subject: string) => `Open ${subject}`,
+    /** Undrawn, with Delete: the owner asked for it on 2026-10-04. The column's header is for screen readers only. */
+    actions: "Actions",
+    delete: "Delete",
+    deleteLabel: (subject: string) => `Delete the draft ${subject}`,
     footer: "A letter goes out at most 40 a day. We don't track opens or clicks.",
     /** Undrawn: the sheet's sample always has letters. */
     none: "No letters yet. New letter starts one.",
@@ -160,6 +164,14 @@ export const announcements = {
     messageHint: "The unsubscribe link is added to the end of every email when it is sent.",
   },
 
+  /** Undrawn (2026-10-04). Only a draft can be deleted, and every draft has gone to nobody. */
+  deleteDialog: {
+    title: "Delete this draft?",
+    detail: "It has gone to nobody. This can't be undone.",
+    confirm: "Delete draft",
+    done: "Draft deleted.",
+  },
+
   stopDialog: {
     title: "Stop sending?",
     detail: (sent: string, waiting: string) => `${people(sent)} already have this letter, and that can't be recalled. The ${waiting} still waiting won't get it, and a stopped letter can't be resumed.`,
@@ -187,6 +199,7 @@ export const announcements = {
     invalid: "That letter can't be saved as written. Check the subject and the body.",
     gone: "That letter no longer exists.",
     notDraft: "Only a draft can be changed, and this letter has been queued.",
+    notDeletable: "Only a draft can be deleted, and this letter has been queued.",
     notTested: "Send yourself a test first. Queue stays off until one has been made.",
     spent: "The availability list has had its one send, so it can't be used again.",
     nobody: "Nobody is on this list, so there is nobody to send to.",
