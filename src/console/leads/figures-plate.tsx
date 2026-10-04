@@ -33,12 +33,13 @@ export function FiguresPlate({ figures }: { readonly figures: LeadFigures | null
   ] as const;
   return (
     <Plate as="section" title={m.title} titleId="ld-figures" headingLevel={2} padding="none" meta={[m.total(formatCount(figures.total))]}>
-      {/* The cells' own right and bottom hairlines are the grid's rules; the outermost ones are
+      {/* `justify-between`: where a label takes two lines its figure still sits on the row's own
+          baseline, level with the rest. The cells' own right and bottom hairlines are the grid's rules; the outermost ones are
           tucked under the plate's edge, so the same markup rules a 6-across and a 2-across grid. */}
       <div className="overflow-hidden">
         <dl className="-mb-px -mr-px grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
           {cells.map(([label, value]) => (
-            <div key={label} className="border-line flex flex-col gap-1 border-b border-r px-5 py-4 max-sm:px-4 max-sm:py-3.5">
+            <div key={label} className="border-line flex flex-col justify-between gap-1 border-b border-r px-5 py-4 max-sm:px-4 max-sm:py-3.5">
               <dt className="legend max-sm:legend-sm">{label}</dt>
               {/* 32/36 as drawn. The phone board draws 26/30; 24px is the nearest step the type scale has. */}
               <dd className="font-display tnum text-5xl font-semibold leading-9 max-sm:text-3xl max-sm:leading-[30px]">{formatCount(value)}</dd>

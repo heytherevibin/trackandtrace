@@ -30,20 +30,29 @@ export interface LeadsPager {
 
 const campaignOf = (row: LeadRow): string => [row.campaign?.source, row.campaign?.medium, row.campaign?.name].filter((part): part is string => Boolean(part)).join(" / ") || t.blank;
 
-// ConsoleLeads.dc.html's `.dt`: 36px rows, 14px gutters, 13px words, one line each. The widths are
-// the sheet's, as floors: a revealed address is wider than a masked one and must never be cut, so
-// the column grows and Campaign, the one column with room to give, gives it.
-const TH = "legend border-line h-9 whitespace-nowrap border-b px-3.5 text-left font-semibold";
-const TD = "border-line h-9 whitespace-nowrap border-b px-3.5";
+// ConsoleLeads.dc.html's `.dt`: 36px rows, 14px gutters, 13px words, one line each.
+//
+// The sheet's column widths are drawn for a 1440 board, and they are kept from the width at which
+// the table has room for them. Below it every column takes what its words need and Campaign, the
+// one column that can be cut, takes what is left: at 1280 the drawn widths add up to more than the
+// plate, and the table scrolled sideways with Reveal half off its edge.
+//
+// A column is never narrower than its words at any width, so a revealed address is never cut.
+//
+// The 14px gutters come in at the same width, 10px below it: the 72px that gives back is what lets
+// a revealed address widen its column at 1280 without pushing Reveal past the plate's edge.
+const GUTTER = "px-2.5 min-[1360px]:px-3.5";
+const TH = `legend border-line h-9 whitespace-nowrap border-b text-left font-semibold ${GUTTER}`;
+const TD = `border-line h-9 whitespace-nowrap border-b ${GUTTER}`;
 const COLUMNS: readonly (readonly [string, string])[] = [
-  [t.email, "w-[146px]"],
-  [t.news, "w-[162px]"],
-  [t.lists, "w-[92px]"],
-  [t.account, "w-[120px]"],
-  [t.source, "w-[106px]"],
-  [t.campaign, "w-full min-w-[120px]"],
-  [t.firstSeen, "w-[108px]"],
-  [t.lastActivity, "w-[112px]"],
+  [t.email, "min-[1360px]:w-[146px]"],
+  [t.news, "min-[1360px]:w-[162px]"],
+  [t.lists, "min-[1360px]:w-[92px]"],
+  [t.account, "min-[1360px]:w-[120px]"],
+  [t.source, "min-[1360px]:w-[106px]"],
+  [t.campaign, "w-full min-w-[88px]"],
+  [t.firstSeen, "min-[1360px]:w-[108px]"],
+  [t.lastActivity, "min-[1360px]:w-[112px]"],
 ];
 
 function PagerStep({ href, children }: { readonly href: Route | null; readonly children: ReactNode }) {
@@ -140,7 +149,7 @@ export function LeadsPlate({
                       {header}
                     </th>
                   ))}
-                  <th scope="col" className={cn(TH, "w-[66px]")}>
+                  <th scope="col" className={cn(TH, "min-[1360px]:w-[66px]")}>
                     <span className="sr-only">{t.actions}</span>
                   </th>
                 </tr>
@@ -165,7 +174,7 @@ export function LeadsPlate({
                     </td>
                     <td className={cn(TD, "tnum")}>{formatDate(row.firstSeen)}</td>
                     <td className={cn(TD, "tnum")}>{formatDate(row.lastActivity)}</td>
-                    <td className={cn(TD, "px-1.5 text-right")}>
+                    <td className="border-line h-9 whitespace-nowrap border-b px-1.5 text-right">
                       {row.hidden ? (
                         <Button variant="ghost" size="sm" aria-label={t.revealLabel(row.shown)} loading={revealing === row.id} onClick={() => onReveal(row)}>
                           {t.reveal}

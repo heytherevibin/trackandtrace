@@ -50,11 +50,13 @@ function Section({ title, tight = false, children }: { readonly title: string; r
 /** The sheet's `.kv` with its label column at the drawn 120px, which the shared list's 35% is not. */
 function Facts({ items }: { readonly items: readonly (readonly [string, string])[] }) {
   return (
-    <dl className="grid grid-cols-[120px_1fr] items-baseline gap-x-4">
+    // Both cells fill the row and share one 24px line, so the two halves of a row's hairline meet
+    // and the label still sits on the value's first line when the value takes two.
+    <dl className="grid grid-cols-[120px_1fr] gap-x-4">
       {items.map(([label, value], i) => (
         <div key={label} className="contents">
-          <dt className={cn("legend-sm py-2.5", i > 0 && "border-line border-t")}>{label}</dt>
-          <dd className={cn("text-body min-w-0 py-2.5 [overflow-wrap:anywhere]", i > 0 && "border-line border-t")}>{value}</dd>
+          <dt className={cn("legend-sm py-2.5 leading-6", i > 0 && "border-line border-t")}>{label}</dt>
+          <dd className={cn("text-body min-w-0 py-2.5 leading-6 [overflow-wrap:anywhere]", i > 0 && "border-line border-t")}>{value}</dd>
         </div>
       ))}
     </dl>

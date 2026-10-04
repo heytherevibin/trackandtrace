@@ -77,7 +77,7 @@ export default async function LeadsPage({ searchParams }: { readonly searchParam
   return (
     <ConsoleFrame member={member}>
       <Header updated={formatTime(now)} />
-      <div className="mt-7 flex flex-col gap-7 max-sm:mt-4 max-sm:gap-4">
+      <div className="mt-6 flex flex-col gap-6 max-sm:mt-4 max-sm:gap-4">
         <FiguresPlate figures={figures} />
         <LeadsBrowser page={page} filters={filters} detail={detail} />
       </div>

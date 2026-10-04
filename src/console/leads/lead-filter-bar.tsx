@@ -105,7 +105,10 @@ export function LeadFilterBar({
             {f.find}
           </button>
         </form>
-        <div className="contents max-sm:hidden">{pickers(false)}</div>
+        {/* One group: where the row has no room for all four beside the box they go under it
+            together, First seen still against the right edge, and never one of them alone. `grow`
+            and not `flex-1`: a basis of zero would always fit beside the box, and wrap inside. */}
+        <div className="flex min-w-0 grow flex-wrap items-center gap-2.5 max-sm:hidden">{pickers(false)}</div>
         <div className={cn("flex basis-full flex-col gap-1", "max-sm:basis-auto")}>
           {refused ? (
             <p id="ld-find-refused" role="alert" className="text-label">

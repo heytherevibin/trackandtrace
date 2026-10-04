@@ -103,3 +103,16 @@ Drawn on 4 Oct 2026 and **approved the same day**, after two changes the owner a
 - **The Account column says Has account, No account or Disabled, and nothing else.** The first drawing put the last sign-in under it; the owner removed it, since Last activity is its own column. The last sign-in stays on the record.
 - **Five News statuses, five tag forms, one box.** Every tag carries a 1px edge, clear unless the form is an outline, so no status is taller or set wider than another: Subscribed is the tint fill, Pending confirmation the steel outline, Unsubscribed the grey fill, Not subscribed a neutral outline, and Suppressed the solid alert ink, because it is the one that means mail cannot reach them. The first drawing had an outline 2px taller than the fills, "Not subscribed" as plain text, and Suppressed looking like Unsubscribed.
 - **People who only have an account are listed**, as "Not subscribed": the brief's lead is "sign-ups and accounts".
+
+### As built (4 Oct 2026)
+
+The page is `src/app/console/leads/page.tsx`; its parts are in `src/console/leads/`. It matches the boards at 1440 and at 390. Where it departs, it is for one of these reasons, each found by rendering the page rather than reading the sheet:
+
+- **Dates read "02 Sept 2026"**, the app's own format, where the boards write "2 Sep 2026".
+- **The pickers carry their label beside a native select** (above it on a phone), as the audit log's do, where the boards draw the label inside the well.
+- **Below 1360px the table's columns take what their words need** and Campaign takes the rest, with 10px gutters for the drawn 14px. The drawn widths add up to more than the plate at 1280, and the table scrolled sideways with Reveal half off its edge. From 1360px the widths and gutters are the board's.
+- **A revealed address is never cut.** Its column widens and Campaign gives the room; a cut campaign is whole in its tooltip and on the record.
+- **Where the filter row has no room for all four pickers beside the search box** (below about 1440px) they go under it together, First seen still against the right edge.
+- **The phone's figures are 24px**, the type scale's nearest step to the drawn 26px.
+- **Previous and Next are links**, so a page of the list has an address; where there is nowhere to go they are the drawn disabled buttons.
+- **Undrawn states**, in the module's own words: filters that match nobody, figures or a record that could not be read, a record that is no longer there, and part of an address typed into the search (refused in the form, before any lookup is made or recorded).
