@@ -201,10 +201,13 @@ describe("today's reality: the rail and its phone trigger render for an Owner an
   // flipped on 2026-09-27 and is Owner+Admin, where 13 Team in the same group is Owner-only. So the
   // group is rendered, and rendered SHORT — which is the case that would have hidden a bug where a
   // group's presence was inferred from the Owner's copy of it rather than this role's.
-  it("gives an Admin Operate, Configure and Record, with Team absent from Configure", () => {
+  // 07 Announcements joined on 2026-10-04, the first built module in People: Owner and Admin.
+  it("gives an Admin Operate, People, Configure and Record, with Team absent from Configure", () => {
     render(<ConsoleRail groups={railFor("admin")} />);
     const rail = screen.getByRole("navigation", { name: "Console" });
     expect(within(rail).getByText("Operate")).toBeVisible();
+    expect(within(rail).getByText("People")).toBeVisible();
+    expect(within(rail).getByRole("link", { name: /Announcements/ })).toHaveAttribute("href", "/announcements");
     expect(within(rail).getByText("Record")).toBeVisible();
     expect(within(rail).getByText("Configure")).toBeVisible();
     expect(within(rail).queryByRole("link", { name: /Team/ })).not.toBeInTheDocument();
@@ -212,7 +215,7 @@ describe("today's reality: the rail and its phone trigger render for an Owner an
     expect(within(rail).getByRole("link", { name: /Sources/ })).toHaveAttribute("href", "/sources");
     expect(within(rail).getByRole("link", { name: /Abuse/ })).toHaveAttribute("href", "/abuse");
     expect(within(rail).getByRole("link", { name: /Switches/ })).toHaveAttribute("href", "/settings");
-    expect(within(rail).getAllByRole("link")).toHaveLength(5);
+    expect(within(rail).getAllByRole("link")).toHaveLength(6);
   });
 });
 

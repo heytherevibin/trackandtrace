@@ -55,7 +55,9 @@ export const CONSOLE_MODULES: readonly ConsoleModule[] = [
   { num: "04", label: "Abuse & limits", group: "operate", roles: OWNER_ADMIN, href: consoleHref("/abuse"), built: true },
   { num: "05", label: "Alerts", group: "operate", roles: OWNER_ADMIN, href: consoleHref("/alerts"), built: false },
   { num: "06", label: "Leads", group: "people", roles: OWNER_ADMIN_SUPPORT, href: consoleHref("/leads"), built: false },
-  { num: "07", label: "Announcements", group: "people", roles: OWNER_ADMIN, href: consoleHref("/announcements"), built: false },
+  // Built 2026-10-04: the Letters pages (list, compose, test send, queue, detail, stop). Its
+  // Suppressions tab follows; the module's address and its access do not change when it does.
+  { num: "07", label: "Announcements", group: "people", roles: OWNER_ADMIN, href: consoleHref("/announcements"), built: true },
   { num: "08", label: "Accounts", group: "people", roles: OWNER_ADMIN, href: consoleHref("/accounts"), built: false },
   { num: "09", label: "Privacy requests", group: "queues", roles: OWNER_ADMIN_SUPPORT, href: consoleHref("/privacy-requests"), built: false },
   { num: "10", label: "Wrong-status reports", group: "queues", roles: OWNER_ADMIN_SUPPORT, href: consoleHref("/wrong-status-reports"), built: false },

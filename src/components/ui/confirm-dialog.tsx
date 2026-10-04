@@ -3,6 +3,7 @@
 import { AlertDialog } from "@base-ui/react/alert-dialog";
 import { useState, type ReactNode } from "react";
 import { messages } from "@/messages";
+import { cn } from "@/utils/cn";
 import { Button } from "./button";
 import { Corners } from "./corners";
 
@@ -20,6 +21,8 @@ export function ConfirmDialog({
   loading = false,
   confirmDisabled = false,
   tone = "danger",
+  phoneSheet = false,
+  before,
   children,
 }: {
   readonly open: boolean;
@@ -32,6 +35,13 @@ export function ConfirmDialog({
   readonly loading?: boolean;
   readonly confirmDisabled?: boolean;
   readonly tone?: "danger" | "primary";
+  /**
+   * Below `sm`, a sheet from the bottom edge with stacked full-width buttons, the action on top
+   * (ConsoleAnnouncementsPhone.dc.html, Stop confirm). From `sm` up it is the centred dialog.
+   */
+  readonly phoneSheet?: boolean;
+  /** Drawn between the title and the description: a summary the sentence then speaks about. */
+  readonly before?: ReactNode;
   readonly children?: ReactNode;
 }) {
   const [busy, setBusy] = useState(false);
@@ -40,13 +50,21 @@ export function ConfirmDialog({
     <AlertDialog.Root open={open} onOpenChange={onOpenChange}>
       <AlertDialog.Portal>
         <AlertDialog.Backdrop className="fixed inset-0 z-dialog bg-backdrop transition-opacity duration-(--duration-base) data-[starting-style]:opacity-0 data-[ending-style]:opacity-0" />
-        <AlertDialog.Viewport className="fixed inset-0 z-dialog flex items-center justify-center p-4">
-          <AlertDialog.Popup className="blueprint w-full max-w-narrow bg-surface-3 p-6 shadow-3 outline-none transition-[transform,opacity] duration-(--duration-slow) ease-out data-[starting-style]:scale-98 data-[starting-style]:opacity-0 data-[ending-style]:scale-98 data-[ending-style]:opacity-0">
+        <AlertDialog.Viewport className={cn("fixed inset-0 z-dialog flex items-center justify-center p-4", phoneSheet && "max-sm:items-end max-sm:p-0")}>
+          <AlertDialog.Popup
+            className={cn(
+              "blueprint w-full max-w-narrow bg-surface-3 p-6 shadow-3 outline-none transition-[transform,opacity] duration-(--duration-slow) ease-out data-[starting-style]:scale-98 data-[starting-style]:opacity-0 data-[ending-style]:scale-98 data-[ending-style]:opacity-0",
+              // The phone board draws the sheet flush to the edges, with no registration marks.
+              phoneSheet && "max-sm:max-w-none max-sm:border-b-0 max-sm:p-5 max-sm:[&>.corner]:hidden",
+            )}
+          >
             <Corners />
             <AlertDialog.Title className="text-3xl tracking-head">{title}</AlertDialog.Title>
+            {before ? <div className="mt-3">{before}</div> : null}
             <AlertDialog.Description className="mt-2.5 text-body text-ink-2">{description}</AlertDialog.Description>
             {children ? <div className="mt-4">{children}</div> : null}
-            <div className="mt-6 flex flex-wrap justify-end gap-2">
+            {/* DOM order stays Cancel then confirm; reversed below `sm`, the action sits on top as drawn. */}
+            <div className={cn("mt-6 flex flex-wrap justify-end gap-2", phoneSheet && "max-sm:flex-col-reverse max-sm:flex-nowrap max-sm:[&>button]:h-11 max-sm:[&>button]:w-full")}>
               <AlertDialog.Close render={<Button variant="secondary">{cancelLabel}</Button>} />
               <Button
                 variant={tone}
