@@ -9,6 +9,7 @@ import {
   type AuditResult,
 } from "@/console/audit/filters";
 import { createConsoleDb, type ConsoleDb } from "@/console/auth/db";
+import { csvFile } from "@/console/csv";
 import type { ConsoleRole } from "@/console/auth/member";
 import { consoleMessages } from "@/console/messages";
 import { AppError } from "@/services/errors";
@@ -320,42 +321,15 @@ const CSV_COLUMNS: readonly (readonly [string, (row: AuditEntry) => string | nul
 ];
 
 /**
- * The characters a spreadsheet reads as the start of a formula rather than as text.
- *
- * This file is opened in Excel or Sheets by the person doing the access review, and the audit log
- * holds text members typed and text the console stored on their behalf -- a reason, a target, a
- * session label. A cell beginning `=`, `+`, `-` or `@` is evaluated on open; a leading tab or
- * carriage return can smuggle one past a naive check. Quoting is not a defence here: a spreadsheet
- * strips the quotes and evaluates what is inside.
- */
-const FORMULA_LEAD = /^[=+\-@\t\r]/;
-
-/**
- * One field, RFC 4180: quoted when it carries a quote, a comma or a line break, with the quotes
- * inside it doubled.
- *
- * A field that would be read as a formula gets a leading apostrophe first. That is a real
- * alteration of the record and it is the deliberate trade: the apostrophe is visible in the file,
- * and a record that is slightly annotated is better than one that runs. Only the leading character
- * is touched; nothing else in the value is changed.
- */
-function csvField(value: string | null): string {
-  if (value === null || value === "") return "";
-  const guarded = FORMULA_LEAD.test(value) ? `'${value}` : value;
-  return /["\r\n,]/.test(guarded) ? `"${guarded.replaceAll('"', '""')}"` : guarded;
-}
-
-/**
- * The filtered set as a CSV file, header first, in the order the database returned it.
- *
- * CRLF line endings and a leading byte-order mark, both for the program that will actually open
- * this: without the BOM, Excel reads UTF-8 as the local code page, and the console's curly quotes,
- * ellipses and Indian names arrive as mojibake in a document someone is about to sign off on.
+ * The filtered set as a CSV file, header first, in the order the database returned it. Quoting, the
+ * formula guard, the line endings and the byte-order mark are `src/console/csv.ts`'s, shared with
+ * the console's other export.
  */
 export function auditCsv(rows: readonly AuditEntry[]): string {
-  const header = CSV_COLUMNS.map(([name]) => name).join(",");
-  const body = rows.map((row) => CSV_COLUMNS.map(([, read]) => csvField(read(row))).join(","));
-  return `﻿${[header, ...body].join("\r\n")}`;
+  return csvFile(
+    CSV_COLUMNS.map(([name]) => name),
+    rows.map((row) => CSV_COLUMNS.map(([, read]) => read(row))),
+  );
 }
 
 /** `console_audit_export`'s own answer: the whole filtered set, and its size. */

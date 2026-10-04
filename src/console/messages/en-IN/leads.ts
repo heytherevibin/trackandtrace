@@ -155,13 +155,47 @@ export const leads = {
     addNote: "Add a note",
     noteHint: "Don't include PNRs, emails or IP addresses; they're removed. Up to 500 characters. A note can't be changed afterwards.",
     addNoteButton: "Add note",
-    /** The phone board's closing line. Deleting a lead joins it when that is built. */
-    largerScreen: "Open on a larger screen to add a tag or a note.",
+    /** The phone board's closing line. */
+    largerScreen: "Open on a larger screen to add a tag or a note, or to delete a lead.",
     retention: "A sign-up that is never confirmed is deleted after 7 days.",
     /** Undrawn. */
     unavailable: "This lead's record is unavailable: the database didn't answer.",
     /** Undrawn. */
     gone: "That lead is no longer here.",
+  },
+
+  /** What a reason-and-key act says when the database refuses it. Undrawn; the audit log's own words. */
+  confirm: {
+    tapMismatch: "That confirmation no longer matches this action. Try again.",
+    refused: "The console wouldn't do that. Reload the page and try again.",
+  },
+
+  export: {
+    action: "Export CSV",
+    /** The phone board's line: nothing is exported from a phone. */
+    phone: "Open on a larger screen to export.",
+    /** Singular undrawn. */
+    summary: (n: string) => (n === "1" ? "Export 1 lead" : `Export ${n} leads`),
+    hint: "The file holds whole addresses, with each lead's status, source, campaign and tags. It works once, in this browser, for 10 minutes.",
+    preparing: (n: string) => (n === "1" ? "Preparing export… 1 lead." : `Preparing export… ${n} leads.`),
+    works: "Works once, in this browser, for 10 minutes",
+    download: "Download",
+    /** Undrawn. */
+    tooMany: (max: number) => `That's more than ${max.toLocaleString("en-IN")} leads. Narrow the filters and try again.`,
+    /** Undrawn: the list could not be read, so there is nothing to count. */
+    unavailable: "Leads couldn't be read, so there is nothing to export yet.",
+  },
+
+  remove: {
+    title: "Delete",
+    detail: "Removes this person, their consents, tags and notes. They can sign up again.",
+    action: "Delete lead",
+    hasAccount: "This lead has an account, so it can't be deleted here.",
+    summary: (email: string) => `Delete the lead ${email}`,
+    hint: (consents: number, tags: number, notes: number) =>
+      `This removes the person, ${consents === 1 ? "their consent" : `their ${consents} consents`}, ${tags === 1 ? "1 tag" : `${tags} tags`} and ${notes === 1 ? "1 note" : `${notes} notes`}. A suppression on the address stays. They can sign up again.`,
+    /** Undrawn. */
+    done: "Lead deleted.",
   },
 
   errors: {

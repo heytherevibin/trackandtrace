@@ -6,6 +6,7 @@ import { DismissRegular } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Corners } from "@/components/ui/corners";
 import { IconButton } from "@/components/ui/icon-button";
+import { DeleteSection } from "@/console/leads/lead-delete";
 import { NotesSection, TagsSection } from "@/console/leads/lead-marks";
 import type { LeadDetail, LeadNote } from "@/console/leads/leads";
 import { NewsTag } from "@/console/leads/news-tag";
@@ -126,8 +127,8 @@ function Record({ detail }: { readonly detail: LeadDetail }) {
  * One lead's record (ConsoleLeads.dc.html, Drawer and Drawer revealed): a 480px plate against the
  * right edge on a desktop, the full screen on a phone, in the geometry of the audit log's entry
  * drawer. The address is masked until Reveal, which the database records; the retention line below
- * never scrolls away. It ends with the lead's tags and notes (lead-marks.tsx), which a desktop can
- * add to and a phone can only read.
+ * never scrolls away. It ends with the lead's tags and notes (lead-marks.tsx) and Delete
+ * (lead-delete.tsx), which a desktop can use and a phone can only read past.
  *
  * `detail` is the record, or why there is none to draw: it could not be read, or the lead is gone.
  */
@@ -138,10 +139,12 @@ export function LeadDrawer({
   tags,
   notes,
   suggestions,
+  environment,
   onReveal,
   onTag,
   onUntag,
   onNote,
+  onDeleted,
   onClose,
 }: {
   readonly detail: LeadDetail | "unavailable" | "gone";
@@ -153,10 +156,14 @@ export function LeadDrawer({
   readonly notes: readonly LeadNote[];
   /** Every tag in use, offered as one is typed. */
   readonly suggestions: readonly string[];
+  /** The deployment a delete is approved under: part of what its key tap is minted over. */
+  readonly environment: string;
   readonly onReveal: () => void;
   readonly onTag: (tag: string) => Promise<boolean>;
   readonly onUntag: (tag: string) => Promise<boolean>;
   readonly onNote: (body: string) => Promise<boolean>;
+  /** The lead was deleted: there is no record left to show. */
+  readonly onDeleted: () => void;
   readonly onClose: () => void;
 }) {
   const record = typeof detail === "string" ? null : detail;
@@ -218,6 +225,7 @@ export function LeadDrawer({
                   <Record detail={record} />
                   <TagsSection tags={tags} suggestions={suggestions} onAdd={onTag} onRemove={onUntag} />
                   <NotesSection notes={notes} onAdd={onNote} />
+                  <DeleteSection lead={record} environment={environment} tags={tags.length} notes={notes.length} onDeleted={onDeleted} />
                   {/* The phone board's closing line: there, the record is read and nothing is changed. */}
                   <p className="border-line text-ink-2 text-label border-t px-4 pb-4 pt-3.5 sm:hidden">{r.largerScreen}</p>
                 </>
