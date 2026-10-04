@@ -353,9 +353,20 @@ export type Database = {
         }
         Returns: Json
       }
+      console_letter: { Args: { p_letter: string }; Returns: Json }
+      console_letter_lists: { Args: never; Returns: Json }
+      console_letter_tested: {
+        Args: { p_environment: string; p_letter: string }
+        Returns: undefined
+      }
+      console_letters: { Args: never; Returns: Json }
       console_me: { Args: never; Returns: Json }
       console_my_keys: { Args: never; Returns: Json }
       console_my_sessions: { Args: never; Returns: Json }
+      console_queue_letter: {
+        Args: { p_environment: string; p_letter: string }
+        Returns: number
+      }
       console_remove_key: {
         Args: { p_environment: string; p_key: string; p_reason: string }
         Returns: number
@@ -380,6 +391,15 @@ export type Database = {
         Args: { p_environment: string; p_invite: string; p_reason: string }
         Returns: undefined
       }
+      console_save_letter: {
+        Args: {
+          p_body: string
+          p_letter?: string
+          p_list: string
+          p_subject: string
+        }
+        Returns: string
+      }
       console_save_settings: {
         Args: {
           p_changes: Json
@@ -392,6 +412,10 @@ export type Database = {
       console_sign_out_others: {
         Args: { p_environment: string }
         Returns: number
+      }
+      console_stop_letter: {
+        Args: { p_environment: string; p_letter: string }
+        Returns: undefined
       }
       console_team: { Args: never; Returns: Json }
       console_unblock_address: {
