@@ -474,6 +474,95 @@ of shape still lands on its start.
   or not: its move uses no window height, and J6-7's order holds. `viewHeight` reads the large viewport from the layout
   each time, never kept by the window's size.
 
+Decided after J6 (2026-10-02): an in-page link's glide is taken up again, as a Tab stop's is, when it is cut short.
+- The browser sets a glide's end as it begins. A window resized a few frames in (a phone's toolbar) moves every section
+  below a piece sized by the window (the still's columns, 02, the run) out from under that end, with no jump; a
+  place-keeping jump made meanwhile cancels the glide outright; and WebKit's own scroll anchoring, answering the resize,
+  stops it where it stands with nothing for the page to hear. Measured on the board's links to 07 and 08: short on every
+  run in Chromium's phone, and in about 4 runs in 10 in WebKit's.
+- The click arms the same watch a Tab's focus does, under the same bounds: taken up two frames after a jump, or after a
+  relayout that moved the target while the page stood on the glide's course, at most three times; let go by the reader's
+  own scroll (a wheel, a finger moving, a scrolling key), a press, or ten still frames. It is taken up to the link's
+  target at its landing while the address still names it (`focus-glide.ts`); a link to 06 or 07 of the running run to
+  its first station while focus is where the click put it (`run.ts`). No rule for a Tab's glide changed.
+- Scroll anchoring is held off (`overflow-anchor: none` on the root) only while a link's glide is watched, and given back
+  as the watch lets go. The page keeps its own places without it, as it does on every browser that has none.
+- A link's glide runs the whole way to its target, so "between where it began and its target" cannot tell the glide
+  from a reader's own hand: a scrollbar's drag (no wheel, touch, key or press) short of the target, then a resize,
+  carried the reader on to the target (the review, 2026-10-02; main leaves them where they put the page). A link's
+  glide is therefore followed frame by frame against the end the browser set for it (`followGlide`): the browser's own
+  goes on toward that end, never back, and does not stop more than 64 px short of it. A page that does either for five
+  frames in a row is the reader's, and the glide is let go. A Tab's glide is not followed so; its course rule stands.
+- Back mid-glide is the reader's: the watch lets go for good as the address stops naming the target (`popstate`), and
+  takes nothing up while the address names something else. The run's take-up held to where focus was, which a rebuild
+  moves; it holds to the address now, and a link's glide to 06 or 07 is handed through the journey's rebuild as
+  `focus-glide.ts` hands its own.
+- Nothing is taken up while a doubt stands (the re-review, 2026-10-02): the take-up came two frames after a cut,
+  before the doubt was settled, so a hand that stopped as the cut landed was carried to 07. A real glide clears its
+  doubt with its next moving frame; a held hand reaches five and is let go. The wait costs a held reader nothing, so
+  the count is generous: a loaded machine holds the page still for the two frames of a resize, then the glide goes on.
+  The glide's speed is not judged. A frame much slower than the last was a doubt for a while (measured between
+  frames' own times), and let real glides go: frames bunch on a slow device, so one looked five times too fast and
+  the next ones a crawl (8 runs in 560 at 6× CPU), and WebKit's glide slows through a resize's long frame (3 runs in
+  3,440).
+  What the follower cannot tell, stated as the bound: a hand that moves the page on toward the target, at any speed,
+  reads as the glide for as long as it moves, and is known once it stops short of the end. So a hand still moving in
+  the very frame a cut lands is taken up once, and its next move cancels that glide. And a place-keeping jump ends the
+  glide, the page standing still after it whoever was moving it, and any doubt with it: only five frames of a page
+  stopped short or going back say it is the reader's. So a hand that moved the page on toward the target, then held it
+  fewer than five frames before such a jump, is carried. Settling a doubt the jump landed on for the reader was tried
+  and dropped real glides (the re-review, 2026-10-03): a resize holds Chromium's glide still for a frame, and the
+  place-keeping jump of the piece the reader is passing through lands on that one doubt, 24 runs in 24 left short of
+  07, 08 or the terminal with the resize late in the glide. The tests had resized only two or eight frames in, while
+  the page still stood above every piece that keeps its place; they now resize late too (40, 60 and 90 frames in for
+  Chromium's long glide, 4 and 6 for WebKit's ten-frame one).
+- The span rule ("the page stood between where the glide began and its target") no longer applies to a link's glide:
+  the follower says whose hand is on the page. It let a dragged reader through, and it dropped a real glide: WebKit's
+  scroll anchoring moves the page 40 to 70 px back as the click changes the address, before the glide begins, which
+  put the page "off course" at the resize (7 runs in 1,920 on desktop WebKit, 345 px short of 07). A Tab's glide keeps
+  the span rule.
+- A click that may glide nowhere (its default prevented, the address naming its target already, so nothing shows it
+  went anywhere) is watched, but nothing is taken up for it until the page has moved toward its target. A prevented
+  click that does navigate changes the address (the router's), and the address rule holds it either way.
+- A link's glide to 06 or 07 goes on whether the run is pinned or not. A rebuild that finds the glide already inside
+  the run unpins it under a reader no longer above it, and the run pins again only once they are: the glide handed
+  through the rebuild found no pinned run and was dropped, the reader left 1,912 px short of 07 (desktop WebKit, whose
+  glide is there four frames in: 7 runs in 30). Its goal is the station at the window while the run is pinned and the
+  section's own top under the masthead while it is not, taken up again as the run pins or unpins.
+- A take-up the browser does not begin is asked for again. WebKit, its own glide stopped by the journey's rebuild in
+  that frame, now and then takes the page to stand at that glide's end already, and makes no glide toward it (9 runs
+  in 120 to 08 on a phone; a glide by 300 px from there ended 300 px past the target). After six still frames an
+  instant scroll to where the page does stand puts that right, and the glide is asked for again, as a cut is, within
+  the same three takes (none short in 120 after).
+- A link the router handles (the masthead's to the terminal, a Next `<Link>`: its click arrives with its default
+  prevented, and the router glides to the fragment a few frames later) is watched from its click too, with half a
+  second for the glide to begin (30 frames, where a Tab's has six).
+
+Found after J6 (2026-10-02): the live pin's sticky top after a resize is its labels' once laid out for the new window.
+- A tablet turned (768×1024 to 1024×768 and back) flips the live chapter's labels between the list and their columns,
+  and the pin's sticky top with them (202 px: the words' height above the masthead's foot, or under it). The chapter
+  stays live and pinned, its timeline the same: a resize of the same shape, not a change of shape.
+- `drawing.ts` answered the resize before the scene laid its labels out again, so its range after the turn started at
+  the layout before's sticky top, and a reader inside the chapter landed (1 − f) × 202 px off: 151 px at 25%, 80 at
+  60%, 20 at 90% (0.047, 0.025 and 0.006 of the range), the same both ways round and with scroll anchoring on or off.
+  It now asks the scene to lay the labels out first (`pinTopLaidOut`), then reads the sticky top: within 4 px.
+- In WebKit that still failed about 3 turns in 10: the labels chose their layout from a media query made when they
+  were built, which WebKit leaves at its old answer through the "resize" that changed it, so the layout asked for at
+  the answer was the list again and the columns came a frame later. The labels now ask the query afresh at each layout.
+- 02 itself (columns at 64rem and up, its list below; 330vh and 300vh) was measured through the same turn at 25%, 60%
+  and 90%, both ways and with anchoring on and off, in Chromium and WebKit, the drawing live or still: within 1 px
+  (0.0003 of its range). Its guard needed no change; `place.spec.ts` now holds both there.
+
+Found after J6 (2026-10-02): 02's guard reads the reader's place as 02 itself decides to pin or to let its pin go.
+- The guard learns the reader's scroll from "scroll" events, and none once #how has changed size until it has settled
+  (such an event may be the browser's own move). A reader below a plain 02 who jumps to the top can have 02 pin (its
+  refit's timer, a "resize") before that jump's event is told: judged from the place before it, they were "past 02" and
+  thrown back down by the pin's growth, to the run, where the drawing stays still (1 run in 30 at 6× CPU, and in 1 of 60
+  measured again).
+- `chapters.ts` now says when 02 is about to pin or to try its fit again (`tt:how-before`), and the guard reads the
+  reader's place and #how's box then, as it does on `tt:layout` and before Motion's switch. The rules for a resize, a
+  change of shape, the split resize and the Back restore are unchanged.
+
 Found after J6, finishing 200% text (2026-09-29; 100% text unchanged throughout):
 - the masthead keeps one row at 390×844 with 200% text: below 16.5rem of its inner query container SIGN IN keeps only
   its icon (its name stays, visually hidden), as it already does below xs; 16.5rem is 264px at 100% text, inside xs.

@@ -1,72 +1,12 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "../fixtures";
 import { LANDING_INSTRUMENTS, collisionsInView } from "./collisions";
-import { atRest, dismissInstall, drawStill, frames, motionOff, noAnchoring, pressTab, readyTab, scrollIntoRun, scrollToId, waitForJourney, waitForLive } from "./journey-helpers";
+import { REST_MS, atRest, atTheWindow, dismissInstall, drawStill, frames, from07, motionOff, noAnchoring, pressTab, readyTab, running, scrollIntoRun, scrollToId, stationOf, trackAtRest, waitForJourney, waitForLive } from "./journey-helpers";
 
 // 06–07, the window-seat run (spec §3.A, §3.G; J6-7, J6-8). The drawing above is held to the still (drawStill): these
 // specs are about the run, and the live drawing would only make the software GPU slower.
 
-/** How far station i's centre stands from the train's: 0 when it is at the window. */
-function offTrain(page: Page, i: number): Promise<number> {
-  return page.evaluate((k) => {
-    const station = document.querySelectorAll("#run [data-station]")[k];
-    const train = document.querySelector("#run .run-train");
-    if (!station || !train) throw new Error("no such station, or no train");
-    const s = station.getBoundingClientRect();
-    const t = train.getBoundingClientRect();
-    return Math.abs(Math.round(s.left + s.width / 2 - (t.left + t.width / 2)));
-  }, i);
-}
 const here = (page: Page) => page.locator("#run [data-station]").evaluateAll((els) => els.findIndex((el) => el.classList.contains("is-here")));
-const stationOf = (page: Page, selector: string) => page.locator("#run [data-station]").evaluateAll((els, sel) => els.findIndex((el) => el.matches(sel) || el.querySelector(sel) !== null || el.closest(sel) !== null), selector);
-const running = (page: Page) => expect(page.locator("#run")).toHaveClass(/is-running/);
-/** The longest the rest wait lasts before it gives up and the place is judged anyway: it then fails with the train's
- * distance from the station and says it was still moving, never as a bare test timeout (nightly review, I-2). */
-const REST_MS = 20_000;
-/** The page and the run's track have both held still for ten frames: the scroll has landed (a glide down to the run
- * leaves the track still until it gets there) and the track's smoothing has come to rest, however long that took, up to
- * REST_MS. Anime eases it a fixed share of the way each frame, so the time to settle is the machine's: on the nightly's
- * GPU-less WebKit runner (about 8 frames a second as the page loads) a jump across the run took about 7 s, still closing
- * in when a 5 s poll gave up (1,864 px, then 1,015, 385, 115 and 28 at the cutoff; run 36406365173). A state wait, then
- * the place is judged. True once at rest; false when it gave up still moving. */
-const trackAtRest = (page: Page): Promise<boolean> =>
-  page.evaluate(
-    (limit) =>
-      new Promise<boolean>((done) => {
-        const until = performance.now() + limit;
-        let last = "";
-        let held = 0;
-        const tick = () => {
-          const now = `${window.scrollY} ${document.querySelector<HTMLElement>("#run .run-track")?.style.transform ?? ""}`;
-          held = now === last ? held + 1 : 0;
-          last = now;
-          if (held >= 10) done(true);
-          else if (performance.now() > until) done(false);
-          else requestAnimationFrame(tick);
-        };
-        requestAnimationFrame(tick);
-      }),
-    REST_MS,
-  );
-/** Station i at the window once the track has come to rest: within 3 px of the train. A track still moving after REST_MS
- * fails here, saying how far off it was. A test that waits on it more than once sets its own timeout (up to REST_MS a
- * wait, plus its pages' own loads). */
-const atTheWindow = async (page: Page, i: number) => {
-  const rested = await trackAtRest(page);
-  const off = await offTrain(page, i);
-  expect(off, `station ${i} ${off}px off the train, ${rested ? "at rest" : `still moving after ${REST_MS / 1000} s`}`).toBeLessThanOrEqual(3);
-  expect(rested, `the run's track still moving after ${REST_MS / 1000} s, station ${i} ${off}px off the train`).toBe(true);
-};
-/** How far 07's top stands from the masthead's foot, read as place-memory reads it (J6-9): where run.ts says it stands
- * while the run is pinned (data-run-at), its own box otherwise. 0 when the reader is at 07. */
-const from07 = (page: Page) =>
-  page.evaluate(() => {
-    const use = document.getElementById("use");
-    if (!use) throw new Error("#use is missing");
-    const foot = document.querySelector("header")?.getBoundingClientRect().bottom ?? 0;
-    const top = use.dataset.runAt === undefined ? use.getBoundingClientRect().top : Number(use.dataset.runAt) - window.scrollY;
-    return Math.abs(Math.round(top - foot));
-  });
 
 test.describe("the window-seat run (spec §3.A)", () => {
   test.beforeEach(async ({ page }) => {

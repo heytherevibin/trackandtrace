@@ -1,6 +1,6 @@
 import { expect, test } from "../fixtures";
 import { STILL_MANIFEST } from "@/components/landing/journey/still-manifest";
-import { blockJourneyChunk, blockSceneChunk, drawStill, motionOff, scrollIntoChapter, scrollToId, stubSaveData, waitForJourney, waitForLive } from "./journey-helpers";
+import { blockJourneyChunk, blockSceneChunk, drawStill, frames, motionOff, scrollIntoChapter, scrollToId, stubSaveData, waitForJourney, waitForLive } from "./journey-helpers";
 
 const drawn = (page: import("@playwright/test").Page) => page.locator("#anatomy .anatomy-still:not(.is-noscript) use[href]");
 
@@ -241,6 +241,25 @@ test.describe("J5: every reason not to draw live (spec §3.C, §4)", () => {
     await expect(page.locator("html")).toHaveAttribute("data-drawing", "still");
     await expect(page.locator("#anatomy")).not.toHaveClass(/is-live/);
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+    await waitForLive(page);
+  });
+
+  // The same reader, on a slow device: 02 pinned (its refit, or a "resize") after their jump to the top and before that
+  // scroll's own event was told, so 02's guard still held them below it, judged them past it, and threw them back down
+  // by the pin's growth, where the drawing stays still (1 run in 30 at 6× CPU). Forced here: a "resize" in the scroll's
+  // own task has 02 decide before the scroll event.
+  test("a reader who jumps to the top from below stays there, though 02 pins before their scroll is told", async ({ page }) => {
+    await page.goto("/#faq");
+    await waitForJourney(page);
+    await expect(page.locator("html")).toHaveAttribute("data-drawing-why", "place");
+    await expect(page.locator("#how")).not.toHaveClass(/is-pinned/);
+    await page.evaluate(() => {
+      window.scrollTo({ top: 0, behavior: "instant" });
+      window.dispatchEvent(new Event("resize"));
+    });
+    await expect(page.locator("#how")).toHaveClass(/is-pinned/);
+    await frames(page, 6); // the scroll's event, and 02's guard's answer to the pin
+    expect(await page.evaluate(() => window.scrollY), "the reader is still at the top").toBeLessThanOrEqual(4);
     await waitForLive(page);
   });
 });

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MOTION_BEFORE_EVENT, MOTION_EVENT } from "@/components/motion/use-motion";
-import { startPlaceGuard } from "@/components/landing/journey/chapters";
+import { HOW_BEFORE_EVENT, startPlaceGuard } from "@/components/landing/journey/chapters";
 import { APART_MS } from "@/components/landing/journey/keep-place";
 import { JUMP_EVENT, LAYOUT_EVENT } from "@/components/landing/journey/journey-events";
 
@@ -55,6 +55,45 @@ describe("02's place guard", () => {
     doc.height = 2600;
     observed([], {} as ResizeObserver);
     expect(scrollTo).toHaveBeenCalledWith({ top: Math.round(1190 + (124 / 2296) * 1896), behavior: "instant" });
+    stop();
+  });
+
+  // A reader below a plain 02 jumps to the top, and 02 pins (its refit's timer, or a "resize") before that scroll's own
+  // event has been told: the guard still held them below 02, judged them past it, and threw them back down by the pin's
+  // growth (5,687 to 7,398 on the page; drawing-modes.spec's 1 run in 30 on a slow device). 02 says it is about to change
+  // its own shape, and the guard reads the reader's place then.
+  it("reads the reader's place afresh as 02 is about to pin, so a jump to the top not yet told as a scroll is never thrown back", () => {
+    let observed: ResizeObserverCallback = () => undefined;
+    window.ResizeObserver = class {
+      constructor(callback: ResizeObserverCallback) {
+        observed = callback;
+      }
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
+    };
+    document.documentElement.dataset.motion = "on";
+    document.documentElement.dataset.journey = "on";
+    document.body.innerHTML = `<header></header><section id="how" class="chapters"></section>`;
+    document.querySelector("header")!.getBoundingClientRect = () => ({ height: 64, bottom: 64 }) as DOMRect;
+    const how = document.getElementById("how")!;
+    const doc = { top: 1000, height: 1400 };
+    let y = 0;
+    vi.spyOn(window, "scrollY", "get").mockImplementation(() => y);
+    vi.spyOn(window, "innerHeight", "get").mockReturnValue(900);
+    how.getBoundingClientRect = () => ({ top: doc.top - y, bottom: doc.top - y + doc.height, width: 1440, height: doc.height }) as DOMRect;
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+    const stop = startPlaceGuard();
+    y = 5687; // at 08, far below 02
+    window.dispatchEvent(new Event("scroll"));
+    y = 0; // an instant scroll to the top: its "scroll" event comes with the next frame
+    window.dispatchEvent(new Event(HOW_BEFORE_EVENT)); // 02, about to pin (chapters.ts's decide)
+    how.classList.add("is-pinned");
+    doc.height = 2970;
+    window.dispatchEvent(new Event(LAYOUT_EVENT));
+    window.dispatchEvent(new Event("scroll")); // heard after #how changed size: never learned from
+    observed([], {} as ResizeObserver);
+    expect(scrollTo).not.toHaveBeenCalled();
     stop();
   });
 

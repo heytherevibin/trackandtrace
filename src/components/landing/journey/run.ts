@@ -1,14 +1,13 @@
 import { animate, onScroll, type JSAnimation, type ScrollObserver } from "animejs";
-import { messages } from "@/messages";
 import { readerPlace } from "./drawing-mode";
 import { keyboardFocus, watchGlide, watchTab } from "./focus-glide";
-import { anchorOf, band, fitsRun, hereAt, layers, leanStep, offsets, runLayout, trainFor, type RunLayout } from "./geometry/run";
+import { anchorOf, band, fitsRun, hereAt, leanStep, offsets, runLayout, trainFor, type RunLayout } from "./geometry/run";
 import { LAYOUT_EVENT, emit } from "./journey-events";
 import { keepPlace, laidOut, mastheadBottom, viewHeight, watchView, type ReadPlace } from "./keep-place";
 import { SMOOTH } from "./motion-tokens";
 import { keepUp, refreshObserver, track } from "./observers";
+import { drawRun } from "./run-draw";
 import type { JourneyContext, Teardown } from "./start-journey";
-import { STATIONS, kmFigure } from "./stations";
 
 // 06–07, the window-seat run (spec §3.A; prototype v3's run.js). The run pins (#run.is-running) and the scroll carries
 // both sections sideways past a window along a line diagram: the rails, the kilometre posts and a platform per station
@@ -20,24 +19,18 @@ import { STATIONS, kmFigure } from "./stations";
 // J6-7). Motion off, a window too short, or a reader below it: the two sections read as they always did.
 
 const RUNNING = "is-running";
-const NS = "http://www.w3.org/2000/svg";
 const PHONE = "(max-width: 47.99rem)";
 const COARSE = "(pointer: coarse)";
 const PLACE_EVENTS = ["scroll", "resize", LAYOUT_EVENT] as const;
-const kmOf = (id: string): number => STATIONS.find((s) => s.id === id)?.km ?? 0;
-const KM = { from: kmOf("features"), to: kmOf("use") };
 
 /** y lies within a pixel of the span from `a` to `b`, either way round. */
 function between(y: number, a: number, b: number): boolean {
   return y >= Math.min(a, b) - 1 && y <= Math.max(a, b) + 1;
 }
 
-function stroke(cls: string, d: string): SVGPathElement {
-  const path = document.createElementNS(NS, "path");
-  path.setAttribute("class", cls);
-  path.setAttribute("d", d);
-  return path;
-}
+/** A link's glide to a section of the run, watched as the journey rebuilds: left by the teardown, taken by the start in
+ * the same task (start-journey.ts starts every module before the rebuild returns), and dropped after it. */
+let handover: { readonly id: string; readonly taken: number } | null = null;
 
 export function startRun({ motion }: JourneyContext): Teardown {
   const run = document.getElementById("run");
@@ -63,6 +56,8 @@ export function startRun({ motion }: JourneyContext): Teardown {
   let placeFrame = 0;
   let layoutFrame = 0;
   let aimed = -1; // the station a Tab stop's glide is bringing to the window, while watch is armed for it
+  // The station a link glides to the window, while watch is armed for it, and where that glide ends.
+  let linked: { readonly i: number; readonly section: HTMLElement; readonly goal: number } | null = null;
 
   /** The scroll at which station i stands at the window: the run's start (its top under the masthead) plus its anchor. */
   const stationY = (i: number, layout: RunLayout): number =>
@@ -84,42 +79,13 @@ export function startRun({ motion }: JourneyContext): Teardown {
     return trainX === null ? null : runLayout(boxes, { w, h, trainX });
   };
 
-  const draw = (layout: RunLayout) => {
-    const drawn = layers(layout, KM);
-    const pairs = [
-      [far, drawn.far],
-      [line, drawn.line],
-      [near, drawn.near],
-    ] as const;
-    for (const [svg, layer] of pairs) {
-      svg.setAttribute("viewBox", `0 0 ${layer.span} ${layout.h}`);
-      svg.style.width = `${layer.span}px`;
-      svg.replaceChildren(...layer.strokes.map((s) => stroke(s.cls, s.d)));
-    }
-    for (const post of drawn.line.posts) {
-      const label = document.createElementNS(NS, "text");
-      label.setAttribute("class", "run-km");
-      label.setAttribute("x", String(post.x));
-      label.setAttribute("y", String(post.y));
-      label.textContent = messages.journey.run.km(kmFigure(post.km));
-      line.append(label);
-    }
-    drawn.line.stops.forEach((stop, i) => {
-      const g = document.createElementNS(NS, "g");
-      g.setAttribute("class", "run-stop");
-      g.dataset.i = String(i);
-      g.append(stroke("run-stroke is-platform", stop.platform), stroke("run-stroke is-tick", stop.tick));
-      line.append(g);
-    });
-  };
-
   /** Everything the pinned run writes but its motion: its height, the train's place, the window's lines, where each
    * section stands, and on touch screens a resting point per station. */
   const place = (layout: RunLayout) => {
     const head = mastheadBottom();
     run.style.setProperty("--run-h", `${Math.round(layout.h + layout.travel)}px`);
     train.style.left = `${layout.trainX}px`;
-    draw(layout);
+    drawRun(layout, { far, line, near });
     current = -1; // the stops were drawn afresh: light them again
     for (const section of sections) {
       const i = stations.findIndex((s) => section.contains(s));
@@ -162,7 +128,7 @@ export function startRun({ motion }: JourneyContext): Teardown {
     lean = 0;
     lastP = 0;
     aimed = -1;
-    watch.disarm();
+    if (!linked) watch.disarm(); // a link's glide goes on to its section, pinned or plain (goalOf)
   };
 
   const paint = () => {
@@ -288,6 +254,7 @@ export function startRun({ motion }: JourneyContext): Teardown {
     if (driver) refreshObserver(driver.observer);
     paint();
     if (run.offsetHeight !== before) emit(LAYOUT_EVENT);
+    retarget(); // the stations stand elsewhere, though the run's height may not have changed
   };
   const soon = () => {
     if (!layoutFrame) layoutFrame = requestAnimationFrame(() => relayout());
@@ -349,6 +316,7 @@ export function startRun({ motion }: JourneyContext): Teardown {
   const onResize = () => {
     if (!at) soon(); // unpinned, a window that grew may fit now; pinned, the pin's observer answers
     else learn(); // a window change the pin did not follow (a toolbar): the place, measured afresh
+    retarget();
   };
 
   // Tab onto a link in a card: bring its station to the window (the page's own scroll-behavior glides it). Only the
@@ -362,6 +330,7 @@ export function startRun({ motion }: JourneyContext): Teardown {
     const station = el?.closest<HTMLElement>("[data-station]") ?? null;
     const i = station ? stations.indexOf(station) : -1;
     if (!el || i < 0 || !tab.down() || !keyboardFocus(el)) return;
+    linked = null; // a Tab's glide from here on, not a link's
     if (!layout) {
       // Not pinned (a reader below the run Shift+Tabs up into it): the browser glides to the card as to any link, and
       // the glide may bring the run's top into the window, pinning it at its start with the card clipped far to the
@@ -404,6 +373,15 @@ export function startRun({ motion }: JourneyContext): Teardown {
    * when). `aimed` stays: onFocus and a relayout reset it. */
   const watch = watchGlide(() => {
     const layout = at;
+    const link = linked;
+    if (link) {
+      // only while the address still names its section: Back mid-glide is the reader's, and theirs to keep (the review)
+      if (window.location.hash !== `#${link.section.id}`) return;
+      const goal = goalOf(link.i, link.section);
+      linked = { ...link, goal };
+      window.scrollTo({ top: goal });
+      return goal;
+    }
     const i = aimed;
     const station = stations[i];
     if (layout && station?.contains(document.activeElement)) window.scrollTo({ top: stationY(i, layout) });
@@ -418,15 +396,60 @@ export function startRun({ motion }: JourneyContext): Teardown {
     if (!section || i < 0) return;
     event.preventDefault();
     window.history.pushState(null, "", `#${section.id}`);
-    window.scrollTo({ top: stationY(i, layout) });
+    glideTo(section, i);
     section.focus({ preventScroll: true });
   };
+  /** Glides station i to the window for a link to `section`, watched from here as a Tab's glide is from its focus, and
+   * followed to its end (focus-glide.ts's watch, and its bounds): a phone's toolbar resizes the window a few frames in,
+   * the glide's end set as it began (short of 07 in 4 runs in 10). `taken`: the takes a glide carried through the
+   * journey's rebuild has had. */
+  function glideTo(section: HTMLElement, i: number, taken = 0): void {
+    const from = window.scrollY;
+    const goal = goalOf(i, section);
+    window.scrollTo({ top: goal });
+    aimed = -1;
+    linked = Math.abs(goal - from) < 1 ? null : { i, section, goal };
+    if (linked) watch.arm(taken, goal);
+  }
+  /** Where a link to `section` takes the page: station i at the window while the run is pinned; while it is not (a rebuild
+   * that found the glide inside the run unpins it, and it pins again only once its reader is above it), the section's own
+   * top under the masthead. A pin or an unpin moves it, and the glide is taken up to where it then is (retarget). */
+  function goalOf(i: number, section: HTMLElement): number {
+    return at ? stationY(i, at) : Math.round(section.getBoundingClientRect().top + window.scrollY - mastheadBottom());
+  }
+  /** Back mid-glide (the address names the section no more): the reader's own way through the history, and the browser's
+   * to scroll. Let go for good, Forward or not. */
+  const onPop = () => {
+    if (!linked || window.location.hash === `#${linked.section.id}`) return;
+    linked = null;
+    watch.disarm();
+  };
+  /** A relayout moved the station a link's glide is bringing to the window, with no jump to say so (a resize re-laying the
+   * run, 02 above it refit, the run pinned or unpinned): a cut, taken up as a jump's is. Whose hand is on the page is the
+   * watch's to say, frame by frame (glide-follower.ts), not a span's: "between where it began and its station" let a
+   * dragged reader through, and dropped a glide WebKit's own scroll anchoring had moved 40 px back before it began (the
+   * address changing as the click lands: 7 runs in 1,920 left 345 px short of 07). */
+  function retarget(): void {
+    const link = linked;
+    const goal = link && watch.armed() ? goalOf(link.i, link.section) : null;
+    if (!link || goal === null || Math.abs(goal - link.goal) < 1) return;
+    linked = { ...link, goal };
+    watch.cut();
+  }
 
   decide();
+  // The rebuild's teardown left a link's glide it watched (the unpin cut it short): taken up by this start, in the same
+  // task, while the address still names its section, whether the run has pinned again or not (goalOf).
+  const passed = handover;
+  handover = null;
+  const section = passed ? sections.find((s) => s.id === passed.id && window.location.hash === `#${s.id}`) : undefined;
+  if (passed && section) glideTo(section, stations.findIndex((s) => section.contains(s)), passed.taken);
   window.addEventListener(LAYOUT_EVENT, soon);
   window.addEventListener(LAYOUT_EVENT, learn); // after a piece above moved the reader by its own change
   window.addEventListener("scroll", onScrolled, { passive: true });
   window.addEventListener("resize", onResize);
+  window.addEventListener(LAYOUT_EVENT, retarget);
+  window.addEventListener("popstate", onPop);
   trackEl.addEventListener("focusin", onFocus);
   document.addEventListener("click", onClick);
   return () => {
@@ -437,12 +460,21 @@ export function startRun({ motion }: JourneyContext): Teardown {
     window.removeEventListener(LAYOUT_EVENT, learn);
     window.removeEventListener("scroll", onScrolled);
     window.removeEventListener("resize", onResize);
+    window.removeEventListener(LAYOUT_EVENT, retarget);
+    window.removeEventListener("popstate", onPop);
     pinObserver.disconnect();
     stopView();
     trackEl.removeEventListener("focusin", onFocus);
     document.removeEventListener("click", onClick);
     window.clearTimeout(again);
     tab.stop();
+    if (linked && watch.armed()) {
+      const left = { id: linked.section.id, taken: watch.taken() };
+      handover = left;
+      queueMicrotask(() => {
+        if (handover === left) handover = null;
+      });
+    }
     watch.stop();
     if (!at) return;
     unpin();
