@@ -30,6 +30,15 @@ export const saveBody = z
 
 export const letterBody = z.object({ id: z.guid() }).strict();
 
+/** A suppression's row id. The address is never in the request: revealing it is what this answers. */
+export const revealBody = z.object({ id: z.guid() }).strict();
+
+/**
+ * A lift names the address as well as the row. The list gives every caller the id; only a reveal
+ * (or an operator's own row) gives the address, and the database refuses a lift without the right one.
+ */
+export const liftBody = z.object({ id: z.guid(), address: z.string().trim().min(3).max(254) }).strict();
+
 /**
  * The traveller site's origin, from the console's own host: the test's unsubscribe line links
  * there. Empty when the host is one this deployment does not serve.

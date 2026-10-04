@@ -364,6 +364,10 @@ export type Database = {
         Returns: undefined
       }
       console_letters: { Args: never; Returns: Json }
+      console_lift_suppression: {
+        Args: { p_address: string; p_environment: string; p_id: string }
+        Returns: undefined
+      }
       console_me: { Args: never; Returns: Json }
       console_my_keys: { Args: never; Returns: Json }
       console_my_sessions: { Args: never; Returns: Json }
@@ -390,6 +394,10 @@ export type Database = {
       console_reset_keys: {
         Args: { p_environment: string; p_member: string; p_reason: string }
         Returns: number
+      }
+      console_reveal_suppression: {
+        Args: { p_environment: string; p_id: string }
+        Returns: string
       }
       console_revoke_invite: {
         Args: { p_environment: string; p_invite: string; p_reason: string }
@@ -421,6 +429,7 @@ export type Database = {
         Args: { p_environment: string; p_letter: string }
         Returns: undefined
       }
+      console_suppressions: { Args: never; Returns: Json }
       console_team: { Args: never; Returns: Json }
       console_unblock_address: {
         Args: {
