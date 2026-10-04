@@ -2,7 +2,7 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "../fixtures";
 import { REBUILD_EVENT } from "@/components/landing/journey/journey-events";
 import { atRest, atTheWindow, dismissInstall, drawStill, frames, from07, noAnchoring, running, stationOf, waitForJourney } from "./journey-helpers";
-import { atResize, glidePlace, throughGlide, watchResize } from "./link-glide-helpers";
+import { atResize, glidePlace, midGlide, throughGlide, watchResize } from "./link-glide-helpers";
 
 // A tapped link's glide, cut short (the reviewer, 2026-10-01: 15 and 13 runs in 36 on the nightly's webkit-phone, to 07).
 // A phone's toolbar resizes the window a few frames into the glide; the browser set the glide's end as it began, and every
@@ -53,24 +53,27 @@ test.describe("a tapped in-page link's glide (spec §3.G)", () => {
             test.setTimeout(60_000); // the rest wait's own limit (REST_MS), and the page's loads
             const { tall, short } = sizes(isMobile);
             const [from, to] = toolbar === "hides" ? [short, tall] : [tall, short];
-            await drawStill(page);
-            await page.setViewportSize(from);
-            if (anchoring === "off") await noAnchoring(page);
-            await page.goto("/");
-            await waitForJourney(page);
-            await dismissInstall(page);
+            const at = await midGlide(FAR, async () => {
+              await drawStill(page);
+              await page.setViewportSize(from);
+              if (anchoring === "off") await noAnchoring(page);
+              await page.goto("/");
+              await waitForJourney(page);
+              await dismissInstall(page);
+              await running(page);
+              const start = await tapLink(page, isMobile, name);
+              await expect(page).toHaveURL(new RegExp(`#${id}$`));
+              await watchResize(page, id);
+              if (when === "2 frames into the glide") await frames(page, 2);
+              else await throughGlide(page, id, start, 0.15);
+              await page.setViewportSize(to);
+              await atRest(page, 15);
+              await frames(page, 30); // the journey's own resize answer lands 150 ms later
+              await atRest(page, 15);
+              return atResize(page);
+            });
             await running(page);
-            const start = await tapLink(page, isMobile, name);
-            await expect(page).toHaveURL(new RegExp(`#${id}$`));
-            await watchResize(page, id);
-            if (when === "2 frames into the glide") await frames(page, 2);
-            else await throughGlide(page, id, start, 0.15);
-            await page.setViewportSize(to);
-            await atRest(page, 15);
-            await frames(page, 30); // the journey's own resize answer lands 150 ms later
-            await atRest(page, 15);
-            await running(page);
-            expect((await atResize(page)).left, MID_GLIDE).toBeGreaterThan(FAR);
+            expect(at.left, MID_GLIDE).toBeGreaterThan(FAR);
             if (id === "use") {
               await atTheWindow(page, await stationOf(page, "#use *"));
               expect(await from07(page), "07's top at the masthead's foot").toBeLessThanOrEqual(4);
@@ -340,6 +343,17 @@ test.describe("a tapped in-page link's glide (spec §3.G)", () => {
   /** The same for the masthead's link, whose glide in WebKit is shorter still: asked for at 30%, it was over as the resize
    * was told in 1 run of 10. */
   const TERMINAL_SHARES = (browser: string) => (browser === "webkit" ? [0.1, 0.2] : [0.3, 0.5, 0.8]);
+  /** The masthead's link clicked, and the window resized once its glide has covered `share` of its way, mid-glide: where
+   * the glide stood as the resize was told. */
+  const terminalResized = (page: Page, isMobile: boolean, share: number, slow = false) =>
+    midGlide(FAR, async () => {
+      const start = await clickTerminal(page, isMobile, slow);
+      await watchResize(page, "terminal");
+      await throughGlide(page, "terminal", start, share);
+      await page.setViewportSize(sizes(isMobile).short);
+      await settled(page);
+      return atResize(page);
+    });
   /** The masthead's link to the terminal, clicked from 6,000 px down: where the page stood. `slow`: the router's
    * navigation takes 700 ms longer to go through, as on a slow machine (its change of the address, and its glide to the
    * fragment, each put off that long). In time, as the watch's wait for it is: sixty frames was past that wait's two
@@ -381,12 +395,14 @@ test.describe("a tapped in-page link's glide (spec §3.G)", () => {
       test(`reaches ${code} though the window is resized ${share * 100}% of the way through the glide`, async ({ page, isMobile, browserName }) => {
         test.skip(!SHARES(browserName).includes(share), "another share of this engine's glide");
         test.setTimeout(60_000); // the rest wait's own limit (REST_MS), and the page's loads
-        const start = await openAndTap(page, isMobile, name);
-        await watchResize(page, id);
-        await throughGlide(page, id, start, share);
-        await page.setViewportSize(sizes(isMobile).short);
-        await settled(page);
-        const at = await atResize(page);
+        const at = await midGlide(FAR, async () => {
+          const start = await openAndTap(page, isMobile, name);
+          await watchResize(page, id);
+          await throughGlide(page, id, start, share);
+          await page.setViewportSize(sizes(isMobile).short);
+          await settled(page);
+          return atResize(page);
+        });
         expect(at.left, MID_GLIDE).toBeGreaterThan(FAR);
         // and the case itself came about: a piece the reader was passing through kept their place with a jump, mid-glide.
         // Held to in Chromium, whose long glide is in a piece at each share; WebKit's ten-frame glide is between two as
@@ -398,23 +414,15 @@ test.describe("a tapped in-page link's glide (spec §3.G)", () => {
       });
     test(`reaches the terminal by the masthead's link from 6,000 px down though the window is resized ${share * 100}% of the way through the glide`, async ({ page, isMobile, browserName }) => {
       test.skip(!TERMINAL_SHARES(browserName).includes(share), "another share of this engine's glide");
-      const start = await clickTerminal(page, isMobile);
-      await watchResize(page, "terminal");
-      await throughGlide(page, "terminal", start, share);
-      await page.setViewportSize(sizes(isMobile).short);
-      await settled(page);
-      expect((await atResize(page)).left, MID_GLIDE).toBeGreaterThan(FAR);
+      test.setTimeout(60_000); // a run made again, when its resize came late
+      expect((await terminalResized(page, isMobile, share)).left, MID_GLIDE).toBeGreaterThan(FAR);
       expect(await fromLanding(page, "terminal"), "the terminal's top where its link lands it").toBeLessThanOrEqual(4);
     });
   }
   // As it begins: the router glides a few frames after the click, and the resize lands before the page has moved far.
   test("reaches the terminal by the masthead's link from 6,000 px down though the window is resized as the glide begins", async ({ page, isMobile }) => {
-    const start = await clickTerminal(page, isMobile);
-    await watchResize(page, "terminal");
-    await throughGlide(page, "terminal", start, 0.01);
-    await page.setViewportSize(sizes(isMobile).short);
-    await settled(page);
-    expect((await atResize(page)).left, MID_GLIDE).toBeGreaterThan(FAR);
+    test.setTimeout(60_000); // a run made again, when its resize came late
+    expect((await terminalResized(page, isMobile, 0.01)).left, MID_GLIDE).toBeGreaterThan(FAR);
     expect(await fromLanding(page, "terminal"), "the terminal's top where its link lands it").toBeLessThanOrEqual(4);
   });
 
@@ -422,12 +430,8 @@ test.describe("a tapped in-page link's glide (spec §3.G)", () => {
   // click, past the thirty frames a glide is given to begin. Counted from the click, the watch had let go by then, and
   // the glide that came after was left 3,700 to 5,500 px short at the resize (5 runs in 2,195 at 4x CPU; forced here).
   test("reaches the terminal by the masthead's link though the router takes 700 ms to go there", async ({ page, isMobile, browserName }) => {
-    const start = await clickTerminal(page, isMobile, true);
-    await watchResize(page, "terminal");
-    await throughGlide(page, "terminal", start, TERMINAL_SHARES(browserName)[0] ?? 0.3);
-    await page.setViewportSize(sizes(isMobile).short);
-    await settled(page);
-    expect((await atResize(page)).left, MID_GLIDE).toBeGreaterThan(FAR);
+    test.setTimeout(60_000); // a run made again, when its resize came late
+    expect((await terminalResized(page, isMobile, TERMINAL_SHARES(browserName)[0] ?? 0.3, true)).left, MID_GLIDE).toBeGreaterThan(FAR);
     expect(await fromLanding(page, "terminal"), "the terminal's top where its link lands it").toBeLessThanOrEqual(4);
   });
 

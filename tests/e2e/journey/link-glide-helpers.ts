@@ -81,3 +81,14 @@ export async function atResize(page: Page): Promise<ResizePlace> {
   if (!at) throw new Error("no resize was told since watchResize");
   return at;
 }
+
+/** Makes `act` (a load, a tap or a click, and a resize) until its resize was told mid-glide, the reader still more than
+ * `far` px from the target, three times at most: the last one's place. The resize is asked for from another process, and
+ * on a loaded machine it can be told once a short glide is over (WebKit's ten frames: 9 runs in 2,120 at a load of 80
+ * and more). That run measured nothing, so it is made again; a test whose three runs all came late still fails, on its
+ * own precondition. */
+export async function midGlide(far: number, act: () => Promise<ResizePlace>): Promise<ResizePlace> {
+  let at = await act();
+  for (let again = 0; again < 2 && at.left <= far; again += 1) at = await act();
+  return at;
+}
