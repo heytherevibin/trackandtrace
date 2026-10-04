@@ -3,7 +3,8 @@ import type { ConsoleDb } from "@/console/auth/db";
 import { consoleMessages } from "@/console/messages";
 import { AppError } from "@/services/errors";
 
-// The console's seven calls (supabase/migrations/20261004090000_console_letters.sql), each through
+// The console's eight calls (supabase/migrations/20261004090000_console_letters.sql, and
+// 20261004120000_console_delete_letter.sql for the eighth), each through
 // the MEMBER'S OWN session: the database re-checks the Admin floor and takes the member from the
 // session, so nothing here passes a member id and nothing here could forge one.
 //
@@ -121,4 +122,15 @@ export async function queueLetter(db: ConsoleDb, environment: string, id: string
 export async function stopLetter(db: ConsoleDb, environment: string, id: string): Promise<void> {
   const { error } = await db.rpc("console_stop_letter", { p_environment: environment, p_letter: id });
   if (error) throw fromError(error);
+}
+
+/**
+ * Deletes a draft. The database refuses anything that has been queued — that is the record of who
+ * received what — and here that refusal reads as one about deleting, not about changing.
+ */
+export async function deleteLetter(db: ConsoleDb, environment: string, id: string): Promise<void> {
+  const { error } = await db.rpc("console_delete_letter", { p_environment: environment, p_letter: id });
+  if (!error) return;
+  if (error.message.includes("not a draft")) throw new AppError("INVALID_INPUT", m.notDeletable);
+  throw fromError(error);
 }

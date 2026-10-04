@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ConsoleDb } from "@/console/auth/db";
-import { queueLetter, readLetter, readLetters, readLists, recordTest, saveLetter, stopLetter } from "@/console/announcements/letters";
+import { deleteLetter, queueLetter, readLetter, readLetters, readLists, recordTest, saveLetter, stopLetter } from "@/console/announcements/letters";
 import { consoleMessages } from "@/console/messages";
 import { AppError } from "@/services/errors";
 
@@ -86,6 +86,16 @@ describe("writing", () => {
     const stopped = db({});
     await stopLetter(stopped.db, "production", ID);
     expect(stopped.rpc).toHaveBeenCalledWith("console_stop_letter", { p_environment: "production", p_letter: ID });
+  });
+
+  it("deletes a draft by id, under the environment the server names", async () => {
+    const { db: client, rpc } = db({});
+    await deleteLetter(client, "production", ID);
+    expect(rpc).toHaveBeenCalledWith("console_delete_letter", { p_environment: "production", p_letter: ID });
+  });
+
+  it("says only a draft can be deleted when the database refuses anything else", async () => {
+    expect(await message(deleteLetter(db({ error: { message: "not a draft" } }).db, "production", ID))).toBe(m.notDeletable);
   });
 
   it.each([

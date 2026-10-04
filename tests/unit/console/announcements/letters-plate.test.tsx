@@ -1,8 +1,10 @@
 import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { LettersPlate, progressOf, whenOf } from "@/console/announcements/letters-plate";
 import type { LetterRow } from "@/console/announcements/letters";
 import { consoleMessages } from "@/console/messages";
+
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }) }));
 
 // ConsoleAnnouncements.dc.html, the List board: Subject, List, State, Progress, When. The four
 // sample letters are the sheet's own, with its figures.
@@ -47,6 +49,15 @@ describe("LettersPlate", () => {
     expect(within(rows[3]!).getByText("Availability")).toBeInTheDocument();
     expect(screen.getByText("4 letters")).toBeInTheDocument();
     expect(screen.getByText(m.letters.footer)).toBeInTheDocument();
+  });
+
+  it("offers Delete on a draft's row and on no other, under an Actions column a screen reader can name", () => {
+    render(<LettersPlate letters={[DRAFT, SENDING, STOPPED, DONE]} />);
+    const table = screen.getByRole("table", { name: m.letters.caption });
+    expect(within(table).getByRole("columnheader", { name: m.letters.actions })).toBeInTheDocument();
+    const rows = within(table).getAllByRole("row").slice(1);
+    expect(within(rows[0]!).getByRole("button", { name: m.letters.deleteLabel(DRAFT.subject) })).toBeInTheDocument();
+    for (const row of rows.slice(1)) expect(within(row).queryByRole("button")).not.toBeInTheDocument();
   });
 
   it("draws the same letters as cards for a phone, each one a single link", () => {

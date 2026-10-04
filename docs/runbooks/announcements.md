@@ -74,8 +74,9 @@ A run with any of these missing fails, loudly and by name, which is the intended
 All of it is in the console at `admin.trakline.in/announcements` (module 07, Owner and Admin):
 **New letter** writes and saves a draft, which then has its own address; **Send a test to me** and
 **Queue** are on that draft; a queued letter's address shows its progress and **Stop**. Writing,
-testing and queueing need a larger screen; on a phone the console reads, and stops. Each of test,
-queue and stop writes a row to the Audit log under Messages. Suppressions are not in the console yet:
+testing and queueing need a larger screen; on a phone the console reads, and stops. A draft can be
+**deleted** from its row in the list; nothing that has been queued can be, because it is the record of
+who received what. Each of test, queue, stop and delete writes a row to the Audit log under Messages. Suppressions are not in the console yet:
 lifting one is still done by hand, as the section further down describes.
 
 1. **Compose.** Pick a list, write a subject (up to 200 characters) and a body (up to 20,000).
