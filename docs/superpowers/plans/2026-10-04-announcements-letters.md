@@ -3959,3 +3959,14 @@ Then: what an operator can now do; what is not here (Suppressions, next PR); the
 **Names used across tasks.** `LetterRow`, `LetterDetail`, `ListCounts`, `LetterList`, `LetterState` (Task 3) are what Tasks 4, 6, 8, 10 and 11 import. `Ahead`, `daysFor`, `finishDate`, `lettersAhead`, `percent` (Task 4) are what Tasks 10 and 11 import. `requestSave`, `requestTest`, `requestQueue`, `requestStop` (Task 9) are what Tasks 10 and 11 call. `ComposeLetter` is exported from `compose-form.tsx` and imported, as a type only, by `compose-readonly.tsx` and the page. `HowPlate` takes `titleId` everywhere it is drawn.
 
 **Known differences from the sheet, each deliberate.** No tab row until Suppressions exists. A Done letter never shows an Unknown above zero (ruling 12). "Saved" on a draft is the day it was first saved, because the store keeps no later date. No "Sample data" cell: the app's data is real.
+
+## As built (PR #120)
+
+The plan was executed on 4 Oct 2026. Where the code differs from the text above, the code is right:
+
+- **Dates** print in the app's house format ("06 Sept 2026"), so the tests match `0?6 Sep` and `0?4 Oct` rather than the sheet's "6 Sep" and "4 Oct".
+- **Task 8:** a test send is counted against the day's allowance only when it reached the mail service (`outcome === "sent"`), as `sendConsoleEmail` already does; a captured send under E2E is recorded but not counted.
+- **Task 9:** `testDeps` uses `publicStoreForReading()`, not `publicStore()`: `tests/unit/console/store-reads.contract.test.ts` forbids the fallback store anywhere in the console. The test route's tests post from `admin.localhost:4211`, the only host with a traveller origin outside production, and a host with none answers 502.
+- **Task 10:** `how-plate.tsx` uses `pl-8` (the spacing rhythm has no `pl-9`); `compose-form.tsx` types `found` explicitly.
+- **Task 12:** the end-to-end spec counts the news list from the database instead of assuming two readers, and polls the phone sheet's box until its entrance has finished. `supabase test db` could not mount this worktree, so pgTAP was run through the database container's own `psql`.
+- The sheets README's "built" line was left out of #120: the B4 section it would edit is changed by #119, and the two would conflict.
