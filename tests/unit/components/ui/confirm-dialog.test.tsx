@@ -21,6 +21,13 @@ describe("ConfirmDialog as a phone sheet", () => {
     expect(actions.className).toContain("max-sm:flex-col-reverse");
   });
 
+  it("draws what it is given before its description, in that order", () => {
+    render(<ConfirmDialog open onOpenChange={() => {}} title="Queue this letter?" before={<p>People 431</p>} description="Once queued, the letter goes to real people." confirmLabel="Queue" onConfirm={() => {}} />);
+    const text = screen.getByRole("alertdialog").textContent ?? "";
+    expect(text.indexOf("People 431")).toBeGreaterThan(-1);
+    expect(text.indexOf("People 431")).toBeLessThan(text.indexOf("Once queued"));
+  });
+
   it("is the centred dialog it always was when not asked to be a sheet", () => {
     dialog(false);
     const viewport = screen.getByRole("alertdialog").parentElement as HTMLElement;

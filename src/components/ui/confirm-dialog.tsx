@@ -22,6 +22,7 @@ export function ConfirmDialog({
   confirmDisabled = false,
   tone = "danger",
   phoneSheet = false,
+  before,
   children,
 }: {
   readonly open: boolean;
@@ -39,6 +40,8 @@ export function ConfirmDialog({
    * (ConsoleAnnouncementsPhone.dc.html, Stop confirm). From `sm` up it is the centred dialog.
    */
   readonly phoneSheet?: boolean;
+  /** Drawn between the title and the description: a summary the sentence then speaks about. */
+  readonly before?: ReactNode;
   readonly children?: ReactNode;
 }) {
   const [busy, setBusy] = useState(false);
@@ -57,6 +60,7 @@ export function ConfirmDialog({
           >
             <Corners />
             <AlertDialog.Title className="text-3xl tracking-head">{title}</AlertDialog.Title>
+            {before ? <div className="mt-3">{before}</div> : null}
             <AlertDialog.Description className="mt-2.5 text-body text-ink-2">{description}</AlertDialog.Description>
             {children ? <div className="mt-4">{children}</div> : null}
             {/* DOM order stays Cancel then confirm; reversed below `sm`, the action sits on top as drawn. */}
