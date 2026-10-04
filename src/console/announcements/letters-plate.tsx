@@ -63,7 +63,7 @@ export function LettersPlate({ letters }: { readonly letters: readonly LetterRow
         <p className="px-5 py-4 text-sm">{m.letters.none}</p>
       ) : (
         <>
-          <div className="overflow-x-auto max-sm:hidden">
+          <div className="relative overflow-x-auto max-sm:hidden">
             <table className="w-full text-left text-sm">
               <caption className="sr-only">{m.letters.caption}</caption>
               <thead>

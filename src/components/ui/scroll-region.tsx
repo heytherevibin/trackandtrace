@@ -54,7 +54,8 @@ export function ScrollRegion({
       ref={box}
       data-scroll-region={name}
       data-scrolls={scrolls === null ? "pending" : scrolls ? "yes" : "no"}
-      className={cn("overflow-x-auto focus-visible:-outline-offset-2", className)}
+      // `relative`: so a visually hidden heading inside stays inside (scrollers.contract.test.ts).
+      className={cn("relative overflow-x-auto focus-visible:-outline-offset-2", className)}
       onFocus={(event) => {
         if (event.target === event.currentTarget) setFocused(true);
       }}

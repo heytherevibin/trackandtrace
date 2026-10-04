@@ -37,6 +37,28 @@ export async function scrollRegionsSettled(page: Page): Promise<void> {
   );
 }
 
+/**
+ * How far the page itself can be scrolled sideways, in px: 0 when it cannot be.
+ *
+ * Asked of the page by scrolling it, because that is the only reading that is neither too strict nor
+ * too kind. `documentElement.scrollWidth` also counts what a scroller inside the page holds (so it
+ * convicts a table that scrolls in its own box, as it should), and a position read back in the same
+ * tick as a plain `scrollTo` is too kind by a mile: the site's `scroll-behavior: smooth`
+ * (src/styles/base.css) turns that call into an animation that has not moved yet, so the read is 0
+ * on any page whatsoever. That is how the audit log's own check passed, from the day that page
+ * shipped, over a page that did scroll sideways. `behavior: "instant"` is what makes the jump
+ * happen before the read.
+ */
+export async function sidewaysScroll(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const top = window.scrollY;
+    window.scrollTo({ left: 100_000, top, behavior: "instant" });
+    const reached = Math.round(window.scrollX);
+    window.scrollTo({ left: 0, top, behavior: "instant" });
+    return reached;
+  });
+}
+
 /** Describes everything that breaks the phone layout on the current page; empty when it fits. */
 export async function layoutBreaks(page: Page): Promise<string[]> {
   await scrollRegionsSettled(page);

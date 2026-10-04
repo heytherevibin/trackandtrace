@@ -98,7 +98,7 @@ export function SuppressionsPlate({ rows }: { readonly rows: readonly Suppressio
         <p className="px-5 py-4 text-sm">{m.none}</p>
       ) : (
         <>
-          <div className="overflow-x-auto max-sm:hidden">
+          <div className="relative overflow-x-auto max-sm:hidden">
             <table className="w-full text-left text-sm">
               <caption className="sr-only">{m.caption}</caption>
               <thead>

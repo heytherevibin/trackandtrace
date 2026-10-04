@@ -43,8 +43,14 @@ export function DataTable<Row>({ columns, rows, rowKey, caption, showCaption = f
   if (rows.length === 0 && emptyState) return <>{emptyState}</>;
   const cell = dense ? "px-3.5 py-2" : "px-5 py-3";
   // Every row, the last included, carries its hairline, as the sheets draw it.
+  //
+  // `relative`: the caption and any `hideHeader` heading are positioned off-screen for a screen
+  // reader, and a scroller that is not itself positioned does not clip a positioned child. Without
+  // it a hidden heading in the last column sat past the window's edge whenever the table was wider
+  // than its scroller, and the PAGE scrolled sideways by as much as the table overflowed (measured
+  // 2026-10-04; tests/unit/scrollers.contract.test.ts holds the rule for every scroller).
   return (
-    <div className={cn("overflow-x-auto", className)} role="region" aria-label={caption} tabIndex={0}>
+    <div className={cn("relative overflow-x-auto", className)} role="region" aria-label={caption} tabIndex={0}>
       <table className="table-stack w-full border-collapse text-left text-body">
         <caption className={showCaption ? "legend px-5 py-2.5 text-left" : "sr-only"}>{caption}</caption>
         <thead>
