@@ -344,9 +344,22 @@ export type Database = {
         }
         Returns: undefined
       }
+      console_delete_lead: {
+        Args: {
+          p_environment: string
+          p_id: string
+          p_reason: string
+          p_value: string
+        }
+        Returns: undefined
+      }
       console_delete_letter: {
         Args: { p_environment: string; p_letter: string }
         Returns: undefined
+      }
+      console_export_leads: {
+        Args: { p_environment: string; p_filters: string; p_reason: string }
+        Returns: Json
       }
       console_find_lead: {
         Args: { p_email: string; p_environment: string }
