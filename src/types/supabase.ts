@@ -344,6 +344,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      console_delete_letter: {
+        Args: { p_environment: string; p_letter: string }
+        Returns: undefined
+      }
       console_invite_member: {
         Args: {
           p_email: string
