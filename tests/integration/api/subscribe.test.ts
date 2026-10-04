@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // seam: the same reply whatever the database said, the hash never the token, and a signature that
 // must verify before anything is written.
 
-const { store, sendEmail } = vi.hoisted(() => ({
+const { store, sendEmail, suppressionFor } = vi.hoisted(() => ({
   store: {
     signUpRow: vi.fn(async () => "send" as "send" | "quiet"),
     confirmRow: vi.fn(async () => ({ state: "confirmed", list: "news" })),
@@ -14,9 +14,11 @@ const { store, sendEmail } = vi.hoisted(() => ({
     rejoinRow: vi.fn(async () => "done"),
     personId: vi.fn(),
   },
-  sendEmail: vi.fn(async () => "sent" as const),
+  sendEmail: vi.fn(async () => ({ outcome: "sent", id: "msg_1" }) as const),
+  suppressionFor: vi.fn(async (_email: string) => null as "all" | "list" | null),
 }));
 vi.mock("@/services/subscriptions/store", () => store);
+vi.mock("@/services/announcements/store", () => ({ suppressionFor }));
 vi.mock("@/services/email/send", () => ({ sendEmail }));
 vi.mock("@/services/email/allowance", () => ({ takeConfirmation: async () => "ok" }));
 
@@ -40,6 +42,8 @@ function post(path: string, body: unknown, ip = "203.0.113.10"): Request {
 beforeEach(() => {
   for (const f of Object.values(store)) f.mockClear();
   sendEmail.mockClear();
+  suppressionFor.mockReset();
+  suppressionFor.mockResolvedValue(null);
 });
 
 describe("POST /api/subscribe", () => {
@@ -56,6 +60,17 @@ describe("POST /api/subscribe", () => {
     store.signUpRow.mockResolvedValueOnce("quiet");
     const response = await signUp(post("/api/subscribe", { email: "asha@example.in", list: "news", source: "footer" }, "203.0.113.11"));
     expect(await response.json()).toEqual({ ok: true, message: m.sent });
+    expect(sendEmail).not.toHaveBeenCalled();
+  });
+
+  it("answers a hard-bounced address exactly as it answers any other, and sends nothing", async () => {
+    const ask = { email: "gone@example.in", list: "news", source: "footer" };
+    const normal = await signUp(post("/api/subscribe", ask, "203.0.113.20"));
+    suppressionFor.mockResolvedValue("all");
+    sendEmail.mockClear();
+    const suppressed = await signUp(post("/api/subscribe", ask, "203.0.113.21"));
+    expect(suppressed.status).toBe(normal.status);
+    expect(await suppressed.json()).toEqual(await normal.json());
     expect(sendEmail).not.toHaveBeenCalled();
   });
 

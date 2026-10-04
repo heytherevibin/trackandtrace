@@ -6,6 +6,10 @@ import { sendConsoleEmail } from "@/console/email/send";
 import { consoleMessages } from "@/console/messages";
 import { resetEnvCache } from "@/services/env";
 
+// Suppression is read from the database before every send; nothing here is suppressed, and the
+// wrapper's own refusals are pinned in tests/unit/services/email/suppression.test.ts.
+vi.mock("@/services/announcements/store", () => ({ suppressionFor: async () => null }));
+
 // Same partial-mock shape as email/send.test.ts: sendConsoleEmail is a spy that calls straight
 // through to the real implementation (still driven by vi.stubEnv/the outbox) for every test but
 // the two that override it for a single call -- proving sendInviteLetter's own try/catch, not just

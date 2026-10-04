@@ -39,7 +39,9 @@
     "source:probe:refusals": "node --env-file-if-exists=.env.local --env-file-if-exists=../../../.env.local scripts/probe-railkit-refusals.mjs",
     "source:health": "node --env-file-if-exists=.env.local scripts/source-health.mjs",
     "source:crawl": "node --env-file-if-exists=.env.local --env-file-if-exists=../../../.env.local scripts/crawl-availability.mjs",
-    "source:report": "node --env-file-if-exists=.env.local --env-file-if-exists=../../../.env.local scripts/observations-report.mjs"
+    "source:report": "node --env-file-if-exists=.env.local --env-file-if-exists=../../../.env.local scripts/observations-report.mjs",
+    "announce:send": "node --env-file-if-exists=.env.local --env-file-if-exists=../../../.env.local scripts/announce-send.mjs",
+    "announce:report": "node --env-file-if-exists=.env.local --env-file-if-exists=../../../.env.local scripts/announce-report.mjs"
   },
   "dependencies": {
     "@base-ui/react": "1.8.0",
@@ -54,7 +56,7 @@
     "animejs": "4.5.0",
     "clsx": "2.1.1",
     "motion": "13.4.0",
-    "next": "16.3.4",
+    "next": "16.3.8",
     "next-themes": "0.4.6",
     "react": "19.2.8",
     "react-dom": "19.2.8",

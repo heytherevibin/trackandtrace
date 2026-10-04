@@ -129,6 +129,11 @@ const envSchema = z
     VERCEL_URL: z.string().optional(),
     /** Server only. Resend sending key for console email; entered by the owner through a hidden prompt. */
     RESEND_API_KEY: z.string().min(20).optional(),
+    /** Server only. The Svix signing secret of the Resend webhook endpoint (whsec_ + base64). Unset, the webhook route refuses everything. */
+    RESEND_WEBHOOK_SECRET: z
+      .string()
+      .regex(/^whsec_[A-Za-z0-9+/]{16,}={0,2}$/, "RESEND_WEBHOOK_SECRET must be the endpoint's signing secret from the Resend dashboard (whsec_…) with no spaces.")
+      .optional(),
     /** Who console email comes from. One default, so no deployment has to set it. */
     CONSOLE_EMAIL_FROM: z.string().min(5).max(120).default("Trakline Console <console@trakline.in>"),
     /** Who a traveller's sign-up confirmation comes from. A different address from the console's, on the same verified domain. */

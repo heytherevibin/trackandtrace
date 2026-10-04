@@ -14,7 +14,7 @@ function deps(over: Partial<SubscribeDeps> = {}): SubscribeDeps & { send: Return
     limiter: { check: vi.fn(async () => ({ ok: true, remaining: 4, retryAfterSeconds: 0 })) },
     allowance: vi.fn(async () => "ok" as const),
     signUp: vi.fn(async () => "send" as const),
-    send: vi.fn(async () => "sent" as const),
+    send: vi.fn(async () => ({ outcome: "sent", id: "msg_1" }) as const),
     origin: "https://trakline.in",
     from: "Trakline <updates@trakline.in>",
     token: () => "tok_abc",
@@ -37,6 +37,12 @@ describe("subscribe", () => {
     const d = deps({ signUp: vi.fn(async () => "quiet" as const) });
     await expect(subscribe(ASK, "203.0.113.9", d)).resolves.toBeUndefined();
     expect(d.send).not.toHaveBeenCalled();
+  });
+
+  it("answers the same, quietly, when the address is suppressed, so a bounced address cannot be told from any other", async () => {
+    const d = deps({ send: vi.fn(async () => ({ outcome: "suppressed" }) as const) });
+    await expect(subscribe(ASK, "203.0.113.9", d)).resolves.toBeUndefined();
+    expect(d.send).toHaveBeenCalledOnce();
   });
 
   it("refuses an address that is not one, before anything else", async () => {
@@ -64,7 +70,7 @@ describe("subscribe", () => {
   });
 
   it("says it did not go through when the email is refused, or there is no safe origin to link to", async () => {
-    await expect(subscribe(ASK, "203.0.113.9", deps({ send: vi.fn(async () => "failed" as const) }))).rejects.toThrow(m.errors.failed);
+    await expect(subscribe(ASK, "203.0.113.9", deps({ send: vi.fn(async () => ({ outcome: "failed" }) as const) }))).rejects.toThrow(m.errors.failed);
     const noOrigin = deps({ origin: "" });
     await expect(subscribe(ASK, "203.0.113.9", noOrigin)).rejects.toThrow(m.errors.failed);
     expect(noOrigin.signUp).not.toHaveBeenCalled();

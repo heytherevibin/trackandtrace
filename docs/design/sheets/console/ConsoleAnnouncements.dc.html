@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Console announcements</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="industry.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&amp;family=Barlow+Condensed:wght@500;600&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="face" data-face="{{face}}" style="width: 1440px; height: {{faceH}}; position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--surface-0); color: var(--ink-1); font-family: var(--body);">
+<div style="height: 28px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 24px; border-bottom: 1px solid var(--line);">
+<span class="tag tag-filled tag-caps">Production</span>
+<span class="legend">admin.trakline.in</span>
+</div>
+<header style="height: 56px; flex: none; display: flex; align-items: center; gap: 12px; padding: 0 24px; border-bottom: 1px solid var(--line);">
+<a href="#" aria-label="Trakline console, Overview" style="display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink-1);">
+<svg width="24" height="24" viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="6" fill="#1a1a1c" stroke="#55555b"></rect><rect x="6" y="8" width="5" height="16" rx="1.5" fill="#ff3b30"></rect><rect x="13" y="8" width="5" height="16" rx="1.5" fill="#ff9a00"></rect><rect x="20" y="8" width="5" height="16" rx="1.5" fill="#ffe100"></rect><circle cx="27.5" cy="16" r="1.75" fill="#ff3b30"></circle></svg>
+<span style="font-family: var(--display); font-weight: 600; font-size: 18px; line-height: 24px; letter-spacing: 0.06em; text-transform: uppercase;">Trakline</span>
+</a>
+<span class="tag tag-outline tag-caps">Console</span>
+<div style="flex-grow: 1;"></div>
+<div style="display: flex; align-items: center; gap: 8px;">
+<span style="display: inline-flex; align-items: baseline; gap: 8px; padding: 0 8px;"><span class="fig" style="font-size: 15px; letter-spacing: 0.06em;">14:32</span><span class="legend-sm">IST</span></span>
+<button type="button" class="box box-icon" aria-label="{{themeLabel}}" title="{{themeLabel}}" onClick="{{cycleTheme}}">
+<sc-if value="{{modeSystem}}" hint-placeholder-val="{{ true }}">
+<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.25" fill="none" stroke="currentColor" stroke-width="1.5"></circle><path d="M10 2.75a7.25 7.25 0 0 1 0 14.5Z" fill="currentColor"></path></svg>
+</sc-if>
+<sc-if value="{{modeDay}}" hint-placeholder-val="{{ false }}">
+<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="4" fill="currentColor"></circle><path d="M10 1.5v2M10 16.5v2M1.5 10h2M16.5 10h2M4 4l1.4 1.4M14.6 14.6 16 16M4 16l1.4-1.4M14.6 5.4 16 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg>
+</sc-if>
+<sc-if value="{{modeNight}}" hint-placeholder-val="{{ false }}">
+<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M8.5 2.2a7.8 7.8 0 1 0 9.3 9.3A6.3 6.3 0 1 1 8.5 2.2Z"></path></svg>
+</sc-if>
+</button>
+<button type="button" class="box" aria-haspopup="menu" aria-expanded="false" aria-label="{{memberLabel}}" style="gap: 10px; padding: 0 10px 0 1px;">
+<span class="avatar">{{initials}}</span>
+<span class="tag tag-outline tag-caps">{{role}}</span>
+<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5"></path></svg>
+</button>
+</div>
+</header>
+<div style="flex-grow: 1; display: flex; min-height: 0;">
+<nav aria-label="Console" style="width: 240px; flex: none; display: flex; flex-direction: column; border-right: 1px solid var(--line); padding: 20px 0 16px;">
+<sc-for list="{{groups}}" as="g" hint-placeholder-count="5">
+<div style="display: flex; flex-direction: column; padding: 0 0 14px;">
+<span class="legend" style="padding: 0 24px 6px;">{{g.legend}}</span>
+<sc-for list="{{g.items}}" as="it" hint-placeholder-count="3">
+<a href="#" aria-current="{{it.aria}}" style="{{it.rowStyle}}">
+<span class="fig" style="width: 22px; font-size: 13px; letter-spacing: 0.04em; color: var(--ink-3);">{{it.num}}</span>
+<span style="flex-grow: 1; font-size: 14px;">{{it.label}}</span>
+<sc-if value="{{it.hasCount}}" hint-placeholder-val="{{ false }}">
+<span class="fig" style="min-width: 22px; height: 20px; padding: 0 6px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--line-strong); font-size: 12px; color: var(--ink-1);">{{it.count}}</span>
+</sc-if>
+</a>
+</sc-for>
+</div>
+</sc-for>
+<div style="flex-grow: 1;"></div>
+<span class="legend-sm" style="padding: 0 24px;">Build 42c5317 · 19 Sep 2026</span>
+</nav>
+<main style="flex-grow: 1; min-width: 0; padding: 32px 40px; display: flex; flex-direction: column; gap: 28px;">
+<div class="ph">
+<div class="ph-main">
+<p class="kicker">07 · Announcements</p>
+<h1 class="ph-title">Announcements</h1>
+<p class="ph-lead">Letters to the people who asked for them. A send goes out over several days, so confirmation and sign-in mail always have room.</p>
+<sc-if value="{{showMeta}}" hint-placeholder-val="{{ true }}">
+<p class="legend ph-meta" style="margin-bottom: 0;">Updated 14:32 IST · Sample data</p>
+</sc-if>
+</div>
+<sc-if value="{{showNew}}" hint-placeholder-val="{{ true }}"><div class="ph-actions"><button type="button" class="btn btn-primary">New letter</button></div></sc-if>
+<sc-if value="{{showBack}}" hint-placeholder-val="{{ false }}"><div class="ph-actions"><a href="#" class="btn btn-secondary">All letters</a></div></sc-if>
+</div>
+<sc-if value="{{showTabs}}" hint-placeholder-val="{{ true }}">
+<div class="tabs" role="tablist" aria-label="Announcements" style="align-self: flex-start;">
+<button type="button" class="tab" role="tab" aria-selected="{{tabLetters}}">Letters</button>
+<button type="button" class="tab" role="tab" aria-selected="{{tabSupp}}">Suppressions</button>
+</div>
+</sc-if>
+
+<sc-if value="{{isList}}" hint-placeholder-val="{{ true }}">
+<section class="plate" aria-labelledby="letters-title">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+<div class="tb"><h2 class="cell title" id="letters-title" style="margin: 0;">Letters</h2><span class="cell">4 letters</span><span class="cell">Sample data</span></div>
+<table class="dt"><caption style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0);">Letters to the subscription lists</caption><thead><tr><th scope="col" style="width: 340px;">Subject</th><th scope="col" style="width: 120px;">List</th><th scope="col" style="width: 120px;">State</th><th scope="col" style="width: 330px;">Progress</th><th scope="col">When</th></tr></thead><tbody>
+<sc-for list="{{letters}}" as="l" hint-placeholder-count="4">
+<tr>
+<td class="first" style="font-weight: 500;"><a href="#">{{l.subject}}</a></td>
+<td>{{l.list}}</td>
+<td><span style="display: inline-flex; align-items: center; gap: 8px;"><span class="{{l.lamp}}"></span>{{l.state}}</span></td>
+<td class="tnum">{{l.progress}}</td>
+<td class="tnum">{{l.when}}</td>
+</tr>
+</sc-for>
+</tbody></table>
+<p style="margin: 0; padding: 12px 20px 14px; border-top: 1px solid var(--line); font-size: 13px; line-height: 20px; color: var(--ink-2);">A letter goes out at most 40 a day. We don't track opens or clicks.</p>
+</section>
+</sc-if>
+
+<sc-if value="{{isCompose}}" hint-placeholder-val="{{ false }}">
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 28px; align-items: start;">
+<section class="plate" aria-labelledby="compose-title">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+<div class="tb"><h2 class="cell title" id="compose-title" style="margin: 0;">New letter</h2><span class="cell">Draft</span><span class="cell">Form TC-10</span></div>
+<div style="padding: 20px; display: flex; flex-direction: column; gap: 20px; max-width: 760px;">
+<div>
+<label class="label" for="compose-subject">Subject</label>
+<input id="compose-subject" class="well" type="text" value="Trakline news: what's coming next">
+</div>
+<div>
+<span class="label" id="compose-list">List</span>
+<div role="radiogroup" aria-labelledby="compose-list">
+<div class="choice" role="radio" aria-checked="true" tabindex="0"><span class="dot" aria-hidden="true"></span><span style="display: flex; flex-direction: column;"><span style="font-size: 14px; line-height: 20px; font-weight: 500;">News</span><span style="font-size: 13px; line-height: 20px; color: var(--ink-3);">431 people confirmed. Anyone unsubscribed or suppressed is left out.</span></span></div>
+<div class="choice" role="radio" aria-checked="false" aria-disabled="true" tabindex="-1" style="opacity: 0.45; cursor: not-allowed;"><span class="dot" aria-hidden="true"></span><span style="display: flex; flex-direction: column;"><span style="font-size: 14px; line-height: 20px; font-weight: 500;">Availability</span><span style="font-size: 13px; line-height: 20px; color: var(--ink-3);">Spent. Its one send finished on 6 Sep 2026, and it can't be chosen again.</span></span></div>
+</div>
+</div>
+<div>
+<label class="label" for="compose-body">Body</label>
+<textarea id="compose-body" class="well" rows="10" style="resize: none;">Hello,
+
+Two things are coming to Trakline next.
+
+A clearer chart view, with the time each train was last checked.
+A public page for the status of the service.
+
+We write about once a month.
+
+The Trakline team</textarea>
+<div class="hint">Plain text. The unsubscribe link is added for you at the end of every email.</div>
+</div>
+</div>
+<div style="display: flex; align-items: center; gap: 16px; padding: 16px 20px; border-top: 1px solid var(--line);">
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 4px;">
+<span class="legend">Test send</span>
+<span style="font-size: 14px; line-height: 20px; color: var(--ink-2);">Sends this letter to asha@example.com, using one email from today's allowance.</span>
+<sc-if value="{{noTest}}" hint-placeholder-val="{{ true }}"><span style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; line-height: 20px; color: var(--ink-2);"><span class="lamp hollow"></span>Not sent yet</span></sc-if>
+<sc-if value="{{hasTest}}" hint-placeholder-val="{{ false }}"><span style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; line-height: 20px; color: var(--ink-2);"><span class="lamp lit"></span>Sent at 14:20 IST to asha@example.com</span></sc-if>
+</div>
+<button type="button" class="btn btn-secondary">Send a test to me</button>
+</div>
+<sc-if value="{{noTest}}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 12px 20px; border-top: 1px solid var(--line);">
+<span id="queue-reason" style="flex-grow: 1; font-size: 13px; line-height: 20px; color: var(--ink-2);">A test send has not been made.</span>
+<button type="button" class="btn btn-secondary">Save draft</button>
+<button type="button" class="btn btn-primary" disabled="true" aria-describedby="queue-reason">Queue</button>
+</div>
+</sc-if>
+<sc-if value="{{hasTest}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 12px 20px; border-top: 1px solid var(--line);">
+<span id="queue-ready" style="flex-grow: 1; font-size: 13px; line-height: 20px; color: var(--ink-2);">Queue sends to 431 people, about 11 days at 40 a day, after the letter ahead.</span>
+<button type="button" class="btn btn-secondary">Save draft</button>
+<button type="button" class="btn btn-primary" aria-describedby="queue-ready">Queue</button>
+</div>
+</sc-if>
+</section>
+<section class="plate" aria-labelledby="how-title">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+<div class="tb"><h2 class="cell title" id="how-title" style="margin: 0;">How a letter goes out</h2></div>
+<ul style="margin: 0; padding: 16px 20px 18px 36px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; line-height: 21px; color: var(--ink-2);">
+<li>At most 40 a day, so confirmation and sign-in mail keep their room.</li>
+<li>Queue fixes who gets it: the people on the list at that moment. Someone who unsubscribes before their turn is skipped.</li>
+<li>Stop halts the rest at once. A stopped letter can't be resumed.</li>
+<li>We don't track opens or clicks.</li>
+</ul>
+</section>
+</div>
+</sc-if>
+
+<sc-if value="{{isDetail}}" hint-placeholder-val="{{ false }}">
+<section class="plate" aria-labelledby="progress-title">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+<div class="tb"><h2 class="cell title" id="progress-title" style="margin: 0;">Progress</h2><span class="cell">{{d.stateWord}}</span><span class="cell">Sample data</span></div>
+<div style="padding: 20px; display: flex; flex-direction: column; gap: 20px;">
+<div style="display: flex; flex-direction: column; gap: 4px;">
+<span class="legend">{{d.headLegend}}</span>
+<p class="fig" style="margin: 0; font-size: 28px; line-height: 32px; letter-spacing: 0.02em;">{{d.headline}}</p>
+<p style="margin: 2px 0 0; max-width: 72ch; font-size: 14px; line-height: 21px; color: var(--ink-2);">{{d.headDetail}}</p>
+</div>
+<div>
+<div class="meter" role="progressbar" aria-label="Recipients handled" aria-valuemin="0" aria-valuemax="{{d.total}}" aria-valuenow="{{d.handled}}"><i style="width: {{d.pct}};"></i></div>
+<div style="display: flex; justify-content: space-between; margin-top: 8px;"><span class="legend tnum">{{d.meterLeft}}</span><span class="legend tnum">{{d.meterRight}}</span></div>
+</div>
+</div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid var(--line);">
+<div style="padding: 20px; display: flex; flex-direction: column; gap: 4px;">
+<span class="legend">Sent</span>
+<span class="fig" style="font-size: 40px; line-height: 44px;">{{d.sent}}</span>
+<span style="font-size: 13px; line-height: 20px; color: var(--ink-3);">Accepted by the mail service for delivery.</span>
+</div>
+<div style="padding: 20px; display: flex; flex-direction: column; gap: 4px; border-left: 1px solid var(--line);">
+<span class="legend">Skipped</span>
+<span class="fig" style="font-size: 40px; line-height: 44px;">{{d.skipped}}</span>
+<span style="font-size: 13px; line-height: 20px; color: var(--ink-3);">Left out when their turn came: unsubscribed or suppressed since the letter was queued.</span>
+</div>
+<div style="padding: 20px; display: flex; flex-direction: column; gap: 4px; border-left: 1px solid var(--line);">
+<span class="legend">Unknown</span>
+<span class="fig" style="font-size: 40px; line-height: 44px;">{{d.unknown}}</span>
+<span style="font-size: 13px; line-height: 20px; color: var(--ink-3);">May or may not have gone: the send timed out. These are never tried again.</span>
+</div>
+</div>
+<sc-if value="{{d.canStop}}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; align-items: center; gap: 16px; padding: 12px 20px; border-top: 1px solid var(--line);">
+<span style="flex-grow: 1; font-size: 13px; line-height: 20px; color: var(--ink-2);">Stop halts the rest at once. What has gone has gone, and a stopped letter can't be resumed.</span>
+<button type="button" class="btn btn-secondary">Stop</button>
+</div>
+</sc-if>
+<sc-if value="{{d.cantResume}}" hint-placeholder-val="{{ false }}">
+<div style="padding: 12px 20px; border-top: 1px solid var(--line); font-size: 13px; line-height: 20px; color: var(--ink-2);">A stopped letter can't be resumed.</div>
+</sc-if>
+</section>
+<section class="plate" aria-labelledby="letter-title">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+<div class="tb"><h2 class="cell title" id="letter-title" style="margin: 0;">Letter</h2><span class="cell">{{d.listCell}}</span></div>
+<dl class="kv" style="padding: 4px 20px 8px; grid-template-columns: 180px 1fr;">
+<dt class="legend">Subject</dt>
+<dd>{{d.subject}}</dd>
+<dt class="legend">List</dt>
+<dd>{{d.list}}</dd>
+<dt class="legend">Queued</dt>
+<dd>{{d.queued}}</dd>
+<dt class="legend">Test send</dt>
+<dd>{{d.test}}</dd>
+<sc-if value="{{d.hasToday}}" hint-placeholder-val="{{ true }}">
+<dt class="legend">Today</dt>
+<dd>31 sent. The day's count resets at 05:30 IST.</dd>
+</sc-if>
+<sc-if value="{{d.hasEnd}}" hint-placeholder-val="{{ true }}">
+<dt class="legend">{{d.endLegend}}</dt>
+<dd>{{d.endValue}}</dd>
+</sc-if>
+<dt class="legend">Message</dt>
+<dd><div class="well" style="min-height: 0; padding: 12px 14px; white-space: pre-wrap; font-size: 14px; line-height: 21px; max-width: 640px;">{{d.body}}</div><p class="hint" style="margin: 8px 0 0;">The unsubscribe link is added to the end of every email when it is sent.</p></dd>
+</dl>
+</section>
+</sc-if>
+
+<sc-if value="{{isSupp}}" hint-placeholder-val="{{ false }}">
+<div role="status" style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; border: 1px solid var(--line); background: var(--accent-wash);">
+<span class="lamp ringed"></span>
+<span style="font-size: 14px; line-height: 20px;"><strong style="font-weight: 600;">1 operator address is suppressed:</strong> kiran@example.com. A hard bounce stops all mail to an address, so their sign-in links won't arrive.</span>
+</div>
+<section class="plate" aria-labelledby="supp-title">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+<div class="tb"><h2 class="cell title" id="supp-title" style="margin: 0;">Suppressed addresses</h2><span class="cell">5 addresses</span><span class="cell">Sample data</span></div>
+<table class="dt"><caption style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0);">Addresses we no longer send to</caption><thead><tr><th scope="col" style="width: 290px;">Address</th><th scope="col" style="width: 100px;">Scope</th><th scope="col" style="width: 230px;">Reason</th><th scope="col" style="width: 170px;">When</th><th scope="col">Source</th><th scope="col" style="width: 150px;"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0);">Actions</span></th></tr></thead><tbody>
+<sc-for list="{{supp}}" as="s" hint-placeholder-count="5">
+<tr>
+<td class="first"><span style="display: inline-flex; align-items: center; gap: 10px;"><span>{{s.address}}</span><sc-if value="{{s.operator}}" hint-placeholder-val="{{ false }}"><span class="tag tag-outline">Operator</span></sc-if></span></td>
+<td><span class="{{s.scopeClass}}">{{s.scope}}</span></td>
+<td>{{s.reason}}</td>
+<td class="tnum">{{s.when}}</td>
+<td>{{s.source}}</td>
+<td style="text-align: right; overflow: visible;"><sc-if value="{{s.masked}}" hint-placeholder-val="{{ true }}"><button type="button" class="btn btn-ghost btn-sm" aria-label="{{s.revealLabel}}">Reveal</button></sc-if> <sc-if value="{{s.canLift}}" hint-placeholder-val="{{ true }}"><button type="button" class="btn btn-ghost btn-sm" aria-label="{{s.liftLabel}}">Lift</button></sc-if><sc-if value="{{s.cantLift}}" hint-placeholder-val="{{ false }}"><button type="button" class="btn btn-ghost btn-sm" disabled="true" title="Reveal the address first" aria-label="{{s.liftLabel}}">Lift</button></sc-if></td>
+</tr>
+</sc-for>
+</tbody></table>
+<ul style="margin: 0; padding: 12px 20px 16px 36px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 4px; font-size: 13px; line-height: 20px; color: var(--ink-2);">
+<li>All stops every email to the address, sign-in and confirmation mail included. List mail stops letters and nothing else.</li>
+<li>Operator marks an address that belongs to a console member.</li>
+<li>Lift needs the address revealed first, so you can see whose mail you are restarting. It ends a suppression we recorded and asks first; it is written to the audit log.</li>
+<li>A row from the mail service's own list also has to be cleared there: lifting ours does not lift theirs.</li>
+</ul>
+</section>
+</sc-if>
+
+<sc-if value="{{isNoAccess}}" hint-placeholder-val="{{ false }}"><section class="plate state" style="max-width: 720px;"><i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i><h2 class="state-title">This module isn't part of the Support role.</h2><p class="state-detail">Ask an Owner if you need it.</p><div class="state-actions"><a href="#" class="btn btn-secondary">Back to Overview</a></div></section></sc-if>
+</main>
+</div>
+<sc-if value="{{dlgQueue}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; inset: 0; z-index: 5; background: var(--backdrop); display: flex; align-items: center; justify-content: center; padding: 16px;">
+<section class="plate state" role="alertdialog" aria-modal="true" aria-labelledby="queue-title" style="width: 520px; background: var(--surface-3); box-shadow: var(--elevation-3);">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+<h2 class="state-title" id="queue-title">Queue this letter?</h2>
+<dl class="kv" style="margin-top: 12px; grid-template-columns: 110px 1fr;">
+<dt class="legend">List</dt>
+<dd>News</dd>
+<dt class="legend">Subject</dt>
+<dd>Trakline news: what's coming next</dd>
+<dt class="legend">People</dt>
+<dd>431</dd>
+<dt class="legend">Behind</dt>
+<dd>Trakline news: a clearer chart view, about 4 days left</dd>
+<dt class="legend">Takes</dt>
+<dd>About 11 days at 40 a day, starting when that one finishes</dd>
+<dt class="legend">Finishes</dt>
+<dd>Around 4 Oct 2026</dd>
+</dl>
+<p class="state-detail">Once queued, the letter goes to real people. You can stop it, but a stopped letter can't be resumed.</p>
+<div class="state-actions" style="justify-content: flex-end; margin-top: 24px;">
+<button type="button" class="btn btn-secondary">Cancel</button>
+<button type="button" class="btn btn-primary">Queue</button>
+</div>
+</section>
+</div>
+</sc-if>
+<sc-if value="{{dlgStop}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; inset: 0; z-index: 5; background: var(--backdrop); display: flex; align-items: center; justify-content: center; padding: 16px;">
+<section class="plate state" role="alertdialog" aria-modal="true" aria-labelledby="stop-title" style="width: 520px; background: var(--surface-3); box-shadow: var(--elevation-3);">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+<h2 class="state-title" id="stop-title">Stop sending?</h2>
+<p style="margin: 10px 0 0; font-size: 17px; line-height: 26px; font-weight: 500;">Trakline news: a clearer chart view</p>
+<p class="state-detail" style="margin-top: 6px;">262 people already have this letter, and that can't be recalled. The 165 still waiting won't get it, and a stopped letter can't be resumed.</p>
+<div class="state-actions" style="justify-content: flex-end; margin-top: 24px;">
+<button type="button" class="btn btn-secondary">Cancel</button>
+<button type="button" class="btn btn-primary">Stop sending</button>
+</div>
+</section>
+</div>
+</sc-if>
+<sc-if value="{{dlgLiftProv}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; inset: 0; z-index: 5; background: var(--backdrop); display: flex; align-items: center; justify-content: center; padding: 16px;">
+<section class="plate state" role="alertdialog" aria-modal="true" aria-labelledby="liftp-title" style="width: 520px; background: var(--surface-3); box-shadow: var(--elevation-3);">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+<h2 class="state-title" id="liftp-title">Lift this suppression?</h2>
+<dl class="kv" style="margin-top: 12px; grid-template-columns: 110px 1fr;">
+<dt class="legend">Address</dt>
+<dd>p.mehta@example.com</dd>
+<dt class="legend">Scope</dt>
+<dd>All</dd>
+<dt class="legend">Source</dt>
+<dd>The mail service's own list</dd>
+</dl>
+<p class="state-detail">Lifting ours does not lift the mail service's own list, which suppressed this address on 9 Sep 2026. Clear it there too, or mail to the address will still be refused. Lifting is written to the audit log.</p>
+<div class="state-actions" style="justify-content: flex-end; margin-top: 24px;">
+<button type="button" class="btn btn-secondary">Cancel</button>
+<button type="button" class="btn btn-primary">Lift suppression</button>
+</div>
+</section>
+</div>
+</sc-if>
+<sc-if value="{{dlgLift}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; inset: 0; z-index: 5; background: var(--backdrop); display: flex; align-items: center; justify-content: center; padding: 16px;">
+<section class="plate state" role="alertdialog" aria-modal="true" aria-labelledby="lift-title" style="width: 520px; background: var(--surface-3); box-shadow: var(--elevation-3);">
+<i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i>
+<h2 class="state-title" id="lift-title">Lift this suppression?</h2>
+<dl class="kv" style="margin-top: 12px; grid-template-columns: 110px 1fr;">
+<dt class="legend">Address</dt>
+<dd>kiran@example.com</dd>
+<dt class="legend">Scope</dt>
+<dd>All</dd>
+</dl>
+<p class="state-detail">Mail to this address resumes: sign-in links, confirmations and letters. It was suppressed on 17 Sep 2026 after a hard bounce, so the address may still not work. Lifting is written to the audit log.</p>
+<div class="state-actions" style="justify-content: flex-end; margin-top: 24px;">
+<button type="button" class="btn btn-secondary">Cancel</button>
+<button type="button" class="btn btn-primary">Lift suppression</button>
+</div>
+</section>
+</div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"state":{"editor":"enum","options":["List","Compose","Queue confirm","Sending","Stop confirm","Stopped","Done","Suppressions","Lift confirm","Lift confirm (mail service list)","No access"],"default":"List","section":"State"},"role":{"editor":"enum","options":["Owner","Admin"],"default":"Owner","section":"State"},"defaultTheme":{"editor":"enum","options":["system","light","dark"],"default":"system","section":"Appearance"},"$preview":{"width":1440,"height":1300}}'>
+class Component extends DCLogic {
+  state = { theme: null, sysDark: false };
+  componentDidMount() {
+    this._mq = window.matchMedia('(prefers-color-scheme: dark)');
+    this._onMq = () => this.setState({ sysDark: this._mq.matches });
+    this.setState({ sysDark: this._mq.matches });
+    this._mq.addEventListener('change', this._onMq);
+  }
+  componentWillUnmount() {
+    if (this._mq) this._mq.removeEventListener('change', this._onMq);
+  }
+  renderVals() {
+    var p = this.props;
+    var st = p.state || 'List';
+    // The confirm states are a board underneath with the dialog over it.
+    var base = { 'Queue confirm': 'Compose', 'Stop confirm': 'Sending', 'Lift confirm': 'Suppressions', 'Lift confirm (mail service list)': 'Suppressions' }[st] || st;
+    var noAccess = st === 'No access';
+    // Announcements is Owner and Admin only: the no-access state is drawn as Support opening it.
+    var who = noAccess ? 'Support' : (p.role || 'Owner');
+    var mode = this.state.theme || p.defaultTheme || 'system';
+    var themeNames = { system: 'System', light: 'Day', dark: 'Night' };
+    var themeNext = { system: 'light', light: 'dark', dark: 'system' };
+    var dark = mode === 'dark' || (mode === 'system' && this.state.sysDark);
+    var members = { Owner: ['Asha Rao', 'AR'], Admin: ['Rohan Iyer', 'RI'], Support: ['Kiran Das', 'KD'] };
+    var access = {
+      Owner: ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13', '14'],
+      Admin: ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '14'],
+      Support: ['01', '06', '09', '10']
+    };
+    var allGroups = [
+      { legend: 'Operate', items: [['01', 'Overview'], ['02', 'Sources & usage'], ['03', 'Status & incidents'], ['04', 'Abuse & limits'], ['05', 'Alerts']] },
+      { legend: 'People', items: [['06', 'Leads'], ['07', 'Announcements'], ['08', 'Accounts']] },
+      { legend: 'Queues', items: [['09', 'Privacy requests', '3'], ['10', 'Wrong-status reports', '5']] },
+      { legend: 'Configure', items: [['11', 'Switches & settings'], ['12', 'Provider keys'], ['13', 'Team']] },
+      { legend: 'Record', items: [['14', 'Audit log']] }
+    ];
+    var allowed = access[who];
+    var current = noAccess ? '' : '07';
+    var rowBase = 'display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 16px 0 22px; text-decoration: none; ';
+    var rowOn = 'color: var(--accent-text); background: color-mix(in oklab, var(--accent) 16%, transparent); box-shadow: inset 2px 0 0 var(--accent);';
+    var groups = allGroups.map(function (g) {
+      return {
+        legend: g.legend,
+        items: g.items.filter(function (i) { return allowed.indexOf(i[0]) !== -1; }).map(function (i) {
+          var on = i[0] === current;
+          return { num: i[0], label: i[1], count: i[2] || '', hasCount: !!i[2], aria: on ? 'page' : 'false', rowStyle: rowBase + (on ? rowOn : 'color: var(--ink-2);') };
+        })
+      };
+    }).filter(function (g) { return g.items.length > 0; });
+
+    // Sample world: Saturday 19 Sep 2026, 14:32 IST, as the other console sheets.
+    var letters = [
+      { subject: "Trakline news: what's coming next", list: 'News', state: 'Draft', lamp: 'lamp hollow', progress: 'Not queued', when: 'Saved 18 Sep 2026' },
+      { subject: 'Trakline news: a clearer chart view', list: 'News', state: 'Sending', lamp: 'lamp half', progress: 'Sent 262 · Skipped 4 · Unknown 0 of 431', when: 'Queued 11 Sep 2026' },
+      { subject: 'Trakline news: the new look', list: 'News', state: 'Stopped', lamp: 'lamp ringed', progress: 'Sent 120 · Skipped 3 · Unknown 0 of 418', when: 'Stopped 10 Sep 2026' },
+      { subject: 'Availability checks are open', list: 'Availability', state: 'Done', lamp: 'lamp lit', progress: 'Sent 212 · Skipped 4 · Unknown 1 of 217', when: 'Finished 6 Sep 2026' }
+    ];
+    var details = {
+      Sending: {
+        stateWord: 'Sending', headLegend: 'Estimated finish', headline: 'About 4 days at 40 a day',
+        headDetail: 'Around 23 Sep 2026. If confirmation mail uses up a day first, nothing from this letter goes that day and the finish moves later.',
+        total: 431, handled: 266, pct: '62%', meterLeft: '266 of 431 handled', meterRight: '165 waiting',
+        sent: '262', skipped: '4', unknown: '0', canStop: true, cantResume: false, hasToday: true,
+        listCell: 'News · 431 people', subject: 'Trakline news: a clearer chart view', list: 'News · 431 people when it was queued',
+        queued: '11 Sep 2026, 09:05 IST by Asha Rao', test: '11 Sep 2026, 08:58 IST to asha@example.com',
+        hasEnd: false, endLegend: '', endValue: '',
+        body: 'Hello,\n\nThe chart view is clearer now: each train shows when it was last checked.\n\nThe Trakline team'
+      },
+      Stopped: {
+        stateWord: 'Stopped', headLegend: 'Stopped', headline: 'Sent to 120 people',
+        headDetail: '3 were skipped, and 295 were never reached and won\'t be. Stopped on 10 Sep 2026, 10:40 IST by Rohan Iyer.',
+        total: 418, handled: 123, pct: '29%', meterLeft: '123 of 418 handled', meterRight: '295 never reached',
+        sent: '120', skipped: '3', unknown: '0', canStop: false, cantResume: true, hasToday: false,
+        listCell: 'News · 418 people', subject: 'Trakline news: the new look', list: 'News · 418 people when it was queued',
+        queued: '8 Sep 2026, 09:12 IST by Asha Rao', test: '8 Sep 2026, 09:03 IST to asha@example.com',
+        hasEnd: true, endLegend: 'Stopped', endValue: '10 Sep 2026, 10:40 IST by Rohan Iyer',
+        body: 'Hello,\n\nTrakline has a new look. Nothing about how checks work has changed.\n\nThe Trakline team'
+      },
+      Done: {
+        stateWord: 'Done', headLegend: 'Finished', headline: 'Sent to 212 people',
+        headDetail: 'Finished on 6 Sep 2026, 14:10 IST. 4 were skipped and 1 may or may not have gone. The availability list is spent: it had its one send and can\'t be chosen again.',
+        total: 217, handled: 217, pct: '100%', meterLeft: '217 of 217 handled', meterRight: '0 waiting',
+        sent: '212', skipped: '4', unknown: '1', canStop: false, cantResume: false, hasToday: false,
+        listCell: 'Availability · 217 people', subject: 'Availability checks are open', list: 'Availability · 217 people when it was queued',
+        queued: '1 Sep 2026, 09:20 IST by Asha Rao', test: '1 Sep 2026, 09:11 IST to asha@example.com',
+        hasEnd: true, endLegend: 'Finished', endValue: '6 Sep 2026, 14:10 IST',
+        body: 'Hello,\n\nAvailability checks are open. Tell us a train and a date and we will show what we have seen.\n\nYou asked for one email, and this is it. If you would like news about Trakline as well, you can join the news list from the link below.\n\nThe Trakline team'
+      }
+    };
+    var supp = [
+      { address: 'kiran@example.com', operator: true, masked: false, scope: 'All', scopeClass: 'tag tag-filled', reason: 'Hard bounce', when: '17 Sep 2026, 11:20 IST', source: 'Delivery report' },
+      { address: 'r•••@example.com', operator: false, masked: true, scope: 'All', scopeClass: 'tag tag-filled', reason: 'Hard bounce', when: '16 Sep 2026, 09:41 IST', source: 'Delivery report' },
+      { address: 's•••@example.com', operator: false, masked: true, scope: 'List mail', scopeClass: 'tag tag-grey', reason: 'Spam complaint', when: '15 Sep 2026, 18:03 IST', source: 'Complaint report' },
+      { address: 'a•••@example.com', operator: false, masked: true, scope: 'List mail', scopeClass: 'tag tag-grey', reason: 'Delayed three times in 30 days', when: '12 Sep 2026, 07:12 IST', source: 'Delivery reports' },
+      { address: 'p•••@example.com', operator: false, masked: true, scope: 'All', scopeClass: 'tag tag-filled', reason: 'Hard bounce', when: '9 Sep 2026, 16:30 IST', source: 'The mail service\'s own list' }
+    ].map(function (s) { s.revealLabel = 'Reveal the address ' + s.address; s.canLift = !s.masked; s.cantLift = s.masked; s.liftLabel = s.masked ? 'Lift the suppression on ' + s.address + ' (reveal the address first)' : 'Lift the suppression on ' + s.address; return s; });
+
+    if (st === 'Lift confirm (mail service list)') {
+      // The mail service's own-list row has been revealed, so it can be lifted.
+      supp[4].address = 'p.mehta@example.com'; supp[4].masked = false; supp[4].canLift = true; supp[4].cantLift = false;
+      supp[4].revealLabel = ''; supp[4].liftLabel = 'Lift the suppression on p.mehta@example.com';
+    }
+    var detailKey = base === 'Sending' || base === 'Stopped' || base === 'Done' ? base : 'Sending';
+    var heights = { 'List': 900, 'Compose': 1120, 'Sending': 1300, 'Stopped': 1300, 'Done': 1300, 'Suppressions': 900, 'No access': 700 };
+    var m = members[who];
+    return {
+      face: dark ? 'night' : 'day', faceH: (heights[base] || 1000) + 'px',
+      modeSystem: mode === 'system', modeDay: mode === 'light', modeNight: mode === 'dark',
+      themeLabel: 'Theme: ' + themeNames[mode] + '. Switch to ' + themeNames[themeNext[mode]],
+      cycleTheme: () => this.setState({ theme: themeNext[mode] }),
+      role: who, initials: m[1], memberLabel: m[0] + ', ' + who + '. Open the member menu',
+      groups: groups, letters: letters, supp: supp, d: details[detailKey],
+      showMeta: !noAccess,
+      showNew: base === 'List' || base === 'Suppressions',
+      showBack: base === 'Compose' || base === 'Sending' || base === 'Stopped' || base === 'Done',
+      showTabs: base === 'List' || base === 'Suppressions',
+      tabLetters: base === 'List' ? 'true' : 'false', tabSupp: base === 'Suppressions' ? 'true' : 'false',
+      isList: base === 'List', isCompose: base === 'Compose', isDetail: base === 'Sending' || base === 'Stopped' || base === 'Done',
+      noTest: st !== 'Queue confirm', hasTest: st === 'Queue confirm',
+      dlgQueue: st === 'Queue confirm', dlgStop: st === 'Stop confirm', dlgLift: st === 'Lift confirm', dlgLiftProv: st === 'Lift confirm (mail service list)',
+      isSupp: base === 'Suppressions', isNoAccess: noAccess
+    };
+  }
+}
+</script>
+</body>
+</html>
