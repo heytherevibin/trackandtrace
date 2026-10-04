@@ -535,8 +535,14 @@ Decided after J6 (2026-10-02): an in-page link's glide is taken up again, as a T
   instant scroll to where the page does stand puts that right, and the glide is asked for again, as a cut is, within
   the same three takes (none short in 120 after).
 - A link the router handles (the masthead's to the terminal, a Next `<Link>`: its click arrives with its default
-  prevented, and the router glides to the fragment a few frames later) is watched from its click too, with half a
-  second for the glide to begin (30 frames, where a Tab's has six).
+  prevented, and the router changes the address and glides to the fragment once its navigation has gone through) is
+  watched from its click too, but armed only once the address names its target, or the page has begun to move toward
+  it (2026-10-04). On a slow machine the navigation takes longer than the thirty frames a link's glide is given to
+  begin: counted from the click, the watch had let go, and the glide that came after was left 3,700 to 5,500 px short
+  at the resize (5 runs in 2,195 at 4× CPU). The wait is bounded in time, two seconds, since slow frames are the
+  point; the thirty frames run from the address. Until then scroll anchoring is left alone, so a prevented click
+  that never navigates costs nothing, and the reader's own scroll or press lets go as ever. A link whose default is
+  not prevented (the board's) glides in its click's own task, and is as it was.
 
 Found after J6 (2026-10-02): the live pin's sticky top after a resize is its labels' once laid out for the new window.
 - A tablet turned (768×1024 to 1024×768 and back) flips the live chapter's labels between the list and their columns,

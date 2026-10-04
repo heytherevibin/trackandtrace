@@ -49,8 +49,11 @@ import type { JourneyContext, Teardown } from "./start-journey";
 
 /** Frames a glide must begin in (its first scroll, or a jump that cuts it) after the focus that asks for it. */
 const START = 6;
-/** The same for a link's glide: the router's own link glides frames after its click, the page a few after that. */
+/** The same for a link's glide: the browser's glide moves the page a few frames after it is asked for. */
 const START_LINK = 30;
+/** How long a click the router handles may take to show it went anywhere (the address naming its target), ms. In time,
+ * not frames: the router's navigation is what a slow machine makes long. */
+const NAMED_MS = 2000;
 /** Frames a link's glide just taken up may leave the page still before it is asked for again: WebKit, its own glide
  * stopped by the journey's rebuild in that frame, now and then takes the page to stand at that glide's end already and
  * begins none toward it (9 runs in 120, the reader left up to 6,100 px short of 08; a glide by 300 px from there ended
@@ -127,12 +130,22 @@ function seen(el: Element): boolean {
   return r.top >= mastheadBottom() && r.bottom <= window.innerHeight;
 }
 
+export interface LinkGlide {
+  /** The click may glide nowhere (its default was prevented, the address naming its target already): nothing is taken
+   * up for it until the page has moved toward its end. */
+  readonly unsure?: boolean;
+  /** Whether the address names the link's target, for a click the router handles (its default prevented): it changes the
+   * address and glides only once its navigation has gone through, on a slow machine long after the click (5 runs in 2,195
+   * at 4x CPU found the watch gone by then). Until it does, or the page moves toward the end, nothing is armed and scroll
+   * anchoring is left alone, for NAMED_MS at most; the glide's frames to begin are counted from then. */
+  readonly named?: () => boolean;
+}
+
 export interface GlideWatch {
   /** A glide has begun: watch it for a place-keeping jump that cuts it short. `taken`: the takes it has already had (one
    * carried through the journey's rebuild). `end`: where the browser is gliding the page to, for an in-page link's
-   * glide: followed frame by frame (followGlide), scroll anchoring held off while it is watched. `unsure`: the click may
-   * glide nowhere (its default was prevented), so nothing is taken up for it until the page has moved toward `end`. */
-  arm(taken?: number, end?: number, unsure?: boolean): void;
+   * glide: followed frame by frame (followGlide), scroll anchoring held off while it is watched. */
+  arm(taken?: number, end?: number, link?: LinkGlide): void;
   /** Still watching the glide it was armed for: not let go by the reader's own scroll or pointer, nor by the page. */
   armed(): boolean;
   /** Something other than a jump cut the glide short (a relayout): taken up as a jump's cut is. */
@@ -158,6 +171,8 @@ export function watchGlide(retake: () => number | void): GlideWatch {
   let unanchored = false;
   let follower: GlideFollower | null = null; // a link's glide, followed
   let unsure = false; // a link's glide that may never begin (arm)
+  // a router's link, waited for: until the address names its target, or the page moves toward `end`, or `until` passes
+  let awaited: { readonly named: () => boolean; readonly from: number; readonly end: number; readonly until: number } | null = null;
   let unbegun = -1; // frames a link's glide just taken up has left the page still; -1 once it moves, or with none asked
 
   /** Scroll anchoring held off (<html style="overflow-anchor: none">), or given back. */
@@ -173,12 +188,23 @@ export function watchGlide(retake: () => number | void): GlideWatch {
     cancelAnimationFrame(frame);
     frame = 0;
     follower = null;
+    awaited = null;
     unbegun = -1;
     anchoring(false);
   };
   const tick = () => {
     frame = 0;
     if (!armed) return;
+    if (awaited) {
+      const toward = (window.scrollY - awaited.from) * Math.sign(awaited.end - awaited.from) >= 1;
+      if (!awaited.named() && !toward) {
+        if (performance.now() > awaited.until) disarm();
+        else frame = requestAnimationFrame(tick);
+        return;
+      }
+      awaited = null; // the click did go somewhere: watched from here, as any link's glide is from its click
+      anchoring(true);
+    }
     if (!started) {
       waited += 1;
       if (waited >= (follower ? START_LINK : START)) disarm();
@@ -221,7 +247,7 @@ export function watchGlide(retake: () => number | void): GlideWatch {
     frame = requestAnimationFrame(tick);
   };
   const onCut = () => {
-    if (!armed) return;
+    if (!armed || awaited) return; // while a router's link is waited for there is no glide to cut
     started = true;
     cut = true;
     quiet = 0;
@@ -243,10 +269,12 @@ export function watchGlide(retake: () => number | void): GlideWatch {
   window.addEventListener("scroll", onScroll, { passive: true });
   for (const type of OWN) window.addEventListener(type, onOwn, { capture: true, passive: true });
   return {
-    arm: (taken = 0, end, maybe = false) => {
+    arm: (taken = 0, end, { unsure: maybe = false, named }: LinkGlide = {}) => {
+      const from = window.scrollY;
       unsure = maybe;
-      anchoring(end !== undefined);
-      follower = end === undefined ? null : followGlide(window.scrollY, end);
+      awaited = end !== undefined && named && !named() ? { named, from, end, until: performance.now() + NAMED_MS } : null;
+      anchoring(end !== undefined && !awaited);
+      follower = end === undefined ? null : followGlide(from, end);
       armed = true;
       takes = taken;
       started = false;
@@ -373,8 +401,8 @@ export function startFocusGlide({ motion }: JourneyContext): Teardown {
   };
   /** A click on an in-page link, unmodified, that glides the page to its target: watched from the click, as a Tab's glide
    * is from its focus. Its default prevented or not: the router's own link (the masthead's to the terminal) prevents it
-   * and glides to the fragment itself; a click that glides nowhere is let go half a second on (START_LINK), and nothing
-   * is taken up for it meanwhile (arm's `unsure`). */
+   * and glides to the fragment itself, once its navigation has gone through (LinkGlide's `named`); a click that glides
+   * nowhere is let go, and nothing is taken up for it meanwhile (`unsure`). */
   const onClick = (event: MouseEvent) => {
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     const link = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>(IN_PAGE) : null;
@@ -385,7 +413,8 @@ export function startFocusGlide({ motion }: JourneyContext): Teardown {
     linked = true;
     // unsure it glides at all: its default prevented, and the address naming its target already (nothing shows it went
     // anywhere). A prevented click that does go there changes the address (the router's), and the address rule holds it.
-    watch.arm(0, aim(el).end, event.defaultPrevented && window.location.hash === `#${el.id}`);
+    const named = () => window.location.hash === `#${el.id}`;
+    watch.arm(0, aim(el).end, event.defaultPrevented ? { unsure: named(), named } : undefined);
   };
   const onScroll = () => {
     lastY = window.scrollY;

@@ -38,7 +38,7 @@ export function glidePlace(page: Page, id: string): Promise<GlidePlace> {
 }
 
 /** Waits until the glide to `#id`, begun at scroll `start`, has covered `share` of its way (0–1), a frame at a time in
- * the page; where it stood then. Fails if the page stands still for a second first: no glide is running. */
+ * the page; where it stood then. Fails if the page stands still for three seconds first: no glide is running. */
 export function throughGlide(page: Page, id: string, start: number, share: number): Promise<GlidePlace> {
   return page.evaluate(
     `new Promise((done, fail) => {
@@ -51,7 +51,7 @@ export function throughGlide(page: Page, id: string, start: number, share: numbe
         if (window.scrollY !== last) stillSince = performance.now();
         last = window.scrollY;
         if (whole - left >= whole * ${share}) return done({ y: Math.round(window.scrollY), left });
-        if (performance.now() - stillSince > 1000) return fail(new Error("the page stood still for a second, " + left + " px from #${id}: no glide is running"));
+        if (performance.now() - stillSince > 3000) return fail(new Error("the page stood still for three seconds, " + left + " px from #${id}: no glide is running"));
         requestAnimationFrame(tick);
       };
       tick();
