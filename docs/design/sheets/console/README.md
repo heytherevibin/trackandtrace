@@ -112,7 +112,7 @@ The page is `src/app/console/leads/page.tsx`; its parts are in `src/console/lead
 - **The pickers carry their label beside a native select** (above it on a phone), as the audit log's do, where the boards draw the label inside the well.
 - **Below 1360px the table's columns take what their words need** and Campaign takes the rest, with 10px gutters for the drawn 14px. The drawn widths add up to more than the plate at 1280, and the table scrolled sideways with Reveal half off its edge. From 1360px the widths and gutters are the board's.
 - **A revealed address is never cut.** Its column widens and Campaign gives the room; a cut campaign is whole in its tooltip and on the record.
-- **Where the filter row has no room for all four pickers beside the search box** (below about 1440px) they go under it together, First seen still against the right edge.
+- **Where the filter row has no room for all four pickers beside the search box** (below about 1420px) they go under it together, First seen still against the right edge.
 - **The phone's figures are 24px**, the type scale's nearest step to the drawn 26px.
 - **Previous and Next are links**, so a page of the list has an address; where there is nowhere to go they are the drawn disabled buttons.
 - **Undrawn states**, in the module's own words: filters that match nobody, figures or a record that could not be read, a record that is no longer there, and part of an address typed into the search (refused in the form, before any lookup is made or recorded).
