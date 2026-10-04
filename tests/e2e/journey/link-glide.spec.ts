@@ -341,8 +341,9 @@ test.describe("a tapped in-page link's glide (spec §3.G)", () => {
    * was told in 1 run of 10. */
   const TERMINAL_SHARES = (browser: string) => (browser === "webkit" ? [0.1, 0.2] : [0.3, 0.5, 0.8]);
   /** The masthead's link to the terminal, clicked from 6,000 px down: where the page stood. `slow`: the router's
-   * navigation takes sixty frames to go through, as on a slow machine (its change of the address, and its glide to the
-   * fragment, each put off that long). */
+   * navigation takes 700 ms longer to go through, as on a slow machine (its change of the address, and its glide to the
+   * fragment, each put off that long). In time, as the watch's wait for it is: sixty frames was past that wait's two
+   * seconds at 8x CPU on a phone, 3 runs in 10. */
   const clickTerminal = async (page: Page, isMobile: boolean, slow = false): Promise<number> => {
     await drawStill(page);
     await page.setViewportSize(sizes(isMobile).tall);
@@ -355,19 +356,17 @@ test.describe("a tapped in-page link's glide (spec §3.G)", () => {
     const start = await page.evaluate(() => window.scrollY);
     if (slow)
       await page.evaluate(() => {
-        const later = (act: () => void) => {
-          let left = 60;
-          const tick = (): void => void (--left <= 0 ? act() : requestAnimationFrame(tick));
-          requestAnimationFrame(tick);
-        };
+        const later = (act: () => void) => void window.setTimeout(act, 700);
         for (const name of ["pushState", "replaceState"] as const) {
           const real = window.history[name].bind(window.history);
           window.history[name] = (...args) => later(() => real(...args));
         }
+        // the router's own glide to the fragment, once: the page's later glides (a take-up) are not the router's
         const into = Element.prototype.scrollIntoView;
         Element.prototype.scrollIntoView = function (...args) {
-          if (this.id === "terminal") later(() => into.apply(this, args));
-          else into.apply(this, args);
+          if (this.id !== "terminal") return into.apply(this, args);
+          Element.prototype.scrollIntoView = into;
+          later(() => into.apply(this, args));
         };
       });
     await page.evaluate(() => {
@@ -419,10 +418,10 @@ test.describe("a tapped in-page link's glide (spec §3.G)", () => {
     expect(await fromLanding(page, "terminal"), "the terminal's top where its link lands it").toBeLessThanOrEqual(4);
   });
 
-  // The router's navigation on a slow machine: the address names the terminal, and the glide begins, sixty frames after
-  // the click, twice the thirty a glide is given to begin. Counted from the click, the watch had let go by then, and the
-  // glide that came after was left 3,700 to 5,500 px short at the resize (5 runs in 2,195 at 4x CPU; forced here).
-  test("reaches the terminal by the masthead's link though the router takes sixty frames to go there", async ({ page, isMobile, browserName }) => {
+  // The router's navigation on a slow machine: the address names the terminal, and the glide begins, 700 ms after the
+  // click, past the thirty frames a glide is given to begin. Counted from the click, the watch had let go by then, and
+  // the glide that came after was left 3,700 to 5,500 px short at the resize (5 runs in 2,195 at 4x CPU; forced here).
+  test("reaches the terminal by the masthead's link though the router takes 700 ms to go there", async ({ page, isMobile, browserName }) => {
     const start = await clickTerminal(page, isMobile, true);
     await watchResize(page, "terminal");
     await throughGlide(page, "terminal", start, TERMINAL_SHARES(browserName)[0] ?? 0.3);
