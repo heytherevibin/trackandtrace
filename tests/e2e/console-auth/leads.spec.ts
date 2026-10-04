@@ -1,5 +1,8 @@
+import { readFileSync } from "node:fs";
 import { consoleMessages } from "@/console/messages";
+import { inviteAndSignIn } from "./audit-helpers";
 import { consoleSql, expect, resetConsole, setUpFirstOwner, test } from "./fixtures";
+import { freshAddress, tapThrough } from "./team-helpers";
 import { expectAxeClean, gotoReady } from "../helpers";
 import { layoutBreaks } from "../layout";
 
@@ -177,6 +180,68 @@ test.describe("Leads", () => {
     expect(consoleSql(`select count(*) from console.lead_tags where person_id = '${PENDING.id}'`)).toBe("0");
   });
 
+  test("the list is exported and a lead is deleted, each with a reason and a key, and Support has no export", async ({ page, baseURL }) => {
+    const owner = await setUpFirstOwner(page, baseURL ?? BASE);
+    const actor = `(select user_id from console.members where email = '${owner.email}')`;
+    // A tag only this test uses: the shared local stack may hold other pending sign-ups, and the
+    // export is of the filtered list.
+    consoleSql(`insert into console.lead_tags (person_id, tag) values ('${PENDING.id}', 'e2e-export');`);
+    const tc01 = page.getByRole("dialog", { name: "Confirm it's you" });
+
+    await gotoReady(page, "/leads?tag=e2e-export");
+    await page.getByRole("button", { name: m.export.action }).click();
+    await expect(tc01.getByText(m.export.summary("1"))).toBeVisible();
+    await expect(tc01.getByText(m.export.hint)).toBeVisible();
+    await expectAxeClean(page, { allowDesignLockedAccent: true });
+    expect(consoleSql(`select count(*) from console.audit_log where action = 'Exported leads' and actor_id = ${actor}`), "asking exports nothing").toBe("0");
+
+    // One file, handed over once, holding the whole address of the lead the filter matches and no other.
+    await tapThrough(page, "Monthly review of sign-ups for September.");
+    const ready = page.getByRole("status").filter({ hasText: m.export.works });
+    const [download] = await Promise.all([page.waitForEvent("download"), ready.getByRole("button", { name: m.export.download }).click()]);
+    expect(download.suggestedFilename()).toMatch(/^leads-\d{4}-\d{2}-\d{2}\.csv$/);
+    const lines = readFileSync(await download.path(), "utf8").split("\r\n");
+    expect(lines[0]).toBe("\uFEFFemail,news,availability_list,account,source,campaign_source,campaign_medium,campaign_name,tags,first_seen,last_activity");
+    expect(lines).toHaveLength(2);
+    expect(lines[1]).toMatch(new RegExp(`^${PENDING.email.replace(/[.]/g, "\\.")},pending,false,none,landing,,,,e2e-export,`));
+    await expect(page.getByRole("button", { name: m.export.download })).toHaveCount(0);
+    expect(
+      consoleSql(`select target || '|' || reason || '|' || (after ->> 'count') || '|' || (after -> 'filters' ->> 'tag') from console.audit_log where action = 'Exported leads' and actor_id = ${actor}`),
+    ).toBe("Leads|Monthly review of sign-ups for September.|1|e2e-export");
+    expect(consoleSql(`select count(*) from console.audit_log where action = 'Exported leads' and (coalesce(after::text, '') || target) like '%@%'`), "the log holds no address").toBe("0");
+
+    // Delete: asked first, then gone, with everything that hung off it, and recorded.
+    await page.getByRole("table", { name: m.table.caption }).getByRole("link", { name: m.table.open(PENDING.masked) }).click();
+    const record = page.getByRole("dialog", { name: m.record.title });
+    await record.getByRole("button", { name: m.remove.action }).click();
+    await expect(tc01.getByText(m.remove.summary(PENDING.masked))).toBeVisible();
+    await expectAxeClean(page, { allowDesignLockedAccent: true });
+    expect(consoleSql(`select count(*) from subscriptions.people where id = '${PENDING.id}'`), "asking deletes nothing").toBe("1");
+    await tapThrough(page, "Asked by phone to be removed from our lists.");
+    await expect(page.getByText(m.remove.done, { exact: true })).toBeVisible();
+    await expect(record).toHaveCount(0);
+    await expect(page).toHaveURL(/\/leads\?tag=e2e-export$/);
+    await expect(page.getByText(m.states.filteredTitle)).toBeVisible();
+    expect(consoleSql(`select (select count(*) from subscriptions.people where id = '${PENDING.id}') + (select count(*) from subscriptions.consents where person_id = '${PENDING.id}') + (select count(*) from console.lead_tags where person_id = '${PENDING.id}')`)).toBe("0");
+    expect(consoleSql(`select target || '|' || reason from console.audit_log where action = 'Deleted a lead' and actor_id = ${actor}`)).toBe(`${PENDING.masked}|Asked by phone to be removed from our lists.`);
+
+    // Support has Leads, and no export: no button on the page, and the route refuses the role.
+    const them = await inviteAndSignIn(page, freshAddress("kiran"), "Support", "Covering the leads queue this week.");
+    try {
+      await gotoReady(them, "/leads");
+      await expect(them.getByRole("heading", { level: 1, name: m.title })).toBeVisible();
+      await expect(them.getByRole("table", { name: m.table.caption }).getByRole("row", { name: named(SUBSCRIBED.masked) })).toBeVisible();
+      await expect(them.getByRole("button", { name: m.export.action })).toHaveCount(0);
+      const refused = await them.evaluate(async () => {
+        const response = await fetch("/api/leads/export", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ filters: "{}", reason: "Trying the door without a key." }) });
+        return response.status;
+      });
+      expect(refused).toBe(403);
+    } finally {
+      await them.context().close();
+    }
+  });
+
   test("on a phone the list is cards with nothing to reveal, and the record is the whole screen", async ({ page, baseURL }) => {
     const owner = await setUpFirstOwner(page, baseURL ?? BASE);
     // Written behind the console's back: a phone reads tags and notes and writes neither.
@@ -191,6 +256,9 @@ test.describe("Leads", () => {
     await expect(cards.getByRole("link", { name: m.table.open(PENDING.masked) })).toBeVisible();
     await expect(page.getByRole("table")).toBeHidden();
     await expect(cards.getByRole("button")).toHaveCount(0);
+    // Nothing is exported from a phone: the page says where to go instead.
+    await expect(page.getByText(m.export.phone)).toBeVisible();
+    await expect(page.getByRole("button", { name: m.export.action })).toHaveCount(0);
     expect(await layoutBreaks(page)).toEqual([]);
     await expectAxeClean(page, { allowDesignLockedAccent: true });
 
@@ -212,6 +280,7 @@ test.describe("Leads", () => {
     await expect(record.getByRole("button", { name: m.record.removeTag("e2e-phone") })).toHaveCount(0);
     await expect(record.getByRole("combobox", { name: m.record.addTag })).toHaveCount(0);
     await expect(record.getByRole("textbox", { name: m.record.addNote })).toHaveCount(0);
+    await expect(record.getByRole("button", { name: m.remove.action })).toHaveCount(0);
 
     await record.getByRole("button", { name: m.table.revealLabel(SUBSCRIBED.masked) }).click();
     await expect(record.getByText(SUBSCRIBED.email)).toBeVisible();

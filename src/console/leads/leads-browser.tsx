@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { notify } from "@/components/ui/toast";
 import { hasFilters, leadQuery, LEAD_PAGE_SIZE, NO_LEAD_FILTERS, type LeadFilters } from "@/console/leads/filters";
 import { LeadDrawer } from "@/console/leads/lead-drawer";
@@ -33,11 +33,17 @@ export function LeadsBrowser({
   filters,
   detail,
   tags,
+  environment,
+  between,
 }: {
   readonly page: LeadPage | null;
   readonly filters: LeadFilters;
   /** Every tag in use: the Tag filter's choices, and what the record offers as one is typed. */
   readonly tags: readonly string[];
+  /** The deployment, for the one act here that is approved under it: Delete lead. */
+  readonly environment: string;
+  /** Drawn between the filters and the list: the export's status rows, which the page owns. */
+  readonly between?: ReactNode;
   /** The open lead's record; why there is none to draw; or null when no record is open. */
   readonly detail: LeadDetail | "unavailable" | "gone" | null;
 }) {
@@ -128,6 +134,7 @@ export function LeadsBrowser({
           if (hasFilters(filters)) router.push(leadQuery(NO_LEAD_FILTERS));
         }}
       />
+      {between}
       <LeadsPlate
         state={state}
         rows={rows}
@@ -148,6 +155,12 @@ export function LeadsBrowser({
           tags={written[open]?.tags ?? (typeof detail === "string" ? [] : detail.tags)}
           notes={written[open]?.notes ?? (typeof detail === "string" ? [] : detail.notes)}
           suggestions={tags}
+          environment={environment}
+          onDeleted={() => {
+            // Back to the list the member came from, re-read: the lead is no longer in it.
+            router.push(leadQuery({ ...filters, lead: null }));
+            router.refresh();
+          }}
           onReveal={() => void reveal(open)}
           onTag={(name) => tag(open, name, false)}
           onUntag={(name) => tag(open, name, true)}
