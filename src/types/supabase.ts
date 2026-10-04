@@ -351,6 +351,7 @@ export type Database = {
         Returns: undefined
       }
       console_business_members: { Args: never; Returns: Json }
+      console_business_pipeline: { Args: never; Returns: Json }
       console_change_role: {
         Args: {
           p_environment: string

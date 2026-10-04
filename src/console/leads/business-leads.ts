@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { ConsoleDb } from "@/console/auth/db";
-import type { BusinessMember, BusinessStage } from "@/console/leads/business";
+import { BUSINESS_STAGES, type BusinessMember, type BusinessStage } from "@/console/leads/business";
 import { businessShape, leadError, parsed, type LeadBusiness } from "@/console/leads/leads";
 
 // The console's calls over the business pipeline (20261008090000_console_business_leads.sql), each
@@ -11,6 +11,18 @@ import { businessShape, leadError, parsed, type LeadBusiness } from "@/console/l
 // A database error THROWS, in the console's words (`leadError`).
 
 const membersShape = z.array(z.object({ id: z.guid(), name: z.string().min(1) }));
+// A card on the board: the lead's id, its MASKED address (anything else is refused, not drawn),
+// its stage and when it entered it, its owner by name, and the line about it.
+const cardShape = z.object({
+  id: z.string().min(3),
+  email: z.string().regex(/^.?•••@.+$/u),
+  stage: z.enum(BUSINESS_STAGES),
+  stageSince: z.iso.datetime({ offset: true }),
+  ownerName: z.string().nullable(),
+  about: z.string().min(1),
+});
+export type PipelineCard = z.infer<typeof cardShape>;
+
 const addedShape = z.object({ id: z.string().min(3), added: z.boolean() });
 
 /** What a member types about a lead. Empty strings are "not given": the database reads them as null. */
@@ -76,4 +88,11 @@ export async function assignBusinessLead(db: ConsoleDb, environment: string, lea
 export async function unmarkBusinessLead(db: ConsoleDb, environment: string, leadId: string): Promise<void> {
   const { error } = await db.rpc("console_unmark_business_lead", { p_environment: environment, p_id: leadId });
   if (error) throw leadError(error);
+}
+
+/** The board: every lead in the pipeline as a card, in the board's order. Reading it records nothing. */
+export async function readPipeline(db: ConsoleDb): Promise<readonly PipelineCard[]> {
+  const { data, error } = await db.rpc("console_business_pipeline");
+  if (error) throw leadError(error);
+  return parsed(z.array(cardShape), data);
 }
