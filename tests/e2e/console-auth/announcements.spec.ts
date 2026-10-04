@@ -91,7 +91,8 @@ test.describe("Announcements", () => {
     await expect(stopping.getByText(subject)).toBeVisible();
     await stopping.getByRole("button", { name: m.stopDialog.confirm }).click();
     await expect(page.getByText(m.stopDialog.done, { exact: true })).toBeVisible();
-    await expect(page.getByText(m.detail.cantResume)).toBeVisible();
+    // Exact: the Stop strip and the dialog both contain this sentence inside a longer one.
+    await expect(page.getByText(m.detail.cantResume, { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: m.detail.stop, exact: true })).toHaveCount(0);
 
     // The list shows it stopped, and the audit log holds the three acts.
@@ -136,7 +137,8 @@ test.describe("Announcements", () => {
       }, { message: "the sheet sits on the bottom edge and spans the screen" })
       .toEqual([0, 844, 390]);
     await sheet.getByRole("button", { name: m.stopDialog.confirm }).click();
-    await expect(page.getByText(m.detail.cantResume)).toBeVisible();
+    // Exact: the Stop strip and the dialog both contain this sentence inside a longer one.
+    await expect(page.getByText(m.detail.cantResume, { exact: true })).toBeVisible();
     expect(await layoutBreaks(page)).toEqual([]);
   });
 });
