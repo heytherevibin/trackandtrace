@@ -54,7 +54,9 @@ export const CONSOLE_MODULES: readonly ConsoleModule[] = [
   // own change, so the page draws Limits and Most limited today and no Block control yet.
   { num: "04", label: "Abuse & limits", group: "operate", roles: OWNER_ADMIN, href: consoleHref("/abuse"), built: true },
   { num: "05", label: "Alerts", group: "operate", roles: OWNER_ADMIN, href: consoleHref("/alerts"), built: false },
-  { num: "06", label: "Leads", group: "people", roles: OWNER_ADMIN_SUPPORT, href: consoleHref("/leads"), built: false },
+  // Built 2026-10-04: the list, search by full email, reveal, and the record (sheet 22). Export,
+  // tags, notes and deletion follow in their own changes; the address and the access do not change.
+  { num: "06", label: "Leads", group: "people", roles: OWNER_ADMIN_SUPPORT, href: consoleHref("/leads"), built: true },
   // Built 2026-10-04: the Letters pages (list, compose, test send, queue, detail, stop). Its
   // Suppressions tab follows; the module's address and its access do not change when it does.
   { num: "07", label: "Announcements", group: "people", roles: OWNER_ADMIN, href: consoleHref("/announcements"), built: true },

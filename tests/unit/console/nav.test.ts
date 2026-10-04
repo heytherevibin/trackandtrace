@@ -64,6 +64,9 @@ describe("railFor against today's real CONSOLE_MODULES", () => {
   const ABUSE = CONSOLE_MODULES.find((m) => m.num === "04");
   // 07 Announcements flipped on 2026-10-04 with its Letters pages: Owner and Admin, and the first
   // built module in the `people` group.
+  // 06 Leads flipped on 2026-10-04 with its list and record. Owner, Admin and Support: the first
+  // module that is Support's own, and so the first time that role's rail has a second group.
+  const LEADS = CONSOLE_MODULES.find((m) => m.num === "06");
   const ANNOUNCEMENTS = CONSOLE_MODULES.find((m) => m.num === "07");
   const SWITCHES = CONSOLE_MODULES.find((m) => m.num === "11");
   const TEAM = CONSOLE_MODULES.find((m) => m.num === "13");
@@ -77,7 +80,7 @@ describe("railFor against today's real CONSOLE_MODULES", () => {
     expect(AUDIT).toBeDefined();
     expect(railFor("owner")).toEqual([
       { group: "operate", modules: [OVERVIEW, SOURCES, ABUSE] },
-      { group: "people", modules: [ANNOUNCEMENTS] },
+      { group: "people", modules: [LEADS, ANNOUNCEMENTS] },
       { group: "configure", modules: [SWITCHES, TEAM] },
       { group: "record", modules: [AUDIT] },
     ]);
@@ -86,21 +89,25 @@ describe("railFor against today's real CONSOLE_MODULES", () => {
   // Main.dc.html:293-298's own access.Admin list has no '13' -- Team is Owner-only, whatever the
   // plan's table said (task-4-addendum.md §5, re-checked for task-8 in task-7-addendum.md §6) --
   // but it does have '14'.
-  it("gives an Admin Overview, Sources, Abuse, Announcements, Switches and the Audit log, but not Team", () => {
+  it("gives an Admin Overview, Sources, Abuse, Leads, Announcements, Switches and the Audit log, but not Team", () => {
     expect(railFor("admin")).toEqual([
       { group: "operate", modules: [OVERVIEW, SOURCES, ABUSE] },
-      { group: "people", modules: [ANNOUNCEMENTS] },
+      { group: "people", modules: [LEADS, ANNOUNCEMENTS] },
       { group: "configure", modules: [SWITCHES] },
       { group: "record", modules: [AUDIT] },
     ]);
   });
 
   // 02 Sources & usage is Owner+Admin+Viewer, so a Viewer has Overview and Sources. Support has
-  // Overview alone: its own three modules (06 Leads, 09 Privacy requests, 10 Wrong-status reports)
-  // are all unbuilt, so the queues that role exists for are still not in its rail.
-  it("gives a Viewer Overview and Sources, and Support Overview alone", () => {
+  // Overview and Leads, and Leads without Announcements beside it: its two queues (09 Privacy
+  // requests, 10 Wrong-status reports) are still unbuilt.
+  it("gives a Viewer Overview and Sources, and Support Overview and Leads", () => {
+    expect(LEADS).toBeDefined();
     expect(railFor("viewer")).toEqual([{ group: "operate", modules: [OVERVIEW, SOURCES] }]);
-    expect(railFor("support")).toEqual([{ group: "operate", modules: [OVERVIEW] }]);
+    expect(railFor("support")).toEqual([
+      { group: "operate", modules: [OVERVIEW] },
+      { group: "people", modules: [LEADS] },
+    ]);
   });
 });
 
@@ -144,8 +151,8 @@ describe("CONSOLE_MODULES", () => {
   // 11 Switches or 01 Overview arrives, this test names what changed instead of counting one more.
   // A tripwire, and it is meant to fire: a module flips only in the PR that adds its page, so an
   // unexplained change here is a rail link to a route that does not exist.
-  it("builds 01 Overview, 02 Sources, 04 Abuse, 07 Announcements, 11 Switches, 13 Team and 14 Audit log, and nothing else yet", () => {
-    expect(CONSOLE_MODULES.filter((m) => m.built).map((m) => m.num)).toEqual(["01", "02", "04", "07", "11", "13", "14"]);
+  it("builds 01 Overview, 02 Sources, 04 Abuse, 06 Leads, 07 Announcements, 11 Switches, 13 Team and 14 Audit log, and nothing else yet", () => {
+    expect(CONSOLE_MODULES.filter((m) => m.built).map((m) => m.num)).toEqual(["01", "02", "04", "06", "07", "11", "13", "14"]);
   });
 
   it("gives every module a distinct, non-empty label and a console href", () => {
