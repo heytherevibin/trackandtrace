@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ConsoleDb } from "@/console/auth/db";
 import { LEAD_PAGE_SIZE, leadQuery, parseLeadFilters, sinceFor } from "@/console/leads/filters";
-import { findLead, noteLead, readFigures, readLead, readLeads, readTags, revealLead, tagLead, untagLead } from "@/console/leads/leads";
+import { deleteLead, exportLeads, findLead, noteLead, readFigures, readLead, readLeads, readTags, revealLead, tagLead, untagLead } from "@/console/leads/leads";
 import { consoleMessages } from "@/console/messages";
 import { AppError } from "@/services/errors";
 
@@ -126,6 +126,54 @@ describe("tags and notes", () => {
     ["no access", m.noAccess],
   ])("turns the database's %j into the console's words", async (raised, shown) => {
     expect(await message(tagLead(db({ error: { message: raised } }).db, "production", ID, "press"))).toBe(shown);
+  });
+});
+
+describe("delete and export", () => {
+  const REASON = "Asked by phone to be removed from our lists.";
+  const m2 = consoleMessages.leads;
+
+  it("deletes by id, passing the tap's own value and reason through untouched", async () => {
+    const { db: client, rpc } = db({ data: null });
+    await deleteLead(client, "production", ID, '{"environment":"production"}', REASON);
+    expect(rpc).toHaveBeenCalledWith("console_delete_lead", { p_environment: "production", p_id: ID, p_value: '{"environment":"production"}', p_reason: REASON });
+  });
+
+  it.each([
+    ["no tap for this action", m2.confirm.tapMismatch],
+    ["has an account", m2.remove.hasAccount],
+    ["environment mismatch", m2.confirm.refused],
+    ["no such lead", m.gone],
+    ["no access", m.noAccess],
+    ["connection refused", m.database],
+  ])("turns the database's %j on a delete into the console's words", async (raised, shown) => {
+    expect(await message(deleteLead(db({ error: { message: raised } }).db, "production", ID, "{}", REASON))).toBe(shown);
+  });
+
+  it("exports the filters verbatim, and answers the file, its name and how many rows it holds", async () => {
+    const FILTERS = '{"account":null,"environment":"production","news":"subscribed","since":null,"source":null,"tag":null}';
+    const row = { email: "asha.verma@example.com", news: "subscribed", availability: false, account: "has", source: "footer", campaignSource: null, campaignMedium: null, campaignName: null, tags: ["press"], firstSeen: "2026-09-02T04:44:00+00:00", lastActivity: "2026-09-18T15:42:00+00:00" };
+    const { db: client, rpc } = db({ data: { rows: [row], count: 1 } });
+    const file = await exportLeads(client, "production", FILTERS, REASON, new Date("2026-09-19T09:02:00Z"));
+    expect(rpc).toHaveBeenCalledWith("console_export_leads", { p_environment: "production", p_filters: FILTERS, p_reason: REASON });
+    expect(file.count).toBe(1);
+    expect(file.fileName).toBe("leads-2026-09-19.csv");
+    expect(file.csv.split("\r\n")[1]).toBe("asha.verma@example.com,subscribed,false,has,footer,,,,press,2026-09-02T04:44:00+00:00,2026-09-18T15:42:00+00:00");
+  });
+
+  it.each([
+    ["no tap for this action", m2.confirm.tapMismatch],
+    ["too many leads to export", m2.export.tooMany(10_000)],
+    ["the export filters could not be read", m2.confirm.refused],
+    ["environment mismatch", m2.confirm.refused],
+    ["no access", m.noAccess],
+    ["connection refused", m.database],
+  ])("turns the database's %j on an export into the console's words", async (raised, shown) => {
+    expect(await message(exportLeads(db({ error: { message: raised } }).db, "production", "{}", REASON, new Date()))).toBe(shown);
+  });
+
+  it("refuses an answer that is not rows of leads, rather than writing a file from it", async () => {
+    expect(await message(exportLeads(db({ data: { rows: [{ email: 42 }], count: 1 } }).db, "production", "{}", REASON, new Date()))).toBe(m.database);
   });
 });
 

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { ConsoleDb } from "@/console/auth/db";
+import { LEAD_EXPORT_MAX, leadExportFileName, leadsCsv } from "@/console/leads/export";
 import { ACCOUNT_STATUSES, LEAD_ID, LEAD_PAGE_SIZE, LEAD_SOURCES, NEWS_STATUSES, sinceFor, type LeadFilters } from "@/console/leads/filters";
 import { consoleMessages } from "@/console/messages";
 import { AppError } from "@/services/errors";
@@ -12,6 +13,7 @@ import { AppError } from "@/services/errors";
 // A database error THROWS: "no leads" and "the database is down" are different pages.
 
 const m = consoleMessages.leads.errors;
+const guarded = consoleMessages.leads;
 
 const when = z.iso.datetime({ offset: true });
 const count = z.number().int().nonnegative();
@@ -86,6 +88,11 @@ function fromError(error: { readonly message: string }): AppError {
   const text = error.message;
   if (text.includes("no access")) return new AppError("INVALID_INPUT", m.noAccess, { status: 403 });
   if (text.includes("no such lead") || text.includes("not a lead id")) return new AppError("NOT_FOUND", m.gone);
+  // The reason-and-key acts' own refusals. Read by message: every console refusal shares a code.
+  if (text.includes("no tap for this action")) return new AppError("INVALID_INPUT", guarded.confirm.tapMismatch, { status: 403 });
+  if (text.includes("has an account")) return new AppError("INVALID_INPUT", guarded.remove.hasAccount);
+  if (text.includes("too many leads to export")) return new AppError("INVALID_INPUT", guarded.export.tooMany(LEAD_EXPORT_MAX));
+  if (text.includes("environment mismatch") || text.includes("the export filters could not be read")) return new AppError("INVALID_INPUT", guarded.confirm.refused, { status: 403 });
   if (text.includes("not an address")) return new AppError("INVALID_INPUT", m.notAddress);
   if (text.includes("not a tag")) return new AppError("INVALID_INPUT", m.notTag);
   if (text.includes("too many tags")) return new AppError("INVALID_INPUT", m.tooManyTags);
@@ -169,4 +176,52 @@ export async function noteLead(db: ConsoleDb, environment: string, leadId: strin
   const { data, error } = await db.rpc("console_note_lead", { p_environment: environment, p_id: leadId, p_body: body });
   if (error) throw fromError(error);
   return parsed(notesShape, data);
+}
+
+/**
+ * Deletes a lead that has no account. `value` and `reason` go through VERBATIM: they are two of the
+ * four strings the member's tap was minted over, and `console_delete_lead` spends that tap by
+ * re-digesting its own arguments. The database refuses a lead with an account before it spends it.
+ */
+export async function deleteLead(db: ConsoleDb, environment: string, leadId: string, value: string, reason: string): Promise<void> {
+  const { error } = await db.rpc("console_delete_lead", { p_environment: environment, p_id: leadId, p_value: value, p_reason: reason });
+  if (error) throw fromError(error);
+}
+
+const exportedShape = z.object({
+  count,
+  rows: z.array(
+    z.object({
+      email: z.string().min(3),
+      news: z.enum(NEWS_STATUSES),
+      availability: z.boolean(),
+      account: z.enum(ACCOUNT_STATUSES),
+      source: z.enum(LEAD_SOURCES),
+      campaignSource: z.string().nullable(),
+      campaignMedium: z.string().nullable(),
+      campaignName: z.string().nullable(),
+      tags: tagsShape,
+      firstSeen: when,
+      lastActivity: when,
+    }),
+  ),
+});
+
+export interface LeadExport {
+  readonly csv: string;
+  readonly count: number;
+  readonly fileName: string;
+}
+
+/**
+ * One export: spend the tap, write the audit row and take the rows, all inside
+ * `console_export_leads` and one transaction, then serialise them here. `filters` and `reason` go
+ * through VERBATIM, for the reason `deleteLead` gives. This is the one call besides `revealLead`
+ * that brings whole addresses out of the database; they go into the file and nowhere else.
+ */
+export async function exportLeads(db: ConsoleDb, environment: string, filters: string, reason: string, now: Date): Promise<LeadExport> {
+  const { data, error } = await db.rpc("console_export_leads", { p_environment: environment, p_filters: filters, p_reason: reason });
+  if (error) throw fromError(error);
+  const answer = parsed(exportedShape, data);
+  return { csv: leadsCsv(answer.rows), count: answer.count, fileName: leadExportFileName(now) };
 }

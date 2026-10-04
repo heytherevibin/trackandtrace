@@ -13,6 +13,8 @@ export type Failed = { readonly kind: "failed"; readonly message: string };
 // The row is checked on the server (leads.ts) before it is sent; here only its presence is.
 const foundSchema = z.object({ ok: z.literal(true), lead: z.custom<LeadRow>((value) => typeof value === "object" && value !== null).nullable() }).strict();
 const revealedSchema = z.object({ ok: z.literal(true), address: z.string() }).strict();
+const doneSchema = z.object({ ok: z.literal(true) }).strict();
+const exportSchema = z.object({ ok: z.literal(true), csv: z.string(), count: z.number().int().nonnegative(), fileName: z.string().regex(/^leads-\d{4}-\d{2}-\d{2}\.csv$/) }).strict();
 const tagsSchema = z.object({ ok: z.literal(true), tags: z.array(z.string()) }).strict();
 // The notes are checked on the server (leads.ts) before they are sent; here only that there is a list.
 const notesSchema = z.object({ ok: z.literal(true), notes: z.custom<readonly LeadNote[]>((value) => Array.isArray(value)) }).strict();
@@ -43,4 +45,22 @@ export async function requestTag(id: string, tag: string, remove = false): Promi
 export async function requestNote(id: string, body: string): Promise<{ readonly kind: "done"; readonly notes: readonly LeadNote[] } | Failed> {
   const result = await apiRequest("/api/leads/note", post({ id, body }), notesSchema);
   return result.ok ? { kind: "done", notes: result.data.notes } : { kind: "failed", message: consoleApiMessage(result.error) };
+}
+
+/** Deletes a lead, after its tap. `value` and `reason` are the strings the tap was minted over. */
+export async function requestDelete(id: string, value: string, reason: string): Promise<{ readonly kind: "done" } | Failed> {
+  const result = await apiRequest("/api/leads/delete", post({ id, value, reason }), doneSchema);
+  return result.ok ? { kind: "done" } : { kind: "failed", message: consoleApiMessage(result.error) };
+}
+
+export interface PreparedLeadExport {
+  readonly csv: string;
+  readonly count: number;
+  readonly fileName: string;
+}
+
+/** Prepares the export, after its tap. A whole list can take a moment: the timeout allows for it. */
+export async function requestExport(filters: string, reason: string): Promise<{ readonly kind: "done"; readonly file: PreparedLeadExport } | Failed> {
+  const result = await apiRequest("/api/leads/export", post({ filters, reason }), exportSchema, { timeoutMs: 30_000 });
+  return result.ok ? { kind: "done", file: { csv: result.data.csv, count: result.data.count, fileName: result.data.fileName } } : { kind: "failed", message: consoleApiMessage(result.error) };
 }
