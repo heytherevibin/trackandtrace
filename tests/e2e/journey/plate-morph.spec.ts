@@ -227,4 +227,41 @@ test.describe("the plate morph", () => {
     const contentBox = await wrapper.locator(":scope > *").first().boundingBox();
     expect(Math.abs((box?.height ?? 0) - (contentBox?.height ?? 0))).toBeLessThanOrEqual(1);
   });
+
+  // A face can change its own height after the commit the morph first measures it in. In a window under 352px the
+  // record's passenger table stacks (use-outgrown.ts), in that commit's own layout effects, and the stacked record is
+  // taller than the table the morph measured (987px against 807 at 320px): a tween to the first measure ended 180px
+  // short and the plate jumped the rest when it let go. The tween runs to the face's height as it stands on each frame,
+  // so the last height it writes is the height the plate keeps. Read from the writes themselves, each one (a
+  // MutationObserver is told every one, with the value it replaced), never from frames: a slow runner drops frames.
+  test("where the record stacks, the morph ends at the height the record stands at: the plate does not jump when it lets go", async ({ page, isMobile }) => {
+    test.skip(!isMobile, "a phone's width");
+    await page.setViewportSize({ width: 320, height: 844 });
+    await page.goto("/");
+    // a party of three: the record with a passenger table in it
+    await page.getByTestId("hero-instrument").getByRole("textbox").fill(PNR.mixed);
+    await page.evaluate(() => {
+      const w = window as unknown as { __written: number[] };
+      w.__written = [];
+      const el = document.querySelector('[data-testid="hero-instrument"] .plate-morph')!;
+      new MutationObserver((records) => {
+        for (const record of records) {
+          const height = /(?:^|;\s*)height:\s*([\d.]+)px/.exec(record.oldValue ?? "");
+          if (height) w.__written.push(Number(height[1]));
+        }
+      }).observe(el, { attributes: true, attributeFilter: ["style"], attributeOldValue: true });
+    });
+    await clickRun(page);
+    const wrapper = page.locator('[data-testid="hero-instrument"] .plate-morph');
+    // the morph has run and let go: it wrote heights, and none is left
+    await expect.poll(() => wrapper.evaluate((el) => (window as unknown as { __written: number[] }).__written.length > 0 && (el as HTMLElement).style.height === ""), { timeout: 10_000 }).toBe(true);
+    const at = await wrapper.evaluate((el) => ({
+      written: (window as unknown as { __written: number[] }).__written,
+      stands: el.getBoundingClientRect().height,
+      rows: [...new Set([...el.querySelectorAll("tbody tr")].map((row) => getComputedStyle(row).display))],
+    }));
+    expect(at.rows, "the record's rows are stacked: the case this test is about").toEqual(["grid"]);
+    expect(new Set(at.written).size, "the morph tweened: it wrote many heights").toBeGreaterThan(5);
+    expect(Math.abs((at.written.at(-1) ?? 0) - at.stands), `the last height written, ${at.written.at(-1)}px, against the ${at.stands}px the plate keeps`).toBeLessThanOrEqual(1);
+  });
 });

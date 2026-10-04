@@ -107,11 +107,17 @@ export function PlateMorph({ face, children }: { readonly face: string; readonly
       box.style.height = `${before.height}px`;
       box.style.overflow = "clip";
     }
-    const tween: Tween = animate(before.height, measured, {
+    // The tween is of the way there, 0 to 1, and "there" is the face's height as it stands on each frame, not the
+    // height measured above. A face can change its own height after this commit without this component rendering
+    // again: the record's passenger table stacks where the window cannot show it (use-outgrown.ts), and the stacked
+    // record is taller. A tween to the first measure ended that much short, and the plate jumped the rest when it let
+    // go. A face that keeps its height gives the same numbers as before.
+    const from = before.height;
+    const tween: Tween = animate(0, 1, {
       duration: MORPH_S,
       ease: EXPO,
-      onUpdate: (h) => {
-        if (box) box.style.height = `${h}px`;
+      onUpdate: (way) => {
+        if (box) box.style.height = `${from + (el.offsetHeight - from) * way}px`;
       },
       onComplete: () => {
         if (grow.current !== tween) return;

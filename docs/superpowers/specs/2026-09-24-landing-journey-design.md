@@ -606,6 +606,25 @@ Decided after J6 (2026-10-02): the landing at 200% text, beyond the phone widths
 - The hero's dial runs past the window by design and `main` clips it, at 100% as at 200%: the sweep's layout reading
   leaves it out by name (layout.ts) and still measures everything else `main` clips.
 
+Decided after J6 (the owner, 2026-10-04): the check plate's in-place record stacks wherever the window cannot show its
+table, at any text size. This replaces the line above that kept the table at 100% text at every width.
+- The table cannot wrap below its own least width (309px at 100% for the fixture's party of three) and starts 42px into
+  the page, so in a window under 352px the page cut its fourth column, coach · berth, off, and no reader could bring it
+  back. There each passenger now stacks into the labelled record it already used with larger text: no scroller, no
+  extra Tab stop, nothing past the frame.
+- From 352px up at 100% text the record is as it was, to the pixel. From 352px to 393px the table still overhangs its
+  frame (by 40px at 352px, 2px at 390px; under 372px it crosses the plate's own border), inside the window: that is how
+  it was drawn and it is left so. The frame holds the table from 394px. With the text larger than drawn the rule is
+  unchanged: the rows stack whenever the frame is narrower than the table.
+- The switch is still a ResizeObserver, not CSS, and no size container was added to the landing. It no longer holds a
+  width: `useOutgrown` measures what the table needs from the table itself (while stacked it keeps the last measure,
+  reckoned at the present text size), so a longer name or a fifth column moves the width by itself. It also judges in
+  a layout effect, before the first paint: a record that cannot fit is never drawn as a table first.
+- The plate's morph tweens to the record's height as it stands on each frame, not to the height it first measured: the
+  stacked record is taller than the table (987px against 807 at 320px), and the plate jumped the difference when the
+  tween let go. The same jump at 200% text (since #117) is gone with it. `tt:layout` is still told once, when the
+  morph settles, at the record's final height.
+
 ## 7. What only the user can do
 
 - Approve this spec, then each PR's merge.

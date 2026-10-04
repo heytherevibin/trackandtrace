@@ -3,7 +3,7 @@ import { PNR, gotoReady } from "./helpers";
 import { drawStill, waitForJourney } from "./journey/journey-helpers";
 import { brokenWords, cutText, layoutBreaks } from "./layout";
 import { UNSUBSCRIBE } from "./subscribe-link";
-import { sweepAt200, text200 } from "./text-200";
+import { LANDING_WITH_RECORD, sweepAt200, text200 } from "./text-200";
 
 // Every route fits a phone: no sideways page scroll, nothing drawn past the screen edge, and no
 // container that hides part of its content (a clipped nav strip, a table wider than its plate).
@@ -214,6 +214,11 @@ test.describe("phone and tablet widths", () => {
         const breaks = await layoutBreaks(page);
         if (breaks.length > 0) failures.push(`${route}\n  ${breaks.join("\n  ")}`);
       }
+      // And the landing with a record in its check plate: the one state of a route whose table once ran out of the
+      // window (four columns, under 352px), where the page cut its last column off. It stacks there now.
+      await LANDING_WITH_RECORD.open(page);
+      const breaks = await layoutBreaks(page);
+      if (breaks.length > 0) failures.push(`${LANDING_WITH_RECORD.name}\n  ${breaks.join("\n  ")}`);
       expect(failures, failures.join("\n")).toEqual([]);
     });
   }

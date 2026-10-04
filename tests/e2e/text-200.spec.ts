@@ -1,7 +1,7 @@
 import { expect, test } from "./fixtures";
 import { PNR, axeResults, gotoReady } from "./helpers";
 import { waitForJourney } from "./journey/journey-helpers";
-import { layoutBreaks } from "./layout";
+import { cutText, layoutBreaks } from "./layout";
 import { report, undersizedTargets } from "./targets";
 import { breaksAt200, narrowFields, text200, wordsBrokenMidWord } from "./text-200";
 
@@ -103,11 +103,15 @@ test("the passengers' scroll region is a landmark with a name of its own, not th
   expect(results.violations.filter((v) => v.id === "landmark-unique").map((v) => v.nodes.map((n) => n.target.join(" ")))).toEqual([]);
 });
 
-// The landing's in-place record at 100% is the table it always was, at every phone width: four columns, wider than the
-// plate under 352px as drawn (the page clips it), never a scroller, never a Tab stop. With the text at 200% its rows
-// stack, as the other tables' do below their breakpoints.
-for (const width of [280, 360, 390] as const) {
-  test(`at ${width}px the landing's record is a plain table at 100%, and stacked rows at 200%`, async ({ page, isMobile }) => {
+// The landing's in-place record (decided 2026-10-04, the owner). At 100% it is the table it always was wherever the
+// window shows all of it: four columns that cannot wrap below 309.1px for the fixture's party of three, starting 42px
+// into the page, so from a 352px window up (to 393px the table overhangs its frame, as drawn; from 394px the frame holds
+// it). In a narrower window the page cut its last column off; there each passenger now stacks into the labelled rows
+// the record already used with larger text: every cell inside the frame, nothing cut, no scroller, no Tab stop of its
+// own. With the text at 200% the rows stack at every one of these widths, as before. The switch measures the table
+// itself (use-outgrown.ts): the widths here are this fixture's, not the code's.
+for (const width of [280, 300, 320, 340, 351, 352, 360, 375, 390] as const) {
+  test(`at ${width}px the landing's record is ${width < 352 ? "stacked rows" : "a plain table"} at 100%, and stacked rows at 200%`, async ({ page, isMobile }) => {
     test.skip(!isMobile, "a phone's widths");
     const record = async () => {
       await page.setViewportSize({ width, height: 844 });
@@ -121,25 +125,83 @@ for (const width of [280, 360, 390] as const) {
       return result.evaluate((el) => {
         const table = el.querySelector("table");
         if (!table) throw new Error("no table");
+        const frame = (table.parentElement as HTMLElement).getBoundingClientRect();
+        const cells = [...table.querySelectorAll<HTMLElement>("tbody td")];
+        const px = (n: number) => Math.round(n * 10) / 10;
         return {
           rows: [...new Set([...table.querySelectorAll("tbody tr")].map((r) => getComputedStyle(r).display))],
           scrollers: el.querySelectorAll('[data-scroll-region], [role="region"], [tabindex="0"]').length,
+          stops: [...el.querySelectorAll<HTMLElement>("a[href], button, input, select, textarea, [tabindex]")].filter((stop) => stop.tabIndex >= 0).length,
           table: Math.round(table.getBoundingClientRect().width),
-          box: Math.round((table.parentElement as HTMLElement).getBoundingClientRect().width),
+          box: Math.round(frame.width),
+          cells: cells.length,
+          // a cell a reader cannot see all of: empty, past the window's side, or (stacked) outside the record's frame
+          pastWindow: cells.flatMap((cell) => {
+            const box = cell.getBoundingClientRect();
+            return box.width > 0 && box.left >= 0 && box.right <= document.documentElement.clientWidth ? [] : [`"${cell.textContent}" [${px(box.left)}, ${px(box.right)}]`];
+          }),
+          pastFrame: cells.flatMap((cell) => {
+            const box = cell.getBoundingClientRect();
+            return box.left >= frame.left - 0.5 && box.right <= frame.right + 0.5 ? [] : [`"${cell.textContent}" [${px(box.left)}, ${px(box.right)}] in [${px(frame.left)}, ${px(frame.right)}]`];
+          }),
+          // stacked, a cell says which column it was: the column's heading, drawn above it
+          labels: cells.map((cell) => (cell.dataset.label ? getComputedStyle(cell, "::before").content : "")).filter((label) => label !== "" && label !== "none").length,
+          empty: cells.filter((cell) => (cell.textContent ?? "").trim() === "").length,
         };
       });
     };
     const drawn = await record();
-    expect(drawn.rows, "at 100%").toEqual(["table-row"]);
+    expect(drawn.cells, "a party of three, four cells a passenger").toBe(12);
+    expect(drawn.empty, "every cell says something").toBe(0);
     expect(drawn.scrollers, "no scroller, no region, no Tab stop at 100%").toBe(0);
+    expect(drawn.stops, "the record's two controls, and no Tab stop besides").toBe(2);
+    expect(drawn.pastWindow, "every cell wholly inside the window at 100%").toEqual([]);
+    if (width < 352) {
+      expect(drawn.rows, "at 100% in a window the table would run out of, the rows stack").toEqual(["grid"]);
+      expect(drawn.table, "and the stacked table is no wider than its frame").toBeLessThanOrEqual(drawn.box);
+      expect(drawn.pastFrame, "every cell inside the record's frame").toEqual([]);
+      expect(drawn.labels, "booked, current and coach · berth, labelled for each passenger").toBe(9);
+    } else {
+      expect(drawn.rows, "at 100% where the window shows all of it, the table as drawn").toEqual(["table-row"]);
+    }
+    expect(await layoutBreaks(page), "at 100%").toEqual([]);
+    expect(await cutText(page, '[data-testid="terminal-result"]'), "no word of the record cut at 100%").toEqual([]);
     await text200(page);
     const large = await record();
     expect(large.scrollers, "no scroller at 200% either").toBe(0);
+    expect(large.stops, "nor a Tab stop").toBe(2);
     expect(large.rows, "at 200% the rows stack").toEqual(["grid"]);
     expect(large.table, "and the table is no wider than its frame").toBeLessThanOrEqual(large.box);
-    expect(await layoutBreaks(page)).toEqual([]);
+    expect(large.labels).toBe(9);
+    expect(await layoutBreaks(page), "at 200%").toEqual([]);
   });
 }
+
+// The same record in a window that changes width under it (a phone turned, a window dragged): it stacks as the window
+// stops showing the whole table and is the table again as soon as the window would, from what the table needed when it
+// was last a table. Each state is waited for, never timed.
+test("the landing's record stacks and is a table again as its window narrows and widens", async ({ page, isMobile }) => {
+  test.skip(!isMobile, "a phone's widths");
+  await gotoReady(page, "/");
+  await waitForJourney(page);
+  await page.getByLabel("PNR number").first().fill(PNR.mixed);
+  await page.getByRole("button", { name: "Run", exact: true }).first().click();
+  const row = page.getByTestId("terminal-result").locator("tbody tr").first();
+  await expect(row).toBeVisible({ timeout: 30_000 });
+  for (const [width, display] of [
+    [390, "table-row"],
+    [320, "grid"],
+    [352, "table-row"],
+    [351, "grid"],
+    [768, "table-row"],
+    [280, "grid"],
+  ] as const) {
+    await page.setViewportSize({ width, height: 844 });
+    await expect(row, `${width}px`).toHaveCSS("display", display);
+  }
+  await expect(page.locator('[style*="height"]:has([data-testid="terminal-result"])')).toHaveCount(0, { timeout: 10_000 });
+  expect(await layoutBreaks(page), "at 280px, after the changes").toEqual([]);
+});
 
 test("the hit-walk credits a label wrapped round its radio, and not a bare radio", async ({ page, isMobile }) => {
   test.skip(!isMobile, "tap targets are a touch-screen concern");

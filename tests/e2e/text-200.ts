@@ -80,6 +80,23 @@ async function introOver(page: Page): Promise<void> {
   await expect(page.locator("#hero-title span span")).toHaveCount(0, { timeout: 15_000 });
 }
 
+/** The landing with a party of three's record in its check plate, the plate's morph over. */
+export const LANDING_WITH_RECORD: State = {
+  name: "/ with a record in the plate",
+  open: async (page) => {
+    await gotoReady(page, "/");
+    await waitForJourney(page);
+    await introOver(page);
+    await enterPnr(page, PNR.mixed);
+    await page.getByRole("button", { name: "Run", exact: true }).first().click();
+    await expect(page.getByRole("link", { name: "Open full record" }).first()).toBeVisible({ timeout: 30_000 });
+    // The plate morphs from its entry to its record (plate-morph.tsx): its height is tweened inline, the record
+    // clipped by it until it settles. Measured before that, the record's foot is hidden and answers no finger.
+    const morphing = page.locator('[style*="height"]:has([data-testid="terminal-result"])');
+    await expect(morphing).toHaveCount(0, { timeout: 10_000 });
+  },
+};
+
 /** Every (site) route, in each state the fixture-mode server can draw. /subscribe/confirm's Before and After need a row
  * in the database, which that server has none of: it draws the invalid link, on the page frame the unsubscribe page
  * shares (SubscriptionPage), whose Before and After are both here.
@@ -97,21 +114,7 @@ export const STATES: readonly State[] = [
       await introOver(page);
     },
   },
-  {
-    name: "/ with a record in the plate",
-    open: async (page) => {
-      await gotoReady(page, "/");
-      await waitForJourney(page);
-      await introOver(page);
-      await enterPnr(page, PNR.mixed);
-      await page.getByRole("button", { name: "Run", exact: true }).first().click();
-      await expect(page.getByRole("link", { name: "Open full record" }).first()).toBeVisible({ timeout: 30_000 });
-      // The plate morphs from its entry to its record (plate-morph.tsx): its height is tweened inline, the record
-      // clipped by it until it settles. Measured before that, the record's foot is hidden and answers no finger.
-      const morphing = page.locator('[style*="height"]:has([data-testid="terminal-result"])');
-      await expect(morphing).toHaveCount(0, { timeout: 10_000 });
-    },
-  },
+  LANDING_WITH_RECORD,
   {
     name: "/watchlist, empty",
     open: async (page) => {

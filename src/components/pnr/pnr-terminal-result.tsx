@@ -18,17 +18,21 @@ const LEGEND_11 = "font-display text-2xs font-semibold uppercase leading-normal 
 const TH = `border-b border-line px-3.5 py-2 text-left ${LEGEND_11}`;
 const TD = "border-b border-line px-3.5 py-2";
 
-// The passenger table needs 19.3rem (309px as drawn). With the text made larger than drawn and the frame narrower than
-// that, each passenger stacks into a record: the passenger across the top, then booked, current and coach · berth
-// labelled beneath, side by side where each has 5rem. At the drawn text size it is always the table, as drawn, on
-// every screen (under 352px the page clips its last column, as it always has).
-const TABLE_MIN_REM = 19.5;
+// The passenger table cannot wrap below its own least width (309px as drawn, for the fixture's party of three). Where
+// it cannot be drawn as drawn, each passenger stacks into a record: the passenger across the top, then booked, current
+// and coach · berth labelled beneath, side by side where each has 5rem. That is so (useOutgrown, which measures the
+// table itself and holds no width of its own):
+// - at any text size, when the table would run past the window's side, where the page cut its last column off and no
+//   reader could bring it back (as drawn, a window under 352px);
+// - with the text made larger than drawn, whenever the frame is narrower than the table.
+// At the drawn text size the table is the table wherever the window shows all of it: from 352px to 393px it overhangs
+// its frame, as it always has, and from 394px the frame holds it.
 const STACKED_ROW = "grid grid-cols-[repeat(auto-fit,minmax(min(100%,5rem),1fr))] gap-x-4 gap-y-2 border-b border-line px-3.5 py-2.5 last:border-b-0";
 const STACKED_CELL = "min-w-0 wrap-break-word before:mb-0.5 before:block before:legend-sm before:text-ink-1/70 before:content-[attr(data-label)_/_'']";
 
 function FactsFrame({ facts, pax }: { readonly facts: readonly TerminalFact[]; readonly pax: readonly PaxRow[] }) {
   const m = messages.check.result.passengers;
-  const [frame, stacked] = useOutgrown<HTMLDivElement>(TABLE_MIN_REM);
+  const [frame, stacked] = useOutgrown<HTMLDivElement>();
   const td = stacked ? STACKED_CELL : TD;
   return (
     <div ref={frame} className="border border-line">
