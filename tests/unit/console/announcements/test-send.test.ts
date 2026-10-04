@@ -75,10 +75,11 @@ describe("sendTest", () => {
     expect(d.send.mock.invocationCallOrder[0]!).toBeLessThan(recordTest.mock.invocationCallOrder[0]!);
   });
 
-  it("counts a captured send too: under E2E the outbox stands in for the mail service", async () => {
+  it("records a captured send but does not count it: under E2E the outbox stood in, and nothing reached the mail service", async () => {
     const d = deps("captured");
     await sendTest(ASK, d);
     expect(recordTest).toHaveBeenCalled();
+    expect(d.counted).not.toHaveBeenCalled();
   });
 
   it("records nothing when the send failed", async () => {

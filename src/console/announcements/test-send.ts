@@ -49,7 +49,9 @@ export async function sendTest(
   // member must read as written — one says nothing was recorded, the other says to send again.
   if (result.outcome === "failed") throw new AppError("INVALID_INPUT", m.testFailed, { status: 502 });
 
-  await deps.counted();
+  // Only a real send counts, as `sendConsoleEmail` has it: a captured one under E2E never reached
+  // the mail service and spent nothing from the day's allowance.
+  if (result.outcome === "sent") await deps.counted();
   try {
     await recordTest(deps.db, ask.environment, ask.id);
   } catch {

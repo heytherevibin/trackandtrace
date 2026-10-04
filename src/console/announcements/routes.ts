@@ -6,7 +6,7 @@ import { consoleMessages } from "@/console/messages";
 import { countSent } from "@/services/email/allowance";
 import { sendToAddress } from "@/services/email/suppression";
 import { env } from "@/services/env";
-import { publicStore } from "@/services/shared-store";
+import { publicStoreForReading } from "@/services/shared-store";
 import { travellerOrigin } from "@/services/subscriptions/links";
 
 // What module 07's routes share: the body shapes and the wiring of the real stores. Kept out of the
@@ -39,7 +39,10 @@ export function travellerOriginFor(req: Request): string {
 }
 
 export async function testDeps(): Promise<TestSendDeps> {
-  const store = publicStore();
+  // The strict store, as every console use of the shared store is (store-reads.contract.test.ts):
+  // it fails when Upstash cannot be reached rather than counting into this instance's memory, and
+  // `countSent` swallows that failure — a test that went but could not be counted is still a test.
+  const store = publicStoreForReading();
   return {
     db: await createConsoleDb(),
     send: (letter, kind) => sendToAddress(letter, kind),
