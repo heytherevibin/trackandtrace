@@ -7,7 +7,7 @@ import { useOutgrown } from "@/components/ui/use-outgrown";
 // wider (a table of `width: 100%`); stacked it is its box's width, whatever the table needed.
 const BORDER = 1;
 interface Laid {
-  /** The window's width. */
+  /** The window's width. Nothing reads it: the rule is the box's, whatever the window would show. */
   readonly window: number;
   /** The box's left edge in the window, and the width inside its hairlines. */
   readonly left: number;
@@ -31,7 +31,7 @@ function lay(next: Laid, rootPx = 16): HTMLElement {
 function Box() {
   const [box, outgrown] = useOutgrown<HTMLDivElement>();
   return (
-    <div ref={box} data-testid="box">
+    <div ref={box} data-testid="box" style={{ borderLeft: `${BORDER}px solid`, borderRight: `${BORDER}px solid` }}>
       <div data-testid="content" data-stacked={outgrown || undefined}>
         {outgrown ? "stacked" : "table"}
       </div>
@@ -61,13 +61,6 @@ beforeEach(() => {
     if (this.dataset.testid === "content") return rect(laid.left + BORDER, this.dataset.stacked ? laid.width : Math.max(laid.need, laid.width));
     return rect(0, 0);
   });
-  vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockImplementation(function (this: HTMLElement) {
-    if (!laid) return 0;
-    return this === document.documentElement ? laid.window : this.dataset.testid === "box" ? laid.width : 0;
-  });
-  vi.spyOn(HTMLElement.prototype, "clientLeft", "get").mockImplementation(function (this: HTMLElement) {
-    return laid && this.dataset.testid === "box" ? BORDER : 0;
-  });
 });
 afterEach(() => {
   vi.restoreAllMocks();
@@ -75,46 +68,53 @@ afterEach(() => {
   document.documentElement.style.fontSize = "";
 });
 
-// The landing's record, as measured at 100% text: the table needs 309.1px, its frame is the window less 84px (41px and
-// a hairline each side), so the table's right edge is at 351.1px wherever the frame is narrower than the table.
+// The landing's record, as measured at 100% text: the table needs 309.1px, and its frame is the window less 84px (41px
+// and a hairline each side) on a phone.
 const phone = (window: number, need = 309.1): Laid => ({ window, left: 41, width: window - 84, need });
 
 describe("useOutgrown", () => {
-  it("at the drawn text size, is true once the content would run past the window's side, where the page would cut it", () => {
+  it("is true whenever the content is wider than its box, at the drawn text size as at any other", () => {
     render(<Box />);
-    expect(lay(phone(351))).toHaveTextContent("stacked"); // 351.1px of table in a 351px window
-    expect(lay(phone(340))).toHaveTextContent("stacked");
     expect(lay(phone(280))).toHaveTextContent("stacked");
+    expect(lay(phone(360))).toHaveTextContent("stacked");
+    expect(lay(phone(390))).toHaveTextContent("stacked"); // 306px of frame, 309.1px of table
+    expect(lay(phone(393))).toHaveTextContent("stacked"); // 309px of frame: a tenth of a pixel short
   });
 
-  it("at the drawn text size, is false while the window shows all of the content, though it overhangs its box: as drawn", () => {
+  it("is true though the window would show all of the content: it is the box that has to hold it, not the window", () => {
     render(<Box />);
-    expect(lay(phone(352))).toHaveTextContent("table"); // 268px of frame, 309.1px of table, all of it in the window
-    expect(lay(phone(390))).toHaveTextContent("table");
+    // 351.1px is where the table ends in a 352px window: inside the window, 40px past its frame
+    expect(lay(phone(352))).toHaveTextContent("stacked");
+    expect(lay({ window: 1440, left: 770, width: 300, need: 309.1 })).toHaveTextContent("stacked");
+  });
+
+  it("is false wherever the box holds the content", () => {
+    render(<Box />);
+    expect(lay(phone(394))).toHaveTextContent("table"); // 310px of frame
+    expect(lay(phone(430))).toHaveTextContent("table");
     expect(lay({ window: 1440, left: 770, width: 455, need: 309.1 })).toHaveTextContent("table");
   });
 
-  it("with the text made larger, is true whenever the content is wider than its box, and false again when the box holds it", () => {
+  it("with the text made larger, is true where the larger content is wider than its box, and false again when the box holds it", () => {
     render(<Box />);
-    // 618.2px of table at 32px: in a 455px frame on a desk, where the window would show all of it
     expect(lay({ window: 1440, left: 770, width: 455, need: 618.2 }, 32)).toHaveTextContent("stacked");
     expect(lay({ window: 1440, left: 400, width: 640, need: 618.2 }, 32)).toHaveTextContent("table");
     expect(lay({ window: 480, left: 41, width: 380, need: 386.4 }, 20)).toHaveTextContent("stacked");
     expect(lay({ window: 480, left: 41, width: 398, need: 386.4 }, 20)).toHaveTextContent("table");
   });
 
-  it("takes its measure from the content, not from a number: a wider table stacks in a wider window", () => {
+  it("takes its measure from the content, not from a number: a wider table stacks in a wider box", () => {
     render(<Box />);
-    expect(lay(phone(380, 345))).toHaveTextContent("stacked"); // 42 + 345 = 387px in 380
-    expect(lay(phone(390, 345))).toHaveTextContent("table");
+    expect(lay(phone(420, 345))).toHaveTextContent("stacked"); // 336px of frame
+    expect(lay(phone(430, 345))).toHaveTextContent("table"); // 346px
   });
 
-  it("stacked, remembers what the content needed and goes back to it as drawn once the window would show it all", () => {
+  it("stacked, remembers what the content needed and goes back to it as drawn once the box would hold it", () => {
     render(<Box />);
     expect(lay(phone(320))).toHaveTextContent("stacked");
-    expect(lay(phone(350))).toHaveTextContent("stacked"); // still 1.1px short
-    expect(lay(phone(352))).toHaveTextContent("table");
-    expect(lay(phone(351))).toHaveTextContent("stacked");
+    expect(lay(phone(393))).toHaveTextContent("stacked"); // still a tenth of a pixel short
+    expect(lay(phone(394))).toHaveTextContent("table");
+    expect(lay(phone(393))).toHaveTextContent("stacked");
   });
 
   it("stacked, reckons what the content needs with the text size: larger text needs more, in the same box", () => {
@@ -126,7 +126,7 @@ describe("useOutgrown", () => {
   });
 
   it("decides before the first paint, with no report from its observer: a record that cannot fit is never drawn as a table", () => {
-    laid = phone(320);
+    laid = phone(390);
     render(<Box />);
     expect(screen.getByTestId("box")).toHaveTextContent("stacked");
   });

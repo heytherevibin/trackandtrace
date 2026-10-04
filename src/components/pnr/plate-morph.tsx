@@ -1,7 +1,7 @@
 "use client";
 
 import { animate } from "motion/react";
-import { useLayoutEffect, useRef, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 import { LAYOUT_EVENT } from "@/components/landing/journey/journey-events";
 import { useMotion } from "@/components/motion/use-motion";
 
@@ -127,6 +127,20 @@ export function PlateMorph({ face, children }: { readonly face: string; readonly
     });
     grow.current = tween;
   });
+
+  // The face's height is kept as it changes, not only as this component renders. A face can change its own height in a
+  // commit of its own (the record's passenger table stacks on a phone, use-outgrown.ts), and the next morph starts from
+  // the height remembered here: remembered from the commit that drew the face, "Check another PNR" cut a stacked record
+  // to its table's height for a frame before it shrank. Each face is an element of its own (keyed), so each is watched.
+  useEffect(() => {
+    const el = inner.current;
+    if (!el || typeof ResizeObserver === "undefined") return undefined;
+    const observer = new ResizeObserver(() => {
+      if (seen.current?.face === face) seen.current = { face, height: el.offsetHeight };
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [face]);
 
   // Motion switched off mid-rise: the face stops where it rests, at once.
   useLayoutEffect(() => {

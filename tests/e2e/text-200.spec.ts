@@ -1,3 +1,4 @@
+import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import { PNR, axeResults, gotoReady } from "./helpers";
 import { waitForJourney } from "./journey/journey-helpers";
@@ -103,97 +104,153 @@ test("the passengers' scroll region is a landmark with a name of its own, not th
   expect(results.violations.filter((v) => v.id === "landmark-unique").map((v) => v.nodes.map((n) => n.target.join(" ")))).toEqual([]);
 });
 
-// The landing's in-place record (decided 2026-10-04, the owner). At 100% it is the table it always was wherever the
-// window shows all of it: four columns that cannot wrap below 309.1px for the fixture's party of three, starting 42px
-// into the page, so from a 352px window up (to 393px the table overhangs its frame, as drawn; from 394px the frame holds
-// it). In a narrower window the page cut its last column off; there each passenger now stacks into the labelled rows
-// the record already used with larger text: every cell inside the frame, nothing cut, no scroller, no Tab stop of its
-// own. With the text at 200% the rows stack at every one of these widths, as before. The switch measures the table
-// itself (use-outgrown.ts): the widths here are this fixture's, not the code's.
-for (const width of [280, 300, 320, 340, 351, 352, 360, 375, 390] as const) {
-  test(`at ${width}px the landing's record is ${width < 352 ? "stacked rows" : "a plain table"} at 100%, and stacked rows at 200%`, async ({ page, isMobile }) => {
-    test.skip(!isMobile, "a phone's widths");
-    const record = async () => {
-      await page.setViewportSize({ width, height: 844 });
-      await gotoReady(page, "/");
-      await waitForJourney(page);
-      await page.getByLabel("PNR number").first().fill(PNR.mixed);
-      await page.getByRole("button", { name: "Run", exact: true }).first().click();
-      const result = page.getByTestId("terminal-result");
-      await expect(result.locator("table")).toBeVisible({ timeout: 30_000 });
-      await expect(page.locator('[style*="height"]:has([data-testid="terminal-result"])')).toHaveCount(0, { timeout: 10_000 });
-      return result.evaluate((el) => {
-        const table = el.querySelector("table");
-        if (!table) throw new Error("no table");
-        const frame = (table.parentElement as HTMLElement).getBoundingClientRect();
-        const cells = [...table.querySelectorAll<HTMLElement>("tbody td")];
-        const px = (n: number) => Math.round(n * 10) / 10;
-        return {
-          rows: [...new Set([...table.querySelectorAll("tbody tr")].map((r) => getComputedStyle(r).display))],
-          scrollers: el.querySelectorAll('[data-scroll-region], [role="region"], [tabindex="0"]').length,
-          stops: [...el.querySelectorAll<HTMLElement>("a[href], button, input, select, textarea, [tabindex]")].filter((stop) => stop.tabIndex >= 0).length,
-          table: Math.round(table.getBoundingClientRect().width),
-          box: Math.round(frame.width),
-          cells: cells.length,
-          // a cell a reader cannot see all of: empty, past the window's side, or (stacked) outside the record's frame
-          pastWindow: cells.flatMap((cell) => {
-            const box = cell.getBoundingClientRect();
-            return box.width > 0 && box.left >= 0 && box.right <= document.documentElement.clientWidth ? [] : [`"${cell.textContent}" [${px(box.left)}, ${px(box.right)}]`];
-          }),
-          pastFrame: cells.flatMap((cell) => {
-            const box = cell.getBoundingClientRect();
-            return box.left >= frame.left - 0.5 && box.right <= frame.right + 0.5 ? [] : [`"${cell.textContent}" [${px(box.left)}, ${px(box.right)}] in [${px(frame.left)}, ${px(frame.right)}]`];
-          }),
-          // stacked, a cell says which column it was: the column's heading, drawn above it
-          labels: cells.map((cell) => (cell.dataset.label ? getComputedStyle(cell, "::before").content : "")).filter((label) => label !== "" && label !== "none").length,
-          empty: cells.filter((cell) => (cell.textContent ?? "").trim() === "").length,
-        };
-      });
+// The landing's in-place record (decided 2026-10-04 and 2026-10-05, the owner): it is the four-column table only where
+// its frame holds the table, at any text size, and everywhere else each passenger stacks into labelled rows: every cell
+// inside the frame, nothing cut, no scroller, no Tab stop of its own. The table cannot wrap below its own least width
+// (309.1px at 100% for the fixture's party of three) and its frame is the window less the page's and the plate's
+// margins (84px on a phone), so as drawn it stacks in every window under 394px: every phone. The switch measures the
+// table itself (use-outgrown.ts), so these tests do too: what is asserted is "stacked exactly where the table is wider
+// than its frame", from the table's own least width, and the named widths only say which side each is expected on.
+
+/** The record in the landing's check plate, a party of three, its plate's morph over. */
+async function openRecord(page: Page, width: number, height = 844): Promise<void> {
+  await page.setViewportSize({ width, height });
+  await gotoReady(page, "/");
+  await waitForJourney(page);
+  await page.getByLabel("PNR number").first().fill(PNR.mixed);
+  await page.getByRole("button", { name: "Run", exact: true }).first().click();
+  await expect(page.getByTestId("terminal-result").locator("table")).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('[style*="height"]:has([data-testid="terminal-result"])')).toHaveCount(0, { timeout: 10_000 });
+}
+
+/** The record as it stands: how its rows are laid out, what its frame holds, and every cell a reader cannot see all of. */
+async function readRecord(page: Page) {
+  return page.getByTestId("terminal-result").evaluate((el) => {
+    const table = el.querySelector("table");
+    if (!table) throw new Error("no table");
+    const box = table.parentElement as HTMLElement;
+    const frame = box.getBoundingClientRect();
+    const style = getComputedStyle(box);
+    const cells = [...table.querySelectorAll<HTMLElement>("tbody td")];
+    const px = (n: number) => Math.round(n * 10) / 10;
+    return {
+      rows: [...new Set([...table.querySelectorAll("tbody tr")].map((r) => getComputedStyle(r).display))],
+      scrollers: el.querySelectorAll('[data-scroll-region], [role="region"], [tabindex="0"]').length,
+      stops: [...el.querySelectorAll<HTMLElement>("a[href], button, input, select, textarea, [tabindex]")].filter((stop) => stop.tabIndex >= 0).length,
+      table: table.getBoundingClientRect().width,
+      /** The width inside the frame's hairlines, in fractions of a pixel. */
+      holds: frame.width - Number.parseFloat(style.borderLeftWidth) - Number.parseFloat(style.borderRightWidth),
+      cells: cells.length,
+      pastWindow: cells.flatMap((cell) => {
+        const at = cell.getBoundingClientRect();
+        return at.width > 0 && at.left >= 0 && at.right <= document.documentElement.clientWidth ? [] : [`"${cell.textContent}" [${px(at.left)}, ${px(at.right)}]`];
+      }),
+      pastFrame: cells.flatMap((cell) => {
+        const at = cell.getBoundingClientRect();
+        return at.left >= frame.left - 0.5 && at.right <= frame.right + 0.5 ? [] : [`"${cell.textContent}" [${px(at.left)}, ${px(at.right)}] in [${px(frame.left)}, ${px(frame.right)}]`];
+      }),
+      // stacked, a cell says which column it was: the column's heading, drawn above it
+      labels: cells.map((cell) => (cell.dataset.label ? getComputedStyle(cell, "::before").content : "")).filter((label) => label !== "" && label !== "none").length,
+      empty: cells.filter((cell) => (cell.textContent ?? "").trim() === "").length,
     };
-    const drawn = await record();
+  });
+}
+
+/** What the table needs: its least width, asked of the table itself while it is a table (a table given no width at all
+ * takes exactly the width it cannot wrap below). In a window wide enough to hold it, at the text size the page has. */
+async function tableNeeds(page: Page): Promise<number> {
+  await page.setViewportSize({ width: 1024, height: 844 });
+  const row = page.getByTestId("terminal-result").locator("tbody tr").first();
+  await expect(row, "a table in a 1024px window: the measure is of a table").toHaveCSS("display", "table-row");
+  return page.getByTestId("terminal-result").evaluate((el) => {
+    const table = el.querySelector("table") as HTMLTableElement;
+    const was = table.style.width;
+    table.style.width = "0";
+    const needs = table.getBoundingClientRect().width;
+    table.style.width = was;
+    return needs;
+  });
+}
+
+for (const [width, expected] of [
+  [280, "grid"],
+  [320, "grid"],
+  [352, "grid"],
+  [360, "grid"],
+  [375, "grid"],
+  [390, "grid"],
+  [430, "table-row"],
+  [768, "table-row"],
+  [1440, "table-row"],
+] as const) {
+  test(`at ${width}px the landing's record is ${expected === "grid" ? "stacked rows" : "the table"} at 100%, by the table's own measure, and stacked rows at 200%`, async ({ page, isMobile }) => {
+    test.skip(!isMobile, "once, on the phone project, across the widths");
+    await openRecord(page, width);
+    const drawn = await readRecord(page);
     expect(drawn.cells, "a party of three, four cells a passenger").toBe(12);
     expect(drawn.empty, "every cell says something").toBe(0);
     expect(drawn.scrollers, "no scroller, no region, no Tab stop at 100%").toBe(0);
     expect(drawn.stops, "the record's two controls, and no Tab stop besides").toBe(2);
     expect(drawn.pastWindow, "every cell wholly inside the window at 100%").toEqual([]);
-    if (width < 352) {
-      expect(drawn.rows, "at 100% in a window the table would run out of, the rows stack").toEqual(["grid"]);
-      expect(drawn.table, "and the stacked table is no wider than its frame").toBeLessThanOrEqual(drawn.box);
-      expect(drawn.pastFrame, "every cell inside the record's frame").toEqual([]);
-      expect(drawn.labels, "booked, current and coach · berth, labelled for each passenger").toBe(9);
-    } else {
-      expect(drawn.rows, "at 100% where the window shows all of it, the table as drawn").toEqual(["table-row"]);
-    }
+    expect(drawn.pastFrame, "and inside the record's frame: nothing crosses its border").toEqual([]);
+    expect(drawn.table, "the table, stacked or not, is no wider than its frame").toBeLessThanOrEqual(drawn.holds + 0.02);
+    expect(drawn.rows, `at 100% in a ${width}px window`).toEqual([expected]);
+    if (expected === "grid") expect(drawn.labels, "booked, current and coach · berth, labelled for each passenger").toBe(9);
     expect(await layoutBreaks(page), "at 100%").toEqual([]);
     expect(await cutText(page, '[data-testid="terminal-result"]'), "no word of the record cut at 100%").toEqual([]);
+    // and that is the table's own measure against its frame's, not this list's say-so
+    const needs = await tableNeeds(page);
+    expect(needs > drawn.holds + 0.02 ? "grid" : "table-row", `the table needs ${needs}px and its frame holds ${drawn.holds}px`).toBe(expected);
+
     await text200(page);
-    const large = await record();
+    await openRecord(page, width);
+    const large = await readRecord(page);
     expect(large.scrollers, "no scroller at 200% either").toBe(0);
     expect(large.stops, "nor a Tab stop").toBe(2);
     expect(large.rows, "at 200% the rows stack").toEqual(["grid"]);
-    expect(large.table, "and the table is no wider than its frame").toBeLessThanOrEqual(large.box);
+    expect(large.table, "and the table is no wider than its frame").toBeLessThanOrEqual(large.holds + 0.02);
     expect(large.labels).toBe(9);
     expect(await layoutBreaks(page), "at 200%").toEqual([]);
   });
 }
 
-// The same record in a window that changes width under it (a phone turned, a window dragged): it stacks as the window
-// stops showing the whole table and is the table again as soon as the window would, from what the table needed when it
-// was last a table. Each state is waited for, never timed.
+// Where the one becomes the other is the table's to say. From its least width and the margins the page gives a phone's
+// frame, the first window whose frame holds the table is worked out here (394px for the fixture's party of three), and
+// the record must be the table there and stacked a pixel narrower: no width is written into the code or into this test.
+test("the landing's record is a table from the first width its frame holds the table, and stacked one pixel narrower", async ({ page, isMobile }) => {
+  test.skip(!isMobile, "a phone's widths");
+  await openRecord(page, 390);
+  const phone = await readRecord(page);
+  const margins = 390 - phone.holds;
+  const needs = await tableNeeds(page);
+  const first = Math.ceil(needs + margins - 0.02);
+  expect(first, `the table needs ${needs}px, the margins take ${margins}px: a width the phone sweep's margins still hold at`).toBeLessThanOrEqual(400);
+  expect(first, "and the table is wider than a 390px phone's frame: the case this test is about").toBeGreaterThan(390);
+  for (const [width, display] of [
+    [first - 1, "grid"],
+    [first, "table-row"],
+  ] as const) {
+    await openRecord(page, width);
+    const at = await readRecord(page);
+    expect(width - at.holds, `the margins at ${width}px are the phone's`).toBe(margins);
+    expect(at.rows, `${width}px: its frame holds ${at.holds}px of the ${needs}px the table needs`).toEqual([display]);
+    expect(at.pastFrame, `${width}px`).toEqual([]);
+  }
+});
+
+// The same record in a window that changes width under it (a window dragged): it stacks as its frame stops holding the
+// table and is the table again as soon as the frame would, from what the table needed when it was last a table. Each
+// state is waited for, never timed.
 test("the landing's record stacks and is a table again as its window narrows and widens", async ({ page, isMobile }) => {
   test.skip(!isMobile, "a phone's widths");
-  await gotoReady(page, "/");
-  await waitForJourney(page);
-  await page.getByLabel("PNR number").first().fill(PNR.mixed);
-  await page.getByRole("button", { name: "Run", exact: true }).first().click();
+  await openRecord(page, 430);
   const row = page.getByTestId("terminal-result").locator("tbody tr").first();
-  await expect(row).toBeVisible({ timeout: 30_000 });
   for (const [width, display] of [
-    [390, "table-row"],
-    [320, "grid"],
-    [352, "table-row"],
-    [351, "grid"],
+    [430, "table-row"],
+    [390, "grid"],
     [768, "table-row"],
+    [352, "grid"],
+    [1024, "table-row"],
     [280, "grid"],
   ] as const) {
     await page.setViewportSize({ width, height: 844 });
@@ -202,6 +259,28 @@ test("the landing's record stacks and is a table again as its window narrows and
   await expect(page.locator('[style*="height"]:has([data-testid="terminal-result"])')).toHaveCount(0, { timeout: 10_000 });
   expect(await layoutBreaks(page), "at 280px, after the changes").toEqual([]);
 });
+
+// A phone turned on its side and back, the record open. The switch reads only the record's frame, never the window
+// (use-outgrown.ts): a turn changes the frame's width, its ResizeObserver reports it, and the record is the table in
+// the 844px window and stacked again in the 390px one, whichever way it started.
+for (const [name, first, turned] of [
+  ["upright, turned on its side and back", { width: 390, height: 844 }, { width: 844, height: 390 }],
+  ["on its side, turned upright and back", { width: 844, height: 390 }, { width: 390, height: 844 }],
+] as const) {
+  test(`a phone ${name}: the landing's record is stacked upright and the table on its side`, async ({ page, isMobile }) => {
+    test.skip(!isMobile, "a phone");
+    await openRecord(page, first.width, first.height);
+    const row = page.getByTestId("terminal-result").locator("tbody tr").first();
+    for (const size of [first, turned, first, turned]) {
+      await page.setViewportSize(size);
+      await expect(row, `${size.width}×${size.height}`).toHaveCSS("display", size.width < size.height ? "grid" : "table-row");
+      const at = await readRecord(page);
+      expect(at.pastFrame, `${size.width}×${size.height}: every cell inside the record's frame`).toEqual([]);
+      expect(at.pastWindow, `${size.width}×${size.height}`).toEqual([]);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth), "no sideways scroll").toBeLessThanOrEqual(0);
+    }
+  });
+}
 
 test("the hit-walk credits a label wrapped round its radio, and not a bare radio", async ({ page, isMobile }) => {
   test.skip(!isMobile, "tap targets are a touch-screen concern");
