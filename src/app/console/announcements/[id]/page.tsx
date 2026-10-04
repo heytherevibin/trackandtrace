@@ -5,6 +5,7 @@ import { z } from "zod";
 import { buttonClassName } from "@/components/ui/button";
 import { ComposeForm, type ComposeLetter } from "@/console/announcements/compose-form";
 import { ComposeReadonly } from "@/console/announcements/compose-readonly";
+import { LetterPlate, ProgressPlate } from "@/console/announcements/detail-plates";
 import { lettersAhead } from "@/console/announcements/estimate";
 import { HowPlate } from "@/console/announcements/how-plate";
 import { readLetter, readLetters, readLists } from "@/console/announcements/letters";
@@ -24,7 +25,7 @@ const m = consoleMessages.announcements;
 export const metadata: Metadata = { title: m.pageTitle };
 
 /**
- * One letter. A draft opens in Compose; anything else opens its detail (Task 11 adds that branch).
+ * One letter. A draft opens in Compose; anything else opens its detail: Progress and Letter.
  * An id that is not one, or names no letter, is the console's not-found page: the address is typed
  * or stale, and there is nothing of this module's to draw.
  */
@@ -80,10 +81,15 @@ export default async function LetterPage({ params }: { readonly params: Promise<
     );
   }
 
-  // Task 11 replaces this with the Progress and Letter plates.
+  // Only a queued letter waits behind others; one that is sending is the letter at the front.
+  const ahead = letter.state === "queued" ? lettersAhead(letters, { id: letter.id, queuedAt: letter.queuedAt }) : null;
   return (
     <ConsoleFrame member={member}>
       <AnnouncementsHeader updated={formatTime(now)} action={back} />
+      <div className="mt-6 flex flex-col gap-6">
+        <ProgressPlate letter={letter} ahead={ahead} now={now.toISOString()} />
+        <LetterPlate letter={letter} />
+      </div>
     </ConsoleFrame>
   );
 }
