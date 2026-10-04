@@ -71,11 +71,20 @@ A run with any of these missing fails, loudly and by name, which is the intended
 
 ## What an operator does
 
+All of it is in the console at `admin.trakline.in/announcements` (module 07, Owner and Admin):
+**New letter** writes and saves a draft, which then has its own address; **Send a test to me** and
+**Queue** are on that draft; a queued letter's address shows its progress and **Stop**. Writing,
+testing and queueing need a larger screen; on a phone the console reads, and stops. Each of test,
+queue and stop writes a row to the Audit log under Messages. Suppressions are not in the console yet:
+lifting one is still done by hand, as the section further down describes.
+
 1. **Compose.** Pick a list, write a subject (up to 200 characters) and a body (up to 20,000).
    Plain text only: there is no HTML field, by decision. **Never write an unsubscribe line or link.**
    The sender appends the unsubscribe line and the `List-Unsubscribe` headers itself, worded for the
    list's own promise, so forgetting them is impossible and typing a second one is a mistake.
-2. **Test send.** One real email to an address you can read. It spends one email from the day's
+2. **Test send.** One real email, to your own sign-in address. Its unsubscribe link is deliberately
+   not a working one (a test must never be able to unsubscribe a real reader), and changing the
+   draft afterwards clears the test, so what you proofed is always what is queued. It spends one email from the day's
    allowance and it is required: **the database itself refuses to queue a letter with no test send on
    record**, not just the console, so there is no way round it and no way to forget. Read it as a
    subscriber would, in a real inbox: the subject, the line breaks, and that the unsubscribe link at
@@ -96,10 +105,10 @@ A run with any of these missing fails, loudly and by name, which is the intended
    only — a reader who unsubscribed is settled by the claim before the run counts anything, so those
    rows appear in the letter's totals and not in the line the run prints. It never prints an address.
    The `report` job, below, is the thing that tells you it has stopped advancing; the console's detail
-   view will show **sent, skipped and unknown as three separate counts**, plus what is still pending.
+   view shows **sent, skipped and unknown as three separate counts**, plus what is still waiting.
 5. **Stop.** Takes effect at the next recipient, not at the end of a batch: the letter's state is read
-   before every send. Stopping halts the remainder; what has gone has gone. Until the console has the
-   button, a Stop is `select public.announce_stop('<letter id>');` as the service role.
+   before every send. Stopping halts the remainder; what has gone has gone. The button is on the
+   letter's page, on a phone too, and asks first.
 
 **A stopped letter is final.** There is no resume. To send the rest, compose a new letter, which will
 go to everyone on the list when *it* is queued, including the people the stopped one already reached.
