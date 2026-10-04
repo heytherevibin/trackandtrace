@@ -194,6 +194,89 @@ export const announcements = {
     newElsewhere: "Open on a larger screen to write a letter.",
   },
 
+  /** The tab row above the two lists (ConsoleAnnouncements.dc.html:83-88). */
+  tabs: { label: "Announcements", letters: "Letters", suppressions: "Suppressions" },
+
+  /**
+   * Suppressions (ConsoleAnnouncements.dc.html, Suppressions and both Lift confirms). The store
+   * names the mail provider in one reason; nothing here does.
+   */
+  suppressions: {
+    pageTitle: "Suppressions · Announcements · Trakline console",
+    title: "Suppressed addresses",
+    count: (n: number) => (n === 1 ? "1 address" : `${n} addresses`),
+    caption: "Addresses we no longer send to",
+    address: "Address",
+    scope: "Scope",
+    reason: "Reason",
+    when: "When",
+    source: "Source",
+    actions: "Actions",
+    scopes: { all: "All", list: "List mail" },
+    operator: "Operator",
+    reasons: {
+      hardBounce: "Hard bounce",
+      complaint: "Spam complaint",
+      delayed: "Delayed three times in 30 days",
+      /** Undrawn: the sheet's sample gives this row "Hard bounce", which the store does not record for it. */
+      provider: "Suppressed by the mail service",
+      /** Undrawn: a reason this console does not recognise, such as one written by hand. */
+      other: "Other",
+    },
+    sources: {
+      delivery: "Delivery report",
+      complaint: "Complaint report",
+      deliveries: "Delivery reports",
+      provider: "The mail service's own list",
+      /** Undrawn. */
+      other: "Recorded by hand",
+    },
+    at: (when: string) => `${when} IST`,
+    reveal: "Reveal",
+    revealLabel: (address: string) => `Reveal the address ${address}`,
+    lift: "Lift",
+    liftLabel: (address: string) => `Lift the suppression on ${address}`,
+    liftLabelMasked: (address: string) => `Lift the suppression on ${address} (reveal the address first)`,
+    liftFirst: "Reveal the address first",
+    bannerOne: "1 operator address is suppressed:",
+    bannerMany: (n: number) => `${n} operator addresses are suppressed:`,
+    bannerRest: (addresses: string) => ` ${addresses}. A hard bounce stops all mail to an address, so their sign-in links won't arrive.`,
+    notes: [
+      "All stops every email to the address, sign-in and confirmation mail included. List mail stops letters and nothing else.",
+      "Operator marks an address that belongs to a console member.",
+      "Lift needs the address revealed first, so you can see whose mail you are restarting. It ends a suppression we recorded and asks first; it is written to the audit log.",
+      "A row from the mail service's own list also has to be cleared there: lifting ours does not lift theirs.",
+    ],
+    phoneNotes: [
+      "Open on a larger screen to lift a suppression.",
+      "All stops every email to the address, sign-in and confirmation mail included. List mail stops letters and nothing else.",
+      "Operator marks an address that belongs to a console member.",
+    ],
+    /** Undrawn: the sheet's sample always has rows. */
+    none: "No addresses are suppressed.",
+    /** Undrawn. */
+    unavailable: "Suppressions unavailable: the database didn't answer.",
+    liftDialog: {
+      title: "Lift this suppression?",
+      address: "Address",
+      scope: "Scope",
+      source: "Source",
+      all: (date: string, after: string) => `Mail to this address resumes: sign-in links, confirmations and letters. It was suppressed on ${date} after ${after}, so the address may still not work. Lifting is written to the audit log.`,
+      /** Undrawn: the sheet draws an All row and a mail-service row, not a List mail one. */
+      list: (date: string, after: string) => `Letters to this address resume. It was suppressed on ${date} after ${after}. Lifting is written to the audit log.`,
+      provider: (date: string) => `Lifting ours does not lift the mail service's own list, which suppressed this address on ${date}. Clear it there too, or mail to the address will still be refused. Lifting is written to the audit log.`,
+      after: { hardBounce: "a hard bounce", complaint: "a spam complaint", delayed: "three delays in 30 days", other: "it was recorded by hand" },
+      confirm: "Lift suppression",
+      done: "Suppression lifted.",
+    },
+    errors: {
+      noAccess: "Your role can't do that.",
+      mismatch: "Reveal the address first: a suppression can only be lifted by someone who has seen whose it is.",
+      gone: "That suppression is no longer there.",
+      database: "That didn't go through: the database didn't answer. Nothing changed.",
+    },
+  },
+
   errors: {
     noAccess: "Your role can't do that.",
     invalid: "That letter can't be saved as written. Check the subject and the body.",
