@@ -217,7 +217,9 @@ export function DateField({
           (never as drawn: 198px, 12.4rem, at its narrowest; with the text at 200% on a 280px or 320px phone it is), the
           date's ten figures and the calendar button cannot share the line: the button takes a line of its own under
           the field, the field's whole width. The field's padding and the button's width are in px, so larger text
-          keeps all the room the well has. */}
+          keeps all the room the well has. On that line the button is `relative` with its insets undone, never
+          `static`: a touch screen's 44px overlay is the button's own pseudo-element (motion.css) and is placed by its
+          nearest positioned ancestor, which a static button is not. Its overlay would be this box's, over the field. */}
       <div className="@container relative">
         {/* The INPUT carries the well, rather than a wrapper around it.
 
@@ -245,7 +247,7 @@ export function DateField({
           aria-expanded={open}
           aria-controls={open ? dialogId : undefined}
           onClick={() => (open ? close() : openCalendar())}
-          className="press absolute inset-y-px right-px inline-flex w-[36px] cursor-pointer items-center justify-center text-ink-1/70 hover:text-ink-1 @max-[8rem]:static @max-[8rem]:mt-1.5 @max-[8rem]:h-10 @max-[8rem]:w-full @max-[8rem]:border @max-[8rem]:border-line"
+          className="press absolute inset-y-px right-px inline-flex w-[36px] cursor-pointer items-center justify-center text-ink-1/70 hover:text-ink-1 @max-[8rem]:relative @max-[8rem]:inset-auto @max-[8rem]:mt-1.5 @max-[8rem]:h-10 @max-[8rem]:w-full @max-[8rem]:border @max-[8rem]:border-line"
         >
           <svg viewBox="0 0 16 16" aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.25">
             <rect x="2" y="3.5" width="12" height="11" />

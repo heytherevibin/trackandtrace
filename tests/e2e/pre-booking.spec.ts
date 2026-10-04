@@ -1,5 +1,6 @@
 import { expect, test } from "./fixtures";
 import { gotoReady } from "./helpers";
+import { text200 } from "./text-200";
 
 // Form TL-02 v2 as the sheet draws it: stations, a date and the classes you would travel in, then
 // every train on that route with the first of those classes answered.
@@ -212,5 +213,88 @@ for (const width of [280, 320, 360, 390] as const) {
     expect(at.dayWidth).toBeGreaterThanOrEqual(width >= 352 ? 44 : 32);
     // where it fitted before, it has not moved: under the field, from the field's left edge
     if (width >= 390) expect(at.left).toBe(at.field);
+  });
+}
+
+// The calendar button is drawn inside the date field, at its right edge: one pixel in from the well's hairline on three
+// sides, 36px wide. A finger's screen draws it there too. It did not: the rule that gives every pressable its 44px
+// overlay on a touch screen (motion.css) also made every pressable `position: relative`, unlayered, and an unlayered
+// rule beats a layered utility whatever its specificity. The button's own `absolute` lost, and it fell out of the
+// field to a 36×16 icon under the field's left edge, at every width a touch screen has (a phone, and a touch laptop
+// at 1440px). The mouse's two are here as the drawing the finger's two are held to.
+for (const [width, touch] of [
+  [390, false],
+  [1440, false],
+  [390, true],
+  [1440, true],
+] as const) {
+  test.describe(`the date field at ${width}px, ${touch ? "on a touch screen" : "with a mouse"}`, () => {
+    test.use({ viewport: { width, height: 844 }, hasTouch: touch });
+
+    test("the calendar button sits inside the field, at its right edge", async ({ page, isMobile }) => {
+      // the phone's touch screen is the phone project's; the mouse and the touch laptop are the desktop's
+      test.skip(isMobile !== (touch && width < 500), "one project a pointer and width");
+      await gotoReady(page, "/pre-booking");
+      expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches), "the pointer this test is about").toBe(touch);
+      const at = await page.getByRole("button", { name: "Choose a date" }).evaluate((button) => {
+        const field = button.parentElement?.querySelector("input");
+        if (!field) throw new Error("no date field beside the calendar button");
+        const b = button.getBoundingClientRect();
+        const f = field.getBoundingClientRect();
+        const px = (n: number): number => Math.round(n * 100) / 100;
+        return { position: getComputedStyle(button).position, fromRight: px(f.right - b.right), fromTop: px(b.top - f.top), fromBottom: px(f.bottom - b.bottom), width: px(b.width) };
+      });
+      expect(at).toEqual({ position: "absolute", fromRight: 1, fromTop: 1, fromBottom: 1, width: 36 });
+    });
+  });
+}
+
+// In a field under 8rem wide the date's ten figures and the button cannot share the line (date-field.tsx): with the
+// text at 200% on a 280px or 320px phone the button takes a line of its own under the field, the field's whole width.
+// A finger's screen draws that too, where it used to draw it a pixel left and a pixel low (the same rule made it
+// `relative` over its own `static`, and its 1px insets, meant for the button inside the field, moved it). And the
+// button's 44px overlay is the button's: the line above it, the field, still answers as the field. A button that said
+// `static` would hand its overlay to the box round both of them, and a tap on the field would open the calendar.
+for (const [width, touch] of [
+  [280, false],
+  [280, true],
+  [320, true],
+] as const) {
+  test.describe(`the date field at ${width}px with its text at 200%, ${touch ? "on a touch screen" : "with a mouse"}`, () => {
+    test.use({ viewport: { width, height: 844 }, hasTouch: touch });
+
+    test("the calendar button takes a line of its own under the field, and the field still answers", async ({ page, isMobile }) => {
+      test.skip(isMobile !== touch, "one project a pointer");
+      await text200(page);
+      await gotoReady(page, "/pre-booking");
+      expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches), "the pointer this test is about").toBe(touch);
+      const at = await page.getByRole("button", { name: "Choose a date" }).evaluate((button) => {
+        const field = button.parentElement?.querySelector("input");
+        if (!field) throw new Error("no date field beside the calendar button");
+        field.scrollIntoView({ block: "center", behavior: "instant" });
+        const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+        const b = button.getBoundingClientRect();
+        const f = field.getBoundingClientRect();
+        const px = (n: number): number => Math.round(n * 100) / 100;
+        // the field's centre and a point just inside each of its corners
+        const points = [
+          [f.left + f.width / 2, f.top + f.height / 2],
+          [f.left + 3, f.top + 3],
+          [f.right - 3, f.top + 3],
+          [f.left + 3, f.bottom - 3],
+          [f.right - 3, f.bottom - 3],
+        ] as const;
+        return {
+          fieldInRem: px(f.width / rem),
+          rem,
+          drawn: { under: px(b.top - f.bottom), fromLeft: px(b.left - f.left), fromRight: px(f.right - b.right), height: px(b.height) },
+          fieldAnswers: points.map(([x, y]) => document.elementFromPoint(x, y) === field),
+        };
+      });
+      expect(at.fieldInRem, "a field under 8rem wide: the case this test is about").toBeLessThan(8);
+      // mt-1.5 under the field, its whole width, h-10
+      expect(at.drawn).toEqual({ under: 0.375 * at.rem, fromLeft: 0, fromRight: 0, height: 2.5 * at.rem });
+      expect(at.fieldAnswers, "a tap on the field is the field's").toEqual([true, true, true, true, true]);
+    });
   });
 }

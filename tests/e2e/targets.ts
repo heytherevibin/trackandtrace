@@ -36,6 +36,19 @@ export async function undersizedTargets(page: Page, within = "body", except?: st
         if (el.tagName === "A" && el.closest("p, li, dd")) continue; // a link in running text is prose
         const r = el.getBoundingClientRect();
         if (r.width === 0 || r.height === 0) continue;
+        // On a touch screen the 44px overlay is the control's own pseudo-element, and what places it is the nearest
+        // positioned ancestor: the control itself, which motion.css makes `relative` unless it says otherwise. One
+        // that says `static` hands its overlay to a box above it, where it answers over whatever else is in that box
+        // (the date field's calendar button, over the field). The walk below cannot see that: a field of 40px is
+        // never walked, and the button still reaches 44px. So it is named here.
+        if (matchMedia("(pointer: coarse)").matches && el.matches('button, [role="button"], .press, .tap-44, .tap-44-start') && getComputedStyle(el).position === "static") {
+          out.push({
+            name: (el.getAttribute("aria-label") ?? el.textContent ?? el.tagName).trim().slice(0, 32) || el.tagName,
+            box: `${Math.round(r.width)}x${Math.round(r.height)}`,
+            missed: "is position: static, so its 44px overlay is an ancestor's, not its own",
+          });
+          continue;
+        }
         // A field is a replaced element and takes no pseudo-element, so it cannot carry an overlay.
         // The drawn 40px well is the whole target; growing it would change the drawing. Named here
         // rather than silently skipped: a field under 40px is still a failure.
