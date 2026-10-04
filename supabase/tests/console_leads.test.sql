@@ -6,7 +6,7 @@ create extension if not exists pgtap with schema extensions;
 -- everyone who gave us an email — a sign-up, an account, or both — and never a console member.
 -- Named notation throughout: PostgREST resolves on argument names.
 
-select plan(49);
+select plan(50);
 
 -- Emptied first: the local database is shared, and this file counts leads. Every traveller account
 -- already there would be one, so they go too — inside this transaction, which rolls back.
@@ -136,6 +136,7 @@ select is((public.console_leads(p_news => null, p_account => null, p_source => '
 select is((public.console_leads(p_news => null, p_account => null, p_source => null, p_since => now() - interval '10 days', p_limit => 50, p_offset => 0) ->> 'total')::int, 2, 'filter by First seen');
 select is(jsonb_array_length(public.console_leads(p_news => null, p_account => null, p_source => null, p_since => null, p_limit => 3, p_offset => 6) -> 'rows'), 1, 'paging gives the last page what is left');
 select is(jsonb_array_length(public.console_leads(p_news => null, p_account => null, p_source => null, p_since => null, p_limit => 5000, p_offset => 0) -> 'rows'), 7, 'a limit past 200 is clamped, not refused');
+select is((public.console_leads() ->> 'total')::int, 7, 'called with no arguments at all, it is the first page of everyone: a filter that is off is simply left out');
 select throws_ok($$select public.console_leads(p_news => 'everyone', p_account => null, p_source => null, p_since => null, p_limit => 50, p_offset => 0)$$, '22023', 'unknown filter', 'a status nobody offers is refused');
 
 -- ---------------------------------------------------------------------------

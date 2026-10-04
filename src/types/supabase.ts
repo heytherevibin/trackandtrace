@@ -365,12 +365,12 @@ export type Database = {
       console_lead_figures: { Args: never; Returns: Json }
       console_leads: {
         Args: {
-          p_account: string
-          p_limit: number
-          p_news: string
-          p_offset: number
-          p_since: string
-          p_source: string
+          p_account?: string
+          p_limit?: number
+          p_news?: string
+          p_offset?: number
+          p_since?: string
+          p_source?: string
         }
         Returns: Json
       }

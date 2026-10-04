@@ -109,7 +109,10 @@ revoke all on function console.lead_row(console.lead) from public, anon, authent
 
 -- The list: newest activity first, filtered, one page. A filter is null for "all". The limit is
 -- clamped to 200 rather than refused, as `console_audit` clamps its own.
-create or replace function public.console_leads(p_news text, p_account text, p_source text, p_since timestamptz, p_limit int, p_offset int) returns jsonb
+--
+-- Every argument has a default, so the generated TypeScript types make each optional: a filter that
+-- is off is simply left out of the call, where a required `string` could not be given null.
+create or replace function public.console_leads(p_news text default null, p_account text default null, p_source text default null, p_since timestamptz default null, p_limit int default 50, p_offset int default 0) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare
   v_limit  int := least(greatest(coalesce(p_limit, 50), 1), 200);
