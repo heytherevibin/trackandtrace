@@ -1,5 +1,6 @@
 import { expect, test } from "./fixtures";
 import { gotoReady } from "./helpers";
+import { dismissInstall } from "./journey/journey-helpers";
 import { text200 } from "./text-200";
 
 // Form TL-02 v2 as the sheet draws it: stations, a date and the classes you would travel in, then
@@ -221,14 +222,15 @@ for (const width of [280, 320, 360, 390] as const) {
 // overlay on a touch screen (motion.css) also made every pressable `position: relative`, unlayered, and an unlayered
 // rule beats a layered utility whatever its specificity. The button's own `absolute` lost, and it fell out of the
 // field to a 36×16 icon under the field's left edge, at every width a touch screen has (a phone, and a touch laptop
-// at 1440px). The mouse's two are here as the drawing the finger's two are held to.
+// at 1440px). The mouse's two are controls: they pass on main too and cannot fail for this fault. They are here as
+// the drawing the finger's two are held to, so a change to that drawing is read as one, and not as a touch fault.
 for (const [width, touch] of [
   [390, false],
   [1440, false],
   [390, true],
   [1440, true],
 ] as const) {
-  test.describe(`the date field at ${width}px, ${touch ? "on a touch screen" : "with a mouse"}`, () => {
+  test.describe(`the date field at ${width}px, ${touch ? "on a touch screen" : "with a mouse (the control)"}`, () => {
     test.use({ viewport: { width, height: 844 }, hasTouch: touch });
 
     test("the calendar button sits inside the field, at its right edge", async ({ page, isMobile }) => {
@@ -255,18 +257,21 @@ for (const [width, touch] of [
 // `relative` over its own `static`, and its 1px insets, meant for the button inside the field, moved it). And the
 // button's 44px overlay is the button's: the line above it, the field, still answers as the field. A button that said
 // `static` would hand its overlay to the box round both of them, and a tap on the field would open the calendar.
+// The mouse's one is a control, as above: it passes on main too.
 for (const [width, touch] of [
   [280, false],
   [280, true],
   [320, true],
 ] as const) {
-  test.describe(`the date field at ${width}px with its text at 200%, ${touch ? "on a touch screen" : "with a mouse"}`, () => {
+  test.describe(`the date field at ${width}px with its text at 200%, ${touch ? "on a touch screen" : "with a mouse (the control)"}`, () => {
     test.use({ viewport: { width, height: 844 }, hasTouch: touch });
 
     test("the calendar button takes a line of its own under the field, and the field still answers", async ({ page, isMobile }) => {
       test.skip(isMobile !== touch, "one project a pointer");
       await text200(page);
       await gotoReady(page, "/pre-booking");
+      // an iPhone's install prompt is a plate fixed over the page's foot, and at 200% it lies over the field
+      await dismissInstall(page);
       expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches), "the pointer this test is about").toBe(touch);
       const at = await page.getByRole("button", { name: "Choose a date" }).evaluate((button) => {
         const field = button.parentElement?.querySelector("input");
@@ -298,3 +303,19 @@ for (const [width, touch] of [
     });
   });
 }
+
+// iOS Safari sizes a date field by its own rules for as long as the field keeps its native appearance: it computes
+// `box-sizing: content-box` and a min-width of its own, whatever the page's CSS says. The well's `w-full` then means
+// 100% plus its padding and hairlines: 52px too wide and 2px too tall, over Quota on an iPad and out of the window on
+// an iPhone (measured in the iOS 26.5 Simulator: 261.7 × 42 in a 209.7 cell at 1032px, 371.8 in 319.8 at 402px, where
+// the page scrolled sideways). `min-width: 0` and `max-width: 100%` do not move it; `appearance: none` does, and the
+// field is then its cell × 40. No engine this suite runs has the fault (Chromium on a touch screen and Playwright's
+// WebKit both compute border-box either way), so what is held here is the declaration that cures it, not the width.
+test("the date field gives up its native appearance, so iOS sizes it as the page says", async ({ page }) => {
+  await gotoReady(page, "/pre-booking");
+  const declared = await page.getByLabel("Journey date").evaluate((field) => {
+    const style = getComputedStyle(field);
+    return { appearance: style.getPropertyValue("appearance"), webkitAppearance: style.getPropertyValue("-webkit-appearance") };
+  });
+  expect(declared).toEqual({ appearance: "none", webkitAppearance: "none" });
+});

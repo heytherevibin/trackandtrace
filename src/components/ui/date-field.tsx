@@ -226,7 +226,14 @@ export function DateField({
             A wrapper's own hairline leaves the field 38px of content box, and a field two pixels
             short of the drawn 40 is a tap-target failure — fields are replaced elements, take no
             pseudo-element, and so cannot be grown by the coarse-pointer overlay every button here
-            gets for free. tests/e2e/tap-targets.spec.ts says exactly that, and caught this. */}
+            gets for free. tests/e2e/tap-targets.spec.ts says exactly that, and caught this.
+
+            `appearance-none` is what makes that true on iOS. A date field that keeps its native appearance is sized
+            there by Safari's own rules, `box-sizing: content-box` and a min-width, whatever the page's CSS says: this
+            one came out 100% + 10 + 40 + 2 wide and 42px tall, over Quota on an iPad and out of the window on an
+            iPhone. `min-width: 0` and `max-width: 100%` do not move it. Without the appearance it is the well's own
+            box, its cell × 40, and it still opens iOS's date picker on a tap. No engine the suite runs has the fault,
+            so tests/e2e/pre-booking.spec.ts holds the declaration itself. */}
         <input
           id={id}
           name={name}
@@ -237,7 +244,7 @@ export function DateField({
           aria-invalid={invalid || undefined}
           aria-describedby={describedBy}
           onChange={(event) => onChange(event.target.value)}
-          className="well h-10 w-full pl-[10px] pr-[40px] @max-[8rem]:pr-[10px] [&::-webkit-calendar-picker-indicator]:hidden"
+          className="well h-10 w-full appearance-none pl-[10px] pr-[40px] @max-[8rem]:pr-[10px] [&::-webkit-calendar-picker-indicator]:hidden"
         />
         <button
           ref={toggle}

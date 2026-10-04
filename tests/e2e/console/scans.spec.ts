@@ -1,6 +1,7 @@
 import { expect, test } from "../fixtures";
 import { expectAxeClean, gotoReady } from "../helpers";
 import { layoutBreaks } from "../layout";
+import { report, undersizedTargets } from "../targets";
 
 declare global {
   interface Window {
@@ -39,4 +40,23 @@ test("console sign in fits every phone width", async ({ page }, testInfo) => {
     await gotoReady(page, "/login");
     expect(await layoutBreaks(page), `${width}px`).toEqual([]);
   }
+});
+
+// The console's pressables are the traveller site's (Button, .press, the same coarse-pointer rule in motion.css), so the
+// same hit-walk reads them (targets.ts): every control answers a finger across 44px, and none says `position: static`,
+// which would hand its overlay to a box above it. With no database here the console draws three things: sign in, the
+// inbox notice after the press, and its own "unavailable" in place of every page that needs a member.
+test("the console's controls answer a finger across 44px, on every page it can draw here", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "console-mobile", "tap targets are a touch-screen concern");
+  await gotoReady(page, "/login");
+  expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches), "a touch screen").toBe(true);
+  expect(report(await undersizedTargets(page)), "sign in").toEqual([]);
+  await page.getByLabel("Console email").fill(`targets-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.com`);
+  await page.getByRole("button", { name: "Email me a sign-in link" }).click();
+  await expect(page.getByRole("heading", { name: "Check your inbox" })).toBeVisible();
+  expect(report(await undersizedTargets(page)), "the inbox notice").toEqual([]);
+  await page.goto("/");
+  await expect(page.locator("body")).toBeVisible();
+  await page.waitForLoadState("networkidle");
+  expect(report(await undersizedTargets(page)), "a page that needs a member").toEqual([]);
 });
