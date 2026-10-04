@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { notify } from "@/components/ui/toast";
-import { hasFilters, leadQuery, LEAD_PAGE_SIZE, type LeadFilters } from "@/console/leads/filters";
+import { hasFilters, leadQuery, LEAD_PAGE_SIZE, NO_LEAD_FILTERS, type LeadFilters } from "@/console/leads/filters";
 import { LeadDrawer } from "@/console/leads/lead-drawer";
 import { LeadFilterBar } from "@/console/leads/lead-filter-bar";
 import type { LeadDetail, LeadPage, LeadRow } from "@/console/leads/leads";
@@ -95,7 +95,7 @@ export function LeadsBrowser({
         onClearSearch={() => setSearch(null)}
         onClearAll={() => {
           setSearch(null);
-          if (hasFilters(filters)) router.push(leadQuery({ news: null, account: null, source: null, seen: "any", page: 1, lead: null }));
+          if (hasFilters(filters)) router.push(leadQuery(NO_LEAD_FILTERS));
         }}
       />
       <LeadsPlate
@@ -106,7 +106,7 @@ export function LeadsBrowser({
         openId={filters.lead}
         revealing={revealing}
         hrefFor={(row) => leadQuery({ ...filters, lead: row.id })}
-        clearHref={leadQuery({ news: null, account: null, source: null, seen: "any", page: 1, lead: null })}
+        clearHref={leadQuery(NO_LEAD_FILTERS)}
         onReveal={(row) => void reveal(row.id)}
         onRetry={() => router.refresh()}
       />

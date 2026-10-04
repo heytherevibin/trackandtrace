@@ -149,6 +149,10 @@ export const leads = {
     noAccess: "Your role can't do that.",
     gone: "That lead is no longer here.",
     notAddress: "Enter the whole email address, like name@example.com.",
+    notTag: "A tag is letters, numbers and hyphens, up to 24.",
+    tooManyTags: "A lead can have 10 tags. Remove one first.",
+    emptyNote: "Write the note first.",
+    noteTooLong: "A note can be up to 500 characters.",
     database: "That didn't go through: the database didn't answer. Nothing changed.",
   },
 } as const;

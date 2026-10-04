@@ -22,7 +22,7 @@ import { NewsTag } from "@/console/leads/news-tag";
 
 const m = consoleMessages.leads;
 const ASHA = "p:a1111111-1111-4111-8111-111111111111";
-const row = (over: Partial<LeadRow>): LeadRow => ({ id: ASHA, email: "a•••@example.com", news: "subscribed", availability: false, account: "has", source: "footer", campaign: { source: "google", medium: "cpc", name: "diwali-2026" }, firstSeen: "2026-09-02T04:44:00+00:00", lastActivity: "2026-09-18T15:42:00+00:00", ...over });
+const row = (over: Partial<LeadRow>): LeadRow => ({ id: ASHA, email: "a•••@example.com", news: "subscribed", availability: false, account: "has", source: "footer", campaign: { source: "google", medium: "cpc", name: "diwali-2026" }, tags: [], firstSeen: "2026-09-02T04:44:00+00:00", lastActivity: "2026-09-18T15:42:00+00:00", ...over });
 const ROWS = [
   row({}),
   row({ id: "p:a2222222-2222-4222-8222-222222222222", email: "m•••@example.org", news: "pending", account: "none", source: "landing", campaign: null }),
@@ -38,6 +38,8 @@ const DETAIL: LeadDetail = {
     { at: "2026-09-09T04:01:00+00:00", kind: "received", list: "news", source: null, subject: "Trakline news: the new look", reason: null },
     { at: "2026-09-02T04:44:00+00:00", kind: "signed_up", list: "news", source: "footer", subject: null, reason: null },
   ],
+  tags: [],
+  notes: [],
 };
 const NONE = parseLeadFilters({});
 
