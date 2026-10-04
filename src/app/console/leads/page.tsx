@@ -12,7 +12,7 @@ import type { BusinessMember } from "@/console/leads/business";
 import { AddBusinessLead } from "@/console/leads/business-lead-dialog";
 import { readBusinessMembers } from "@/console/leads/business-leads";
 import { FiguresPlate } from "@/console/leads/figures-plate";
-import { parseLeadFilters, type LeadSearchParams } from "@/console/leads/filters";
+import { leadQuery, parseLeadFilters, type LeadSearchParams } from "@/console/leads/filters";
 import { LeadExportButton, LeadExportProvider, LeadExportStatus } from "@/console/leads/lead-export";
 import { readFigures, readLead, readLeads, readTags, type LeadDetail, type LeadFigures, type LeadPage } from "@/console/leads/leads";
 import { LeadsBrowser } from "@/console/leads/leads-browser";
@@ -109,7 +109,7 @@ export default async function LeadsPage({ searchParams }: { readonly searchParam
           exportOnPhone={canExport}
           action={
             <>
-              <AddBusinessLead members={members} me={member.userId} filters={filters} />
+              <AddBusinessLead members={members} me={member.userId} page={leadQuery({ ...filters, lead: null })} />
               {canExport ? <LeadExportButton /> : null}
             </>
           }

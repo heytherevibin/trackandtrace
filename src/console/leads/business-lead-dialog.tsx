@@ -1,5 +1,6 @@
 "use client";
 
+import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { useId, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
@@ -9,7 +10,6 @@ import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { notify } from "@/components/ui/toast";
 import { BUSINESS_ABOUT_MAX, BUSINESS_NAME_MAX, type BusinessMember } from "@/console/leads/business";
-import { leadQuery, type LeadFilters } from "@/console/leads/filters";
 import type { LeadBusiness } from "@/console/leads/leads";
 import { requestAddBusiness, requestMarkBusiness, type BusinessForm } from "@/console/leads/leads-client";
 import { businessAddBody, businessMarkBody } from "@/console/leads/routes";
@@ -17,6 +17,11 @@ import { consoleMessages } from "@/console/messages";
 
 const m = consoleMessages.leads;
 const b = m.business;
+
+/** A page's address with one lead's record open over it: `/leads?news=pending` → `/leads?news=pending&lead=…`. */
+export function leadRecordHref(page: Route, leadId: string): Route {
+  return `${page}${page.includes("?") ? "&" : "?"}lead=${encodeURIComponent(leadId)}` as Route;
+}
 
 /** Whose lead the form is about: an address typed by hand, or a lead that is already in the list. */
 export type BusinessFormMode = { readonly kind: "add" } | { readonly kind: "mark"; readonly id: string; readonly email: string };
@@ -174,10 +179,14 @@ function BusinessLeadForm({
 
 /**
  * The page header's "Add a business lead", and its form. On success it opens the lead's record
- * over the list as it was filtered: the lead's id goes to the address, the typed email never does.
- * An address that was already a lead is said to be, and that lead is the one opened.
+ * over the page the member is on: the lead's id is added to that page's address (`page`), and the
+ * typed email never is. An address that was already a lead is said to be, and that lead is the one
+ * opened.
+ *
+ * `page` is an address and not a function that makes one, because a server page hands it across
+ * the client boundary and only data crosses.
  */
-export function AddBusinessLead({ members, me, filters }: { readonly members: readonly BusinessMember[]; readonly me: string; readonly filters: LeadFilters }) {
+export function AddBusinessLead({ members, me, page }: { readonly members: readonly BusinessMember[]; readonly me: string; readonly page: Route }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   return (
@@ -193,7 +202,7 @@ export function AddBusinessLead({ members, me, filters }: { readonly members: re
           setOpen(false);
           if (done.kind !== "added") return;
           notify.success(done.added ? b.added : b.existing);
-          router.push(leadQuery({ ...filters, lead: done.id }));
+          router.push(leadRecordHref(page, done.id));
           router.refresh();
         }}
       />
