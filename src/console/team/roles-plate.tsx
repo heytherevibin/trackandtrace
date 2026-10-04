@@ -60,7 +60,7 @@ function AccessSquare({ level, label }: { readonly level: AccessLevel; readonly 
 export function RolesPlate() {
   return (
     <Plate as="section" title={m.title} titleId="team-roles" headingLevel={2} meta={[m.moduleCount]} padding="none">
-      <div className="overflow-x-auto">
+      <div className="relative overflow-x-auto">
         <table className="w-full border-collapse text-left">
           <caption className="sr-only">{m.tableCaption}</caption>
           <thead>

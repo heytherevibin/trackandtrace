@@ -3,7 +3,7 @@ import { consoleSql, expect, ownerIdentity, resetConsole, setUpFirstOwner, test 
 import { freshAddress, idOf } from "./team-helpers";
 import { consoleMessages } from "@/console/messages";
 import { expectAxeClean, gotoReady } from "../helpers";
-import { layoutBreaks } from "../layout";
+import { layoutBreaks, sidewaysScroll } from "../layout";
 
 const BASE = "http://admin.localhost:4211";
 const m = consoleMessages.audit;
@@ -95,17 +95,14 @@ test.describe("the Audit log", () => {
     expect(breaks, "the Audit log at 1280px, outside the entries table's own scroller").toEqual([]);
 
     // And with the table back, what a member would actually feel: the page does not scroll
-    // sideways. Measured rather than inferred, because `documentElement.scrollWidth` cannot be
-    // trusted here -- Chrome folds a nested scroller's overflow into every ancestor's scrollWidth
-    // (1412px in a 1280px viewport on this page) while still clipping it and refusing to scroll.
-    // `window.scrollX` is the property that does not lie.
-    const scrolledBy = await page.evaluate(() => {
-      window.scrollTo(3000, 0);
-      const x = window.scrollX;
-      window.scrollTo(0, 0);
-      return x;
-    });
-    expect(scrolledBy, "the Audit log must not scroll sideways at 1280px").toBe(0);
+    // sideways, however far the entries table scrolls inside its own box.
+    //
+    // This check read `window.scrollX` straight after a plain `scrollTo` until 2026-10-04, which
+    // under the site's smooth scrolling reads 0 before anything has moved — and so it passed while
+    // the page really did scroll sideways here, by as much as the table overflowed: the table's
+    // visually hidden "Open" heading is absolutely positioned, and DataTable's scroller, not being
+    // positioned itself, did not clip it. `sidewaysScroll` makes the jump instant, then reads.
+    expect(await sidewaysScroll(page), "the Audit log must not scroll sideways at 1280px").toBe(0);
     await expectAxeClean(page);
 
     // Clear filters takes the address back to the page's own, which is what "the default view

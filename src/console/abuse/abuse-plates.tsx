@@ -72,7 +72,7 @@ export function MostLimitedPlate({ today, environment }: { readonly today: Limit
       ) : today.top.length === 0 ? (
         <p className="px-5 py-4 text-sm">{m.mostLimited.quiet}</p>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="relative overflow-x-auto">
           <table className="w-full text-left text-sm">
             <caption className="sr-only">{m.mostLimited.caption}</caption>
             <thead>
@@ -124,7 +124,7 @@ export function BlockedPlate({ blocks, environment, keyId }: { readonly blocks: 
       ) : blocks.length === 0 ? (
         <p className="px-5 py-4 text-sm">{m.blocked.none}</p>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="relative overflow-x-auto">
           <table className="w-full text-left text-sm">
             <caption className="sr-only">{m.blocked.caption}</caption>
             <thead>
