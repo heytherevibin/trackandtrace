@@ -76,7 +76,7 @@ insert into announcements.deliveries (letter_id, person_id, state, sent_at) valu
 -- ---------------------------------------------------------------------------
 select is(
   (select count(*)::int from unnest(array[
-     'public.console_lead_figures()', 'public.console_leads(text, text, text, timestamptz, integer, integer)', 'public.console_lead(text)',
+     'public.console_lead_figures()', 'public.console_leads(text, text, text, text, timestamptz, integer, integer)', 'public.console_lead(text)',
      'public.console_reveal_lead(text, text)', 'public.console_find_lead(text, text)']) f
     where has_function_privilege('authenticated', f, 'execute')
       and not has_function_privilege('anon', f, 'execute')
