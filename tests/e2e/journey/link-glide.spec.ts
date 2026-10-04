@@ -2,7 +2,7 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "../fixtures";
 import { REBUILD_EVENT } from "@/components/landing/journey/journey-events";
 import { atRest, atTheWindow, dismissInstall, drawStill, frames, from07, noAnchoring, running, stationOf, waitForJourney } from "./journey-helpers";
-import { atResize, glidePlace, midGlide, throughGlide, watchResize } from "./link-glide-helpers";
+import { atResize, glidePlace, midGlide, tellThroughGlide, throughGlide, watchResize } from "./link-glide-helpers";
 
 // A tapped link's glide, cut short (the reviewer, 2026-10-01: 15 and 13 runs in 36 on the nightly's webkit-phone, to 07).
 // A phone's toolbar resizes the window a few frames into the glide; the browser set the glide's end as it began, and every
@@ -144,25 +144,25 @@ test.describe("a tapped in-page link's glide (spec §3.G)", () => {
   // says nothing: the review, 2026-10-02), and a resize follows: they stay where they put it, as place-keeping leaves
   // them, never carried on to the target. The glide is known from a reader's own move by how it goes: on toward its end,
   // never back, never stopping short of it; and nothing is taken up while that is in doubt.
-  // Each drag as the page's place frame by frame (`start`: where the page stood at the tap; `y0`: where the glide had
-  // taken it as the hand took over). The last three stop as the cut lands, or never look unlike a glide while they move
+  // Each drag as the page's place frame by frame (`start`: where the page stood at the tap). The last three stop as the
+  // cut lands, or never look unlike a glide while they move
   // (the re-review, 2026-10-02: taken up on the second still frame, while the doubt still stood, each was carried to 07).
-  const DRAGS: Readonly<Record<string, (start: number, y0: number) => readonly number[]>> = {
+  const DRAGS: Readonly<Record<string, (start: number) => readonly number[]>> = {
     "on toward the target, six frames": (start) => [0, 1, 2, 3, 4, 5].map((i) => start + 400 + i * 7),
     "back up the page, six frames": (start) => [0, 1, 2, 3, 4, 5].map((i) => start + 600 - i * 7),
     "to a standstill, six frames": (start) => [0, 1, 2, 3, 4, 5].map(() => start + 400),
     "one frame before the resize": (start) => [start + 400],
     "two frames before the resize": (start) => [start + 400, start + 400],
-    // held five frames: a hand held fewer before the resize's place-keeping jump is carried (the stated bound)
-    "steadily on toward the target, 30 px a frame for twelve frames": (_start, y0) => [...Array.from({ length: 12 }, (_, i) => y0 + 30 * (i + 1)), ...Array.from({ length: 5 }, () => y0 + 360)],
+    // held five frames: a hand held fewer before the resize's place-keeping jump is carried (the stated bound). From
+    // near where the glide began, not from where it had got to: WebKit's is most of the way to the target by then.
+    "steadily on toward the target, 30 px a frame for twelve frames": (start) => [...Array.from({ length: 12 }, (_, i) => start + 400 + 30 * (i + 1)), ...Array.from({ length: 5 }, () => start + 760)],
   };
   for (const { code, id, name } of LINKS)
     for (const [how, places] of Object.entries(DRAGS))
       test(`never carries a reader who dragged the scrollbar ${how}, then held it, on to ${code}`, async ({ page, isMobile }) => {
         const start = await openAndTap(page, isMobile, name);
         await frames(page, 3);
-        const y0 = await page.evaluate(() => window.scrollY);
-        for (const y of places(start, y0)) {
+        for (const y of places(start)) {
           await page.evaluate((top) => window.scrollTo({ top, behavior: "instant" }), y);
           await frames(page, 1);
         }
@@ -218,12 +218,12 @@ test.describe("a tapped in-page link's glide (spec §3.G)", () => {
       });
 
     // The journey rebuilds mid-glide (a late font changing a piece's fit): every module is torn down and started again,
-    // the run unpinned and pinned again under the glide.
-    test(`reaches ${code} though the journey rebuilds four frames into the glide`, async ({ page, isMobile }) => {
+    // the run unpinned and pinned again under the glide. Told in the page, a tenth of the way through the glide.
+    test(`reaches ${code} though the journey rebuilds a tenth of the way through the glide`, async ({ page, isMobile }) => {
       test.setTimeout(60_000); // the rest wait's own limit (REST_MS), and the page's loads
-      await openAndTap(page, isMobile, name);
-      await frames(page, 4);
-      await page.evaluate((rebuild) => window.dispatchEvent(new Event(rebuild)), REBUILD_EVENT);
+      const start = await openAndTap(page, isMobile, name);
+      const at = await tellThroughGlide(page, id, start, 0.1, REBUILD_EVENT);
+      expect(at.left, MID_GLIDE).toBeGreaterThan(FAR);
       await settled(page);
       await running(page);
       if (id === "use") await atTheWindow(page, await stationOf(page, "#use *"));
@@ -337,9 +337,10 @@ test.describe("a tapped in-page link's glide (spec §3.G)", () => {
   // needs a still frame seen before that jump, which a slow machine does not give it (at bd19d27 the jump found a doubt
   // standing in 16 runs of 17 at 1x CPU, 1 of 17 at 4x, none at 8x); with every such jump made to drop the glide, 15 or
   // 16 of these 18 fail at 1x, 4x and 8x alike, so they measure the jump on a slow machine too.
-  // WebKit's glide is ten frames long, and the resize is told a frame or two after it is asked for, so its last share is
-  // 45%: asked for at 60%, the glide was over as the resize was told in 2 runs of 180, and the test said so.
-  const SHARES = (browser: string) => (browser === "webkit" ? [0.3, 0.45] : [0.3, 0.5, 0.8]);
+  // WebKit's glide is ten frames long, and the resize is told a frame or two after it is asked for (more on a loaded
+  // machine), so its shares are 20% and 35%: asked for at 45% or 60%, the glide was over as the resize was told now and
+  // then, and the test said so.
+  const SHARES = (browser: string) => (browser === "webkit" ? [0.2, 0.35] : [0.3, 0.5, 0.8]);
   /** The same for the masthead's link, whose glide in WebKit is shorter still: asked for at 30%, it was over as the resize
    * was told in 1 run of 10. */
   const TERMINAL_SHARES = (browser: string) => (browser === "webkit" ? [0.1, 0.2] : [0.3, 0.5, 0.8]);
@@ -390,7 +391,7 @@ test.describe("a tapped in-page link's glide (spec §3.G)", () => {
     });
     return start;
   };
-  for (const share of [0.1, 0.2, 0.3, 0.45, 0.5, 0.8]) {
+  for (const share of [0.1, 0.2, 0.3, 0.35, 0.5, 0.8]) {
     for (const { code, id, name } of LINKS)
       test(`reaches ${code} though the window is resized ${share * 100}% of the way through the glide`, async ({ page, isMobile, browserName }) => {
         test.skip(!SHARES(browserName).includes(share), "another share of this engine's glide");

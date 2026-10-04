@@ -59,6 +59,27 @@ export function throughGlide(page: Page, id: string, start: number, share: numbe
   ) as Promise<GlidePlace>;
 }
 
+/** Tells `event` on the window once the glide to `#id`, begun at scroll `start`, has covered `share` of its way, in the
+ * page and in that same frame; where the glide stood then. For what a test does mid-glide in the page itself (the
+ * journey's rebuild): asked for from the test, after a count of frames, it came after WebKit's glide had ended and the
+ * page had rested ten frames on a loaded machine (2 runs in 40), and measured a reader at rest in the run. */
+export function tellThroughGlide(page: Page, id: string, start: number, share: number, event: string): Promise<GlidePlace> {
+  return page.evaluate(
+    `new Promise((done) => {
+      ${leftTo.toString()}
+      const whole = Math.abs(window.scrollY - ${start}) + leftTo(${JSON.stringify(id)});
+      const tick = () => {
+        const left = leftTo(${JSON.stringify(id)});
+        if (whole - left < whole * ${share}) return void requestAnimationFrame(tick);
+        const at = { y: Math.round(window.scrollY), left };
+        window.dispatchEvent(new Event(${JSON.stringify(event)}));
+        done(at);
+      };
+      tick();
+    })`,
+  ) as Promise<GlidePlace>;
+}
+
 /** Notes where the glide to `#id` stands as the next "resize" is told (the window's, as the page hears it), and counts
  * the place-keeping jumps made from then on: read both back with atResize once the page has settled. */
 export async function watchResize(page: Page, id: string): Promise<void> {
