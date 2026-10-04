@@ -36,8 +36,8 @@ test.afterAll(() => {
 });
 
 /**
- * 06 Leads, first part. The list's arithmetic and every state are proven in tests/unit/console/leads
- * and supabase/tests/console_leads.test.sql. This proves the path once, in a real browser against
+ * 06 Leads. The list's arithmetic and every state are proven in tests/unit/console/leads and
+ * supabase/tests/console_leads.test.sql (tags and notes: console_lead_tags_notes.test.sql). This proves the path once, in a real browser against
  * the real database: that a whole address is nowhere in the page until it is revealed, that a search
  * never puts one in the page's address, and that the two recorded acts left their rows.
  */
@@ -121,12 +121,70 @@ test.describe("Leads", () => {
     expect(consoleSql(`select count(*) from console.audit_log where category = 'leads' and actor_id = ${actor}`)).toBe("3");
   });
 
+  test("a tag and a note are written on the record, recorded, and the note is kept without the address in it", async ({ page, baseURL }) => {
+    const owner = await setUpFirstOwner(page, baseURL ?? BASE);
+    const actor = `(select user_id from console.members where email = '${owner.email}')`;
+    const audited = (action: string) => consoleSql(`select count(*) from console.audit_log where category = 'leads' and action = '${action}' and target = '${PENDING.masked}' and actor_id = ${actor}`);
+
+    await gotoReady(page, `/leads?lead=${encodeURIComponent(`p:${PENDING.id}`)}`);
+    const record = page.getByRole("dialog", { name: m.record.title });
+    await expect(record.getByText(m.record.noTags)).toBeVisible();
+    await expect(record.getByText(m.record.noNotes)).toBeVisible();
+
+    // Not a tag: said in the form, and nothing is asked of the database.
+    const box = record.getByRole("combobox", { name: m.record.addTag });
+    await box.fill("two words");
+    await record.getByRole("button", { name: m.record.add, exact: true }).click();
+    await expect(record.getByRole("alert")).toHaveText(m.errors.notTag);
+    expect(consoleSql(`select count(*) from console.lead_tags where person_id = '${PENDING.id}'`)).toBe("0");
+
+    // A tag, however it is typed.
+    await box.fill("E2E-Press");
+    await record.getByRole("button", { name: m.record.add, exact: true }).click();
+    await expect(record.getByRole("button", { name: m.record.removeTag("e2e-press") })).toBeVisible();
+    expect(consoleSql(`select tag from console.lead_tags where person_id = '${PENDING.id}'`)).toBe("e2e-press");
+    expect(audited("Tagged a lead")).toBe("1");
+
+    // A note: what is kept, and shown, has the address and the PNR-like number taken out.
+    await record.getByRole("textbox", { name: m.record.addNote }).fill("Rang back from someone@example.com about 2345678901.");
+    await record.getByRole("button", { name: m.record.addNoteButton }).click();
+    const notes = record.getByRole("list", { name: m.record.notes });
+    await expect(notes.getByText("Rang back from [removed] about [removed].")).toBeVisible();
+    await expect(notes).toContainText(owner.name);
+    expect(consoleSql(`select body from console.lead_notes where person_id = '${PENDING.id}'`)).toBe("Rang back from [removed] about [removed].");
+    expect(audited("Added a note to a lead")).toBe("1");
+    expect(consoleSql(`select count(*) from console.audit_log where category = 'leads' and actor_id = ${actor} and (coalesce(after::text, '') || coalesce(reason, '')) like '%Rang back%'`), "the log holds none of the note").toBe("0");
+    await expectAxeClean(page, { allowDesignLockedAccent: true });
+
+    // The list behind the record now carries the tag, and the Tag filter offers it.
+    await record.getByRole("button", { name: "Close" }).click();
+    const table = page.getByRole("table", { name: m.table.caption });
+    await expect(table.getByRole("row", { name: named(PENDING.masked) })).toContainText("e2e-press");
+    await page.getByRole("search", { name: m.filters.label }).getByRole("combobox", { name: m.filters.tag, exact: true }).selectOption("e2e-press");
+    await expect(page).toHaveURL(/\/leads\?tag=e2e-press$/);
+    await expect(table.getByRole("row", { name: named(PENDING.masked) })).toBeVisible();
+    await expect(table.getByRole("row", { name: named(SUBSCRIBED.masked) })).toHaveCount(0);
+    expect(await layoutBreaks(page)).toEqual([]);
+
+    // Removed, and recorded; a tag nobody carries is no longer a choice.
+    await table.getByRole("link", { name: m.table.open(PENDING.masked) }).click();
+    await record.getByRole("button", { name: m.record.removeTag("e2e-press") }).click();
+    await expect(record.getByText(m.record.noTags)).toBeVisible();
+    expect(audited("Removed a tag from a lead")).toBe("1");
+    expect(consoleSql(`select count(*) from console.lead_tags where person_id = '${PENDING.id}'`)).toBe("0");
+  });
+
   test("on a phone the list is cards with nothing to reveal, and the record is the whole screen", async ({ page, baseURL }) => {
     const owner = await setUpFirstOwner(page, baseURL ?? BASE);
+    // Written behind the console's back: a phone reads tags and notes and writes neither.
+    consoleSql(`
+      insert into console.lead_tags (person_id, tag) values ('${SUBSCRIBED.id}', 'e2e-phone');
+      insert into console.lead_notes (person_id, body, author_name) values ('${SUBSCRIBED.id}', 'A note read on a phone.', 'Kiran Das');`);
     await page.setViewportSize({ width: 390, height: 844 });
 
     await gotoReady(page, "/leads");
     const cards = page.getByRole("list", { name: m.table.caption });
+    await expect(cards.getByRole("link", { name: m.table.open(SUBSCRIBED.masked) })).toContainText("e2e-phone");
     await expect(cards.getByRole("link", { name: m.table.open(PENDING.masked) })).toBeVisible();
     await expect(page.getByRole("table")).toBeHidden();
     await expect(cards.getByRole("button")).toHaveCount(0);
@@ -143,6 +201,14 @@ test.describe("Leads", () => {
         return box ? [Math.round(box.x), Math.round(box.y), Math.round(box.width), Math.round(box.height)] : null;
       }, { message: "the record covers the screen" })
       .toEqual([0, 0, 390, 844]);
+
+    // Tags and notes are read here, and there is nothing to add or remove them with.
+    await expect(record.getByText("e2e-phone")).toBeVisible();
+    await expect(record.getByText("A note read on a phone.")).toBeVisible();
+    await expect(record.getByText(m.record.largerScreen)).toBeVisible();
+    await expect(record.getByRole("button", { name: m.record.removeTag("e2e-phone") })).toHaveCount(0);
+    await expect(record.getByRole("combobox", { name: m.record.addTag })).toHaveCount(0);
+    await expect(record.getByRole("textbox", { name: m.record.addNote })).toHaveCount(0);
 
     await record.getByRole("button", { name: m.table.revealLabel(SUBSCRIBED.masked) }).click();
     await expect(record.getByText(SUBSCRIBED.email)).toBeVisible();

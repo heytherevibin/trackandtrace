@@ -131,9 +131,11 @@ The page is `src/app/console/leads/page.tsx`; its parts are in `src/console/lead
 
 - **Dates read "02 Sept 2026"**, the app's own format, where the boards write "2 Sep 2026".
 - **The pickers carry their label beside a native select** (above it on a phone), as the audit log's do, where the boards draw the label inside the well.
-- **Below 1360px the table's columns take what their words need** and Campaign takes the rest, with 10px gutters for the drawn 14px. The drawn widths add up to more than the plate at 1280, and the table scrolled sideways with Reveal half off its edge. From 1360px the widths and gutters are the board's.
-- **A revealed address is never cut.** Its column widens and Campaign gives the room; a cut campaign is whole in its tooltip and on the record.
-- **Where the filter row has no room for all four pickers beside the search box** (below about 1420px) they go under it together, First seen still against the right edge.
+- **Below 1360px the table's columns take what their words need**, on 10px gutters for the drawn 14px, and **the Campaign column is not drawn**: ten columns do not fit a 1280 window beside the rail, and the campaign is whole on the record. From 1360px the widths and gutters are the board's.
+- **Tags is the column that gives.** It takes what is left and cuts its tag with an ellipsis; the whole tag is a hover away and on the record. A revealed address is never cut: its column widens and Tags gives the room.
+- **The filters are on two rows at every width from `sm`**, as part two draws them: the search box with its hint beside it, then the five pickers, First seen against the right edge.
+- **Tags and notes are built; Delete and Export are not yet** (their own change). Until then the record ends with Notes, and the phone's closing line reads "Open on a larger screen to add a tag or a note."
+- **A tag in the list is its first, with "+2" for the rest**; the board draws one or two and never more.
 - **The phone's figures are 24px**, the type scale's nearest step to the drawn 26px.
 - **Previous and Next are links**, so a page of the list has an address; where there is nowhere to go they are the drawn disabled buttons.
 - **Undrawn states**, in the module's own words: filters that match nobody, figures or a record that could not be read, a record that is no longer there, and part of an address typed into the search (refused in the form, before any lookup is made or recorded).

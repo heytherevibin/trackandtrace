@@ -3,10 +3,9 @@
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Picker } from "@/console/components/picker";
-import { ACCOUNT_STATUSES, LEAD_SOURCES, NEWS_STATUSES, SEEN_RANGES, type LeadFilters } from "@/console/leads/filters";
+import { ACCOUNT_STATUSES, LEAD_SOURCES, LEAD_TAG, NEWS_STATUSES, SEEN_RANGES, type LeadFilters } from "@/console/leads/filters";
 import { findBody } from "@/console/leads/routes";
 import { consoleMessages } from "@/console/messages";
-import { cn } from "@/utils/cn";
 
 const m = consoleMessages.leads;
 const f = m.filters;
@@ -16,18 +15,19 @@ function among<T extends string>(values: readonly T[], value: string): T | null 
 }
 
 /**
- * The search box, the four pickers and the chip row (ConsoleLeads.dc.html's filter bar, and the
+ * The search box, the five pickers and the chip row (ConsoleLeads.dc.html's filter bar, and the
  * phone board's: the box, its hint, then the pickers two across).
  *
  * THE SEARCH TAKES A WHOLE ADDRESS and applies on Enter. Part of one is refused here, in the form's
  * own words, before any request: every lookup is written to the audit log, and a typo should not be.
  * The address never goes to the page's address; `onFind` sends it in a request body.
  *
- * The pickers are drawn twice, a row from `sm` up and a 2×2 grid below it, each `display: none` at
- * the other width. Both write the same filter model.
+ * The pickers are drawn twice, a row from `sm` up and a two-column grid below it, each
+ * `display: none` at the other width. Both write the same filter model.
  */
 export function LeadFilterBar({
   filters,
+  tags,
   searching,
   searched,
   onPick,
@@ -36,6 +36,8 @@ export function LeadFilterBar({
   onClearAll,
 }: {
   readonly filters: LeadFilters;
+  /** Every tag in use: the Tag filter's choices. */
+  readonly tags: readonly string[];
   readonly searching: boolean;
   /** A search is applied: the chip row is drawn. */
   readonly searched: boolean;
@@ -63,62 +65,71 @@ export function LeadFilterBar({
     onPick({ ...filters, ...next, page: 1, lead: null });
   };
 
+  // A tag in the address that no lead carries any more is still the filter in force, so it is still
+  // a choice: a picker that could not show its own value would read "All" over a filtered list.
+  const tagChoices = filters.tag !== null && !tags.includes(filters.tag) ? [filters.tag, ...tags] : tags;
+
   const pickers = (stacked: boolean) => (
     <>
       <Picker stacked={stacked} label={f.news} all={f.all} value={filters.news ?? ""} options={NEWS_STATUSES.map((one) => ({ value: one, label: m.news[one] }))} onPick={(value) => pick({ news: among(NEWS_STATUSES, value) })} />
       <Picker stacked={stacked} label={f.account} all={f.all} value={filters.account ?? ""} options={ACCOUNT_STATUSES.map((one) => ({ value: one, label: m.account[one] }))} onPick={(value) => pick({ account: among(ACCOUNT_STATUSES, value) })} />
       <Picker stacked={stacked} label={f.source} all={f.all} value={filters.source ?? ""} options={LEAD_SOURCES.map((one) => ({ value: one, label: m.sources[one] }))} onPick={(value) => pick({ source: among(LEAD_SOURCES, value) })} />
-      {/* The sheet sets First seen against the row's right edge, apart from the three facts about a lead. */}
+      <Picker stacked={stacked} label={f.tag} all={f.all} value={filters.tag ?? ""} options={tagChoices.map((one) => ({ value: one, label: one }))} onPick={(value) => pick({ tag: LEAD_TAG.test(value) ? value : null })} />
+      {/* The sheet sets First seen against the row's right edge, apart from the four facts about a lead;
+          on a phone it is the fifth of five in two columns, and takes the last row whole. */}
       {stacked ? null : <span className="grow" />}
-      <Picker stacked={stacked} label={f.seen} all={f.anyTime} value={filters.seen === "any" ? "" : filters.seen} options={SEEN_RANGES.map((one) => ({ value: one, label: m.seen[one] }))} onPick={(value) => pick({ seen: among(SEEN_RANGES, value) ?? "any" })} />
+      <div className={stacked ? "col-span-2" : "contents"}>
+        <Picker stacked={stacked} label={f.seen} all={f.anyTime} value={filters.seen === "any" ? "" : filters.seen} options={SEEN_RANGES.map((one) => ({ value: one, label: m.seen[one] }))} onPick={(value) => pick({ seen: among(SEEN_RANGES, value) ?? "any" })} />
+      </div>
     </>
   );
 
   return (
     <div className="flex flex-col gap-2.5">
-      <div role="search" aria-label={f.label} className="flex flex-wrap items-center gap-2.5 max-sm:flex-col max-sm:items-stretch max-sm:gap-2">
-        <form onSubmit={submit} className="relative w-[300px] max-w-full max-sm:w-full" noValidate>
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true" className="text-ink-3 pointer-events-none absolute left-3 top-1/2 -translate-y-1/2">
-            <circle cx="7" cy="7" r="4.5" />
-            <path d="m10.5 10.5 3 3" />
-          </svg>
-          <input
-            type="search"
-            // Not `type="email"`: the browser's own bubble would answer part of an address before this form can.
-            inputMode="email"
-            autoComplete="off"
-            spellCheck={false}
-            className="well placeholder:text-ink-3 h-10 w-full pl-8 pr-2.5 max-sm:h-11"
-            aria-label={f.search}
-            aria-describedby={refused ? "ld-find-refused ld-find-hint" : "ld-find-hint"}
-            aria-invalid={refused || undefined}
-            aria-busy={searching || undefined}
-            placeholder={f.search}
-            maxLength={254}
-            value={draft}
-            onChange={(event) => {
-              setDraft(event.target.value);
-              setRefused(false);
-            }}
-          />
-          <button type="submit" className="sr-only" tabIndex={-1}>
-            {f.find}
-          </button>
-        </form>
-        {/* One group: where the row has no room for all four beside the box they go under it
-            together, First seen still against the right edge, and never one of them alone. `grow`
-            and not `flex-1`: a basis of zero would always fit beside the box, and wrap inside. */}
-        <div className="flex min-w-0 grow flex-wrap items-center gap-2.5 max-sm:hidden">{pickers(false)}</div>
-        <div className={cn("flex basis-full flex-col gap-1", "max-sm:basis-auto")}>
-          {refused ? (
-            <p id="ld-find-refused" role="alert" className="text-label">
-              {m.errors.notAddress}
+      <div role="search" aria-label={f.label} className="flex flex-col gap-2.5 max-sm:gap-2">
+        {/* The box and what it does, side by side: the hint is about the search, so it stays with it
+            now that the pickers have a row of their own. Where there is no room it goes under. */}
+        <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5">
+          <form onSubmit={submit} className="relative w-[300px] max-w-full max-sm:w-full" noValidate>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true" className="text-ink-3 pointer-events-none absolute left-3 top-1/2 -translate-y-1/2">
+              <circle cx="7" cy="7" r="4.5" />
+              <path d="m10.5 10.5 3 3" />
+            </svg>
+            <input
+              type="search"
+              // Not `type="email"`: the browser's own bubble would answer part of an address before this form can.
+              inputMode="email"
+              autoComplete="off"
+              spellCheck={false}
+              className="well placeholder:text-ink-3 h-10 w-full pl-8 pr-2.5 max-sm:h-11"
+              aria-label={f.search}
+              aria-describedby={refused ? "ld-find-refused ld-find-hint" : "ld-find-hint"}
+              aria-invalid={refused || undefined}
+              aria-busy={searching || undefined}
+              placeholder={f.search}
+              maxLength={254}
+              value={draft}
+              onChange={(event) => {
+                setDraft(event.target.value);
+                setRefused(false);
+              }}
+            />
+            <button type="submit" className="sr-only" tabIndex={-1}>
+              {f.find}
+            </button>
+          </form>
+          <div className="flex min-w-[min(16rem,100%)] flex-1 flex-col gap-1">
+            {refused ? (
+              <p id="ld-find-refused" role="alert" className="text-label">
+                {m.errors.notAddress}
+              </p>
+            ) : null}
+            <p id="ld-find-hint" className="text-ink-3 text-label">
+              {f.hint}
             </p>
-          ) : null}
-          <p id="ld-find-hint" className="text-ink-3 text-label">
-            {f.hint}
-          </p>
+          </div>
         </div>
+        <div className="flex flex-wrap items-center gap-2.5 max-sm:hidden">{pickers(false)}</div>
         <div className="grid grid-cols-2 gap-2 sm:hidden">{pickers(true)}</div>
       </div>
 

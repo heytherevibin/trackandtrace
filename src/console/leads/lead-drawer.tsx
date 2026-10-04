@@ -1,13 +1,15 @@
 "use client";
 
 import { Dialog as BaseDialog } from "@base-ui/react/dialog";
-import type { ReactNode } from "react";
+
 import { DismissRegular } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Corners } from "@/components/ui/corners";
 import { IconButton } from "@/components/ui/icon-button";
-import type { LeadDetail } from "@/console/leads/leads";
+import { NotesSection, TagsSection } from "@/console/leads/lead-marks";
+import type { LeadDetail, LeadNote } from "@/console/leads/leads";
 import { NewsTag } from "@/console/leads/news-tag";
+import { RecordSection } from "@/console/leads/record-section";
 import { consoleMessages } from "@/console/messages";
 import { messages } from "@/messages";
 import { cn } from "@/utils/cn";
@@ -37,16 +39,6 @@ function eventText(e: Event): string {
   return r.events[e.kind];
 }
 
-/** `tight` is the heading over a list of facts, whose first row brings its own 10px. */
-function Section({ title, tight = false, children }: { readonly title: string; readonly tight?: boolean; readonly children: ReactNode }) {
-  return (
-    <div className="border-line border-t px-5 pb-4 pt-3.5 max-sm:px-4">
-      <h3 className={cn("legend", tight ? "mb-1" : "mb-2.5")}>{title}</h3>
-      {children}
-    </div>
-  );
-}
-
 /** The sheet's `.kv` with its label column at the drawn 120px, which the shared list's 35% is not. */
 function Facts({ items }: { readonly items: readonly (readonly [string, string])[] }) {
   return (
@@ -68,7 +60,7 @@ function Record({ detail }: { readonly detail: LeadDetail }) {
   const methods = account ? [account.emailLink ? r.emailLink : null, account.google ? r.google : null, account.passkeys > 0 ? r.passkeys(account.passkeys) : null].filter((x): x is string => x !== null) : [];
   return (
     <>
-      <Section title={r.subscriptions}>
+      <RecordSection title={r.subscriptions}>
         <div className="flex flex-col gap-3">
           {(["news", "availability"] as const).map((list) => {
             const consent = detail.consents.find((c) => c.list === list);
@@ -83,8 +75,8 @@ function Record({ detail }: { readonly detail: LeadDetail }) {
             );
           })}
         </div>
-      </Section>
-      <Section title={r.accountTitle} tight={account !== null}>
+      </RecordSection>
+      <RecordSection title={r.accountTitle} tight={account !== null}>
         {account ? (
           <>
             {account.disabled ? <p className="text-ink-2 text-label pt-1.5">{r.disabled}</p> : null}
@@ -101,8 +93,8 @@ function Record({ detail }: { readonly detail: LeadDetail }) {
         ) : (
           <p className="text-ink-3 text-label">{r.noAccount}</p>
         )}
-      </Section>
-      <Section title={r.campaignTitle} tight={detail.campaign !== null}>
+      </RecordSection>
+      <RecordSection title={r.campaignTitle} tight={detail.campaign !== null}>
         {detail.campaign ? (
           <Facts
             items={[
@@ -115,8 +107,8 @@ function Record({ detail }: { readonly detail: LeadDetail }) {
         ) : (
           <p className="text-ink-3 text-label">{r.noCampaign}</p>
         )}
-      </Section>
-      <Section title={r.timeline}>
+      </RecordSection>
+      <RecordSection title={r.timeline}>
         <ol className="flex flex-col gap-2.5">
           {detail.timeline.map((e, i) => (
             <li key={`${e.at}-${e.kind}-${i}`} className="flex flex-col gap-0.5">
@@ -125,7 +117,7 @@ function Record({ detail }: { readonly detail: LeadDetail }) {
             </li>
           ))}
         </ol>
-      </Section>
+      </RecordSection>
     </>
   );
 }
@@ -134,7 +126,8 @@ function Record({ detail }: { readonly detail: LeadDetail }) {
  * One lead's record (ConsoleLeads.dc.html, Drawer and Drawer revealed): a 480px plate against the
  * right edge on a desktop, the full screen on a phone, in the geometry of the audit log's entry
  * drawer. The address is masked until Reveal, which the database records; the retention line below
- * never scrolls away.
+ * never scrolls away. It ends with the lead's tags and notes (lead-marks.tsx), which a desktop can
+ * add to and a phone can only read.
  *
  * `detail` is the record, or why there is none to draw: it could not be read, or the lead is gone.
  */
@@ -142,14 +135,28 @@ export function LeadDrawer({
   detail,
   revealed,
   revealing,
+  tags,
+  notes,
+  suggestions,
   onReveal,
+  onTag,
+  onUntag,
+  onNote,
   onClose,
 }: {
   readonly detail: LeadDetail | "unavailable" | "gone";
   /** The whole address, once it has been revealed on this visit. */
   readonly revealed: string | null;
   readonly revealing: boolean;
+  /** The lead's tags and notes as they stand now: the record's own, or a write's answer since. */
+  readonly tags: readonly string[];
+  readonly notes: readonly LeadNote[];
+  /** Every tag in use, offered as one is typed. */
+  readonly suggestions: readonly string[];
   readonly onReveal: () => void;
+  readonly onTag: (tag: string) => Promise<boolean>;
+  readonly onUntag: (tag: string) => Promise<boolean>;
+  readonly onNote: (body: string) => Promise<boolean>;
   readonly onClose: () => void;
 }) {
   const record = typeof detail === "string" ? null : detail;
@@ -209,6 +216,10 @@ export function LeadDrawer({
                     </p>
                   )}
                   <Record detail={record} />
+                  <TagsSection tags={tags} suggestions={suggestions} onAdd={onTag} onRemove={onUntag} />
+                  <NotesSection notes={notes} onAdd={onNote} />
+                  {/* The phone board's closing line: there, the record is read and nothing is changed. */}
+                  <p className="border-line text-ink-2 text-label border-t px-4 pb-4 pt-3.5 sm:hidden">{r.largerScreen}</p>
                 </>
               )}
             </div>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import type { ReactNode } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button, buttonClassName } from "@/components/ui/button";
 import { Plate } from "@/components/ui/plate";
 import { StateBlock } from "@/components/ui/state-block";
@@ -28,31 +29,36 @@ export interface LeadsPager {
   readonly next: Route | null;
 }
 
-const campaignOf = (row: LeadRow): string => [row.campaign?.source, row.campaign?.medium, row.campaign?.name].filter((part): part is string => Boolean(part)).join(" / ") || t.blank;
+/** The whole campaign: "google / cpc / diwali-2026". The cell draws its name; this is its tooltip. */
+const campaignOf = (row: LeadRow): string => [row.campaign?.source, row.campaign?.medium, row.campaign?.name].filter((part): part is string => Boolean(part)).join(" / ");
+/** What the Campaign cell draws: the name, or failing that whichever part there is. */
+const campaignName = (row: LeadRow): string => row.campaign?.name ?? row.campaign?.source ?? row.campaign?.medium ?? t.blank;
 
 // ConsoleLeads.dc.html's `.dt`: 36px rows, 14px gutters, 13px words, one line each.
 //
 // The sheet's column widths are drawn for a 1440 board, and they are kept from the width at which
-// the table has room for them. Below it every column takes what its words need and Campaign, the
-// one column that can be cut, takes what is left: at 1280 the drawn widths add up to more than the
-// plate, and the table scrolled sideways with Reveal half off its edge.
+// the table has room for them (1360px). Below it:
+//   - every column takes what its words need, on 10px gutters;
+//   - the Campaign column is not drawn. Ten columns do not fit a 1280 window beside the rail, and
+//     the campaign is whole on the record.
 //
-// A column is never narrower than its words at any width, so a revealed address is never cut.
-//
-// The 14px gutters come in at the same width, 10px below it: the 72px that gives back is what lets
-// a revealed address widen its column at 1280 without pushing Reveal past the plate's edge.
+// TAGS IS THE COLUMN THAT GIVES at every width: it takes what is left and cuts its tag with an
+// ellipsis. A revealed address is wider than a masked one and is never cut, so its column grows and
+// Tags gives it the room.
 const GUTTER = "px-2.5 min-[1360px]:px-3.5";
 const TH = `legend border-line h-9 whitespace-nowrap border-b text-left font-semibold ${GUTTER}`;
 const TD = `border-line h-9 whitespace-nowrap border-b ${GUTTER}`;
+const NARROW_HIDDEN = "max-[1359px]:hidden";
 const COLUMNS: readonly (readonly [string, string])[] = [
   [t.email, "min-[1360px]:w-[146px]"],
   [t.news, "min-[1360px]:w-[162px]"],
   [t.lists, "min-[1360px]:w-[92px]"],
-  [t.account, "min-[1360px]:w-[120px]"],
-  [t.source, "min-[1360px]:w-[106px]"],
-  [t.campaign, "w-full min-w-[88px]"],
-  [t.firstSeen, "min-[1360px]:w-[108px]"],
-  [t.lastActivity, "min-[1360px]:w-[112px]"],
+  [t.account, "min-[1360px]:w-[104px]"],
+  [t.source, "min-[1360px]:w-[100px]"],
+  [t.campaign, NARROW_HIDDEN],
+  [t.tags, "w-full min-w-[96px]"],
+  [t.firstSeen, "min-[1360px]:w-[104px]"],
+  [t.lastActivity, "min-[1360px]:w-[108px]"],
 ];
 
 function PagerStep({ href, children }: { readonly href: Route | null; readonly children: ReactNode }) {
@@ -139,7 +145,10 @@ export function LeadsPlate({
         />
       ) : (
         <>
-          <div className="overflow-x-auto max-sm:hidden">
+          {/* `relative`: the caption and the Actions heading are positioned off-screen for a screen
+              reader, and an unpositioned scroller does not clip a positioned child. Without it they
+              sat past the window's edge whenever the table scrolled, and the PAGE scrolled sideways. */}
+          <div className="relative overflow-x-auto max-sm:hidden">
             <table className="text-label w-full border-collapse">
               <caption className="sr-only">{t.caption}</caption>
               <thead>
@@ -168,9 +177,33 @@ export function LeadsPlate({
                     <td className={TD}>{row.availability ? t.availability : t.blank}</td>
                     <td className={TD}>{m.account[row.account]}</td>
                     <td className={TD}>{m.sources[row.source]}</td>
-                    {/* `max-w-0` under a full-width column: it takes what is left and cuts with an ellipsis, never pushes. */}
-                    <td className={cn(TD, "max-w-0 truncate")} title={row.campaign ? campaignOf(row) : undefined}>
-                      {campaignOf(row)}
+                    <td className={cn(TD, NARROW_HIDDEN)}>
+                      {row.campaign ? (
+                        <span className="block max-w-[96px] truncate" title={campaignOf(row)}>
+                          {campaignName(row)}
+                        </span>
+                      ) : (
+                        t.blank
+                      )}
+                    </td>
+                    {/* The first tag, and how many more: a row is one line. `max-w-0` under a full-width
+                        column: it takes what is left and cuts the tag with an ellipsis, never pushes.
+                        The rest are a hover away and on the record. */}
+                    <td className={cn(TD, "max-w-0")}>
+                      {row.tags[0] === undefined ? (
+                        t.blank
+                      ) : (
+                        <span className="flex items-center gap-2">
+                          <span className="bg-surface-1 text-2xs tracking-head text-ink-2 min-w-0 truncate px-2.5 py-[3px] leading-normal" title={row.tags[0]}>
+                            {row.tags[0]}
+                          </span>
+                          {row.tags.length > 1 ? (
+                            <span className="legend-sm shrink-0" title={row.tags.join(", ")}>
+                              {t.moreTags(row.tags.length - 1)}
+                            </span>
+                          ) : null}
+                        </span>
+                      )}
                     </td>
                     <td className={cn(TD, "tnum")}>{formatDate(row.firstSeen)}</td>
                     <td className={cn(TD, "tnum")}>{formatDate(row.lastActivity)}</td>
@@ -195,6 +228,15 @@ export function LeadsPlate({
                     <NewsTag status={row.news} />
                   </span>
                   <span className="text-sm leading-5">{m.account[row.account]}</span>
+                  {row.tags.length > 0 ? (
+                    <span className="flex flex-wrap gap-1.5">
+                      {row.tags.map((tag) => (
+                        <Badge key={tag} variant="neutral">
+                          {tag}
+                        </Badge>
+                      ))}
+                    </span>
+                  ) : null}
                   <span className="legend-sm tnum">{t.firstSeenLine(formatDate(row.firstSeen), m.sources[row.source])}</span>
                 </Link>
               </li>

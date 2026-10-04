@@ -6,8 +6,8 @@ import { notify } from "@/components/ui/toast";
 import { hasFilters, leadQuery, LEAD_PAGE_SIZE, NO_LEAD_FILTERS, type LeadFilters } from "@/console/leads/filters";
 import { LeadDrawer } from "@/console/leads/lead-drawer";
 import { LeadFilterBar } from "@/console/leads/lead-filter-bar";
-import type { LeadDetail, LeadPage, LeadRow } from "@/console/leads/leads";
-import { requestFind, requestReveal } from "@/console/leads/leads-client";
+import type { LeadDetail, LeadNote, LeadPage, LeadRow } from "@/console/leads/leads";
+import { requestFind, requestNote, requestReveal, requestTag } from "@/console/leads/leads-client";
 import { LeadsPlate, type LeadsState, type ShownLead } from "@/console/leads/leads-plate";
 import { consoleMessages } from "@/console/messages";
 import { formatCount } from "@/utils/datetime";
@@ -32,9 +32,12 @@ export function LeadsBrowser({
   page,
   filters,
   detail,
+  tags,
 }: {
   readonly page: LeadPage | null;
   readonly filters: LeadFilters;
+  /** Every tag in use: the Tag filter's choices, and what the record offers as one is typed. */
+  readonly tags: readonly string[];
   /** The open lead's record; why there is none to draw; or null when no record is open. */
   readonly detail: LeadDetail | "unavailable" | "gone" | null;
 }) {
@@ -44,6 +47,9 @@ export function LeadsBrowser({
   // A search that has been answered: the one lead with that address, or null for nobody.
   const [search, setSearch] = useState<{ readonly lead: LeadRow | null } | null>(null);
   const [searching, setSearching] = useState(false);
+  // What a write answered, by lead: its tags and notes as the database now holds them. The record
+  // shows these at once; the list behind it and the Tag filter are re-read from the server.
+  const [written, setWritten] = useState<Readonly<Record<string, { readonly tags?: readonly string[]; readonly notes?: readonly LeadNote[] }>>>({});
 
   async function reveal(id: string): Promise<void> {
     setRevealing(id);
@@ -68,6 +74,28 @@ export function LeadsBrowser({
     setSearch({ lead: outcome.lead });
   }
 
+  async function tag(id: string, name: string, remove: boolean): Promise<boolean> {
+    const outcome = remove ? await requestTag(id, name, true) : await requestTag(id, name);
+    if (outcome.kind === "failed") {
+      notify.error(outcome.message);
+      return false;
+    }
+    setWritten((before) => ({ ...before, [id]: { ...before[id], tags: outcome.tags } }));
+    router.refresh();
+    return true;
+  }
+
+  async function note(id: string, body: string): Promise<boolean> {
+    const outcome = await requestNote(id, body);
+    if (outcome.kind === "failed") {
+      notify.error(outcome.message);
+      return false;
+    }
+    setWritten((before) => ({ ...before, [id]: { ...before[id], notes: outcome.notes } }));
+    router.refresh();
+    return true;
+  }
+
   const listed: readonly LeadRow[] = search ? (search.lead ? [search.lead] : []) : (page?.rows ?? []);
   const rows: readonly ShownLead[] = listed.map((row) => ({ ...row, shown: revealed[row.id] ?? row.email, hidden: revealed[row.id] === undefined }));
 
@@ -79,12 +107,14 @@ export function LeadsBrowser({
   const range = search ? t.range("1", "1", "1") : t.range(formatCount(first), formatCount(last), formatCount(total));
   const cell = search ? (search.lead ? t.oneMatch : t.noMatch) : state === "rows" ? range : t.blank;
 
+  const open = filters.lead;
   const paged = (to: number) => leadQuery({ ...filters, page: to, lead: null });
 
   return (
     <>
       <LeadFilterBar
         filters={filters}
+        tags={tags}
         searching={searching}
         searched={search !== null}
         onFind={(email) => void find(email)}
@@ -110,14 +140,18 @@ export function LeadsBrowser({
         onReveal={(row) => void reveal(row.id)}
         onRetry={() => router.refresh()}
       />
-      {detail !== null && filters.lead !== null ? (
+      {detail !== null && open !== null ? (
         <LeadDrawer
           detail={detail}
-          revealed={revealed[filters.lead] ?? null}
+          revealed={revealed[open] ?? null}
           revealing={revealing === filters.lead}
-          onReveal={() => {
-            if (filters.lead) void reveal(filters.lead);
-          }}
+          tags={written[open]?.tags ?? (typeof detail === "string" ? [] : detail.tags)}
+          notes={written[open]?.notes ?? (typeof detail === "string" ? [] : detail.notes)}
+          suggestions={tags}
+          onReveal={() => void reveal(open)}
+          onTag={(name) => tag(open, name, false)}
+          onUntag={(name) => tag(open, name, true)}
+          onNote={(body) => note(open, body)}
           onClose={() => router.push(leadQuery({ ...filters, lead: null }))}
         />
       ) : null}
