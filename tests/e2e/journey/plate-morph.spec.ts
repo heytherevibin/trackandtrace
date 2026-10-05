@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "../fixtures";
 import { PNR } from "../helpers";
-import { motionOff, transformOf } from "./journey-helpers";
+import { drawStill, motionOff, transformOf, waitForJourney } from "./journey-helpers";
 
 /** Samples the morph's height every frame for `ms` after `act`. */
 async function heightsDuring(page: Page, act: () => Promise<void>, ms = 900): Promise<number[]> {
@@ -301,5 +301,148 @@ test.describe("the plate morph", () => {
     expect(new Set(written).size, "the morph tweened back: it wrote many heights").toBeGreaterThan(5);
     expect(Math.abs((written[0] ?? 0) - stood.height), `the first height written, ${written[0]}px, against the ${stood.height}px the record stood at`).toBeLessThanOrEqual(1);
     expect(Math.max(...written), "and it only shrinks from there").toBeLessThanOrEqual(stood.height + 1);
+  });
+  // Motion off gives every property of every element a 0.01ms transition (motion.css): a change of style lands a frame
+  // late. The record stacks by its own measure in the commit that draws it, and while that swapped classes on the same
+  // table, rows and cells, their paddings and borders were the table's for one frame under the stacked layout: the
+  // record was drawn 900px tall and 770px a frame later on a 390px phone, the page under it shifting twice. The stacked
+  // record is its own elements now, which start as they stand. Read every frame from the press: once the record is
+  // drawn, the plate is at its rest height in every frame, and the page shifts once, for the record's arrival.
+  test("Motion off: the stacked record stands at its own height from the first frame it is drawn in", async ({ page, isMobile }) => {
+    test.skip(!isMobile, "a phone: the record stacks there");
+    await motionOff(page);
+    await page.goto("/");
+    await page.getByTestId("hero-instrument").getByRole("textbox").fill(PNR.mixed);
+    await page.evaluate(() => {
+      const w = window as unknown as { __frames: number[]; __first: number | null; __shifts: number[] | null };
+      w.__frames = [];
+      w.__first = null;
+      w.__shifts = null;
+      if (PerformanceObserver.supportedEntryTypes.includes("layout-shift")) {
+        const shifts: number[] = [];
+        w.__shifts = shifts;
+        new PerformanceObserver((list) => shifts.push(...list.getEntries().map((entry) => entry.startTime))).observe({ type: "layout-shift" });
+      }
+      const el = document.querySelector('[data-testid="hero-instrument"] .plate-morph')!;
+      const tick = () => {
+        if (el.querySelector('[data-testid="terminal-result"]')) {
+          w.__first ??= performance.now();
+          w.__frames.push(el.getBoundingClientRect().height);
+        }
+        // sixty frames from the record's first: the frame the fault was in is the first
+        if (w.__frames.length < 60) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+    await clickRun(page);
+    await page.waitForFunction(() => (window as unknown as { __frames: number[] }).__frames.length >= 60, undefined, { timeout: 15_000 });
+    const at = await page.evaluate(() => {
+      const w = window as unknown as { __frames: number[]; __first: number; __shifts: number[] | null };
+      const rows = [...new Set([...document.querySelectorAll('[data-testid="terminal-result"] tbody tr')].map((row) => getComputedStyle(row).display))];
+      // a shift is timed at its frame's layout, after that frame's callbacks: the record's own is at or after `first`
+      return { frames: w.__frames, rows, shifts: w.__shifts?.filter((time) => time >= w.__first - 1).length ?? null };
+    });
+    expect(at.rows, "the record's rows are stacked: the case this test is about").toEqual(["grid"]);
+    const rest = at.frames.at(-1)!;
+    expect(at.frames.filter((height) => Math.abs(height - rest) > 1), `every frame from the record's first at its rest height, ${rest}px`).toEqual([]);
+    if (at.shifts !== null) expect(at.shifts, "the page shifts once, as the record arrives, and not again a frame later").toBeLessThanOrEqual(1);
+  });
+
+  // With Motion off the plate swaps faces at once and tells the journey its layout moved (tt:layout) in the same
+  // commit, before the record has stacked: the journey measured the page with the table in it (731px) and the record
+  // then stood at 911px on a 360px phone with nobody told. Every station was announced 180px early from there on. A
+  // face that changes its own height with no morph running tells the journey again. Here the board's stations are swept
+  // as the page was left, then again after a layout event sent from the test: told right the first time, both are the
+  // same.
+  test("Motion off: the journey is told once the record has stacked, and announces each station where it stands", async ({ page, isMobile }) => {
+    test.skip(!isMobile, "a phone: the record stacks there");
+    test.setTimeout(90_000);
+    await motionOff(page);
+    await drawStill(page);
+    await page.setViewportSize({ width: 360, height: 844 });
+    await page.goto("/");
+    await waitForJourney(page);
+    await page.evaluate(() => {
+      const w = window as unknown as { __layouts: number };
+      w.__layouts = 0;
+      window.addEventListener("tt:layout", () => {
+        w.__layouts += 1;
+      });
+    });
+    await page.getByTestId("hero-instrument").getByRole("textbox").fill(PNR.mixed);
+    await clickRun(page);
+    await expect(page.getByTestId("terminal-result").locator("tbody tr").first()).toHaveCSS("display", "grid");
+    // The telling ends: the layout events stop (a face told of nothing new tells nobody), however long is waited.
+    const layouts = () => page.evaluate(() => (window as unknown as { __layouts: number }).__layouts);
+    await expect.poll(async () => {
+      const before = await layouts();
+      await page.waitForTimeout(600);
+      return (await layouts()) - before;
+    }, { timeout: 15_000 }).toBe(0);
+    expect(await layouts(), "told, and not without end").toBeLessThan(12);
+
+    /** Where the scroll stands as each of the first stations is announced, from the top down in 20px steps. */
+    const sweep = () =>
+      page.evaluate(async () => {
+        const frame = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        const seen: { readonly station: number; readonly y: number }[] = [];
+        const onStation = (event: Event) => seen.push({ station: (event as CustomEvent<{ index: number }>).detail.index, y: Math.round(window.scrollY) });
+        window.scrollTo({ top: 0, behavior: "instant" });
+        await frame();
+        window.addEventListener("tt:station", onStation);
+        const foot = document.documentElement.scrollHeight - window.innerHeight;
+        for (let y = 20; y <= foot && seen.length < 3; y += 20) {
+          window.scrollTo({ top: y, behavior: "instant" });
+          await frame();
+        }
+        window.removeEventListener("tt:station", onStation);
+        window.scrollTo({ top: 0, behavior: "instant" });
+        await frame();
+        return seen;
+      });
+    const asLeft = await sweep();
+    expect(asLeft.length, "three stations passed on the way down").toBe(3);
+    await page.evaluate(() => window.dispatchEvent(new Event("tt:layout")));
+    const toldAgain = await sweep();
+    expect(asLeft, "the stations as the record left them, against the same once told afresh").toEqual(toldAgain);
+  });
+
+  // A tween that is stopped is run to "now" once more as it stops, and writes. Stopped because the face changed, the
+  // face it measures has gone from the page: its height reads 0, and the plate was written a height below either face's
+  // (overwritten in the same effect, so never painted). Only the tween still current writes. Read from the writes.
+  test("checking another PNR while the record is still growing writes no height below the entry's", async ({ page, isMobile }) => {
+    test.skip(!isMobile, "once is enough");
+    await page.goto("/");
+    await page.getByTestId("hero-instrument").getByRole("textbox").fill(PNR.mixed);
+    await watchHeights(page);
+    // In the page, frame by frame: as soon as the plate is growing (an inline height on it) and the record's button is
+    // there, press it. The press lands at a share of the morph, never at a time.
+    const pressed = page.evaluate(
+      () =>
+        new Promise<number>((resolve, reject) => {
+          const end = performance.now() + 20_000;
+          const tick = () => {
+            const el = document.querySelector<HTMLElement>('[data-testid="hero-instrument"] .plate-morph');
+            const another = [...(el?.querySelectorAll("button") ?? [])].find((button) => /check another pnr/i.test(button.textContent ?? ""));
+            if (el && another && el.style.height !== "") {
+              const at = Number.parseFloat(el.style.height);
+              another.click();
+              return resolve(at);
+            }
+            if (performance.now() > end) return reject(new Error("the record never grew"));
+            requestAnimationFrame(tick);
+          };
+          requestAnimationFrame(tick);
+        }),
+    );
+    await page.getByTestId("hero-instrument").getByRole("button", { name: /run/i }).click();
+    const at = await pressed;
+    await expect(page.getByTestId("terminal-result")).toHaveCount(0);
+    await letGo(page);
+    const written = await page.evaluate(() => (window as unknown as { __written: number[] }).__written);
+    // the first height written is the entry's own, where the growth started from
+    const entry = written[0] ?? 0;
+    expect(at, "pressed while the plate was growing, an inline height on it: the case this test is about").toBeGreaterThanOrEqual(entry);
+    expect(written.filter((height) => height < entry - 2), `every height written, against the entry's ${entry}px`).toEqual([]);
   });
 });

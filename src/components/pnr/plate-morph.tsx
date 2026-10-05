@@ -117,6 +117,9 @@ export function PlateMorph({ face, children }: { readonly face: string; readonly
       duration: MORPH_S,
       ease: EXPO,
       onUpdate: (way) => {
+        // A tween is run to "now" once more as it is stopped. Stopped for a change of face, its own face has left the
+        // page and measures 0: only the tween still current writes.
+        if (grow.current !== tween) return;
         if (box) box.style.height = `${from + (el.offsetHeight - from) * way}px`;
       },
       onComplete: () => {
@@ -129,17 +132,39 @@ export function PlateMorph({ face, children }: { readonly face: string; readonly
   });
 
   // The face's height is kept as it changes, not only as this component renders. A face can change its own height in a
-  // commit of its own (the record's passenger table stacks on a phone, use-outgrown.ts), and the next morph starts from
-  // the height remembered here: remembered from the commit that drew the face, "Check another PNR" cut a stacked record
-  // to its table's height for a frame before it shrank. Each face is an element of its own (keyed), so each is watched.
+  // commit of its own (the record's passenger table stacks on a phone, use-outgrown.ts), and two things go by it:
+  // - the next morph starts from the height remembered here: remembered from the commit that drew the face, "Check
+  //   another PNR" cut a stacked record to its table's height for a frame before it shrank;
+  // - the page is told its layout moved (tt:layout) when no morph is running to tell it at its end. With Motion off
+  //   the swap is at once and the page was told in that commit, before the record stacked: the journey had measured
+  //   the page with the table in it, and announced every station too early from there on.
+  // Told a frame later, never from inside the observer: whoever hears it may move boxes that are being observed. And
+  // only for a change at the same width: a change of width is the window's (a resize, a turn), which the journey hears
+  // for itself and settles in its own time. A face told of nothing new tells nobody, so this cannot go round.
+  // Each face is an element of its own (keyed), so each is watched.
   useEffect(() => {
     const el = inner.current;
     if (!el || typeof ResizeObserver === "undefined") return undefined;
+    let width = el.offsetWidth;
+    let telling = 0;
     const observer = new ResizeObserver(() => {
-      if (seen.current?.face === face) seen.current = { face, height: el.offsetHeight };
+      const was = seen.current;
+      if (was?.face !== face) return;
+      const now = { width: el.offsetWidth, height: el.offsetHeight };
+      const moved = now.height !== was.height && now.width === width;
+      width = now.width;
+      seen.current = { face, height: now.height };
+      if (!moved || grow.current || telling) return;
+      telling = requestAnimationFrame(() => {
+        telling = 0;
+        window.dispatchEvent(new Event(LAYOUT_EVENT));
+      });
     });
     observer.observe(el);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(telling);
+    };
   }, [face]);
 
   // Motion switched off mid-rise: the face stops where it rests, at once.

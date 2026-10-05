@@ -260,6 +260,64 @@ test("the landing's record stacks and is a table again as its window narrows and
   expect(await layoutBreaks(page), "at 280px, after the changes").toEqual([]);
 });
 
+// Stacked, the record's columns are the facts grid's above it (decided 2026-10-05, the owner): Booked under the first
+// column and Current exactly under the second (Route, Class · quota), with Coach · berth on a row of its own beneath on
+// every phone. The two grids are cut from the same two lengths (pnr-terminal-result.tsx), so they hold as many columns
+// as each other at any width and text size. With this fixture the record never stacks where the frame holds three
+// columns (the table needs 19.3rem and three columns 20.6rem): at 200% text it is two columns at 640, 768 and 1440,
+// and one column, the facts grid's one, at 1024. The two grids turn from one column to two at the same pixel, a 220px
+// frame: a 304px window has it and a 302px window is 2px short (a stacked track 2px narrower, 5rem for 5.125rem, would
+// already stand two across there, beside a facts grid of one).
+for (const [width, zoom, columns] of [
+  [302, 100, 1],
+  [304, 100, 2],
+  [320, 100, 2],
+  [360, 100, 2],
+  [375, 100, 2],
+  [390, 100, 2],
+  [393, 100, 2],
+  [640, 200, 2],
+  [768, 200, 2],
+  [1024, 200, 1],
+  [1440, 200, 2],
+] as const) {
+  test(`at ${width}px at ${zoom}% text the stacked record's columns stand under the facts grid's: ${columns === 2 ? "Current under the second" : "one column, as the facts grid is"}`, async ({ page, isMobile }) => {
+    test.skip(!isMobile, "once, on the phone project, across the widths");
+    if (zoom === 200) await text200(page);
+    await openRecord(page, width);
+    const at = await page.getByTestId("terminal-result").evaluate((el) => {
+      const table = el.querySelector("table");
+      const frame = table?.parentElement;
+      if (!table || !frame) throw new Error("no table");
+      const facts = [...frame.querySelectorAll("dl > div > dt")].map((dt) => ({ name: (dt.textContent ?? "").trim(), left: dt.getBoundingClientRect().left, top: dt.getBoundingClientRect().top }));
+      // the facts grid's columns: where its first row's cells start
+      const columns = facts.filter((fact) => Math.abs(fact.top - (facts[0]?.top ?? 0)) < 1);
+      return {
+        rows: [...new Set([...table.querySelectorAll("tbody tr")].map((r) => getComputedStyle(r).display))],
+        columns,
+        passengers: [...table.querySelectorAll("tbody tr")].map((row) =>
+          [...row.querySelectorAll<HTMLElement>("td[data-label]")].map((cell) => ({ label: cell.dataset.label ?? "", left: cell.getBoundingClientRect().left, top: cell.getBoundingClientRect().top })),
+        ),
+      };
+    });
+    expect(at.rows, "the record is stacked: the case this test is about").toEqual(["grid"]);
+    expect(at.columns.length, `the facts grid's columns (${at.columns.map((c) => c.name).join(", ")})`).toBe(columns);
+    expect(at.passengers.length).toBe(3);
+    for (const cells of at.passengers) {
+      expect(cells.map((cell) => cell.label)).toEqual(["Booked", "Current", "Coach · berth"]);
+      // each labelled cell in turn under the facts grid's columns in turn, to half a pixel
+      for (const [k, cell] of cells.entries()) expect(Math.abs(cell.left - (at.columns[k % columns]?.left ?? Number.NaN)), `${cell.label} at ${cell.left}px, under ${at.columns[k % columns]?.name}`).toBeLessThanOrEqual(0.5);
+      const [booked, current, berth] = cells;
+      if (!booked || !current || !berth) throw new Error("a passenger without its three cells");
+      if (columns === 2) {
+        expect(at.columns[1]?.name, "the facts grid's second column").toBe("Route");
+        expect(Math.abs(current.top - booked.top), "Booked and Current side by side").toBeLessThan(1);
+        expect(berth.top, "Coach · berth on a row of its own beneath").toBeGreaterThan(booked.top + 1);
+      }
+    }
+  });
+}
+
 // A phone turned on its side and back, the record open. The switch reads only the record's frame, never the window
 // (use-outgrown.ts): a turn changes the frame's width, its ResizeObserver reports it, and the record is the table in
 // the 844px window and stacked again in the 390px one, whichever way it started.

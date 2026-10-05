@@ -630,6 +630,20 @@ its table, at any text size, and is the table only where the frame holds it.
   the tween let go; the same jump at 200% text, since #117, went with it), and "Check another PNR" starts from the
   height the record stood at, not from the height remembered when the record was first drawn. `tt:layout` is still
   told once, when a morph settles, at the face's final height.
+- Stacked, the record's columns are the facts grid's above it (the owner, 2026-10-05): Current stands exactly under
+  Route and Class · quota, Booked under Train, and on every phone Coach · berth has a row of its own beneath them.
+  There is no three across at 384px to 393px any more. Both grids are cut from the same two lengths on the record's
+  frame (a fact's least width and its padding), so they hold as many columns as each other at every width and text
+  size: one column under 13.75rem of frame, two from there. The record never stacks where three would fit (the
+  fixture's table needs 19.3rem, three columns 20.6rem). At 200% text it is two columns at 640px, 768px and 1440px and
+  one, like the facts grid, at 1024px.
+- With Motion off (every property a 0.01ms transition) two things followed from the record stacking in a commit of
+  its own, and both are closed. The stacked record is elements of its own, not the table's with their classes swapped,
+  so it stands at its rest height from its first frame (it was drawn taller for one, and the page shifted twice). And a face that changes
+  its own height while no morph is running tells the page again (`tt:layout`, a frame later, only for a change at the
+  same width: a change of width is the window's, which the journey hears for itself): with Motion off the plate had
+  told the journey in the commit before the record stacked, and every station was announced too early from there on
+  (180px at 360px).
 
 ## 7. What only the user can do
 

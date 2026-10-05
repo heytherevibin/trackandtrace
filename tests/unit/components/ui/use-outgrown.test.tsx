@@ -1,4 +1,5 @@
 import { act, render, screen } from "@testing-library/react";
+import { useLayoutEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useOutgrown } from "@/components/ui/use-outgrown";
 
@@ -28,8 +29,14 @@ function lay(next: Laid, rootPx = 16): HTMLElement {
   return screen.getByTestId("box");
 }
 
+/** Every state the box has been drawn in since it was last emptied: one entry a commit. */
+let drawn: string[] = [];
+
 function Box() {
   const [box, outgrown] = useOutgrown<HTMLDivElement>();
+  useLayoutEffect(() => {
+    drawn.push(outgrown ? "stacked" : "table");
+  });
   return (
     <div ref={box} data-testid="box" style={{ borderLeft: `${BORDER}px solid`, borderRight: `${BORDER}px solid` }}>
       <div data-testid="content" data-stacked={outgrown || undefined}>
@@ -44,6 +51,7 @@ const rect = (left: number, width: number): DOMRect => ({ left, right: left + wi
 beforeEach(() => {
   laid = null;
   observed = [];
+  drawn = [];
   RealResizeObserver = window.ResizeObserver;
   window.ResizeObserver = class {
     constructor(private readonly notify: () => void) {}
@@ -129,6 +137,50 @@ describe("useOutgrown", () => {
     laid = phone(390);
     render(<Box />);
     expect(screen.getByTestId("box")).toHaveTextContent("stacked");
+  });
+
+  // The slack is one layout unit, 0.02px, and it is a "wider than", not an "as wide as". The box stands with its inner
+  // left edge at 0 here, so every number below reaches the hook exactly as written and the sums are the hook's own.
+  const exact = (need: number): Laid => ({ window: 390, left: -BORDER, width: 300, need });
+
+  it("leaves content less than a layout unit wider than its box as drawn: a table the width of its frame is not stacked for a rounding", () => {
+    render(<Box />);
+    expect(lay(exact(300.01))).toHaveTextContent("table");
+    expect(lay(exact(300.03))).toHaveTextContent("stacked");
+  });
+
+  it("leaves content wider than its box by exactly the slack as drawn: outgrown is wider than, not as wide as", () => {
+    render(<Box />);
+    expect(lay(exact(300 + 0.02))).toHaveTextContent("table");
+  });
+
+  // The observer judges a stacked box as stacked: from the measure it kept. Judged as if it were drawn as a table, it
+  // would read the stacked rows' width as what the table needs, call the box wide enough, draw the table, and stack it
+  // again before the paint: the same answer in the end, by way of two commits and a table's worth of layout on every
+  // change of size.
+  it("stacked and still too narrow after a change of size, draws nothing again: it never goes by way of the table", () => {
+    render(<Box />);
+    expect(lay(phone(320))).toHaveTextContent("stacked");
+    drawn = [];
+    expect(lay(phone(340))).toHaveTextContent("stacked");
+    expect(lay(phone(300))).toHaveTextContent("stacked");
+    expect(drawn, "no commit at all: the answer did not change").toEqual([]);
+  });
+
+  it("going back to the table is one change, not three", () => {
+    render(<Box />);
+    expect(lay(phone(320))).toHaveTextContent("stacked");
+    drawn = [];
+    expect(lay(phone(430))).toHaveTextContent("table");
+    expect(drawn).toEqual(["table"]);
+  });
+
+  it("stops watching its box when it goes: nothing is left observing", () => {
+    const { unmount } = render(<Box />);
+    expect(lay(phone(320))).toHaveTextContent("stacked");
+    expect(observed.length, "watching while it is drawn").toBe(1);
+    unmount();
+    expect(observed.length, "and not after").toBe(0);
   });
 
   it("says nothing where nothing is laid out: the server's markup is the table", () => {
