@@ -2,8 +2,8 @@ import type { ReactNode } from "react";
 import { cn } from "@/utils/cn";
 
 /**
- * One ruled section of a lead's record (ConsoleLeads.dc.html's drawer): a legend heading over its
- * body. `tight` is the heading over a list of facts, whose first row brings its own 10px.
+ * One ruled section of a record (ConsoleLeads.dc.html's drawer, and ConsoleAccounts.dc.html's): a
+ * legend heading over its body. `tight` is the heading over a list of facts, whose first row brings its own 10px.
  */
 export function RecordSection({ title, tight = false, children }: { readonly title: string; readonly tight?: boolean; readonly children: ReactNode }) {
   return (

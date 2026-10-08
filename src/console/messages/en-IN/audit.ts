@@ -219,6 +219,7 @@ export const audit = {
     messages: "Messages",
     provider_keys: "Provider keys",
     leads: "Leads",
+    accounts: "Accounts",
     record: "Record",
     system: "System",
   },

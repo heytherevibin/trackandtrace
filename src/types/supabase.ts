@@ -172,6 +172,17 @@ export type Database = {
         Args: { p_can_book: boolean; p_raw_status: string }
         Returns: string
       }
+      console_account: { Args: { p_id: string }; Returns: Json }
+      console_accounts: {
+        Args: {
+          p_limit?: number
+          p_method?: string
+          p_offset?: number
+          p_since?: string
+          p_status?: string
+        }
+        Returns: Json
+      }
       console_add_business_lead: {
         Args: {
           p_about: string
@@ -378,6 +389,10 @@ export type Database = {
         Args: { p_environment: string; p_filters: string; p_reason: string }
         Returns: Json
       }
+      console_find_account: {
+        Args: { p_email: string; p_environment: string }
+        Returns: Json
+      }
       console_find_lead: {
         Args: { p_email: string; p_environment: string }
         Returns: Json
@@ -462,6 +477,10 @@ export type Database = {
       console_reset_keys: {
         Args: { p_environment: string; p_member: string; p_reason: string }
         Returns: number
+      }
+      console_reveal_account: {
+        Args: { p_environment: string; p_id: string }
+        Returns: string
       }
       console_reveal_lead: {
         Args: { p_environment: string; p_id: string }

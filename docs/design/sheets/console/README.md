@@ -1,4 +1,4 @@
-# Console sheets: B0, B2, B4 and sheet 22
+# Console sheets: B0, B2, B4, sheet 22 and sheet 24
 
 The console's sheets, drawn on the Design canvas. B0 (the frame and its audit log) and B2 (admin core) were approved on 19 Sep 2026. Phase 2 builds from these files. Where they differ from the prompts in `docs/superpowers/specs/phase-1-sheets/b0-calibration.md` and `b2-admin-core.md`, these files win.
 
@@ -171,3 +171,43 @@ The page is `src/app/console/leads/page.tsx`; its parts are in `src/console/lead
 - **The phone's figures are 24px**, the type scale's nearest step to the drawn 26px.
 - **Previous and Next are links**, so a page of the list has an address; where there is nowhere to go they are the drawn disabled buttons.
 - **Undrawn states**, in the module's own words: filters that match nobody, figures or a record that could not be read, a record that is no longer there, and part of an address typed into the search (refused in the form, before any lookup is made or recorded).
+
+## Sheet 24: Accounts
+
+Drawn on 8 Oct 2026 and **approved the same day**. Module 08's pages are transcribed from these files 1:1. Same frame, same `industry.css`, no new classes. The sample world is the other console sheets': 1,204 accounts, the figure sheet 22 gives as "With an account", and `a•••@example.com` is the same person there.
+
+| File | Sheet | States (props) |
+|---|---|---|
+| `ConsoleAccounts.dc.html` | 24 Accounts at 1440 | role (Owner, Admin) · state: List, Search: one match, Search: no match, Record, Record revealed, Record: disabled, Sign out: confirm, Disable: confirm, Enable: confirm, Empty, Unavailable, No access |
+| `ConsoleAccountsPhone.dc.html` | 24 Accounts at 390 | role · state: List, Record, Record revealed, Record: disabled, Empty, No access |
+
+Decided with the owner before drawing:
+
+- **"Start deletion" and the "Deletion pending" status are left out** until Privacy requests (module 09) is built. The brief routes an account's deletion through an erasure request there, and there is nowhere to open one yet.
+- **Sign out everywhere and Disable take effect at once.** A traveller who is signed in is refused on their next request, not when their token runs out up to an hour later.
+- **A disabled traveller who tries to sign in reads** "This account has been switched off, so it can't sign in.", where the sign-in page says a link did not work today. No address: the site publishes none.
+
+What the boards draw:
+
+- **The list**: Email (masked, opens the record), Created, Last sign-in, Sign-in ("Email link · 2 passkeys"), Saved PNRs (a count), News (a tag that opens the same person in Leads), Status, and Reveal. Newest sign-in first. The board draws 8 of a page's 50 rows.
+- **Search** takes the whole address, exactly, as in Leads. The match stays masked and the lookup is written to the audit log.
+- **Three pickers**: Status (Active, Disabled), Sign-in (Email link, Google, Passkey) and Created. The brief lists two ways to sign in; Google is drawn because the site offers it.
+- **The record** (a drawer at 1440, a full screen at 390): the address with Reveal; Status; the account's facts; Sessions, as how many are signed in and when one was last seen; News, with a link to the lead; then Sign out everywhere, and Disable or Enable. It closes with "Saved PNRs stay private: the console shows only how many."
+- **A disabled account** says since when and by whom, has nobody signed in, and offers Enable.
+- **Sign out everywhere, Disable and Enable** each go through Confirm it's you (TC-01): a reason and a key. The confirm for Disable says what is kept: saved PNRs and subscriptions, and that news still reaches them if they are subscribed.
+- **On a phone** the page reads and reveals; it changes nothing, and a record says to open it on a larger screen.
+- **No access** is drawn as Support opening the module. No loading state is drawn: the page is read on the server and arrives whole.
+- **No PNR, passenger name or watchlist entry appears on any board.** Console members are not listed.
+
+### As built (8 Oct 2026)
+
+The page is `src/app/console/accounts/page.tsx`; its parts are in `src/console/accounts/`. It is built in two changes, and this is the first: **the list, search, the three filters, the record and Reveal.** Sign out everywhere, Disable and Enable, the check that makes them take effect at once, and the traveller's sign-in line are the second.
+
+- **The record has no acts yet**, and no line telling a phone to use a larger screen: there is nothing to change on either. Both arrive with the second change.
+- **A disabled account reads "Can't sign in."** Since when and by whom is drawn; the second change records both when it disables an account, and the line gains them then.
+- **Sign-in is the column that gives**, as Tags is in Leads: it takes what is left and cuts its words with an ellipsis, the whole of them a hover away and on the record. Below 1360px every other column takes what its words need, on 10px gutters. A revealed address is never cut.
+- **An account nobody has signed in to yet** reads "Never" under Last sign-in, and "Never signed in" on a phone's card; the boards draw every account signed in.
+- **Dates, pickers, the pager and the undrawn states** follow the Leads page (above): "02 Sept 2026", a label beside a native select, Previous and Next as links, and the module's own words for filters that match nobody, a record that could not be read or is no longer there, and part of an address typed into the search.
+- **The filter bar, the record's shell and the pager's steps are shared with Leads** (`src/console/components/`): lifted out of that module unchanged when this one needed the same pieces.
+- **Reading is Owner and Admin, in the database as on the page.** Finding by email and Reveal each write an audit row under the category `accounts`, by the masked address.
+

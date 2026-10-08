@@ -203,6 +203,7 @@ describe("today's reality: the rail and its phone trigger render for an Owner an
   // group's presence was inferred from the Owner's copy of it rather than this role's.
   // 07 Announcements joined on 2026-10-04, the first built module in People: Owner and Admin.
   // 06 Leads joined it on 2026-10-04, above it, as the sheet's map orders the group.
+  // 08 Accounts joined on 2026-10-08, below both.
   it("gives an Admin Operate, People, Configure and Record, with Team absent from Configure", () => {
     render(<ConsoleRail groups={railFor("admin")} />);
     const rail = screen.getByRole("navigation", { name: "Console" });
@@ -210,6 +211,7 @@ describe("today's reality: the rail and its phone trigger render for an Owner an
     expect(within(rail).getByText("People")).toBeVisible();
     expect(within(rail).getByRole("link", { name: /Leads/ })).toHaveAttribute("href", "/leads");
     expect(within(rail).getByRole("link", { name: /Announcements/ })).toHaveAttribute("href", "/announcements");
+    expect(within(rail).getByRole("link", { name: /Accounts/ })).toHaveAttribute("href", "/accounts");
     expect(within(rail).getByText("Record")).toBeVisible();
     expect(within(rail).getByText("Configure")).toBeVisible();
     expect(within(rail).queryByRole("link", { name: /Team/ })).not.toBeInTheDocument();
@@ -217,7 +219,7 @@ describe("today's reality: the rail and its phone trigger render for an Owner an
     expect(within(rail).getByRole("link", { name: /Sources/ })).toHaveAttribute("href", "/sources");
     expect(within(rail).getByRole("link", { name: /Abuse/ })).toHaveAttribute("href", "/abuse");
     expect(within(rail).getByRole("link", { name: /Switches/ })).toHaveAttribute("href", "/settings");
-    expect(within(rail).getAllByRole("link")).toHaveLength(7);
+    expect(within(rail).getAllByRole("link")).toHaveLength(8);
   });
 });
 

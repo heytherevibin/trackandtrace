@@ -7,7 +7,7 @@ import { ConfirmItsYou } from "@/console/components/confirm-its-you";
 import { LEAD_DELETE_ACTION, leadDeleteValue } from "@/console/leads/export";
 import type { LeadDetail } from "@/console/leads/leads";
 import { requestDelete } from "@/console/leads/leads-client";
-import { RecordSection } from "@/console/leads/record-section";
+import { RecordSection } from "@/console/components/record-section";
 import { consoleMessages } from "@/console/messages";
 
 const m = consoleMessages.leads.remove;

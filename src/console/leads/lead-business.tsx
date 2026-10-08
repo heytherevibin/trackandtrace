@@ -9,7 +9,7 @@ import { BUSINESS_STAGES, type BusinessMember } from "@/console/leads/business";
 import { MarkBusinessLead } from "@/console/leads/business-lead-dialog";
 import type { LeadBusiness } from "@/console/leads/leads";
 import { requestAssignBusiness, requestMoveBusiness, requestUnmarkBusiness } from "@/console/leads/leads-client";
-import { Facts, RecordSection } from "@/console/leads/record-section";
+import { Facts, RecordSection } from "@/console/components/record-section";
 import { consoleMessages } from "@/console/messages";
 
 const b = consoleMessages.leads.business;
