@@ -60,7 +60,7 @@ export const CONSOLE_MODULES: readonly ConsoleModule[] = [
   // Built 2026-10-04: the Letters pages (list, compose, test send, queue, detail, stop). Its
   // Suppressions tab follows; the module's address and its access do not change when it does.
   { num: "07", label: "Announcements", group: "people", roles: OWNER_ADMIN, href: consoleHref("/announcements"), built: true },
-  { num: "08", label: "Accounts", group: "people", roles: OWNER_ADMIN, href: consoleHref("/accounts"), built: false },
+  { num: "08", label: "Accounts", group: "people", roles: OWNER_ADMIN, href: consoleHref("/accounts"), built: true },
   { num: "09", label: "Privacy requests", group: "queues", roles: OWNER_ADMIN_SUPPORT, href: consoleHref("/privacy-requests"), built: false },
   { num: "10", label: "Wrong-status reports", group: "queues", roles: OWNER_ADMIN_SUPPORT, href: consoleHref("/wrong-status-reports"), built: false },
   // 2026-09-27: src/app/console/settings/page.tsx exists, so this flips. It draws one plate of the

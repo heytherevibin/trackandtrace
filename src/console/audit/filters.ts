@@ -15,7 +15,7 @@ export type AuditResult = (typeof AUDIT_RESULTS)[number];
  * plus the `system` rows its own maintenance leaves behind, and a row carrying anything else still
  * parses and still shows.
  */
-export const AUDIT_CATEGORIES = ["session", "team", "configure", "messages", "provider_keys", "leads", "record", "system"] as const;
+export const AUDIT_CATEGORIES = ["session", "team", "configure", "messages", "provider_keys", "leads", "accounts", "record", "system"] as const;
 
 export const AUDIT_RANGES = ["today", "7d", "30d", "custom"] as const;
 export type AuditRange = (typeof AUDIT_RANGES)[number];
