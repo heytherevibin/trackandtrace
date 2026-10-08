@@ -106,11 +106,20 @@ test("the passengers' scroll region is a landmark with a name of its own, not th
 
 // The landing's in-place record (decided 2026-10-04 and 2026-10-05, the owner): it is the four-column table only where
 // its frame holds the table, at any text size, and everywhere else each passenger stacks into labelled rows: every cell
-// inside the frame, nothing cut, no scroller, no Tab stop of its own. The table cannot wrap below its own least width
-// (309.1px at 100% for the fixture's party of three) and its frame is the window less the page's and the plate's
-// margins (84px on a phone), so as drawn it stacks in every window under 394px: every phone. The switch measures the
-// table itself (use-outgrown.ts), so these tests do too: what is asserted is "stacked exactly where the table is wider
-// than its frame", from the table's own least width, and the named widths only say which side each is expected on.
+// inside the frame, nothing cut, no scroller, no Tab stop of its own. The switch measures the table itself
+// (use-outgrown.ts), so these tests do too: what is asserted is "stacked exactly where the table is wider than its
+// frame", from the table's own least width and the frame's own width, both read from the page.
+//
+// No width here says where that turn is, because it is the machine's as much as the page's. The table cannot wrap below
+// its least width, and that width is its words' as this machine's text shaping sets them: 309.1px for the fixture's
+// party of three on macOS, 322px on the Linux runner. The frame is the window less the page's and the plate's margins
+// (84px to a 400px window, growing after it), so the first window that holds the table is 394px on the one and 406px
+// on the other. A width is named as stacked or as a table only where no machine's letters could move it there (a 360px
+// phone or narrower; a 768px window or wider); between them the page's own measure says which.
+
+/** How the record's rows are laid out in a frame `holds` px wide inside its border, by the table's own least width:
+ * stacked when the table is wider than the frame by more than a layout unit, as use-outgrown.ts has it. */
+const byMeasure = (needs: number, holds: number): "grid" | "table-row" => (needs > holds + 0.02 ? "grid" : "table-row");
 
 /** The record in the landing's check plate, a party of three, its plate's morph over. */
 async function openRecord(page: Page, width: number, height = 844): Promise<void> {
@@ -172,18 +181,8 @@ async function tableNeeds(page: Page): Promise<number> {
   });
 }
 
-for (const [width, expected] of [
-  [280, "grid"],
-  [320, "grid"],
-  [352, "grid"],
-  [360, "grid"],
-  [375, "grid"],
-  [390, "grid"],
-  [430, "table-row"],
-  [768, "table-row"],
-  [1440, "table-row"],
-] as const) {
-  test(`at ${width}px the landing's record is ${expected === "grid" ? "stacked rows" : "the table"} at 100%, by the table's own measure, and stacked rows at 200%`, async ({ page, isMobile }) => {
+for (const width of [280, 320, 352, 360, 375, 390, 430, 768, 1440] as const) {
+  test(`at ${width}px the landing's record is stacked rows or the table at 100% as the table's own measure has it, and at 200%`, async ({ page, isMobile }) => {
     test.skip(!isMobile, "once, on the phone project, across the widths");
     await openRecord(page, width);
     const drawn = await readRecord(page);
@@ -194,46 +193,65 @@ for (const [width, expected] of [
     expect(drawn.pastWindow, "every cell wholly inside the window at 100%").toEqual([]);
     expect(drawn.pastFrame, "and inside the record's frame: nothing crosses its border").toEqual([]);
     expect(drawn.table, "the table, stacked or not, is no wider than its frame").toBeLessThanOrEqual(drawn.holds + 0.02);
-    expect(drawn.rows, `at 100% in a ${width}px window`).toEqual([expected]);
-    if (expected === "grid") expect(drawn.labels, "booked, current and coach · berth, labelled for each passenger").toBe(9);
+    if (drawn.rows.includes("grid")) expect(drawn.labels, "booked, current and coach · berth, labelled for each passenger").toBe(9);
     expect(await layoutBreaks(page), "at 100%").toEqual([]);
     expect(await cutText(page, '[data-testid="terminal-result"]'), "no word of the record cut at 100%").toEqual([]);
-    // and that is the table's own measure against its frame's, not this list's say-so
+    // Stacked or the table: the table's own least width against what its frame holds, both as this machine draws them.
     const needs = await tableNeeds(page);
-    expect(needs > drawn.holds + 0.02 ? "grid" : "table-row", `the table needs ${needs}px and its frame holds ${drawn.holds}px`).toBe(expected);
+    const expected = byMeasure(needs, drawn.holds);
+    expect(drawn.rows, `at 100% in a ${width}px window: the table needs ${needs}px and its frame holds ${drawn.holds}px`).toEqual([expected]);
+    // And the measure is not asked to vouch for itself: where no machine's letters could bring the turn, it is named.
+    if (width <= 360) expect(expected, "a 360px phone or narrower: stacked").toBe("grid");
+    if (width >= 768) expect(expected, "a 768px window or wider: the table").toBe("table-row");
 
     await text200(page);
     await openRecord(page, width);
     const large = await readRecord(page);
     expect(large.scrollers, "no scroller at 200% either").toBe(0);
     expect(large.stops, "nor a Tab stop").toBe(2);
-    expect(large.rows, "at 200% the rows stack").toEqual(["grid"]);
+    expect(large.pastFrame, "nothing crosses the frame's border at 200%").toEqual([]);
     expect(large.table, "and the table is no wider than its frame").toBeLessThanOrEqual(large.holds + 0.02);
-    expect(large.labels).toBe(9);
+    // every length across the table is in rem: with the text doubled it needs twice as much
+    expect(large.rows, `at 200% the table needs about ${needs * 2}px and its frame holds ${large.holds}px`).toEqual([byMeasure(needs * 2, large.holds)]);
+    if (width <= 430) expect(large.rows, "a phone with its text doubled: stacked").toEqual(["grid"]);
+    if (large.rows.includes("grid")) expect(large.labels).toBe(9);
     expect(await layoutBreaks(page), "at 200%").toEqual([]);
   });
 }
 
-// Where the one becomes the other is the table's to say. From its least width and the margins the page gives a phone's
-// frame, the first window whose frame holds the table is worked out here (394px for the fixture's party of three), and
-// the record must be the table there and stacked a pixel narrower: no width is written into the code or into this test.
+// Where the one becomes the other is the table's to say, and the frame's. The first window whose frame holds the table
+// is found here from the page itself: the table's least width, and the frame's width read at each window tried (the
+// page's margins are its own business, and grow past 400px). The record must be the table in that window and stacked in
+// the one a pixel narrower. No width is written into the code or into this test: the answer is 394px on macOS and 406px
+// on the Linux runner, whose letters make the same table 13px wider.
 test("the landing's record is a table from the first width its frame holds the table, and stacked one pixel narrower", async ({ page, isMobile }) => {
   test.skip(!isMobile, "a phone's widths");
-  await openRecord(page, 390);
-  const phone = await readRecord(page);
-  const margins = 390 - phone.holds;
+  await openRecord(page, 360);
   const needs = await tableNeeds(page);
-  const first = Math.ceil(needs + margins - 0.02);
-  expect(first, `the table needs ${needs}px, the margins take ${margins}px: a width the phone sweep's margins still hold at`).toBeLessThanOrEqual(400);
-  expect(first, "and the table is wider than a 390px phone's frame: the case this test is about").toBeGreaterThan(390);
+  /** What the record's frame holds in a window this wide, as the page lays it out. */
+  const holdsAt = async (width: number): Promise<number> => {
+    await page.setViewportSize({ width, height: 844 });
+    return (await readRecord(page)).holds;
+  };
+  // From a phone too narrow for any table of four columns to the last of the one-column windows, across which the frame
+  // only widens with the window: wide bounds on purpose, they say nothing of where the turn is.
+  const [narrow, wide] = [240, 640] as const;
+  expect(await holdsAt(narrow), `a ${narrow}px window's frame does not hold the ${needs}px table`).toBeLessThan(needs - 0.02);
+  expect(await holdsAt(wide), `a ${wide}px window's frame holds the ${needs}px table`).toBeGreaterThanOrEqual(needs);
+  let [stacks, holds] = [narrow as number, wide as number];
+  while (holds - stacks > 1) {
+    const middle = Math.floor((stacks + holds) / 2);
+    if (byMeasure(needs, await holdsAt(middle)) === "table-row") holds = middle;
+    else stacks = middle;
+  }
   for (const [width, display] of [
-    [first - 1, "grid"],
-    [first, "table-row"],
+    [holds - 1, "grid"],
+    [holds, "table-row"],
   ] as const) {
     await openRecord(page, width);
     const at = await readRecord(page);
-    expect(width - at.holds, `the margins at ${width}px are the phone's`).toBe(margins);
-    expect(at.rows, `${width}px: its frame holds ${at.holds}px of the ${needs}px the table needs`).toEqual([display]);
+    expect(byMeasure(needs, at.holds), `${width}px: its frame holds ${at.holds}px of the ${needs}px the table needs`).toBe(display);
+    expect(at.rows, `${width}px, loaded so: its frame holds ${at.holds}px of the ${needs}px the table needs`).toEqual([display]);
     expect(at.pastFrame, `${width}px`).toEqual([]);
   }
 });
@@ -243,13 +261,14 @@ test("the landing's record is a table from the first width its frame holds the t
 // state is waited for, never timed.
 test("the landing's record stacks and is a table again as its window narrows and widens", async ({ page, isMobile }) => {
   test.skip(!isMobile, "a phone's widths");
-  await openRecord(page, 430);
+  await openRecord(page, 480);
   const row = page.getByTestId("terminal-result").locator("tbody tr").first();
+  // widths well to either side of the turn, wherever this machine's letters put it (see the note above)
   for (const [width, display] of [
-    [430, "table-row"],
-    [390, "grid"],
+    [480, "table-row"],
+    [360, "grid"],
     [768, "table-row"],
-    [352, "grid"],
+    [320, "grid"],
     [1024, "table-row"],
     [280, "grid"],
   ] as const) {
@@ -300,7 +319,11 @@ for (const [width, zoom, columns] of [
         ),
       };
     });
-    expect(at.rows, "the record is stacked: the case this test is about").toEqual(["grid"]);
+    // Stacked is this test's case, and at a width near the turn it is this machine's letters that decide it (see the
+    // note above the record's tests). Where they could not (a 360px phone or narrower; doubled text in a window to
+    // 768px) the record must be stacked. Elsewhere a record that is the table has nothing here to line up, and says so.
+    if (zoom === 100 ? width <= 360 : width <= 768) expect(at.rows, "the record is stacked: the case this test is about").toEqual(["grid"]);
+    test.skip(!at.rows.includes("grid"), "on this machine the record's frame holds its table at this width: nothing is stacked to line up");
     expect(at.columns.length, `the facts grid's columns (${at.columns.map((c) => c.name).join(", ")})`).toBe(columns);
     expect(at.passengers.length).toBe(3);
     for (const cells of at.passengers) {
@@ -320,10 +343,11 @@ for (const [width, zoom, columns] of [
 
 // A phone turned on its side and back, the record open. The switch reads only the record's frame, never the window
 // (use-outgrown.ts): a turn changes the frame's width, its ResizeObserver reports it, and the record is the table in
-// the 844px window and stacked again in the 390px one, whichever way it started.
+// the 780px window and stacked again in the 360px one, whichever way it started (a 360 by 780 phone: 33px short of the
+// table upright on macOS, and 300px to spare on its side).
 for (const [name, first, turned] of [
-  ["upright, turned on its side and back", { width: 390, height: 844 }, { width: 844, height: 390 }],
-  ["on its side, turned upright and back", { width: 844, height: 390 }, { width: 390, height: 844 }],
+  ["upright, turned on its side and back", { width: 360, height: 780 }, { width: 780, height: 360 }],
+  ["on its side, turned upright and back", { width: 780, height: 360 }, { width: 360, height: 780 }],
 ] as const) {
   test(`a phone ${name}: the landing's record is stacked upright and the table on its side`, async ({ page, isMobile }) => {
     test.skip(!isMobile, "a phone");
