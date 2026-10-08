@@ -3,6 +3,12 @@ import { PNR } from "../helpers";
 import { drawStill, motionOff, transformOf } from "./journey-helpers";
 import { MORPH_MS, PLATE, REST_FRAMES, clickRun, faceTransformsFromFirstPaint, fill, hydrated, letGo, open, recordPlate, recordRun, rested, run, watchHeights, type PlateFrame } from "./plate-morph-helpers";
 
+/** A phone on which the record's passenger table stacks, whatever machine draws it. The record stacks where its frame
+ * is narrower than its table, and the table is as wide as the machine's text shaping sets its words: the frame holds
+ * it from a 394px window on macOS and from 406px on the Linux runner. The phone project's own 390px is 3px inside that
+ * on the one; a 360px window is 33px inside it, and 46px on the other. */
+const STACKS = { width: 360, height: 844 } as const;
+
 test.describe("the plate morph", () => {
   test("Motion off: the first face never rises, from first paint on", async ({ page }) => {
     await motionOff(page);
@@ -219,7 +225,7 @@ test.describe("the plate morph", () => {
   });
 
   // A face can change its own height after the commit the morph first measures it in. On a phone the record's
-  // passenger table stacks (use-outgrown.ts: a frame narrower than the table, every window under 394px), in that
+  // passenger table stacks (use-outgrown.ts: a frame narrower than the table, every phone's window), in that
   // commit's own layout effects, and the stacked record is taller than the table the morph measured. A tween to the
   // first measure ended that much short and the plate jumped the rest when it let go. The tween runs to the face's
   // height as it stands on each frame, so the last height it writes is the height the plate keeps. Read from the writes
@@ -227,6 +233,7 @@ test.describe("the plate morph", () => {
   // runner drops frames.
   test("where the record stacks, the morph ends at the height the record stands at: the plate does not jump when it lets go", async ({ page, isMobile }) => {
     test.skip(!isMobile, "a phone: the record stacks there");
+    await page.setViewportSize(STACKS);
     await open(page);
     // a party of three: the record with a passenger table in it
     await fill(page, PNR.mixed);
@@ -250,6 +257,7 @@ test.describe("the plate morph", () => {
   // shrank. The morph keeps the face's height as it changes, so the first height it writes is the height the plate had.
   test("checking another PNR from a stacked record starts from the height the record stood at", async ({ page, isMobile }) => {
     test.skip(!isMobile, "a phone: the record stacks there");
+    await page.setViewportSize(STACKS);
     await open(page);
     await fill(page, PNR.mixed);
     await watchHeights(page);
@@ -278,6 +286,7 @@ test.describe("the plate morph", () => {
   test("Motion off: the stacked record stands at its own height from the first frame it is drawn in", async ({ page, isMobile }) => {
     test.skip(!isMobile, "a phone: the record stacks there");
     await motionOff(page);
+    await page.setViewportSize(STACKS);
     await open(page);
     await fill(page, PNR.mixed);
     await page.evaluate(() => {
@@ -326,7 +335,7 @@ test.describe("the plate morph", () => {
     test.setTimeout(90_000);
     await motionOff(page);
     await drawStill(page);
-    await page.setViewportSize({ width: 360, height: 844 });
+    await page.setViewportSize(STACKS);
     await open(page);
     await page.evaluate(() => {
       const w = window as unknown as { __layouts: number };

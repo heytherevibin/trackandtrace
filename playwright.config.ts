@@ -23,8 +23,8 @@ const NOT_HERE = /(console(-auth)?|production|nightly)\//;
  * (twice over, a skipped twin on the other project) took the first shard from 377 tests to 390, and the thirteen it
  * gained were seven more of Night falls's page sweeps, drawn live, and six of the phone's. It ran 17.1 minutes against
  * the step's 17 (CI run 37755406293; it had been 13.2 to 16.7 on main and on three other branches that week). With
- * Night falls here the first shard is the desktop's specs to live-drawing and the phone's first, and the sweeps fall to
- * the last shard, which had the most room (8 to 12 minutes). */
+ * Night falls here the first shard is the desktop's specs to live-drawing and the phone's first, and the desktop's
+ * sweeps fall to the third shard, among the phone's tests, which had room (7.5 to 10.8 minutes). */
 const DESKTOP_LATER = /tests\/e2e\/(journey\/[n-z][^/]*|[k-z][^/]*)\.spec\.ts$/;
 const DESKTOP = { name: "desktop", use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 } } };
 
