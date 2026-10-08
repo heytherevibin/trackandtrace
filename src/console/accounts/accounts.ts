@@ -41,7 +41,17 @@ const row = {
 
 const rowShape = z.object(row).strict();
 const pageShape = z.object({ total: count, rows: z.array(rowShape) }).strict();
-const detailShape = z.object({ ...row, sessions: z.object({ count, lastSeenAt: when.nullable() }).strict() }).strict();
+const detailShape = z
+  .object({
+    ...row,
+    sessions: z.object({ count, lastSeenAt: when.nullable() }).strict(),
+    // Since when an account has been disabled, and by whom. Absent until the module's second change
+    // records them; named here already, because this shape is strict and the database is always
+    // changed before the code that reads it.
+    disabledAt: when.nullable().optional(),
+    disabledBy: z.string().min(1).nullable().optional(),
+  })
+  .strict();
 
 export type AccountRow = z.infer<typeof rowShape>;
 export type AccountPage = z.infer<typeof pageShape>;

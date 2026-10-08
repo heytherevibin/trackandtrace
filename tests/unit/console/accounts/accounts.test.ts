@@ -96,6 +96,13 @@ describe("reading", () => {
     expect(await readAccount(db({ data: null }).db, ID)).toBeNull();
     expect((await readAccount(db({ data: { ...DETAIL, sessions: { count: 0, lastSeenAt: null } } }).db, ID))?.sessions).toEqual({ count: 0, lastSeenAt: null });
   });
+
+  it("takes a record that says since when an account has been disabled and by whom, and refuses any other key", async () => {
+    const disabled = { ...DETAIL, disabled: true, disabledAt: "2026-09-18T10:35:00+00:00", disabledBy: "Asha Rao" };
+    expect(await readAccount(db({ data: disabled }).db, ID)).toEqual(disabled);
+    expect(await readAccount(db({ data: { ...DETAIL, disabledAt: null, disabledBy: null } }).db, ID)).toMatchObject({ disabledAt: null, disabledBy: null });
+    expect(await message(readAccount(db({ data: { ...DETAIL, pnrs: ["1234567890"] } }).db, ID))).toBe(m.database);
+  });
 });
 
 describe("reveal and find", () => {
