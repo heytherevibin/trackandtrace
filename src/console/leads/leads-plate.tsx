@@ -1,10 +1,10 @@
 import Link from "next/link";
 import type { Route } from "next";
-import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonClassName } from "@/components/ui/button";
 import { Plate } from "@/components/ui/plate";
 import { StateBlock } from "@/components/ui/state-block";
+import { PagerStep } from "@/console/components/pager-step";
 import type { LeadRow } from "@/console/leads/leads";
 import { NewsTag } from "@/console/leads/news-tag";
 import { consoleMessages } from "@/console/messages";
@@ -60,22 +60,6 @@ const COLUMNS: readonly (readonly [string, string])[] = [
   [t.firstSeen, "min-[1360px]:w-[104px]"],
   [t.lastActivity, "min-[1360px]:w-[108px]"],
 ];
-
-function PagerStep({ href, children }: { readonly href: Route | null; readonly children: ReactNode }) {
-  // Nowhere to go is a disabled button, as drawn, and not a link: a link must lead somewhere.
-  if (href === null) {
-    return (
-      <Button size="sm" className="max-sm:h-11" disabled>
-        {children}
-      </Button>
-    );
-  }
-  return (
-    <Link href={href} prefetch={false} className={buttonClassName({ size: "sm", className: "max-sm:h-11" })}>
-      {children}
-    </Link>
-  );
-}
 
 /**
  * The Leads plate (ConsoleLeads.dc.html) and the phone board's cards. Drawn twice, a table from

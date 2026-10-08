@@ -1,19 +1,14 @@
 "use client";
 
-import { Dialog as BaseDialog } from "@base-ui/react/dialog";
-import { DismissRegular } from "@/components/icons";
-import { Button } from "@/components/ui/button";
-import { Corners } from "@/components/ui/corners";
-import { IconButton } from "@/components/ui/icon-button";
+import { RecordAddress, RecordDrawer } from "@/console/components/record-drawer";
+import { Facts, RecordSection } from "@/console/components/record-section";
 import type { BusinessMember } from "@/console/leads/business";
 import { BusinessSection } from "@/console/leads/lead-business";
 import { DeleteSection } from "@/console/leads/lead-delete";
 import { NotesSection, TagsSection } from "@/console/leads/lead-marks";
 import type { LeadBusiness, LeadDetail, LeadNote } from "@/console/leads/leads";
 import { NewsTag } from "@/console/leads/news-tag";
-import { Facts, RecordSection } from "@/console/leads/record-section";
 import { consoleMessages } from "@/console/messages";
-import { messages } from "@/messages";
 import { formatCount, formatDate, formatDateTime } from "@/utils/datetime";
 
 const m = consoleMessages.leads;
@@ -109,10 +104,9 @@ function Record({ detail }: { readonly detail: LeadDetail }) {
 }
 
 /**
- * One lead's record (ConsoleLeads.dc.html, Drawer and Drawer revealed): a 480px plate against the
- * right edge on a desktop, the full screen on a phone, in the geometry of the audit log's entry
- * drawer. The address is masked until Reveal, which the database records; the retention line below
- * never scrolls away. It ends with the lead's tags and notes (lead-marks.tsx), its place in the
+ * One lead's record (ConsoleLeads.dc.html, Drawer and Drawer revealed), in the shell every record
+ * shares (record-drawer.tsx). The address is masked until Reveal, which the database records; the
+ * retention line below never scrolls away. It ends with the lead's tags and notes (lead-marks.tsx), its place in the
  * business pipeline (lead-business.tsx) and Delete (lead-delete.tsx), which a desktop can use and
  * a phone can only read past.
  *
@@ -163,78 +157,33 @@ export function LeadDrawer({
   readonly onClose: () => void;
 }) {
   const record = typeof detail === "string" ? null : detail;
-  const masked = revealed === null;
   const kept = business !== null || (record?.timeline.some((event) => event.kind === "added_by_hand") ?? false);
   return (
-    <BaseDialog.Root
-      open
-      onOpenChange={(next) => {
-        if (!next) onClose();
-      }}
-    >
-      <BaseDialog.Portal>
-        <BaseDialog.Backdrop className="fixed inset-0 z-dialog bg-backdrop transition-opacity duration-(--duration-base) data-[starting-style]:opacity-0 data-[ending-style]:opacity-0" />
-        <BaseDialog.Viewport className="fixed inset-0 z-dialog flex justify-end p-3 max-sm:p-0">
-          <BaseDialog.Popup
-            className={
-              "blueprint flex w-[480px] max-w-full flex-col bg-surface-3 shadow-3 outline-none sm:w-[480px] " +
-              "max-sm:w-full max-sm:border-0 max-sm:bg-surface-0 max-sm:shadow-none " +
-              "transition-transform duration-(--duration-slow) ease-out-expo data-[starting-style]:translate-x-full data-[ending-style]:translate-x-full"
-            }
-          >
-            <span className="max-sm:hidden">
-              <Corners />
-            </span>
-            {/* One header, two geometries: the desktop board's title block (title, a meta cell and
-                the Close behind hairlines), and the phone board's 56px bar with nothing ruled. */}
-            <div className="border-line flex items-stretch border-b max-sm:h-14 max-sm:items-center max-sm:gap-3 max-sm:pl-4 max-sm:pr-2">
-              <h2 className="legend text-ink-1 flex-1 px-5 py-3 leading-6 max-sm:p-0">
-                <BaseDialog.Title render={<span />}>{r.title}</BaseDialog.Title>
-              </h2>
-              {record ? <span className="legend border-line max-sm:legend-sm whitespace-nowrap border-l px-5 py-3 leading-6 max-sm:border-l-0 max-sm:p-0">{r.firstSeen(formatDate(record.firstSeen))}</span> : null}
-              <span className="border-line flex items-center border-l px-3 py-1.5 max-sm:border-l-0 max-sm:p-0">
-                <BaseDialog.Close render={<IconButton className="max-sm:size-11" label={messages.common.close} icon={<DismissRegular className="size-5" aria-hidden="true" />} size="sm" />} />
-              </span>
-            </div>
-            {/* A stop of its own for a keyboard, as DataTable's scroller is. Until the address is
-                revealed the Reveal button is in here and focus can reach it; afterwards nothing in
-                it takes focus, and a record taller than the window could not be scrolled by keys. */}
-            <div role="region" aria-label={r.details} tabIndex={0} className="min-h-0 flex-1 overflow-y-auto">
-              {record === null ? (
-                <p role={detail === "unavailable" ? "alert" : "status"} className="px-5 py-4 text-sm max-sm:px-4">
-                  {detail === "unavailable" ? r.unavailable : r.gone}
-                </p>
-              ) : (
-                <>
-                  <div className="flex items-center gap-3 px-5 py-3.5 max-sm:px-4">
-                    <span className="min-w-0 grow text-lg font-medium [overflow-wrap:anywhere]">{revealed ?? record.email}</span>
-                    {masked ? (
-                      <Button variant="ghost" size="sm" className="max-sm:h-11" aria-label={m.table.revealLabel(record.email)} loading={revealing} onClick={onReveal}>
-                        {m.table.reveal}
-                      </Button>
-                    ) : null}
-                  </div>
-                  {masked ? null : (
-                    <p role="status" className="text-ink-2 text-label -mt-1.5 px-5 pb-3.5 max-sm:px-4">
-                      {r.revealed}
-                    </p>
-                  )}
-                  <Record detail={record} />
-                  <TagsSection tags={tags} suggestions={suggestions} onAdd={onTag} onRemove={onUntag} />
-                  <NotesSection notes={notes} onAdd={onNote} />
-                  <BusinessSection lead={record} business={business} members={members} me={me} onChange={onBusiness} />
-                  <DeleteSection lead={record} environment={environment} tags={tags.length} notes={notes.length} onDeleted={onDeleted} />
-                  {/* The phone board's closing line: there, the record is read and nothing is changed. */}
-                  <p className="border-line text-ink-2 text-label border-t px-4 pb-4 pt-3.5 sm:hidden">{r.largerScreen}</p>
-                </>
-              )}
-            </div>
-            {/* A lead added by hand has given no consent and is not cleaned up after seven days, in
-                the pipeline or out of it; nor is anyone while they are in it. The line says which. */}
-            <p className="seam text-ink-3 px-5 py-3.5 text-sm leading-5 max-sm:px-4">{kept ? m.business.kept : r.retention}</p>
-          </BaseDialog.Popup>
-        </BaseDialog.Viewport>
-      </BaseDialog.Portal>
-    </BaseDialog.Root>
+    // A lead added by hand has given no consent and is not cleaned up after seven days, in the
+    // pipeline or out of it; nor is anyone while they are in it. The closing line says which.
+    <RecordDrawer title={r.title} meta={record ? r.firstSeen(formatDate(record.firstSeen)) : null} regionLabel={r.details} footer={kept ? m.business.kept : r.retention} onClose={onClose}>
+      {record === null ? (
+        <p role={detail === "unavailable" ? "alert" : "status"} className="px-5 py-4 text-sm max-sm:px-4">
+          {detail === "unavailable" ? r.unavailable : r.gone}
+        </p>
+      ) : (
+        <>
+          <RecordAddress
+            masked={record.email}
+            revealed={revealed}
+            revealing={revealing}
+            words={{ reveal: m.table.reveal, revealLabel: m.table.revealLabel(record.email), revealedLine: r.revealed }}
+            onReveal={onReveal}
+          />
+          <Record detail={record} />
+          <TagsSection tags={tags} suggestions={suggestions} onAdd={onTag} onRemove={onUntag} />
+          <NotesSection notes={notes} onAdd={onNote} />
+          <BusinessSection lead={record} business={business} members={members} me={me} onChange={onBusiness} />
+          <DeleteSection lead={record} environment={environment} tags={tags.length} notes={notes.length} onDeleted={onDeleted} />
+          {/* The phone board's closing line: there, the record is read and nothing is changed. */}
+          <p className="border-line text-ink-2 text-label border-t px-4 pb-4 pt-3.5 sm:hidden">{r.largerScreen}</p>
+        </>
+      )}
+    </RecordDrawer>
   );
 }

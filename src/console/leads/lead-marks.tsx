@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { LEAD_NOTE_MAX, LEAD_TAG } from "@/console/leads/filters";
 import type { LeadNote } from "@/console/leads/leads";
-import { RecordSection } from "@/console/leads/record-section";
+import { RecordSection } from "@/console/components/record-section";
 import { consoleMessages } from "@/console/messages";
 import { formatDateTime } from "@/utils/datetime";
 
