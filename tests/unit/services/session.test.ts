@@ -30,4 +30,34 @@ describe("currentUserFrom", () => {
     fake.auth.getClaims.mockResolvedValueOnce({ data: { claims: { sub: "u9", email: "e@x.y" } }, error: null });
     expect(await currentUserFrom(fake.asDb())).toEqual({ id: "u9", email: "e@x.y", name: null, avatarUrl: null });
   });
+
+  // Sign out everywhere and Disable take effect at once (module 08): a token is good for up to an
+  // hour after its session has been ended, so the database is asked whether the session is still there.
+  const signedIn = () => {
+    const fake = new FakeSupabase();
+    fake.auth.getClaims.mockResolvedValue({ data: { claims: { sub: "u9", email: "e@x.y" } }, error: null });
+    return fake;
+  };
+  it("asks the database whether the session is still there, and answers nobody when it is not", async () => {
+    const fake = signedIn();
+    fake.rpc.mockResolvedValueOnce({ data: false, error: null });
+    expect(await currentUserFrom(fake.asDb())).toBeNull();
+    expect(fake.rpc).toHaveBeenCalledWith("session_live");
+  });
+  it("keeps the traveller signed in when the check itself fails: only a plain no ends a session", async () => {
+    const failed = signedIn();
+    failed.rpc.mockResolvedValueOnce({ data: null, error: { message: "connection refused" } });
+    expect(await currentUserFrom(failed.asDb())).toMatchObject({ id: "u9" });
+    const thrown = signedIn();
+    thrown.rpc.mockRejectedValueOnce(new Error("fetch failed"));
+    expect(await currentUserFrom(thrown.asDb())).toMatchObject({ id: "u9" });
+    const odd = signedIn();
+    odd.rpc.mockResolvedValueOnce({ data: null, error: null });
+    expect(await currentUserFrom(odd.asDb())).toMatchObject({ id: "u9" });
+  });
+  it("does not ask when there is no verified token to ask about", async () => {
+    const fake = new FakeSupabase();
+    expect(await currentUserFrom(fake.asDb())).toBeNull();
+    expect(fake.rpc).not.toHaveBeenCalled();
+  });
 });

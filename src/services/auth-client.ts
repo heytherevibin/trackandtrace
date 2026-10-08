@@ -1,3 +1,4 @@
+import { messages } from "@/messages";
 import { createBrowserSupabase } from "./supabase/browser";
 
 // Browser-side sign-in helpers. Data never flows through the browser client;
@@ -15,7 +16,13 @@ export interface PasskeyRecord {
 }
 
 const NOT_CONFIGURED = "Sign-in is not connected on this deployment.";
+/** The auth service's code for an account an operator has disabled. Its own words are "User is banned". */
+export const BANNED_CODE = "user_banned";
+
+const codeOf = (error: unknown): string => (typeof error === "object" && error !== null && "code" in error ? String((error as { code: unknown }).code) : "");
+
 const PASSKEY_MESSAGES: Readonly<Record<string, string | null>> = {
+  [BANNED_CODE]: messages.auth.errors.disabled,
   ERROR_CEREMONY_ABORTED: null,
   ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED: "This device already has a passkey for your account.",
   ERROR_INVALID_DOMAIN: "Passkeys need a secure address (https, or localhost).",
@@ -23,7 +30,7 @@ const PASSKEY_MESSAGES: Readonly<Record<string, string | null>> = {
 
 /** The error as a line to show, or null when the reader dismissed the prompt themselves. */
 function passkeyMessage(error: unknown): string | null {
-  const code = typeof error === "object" && error !== null && "code" in error ? String((error as { code: unknown }).code) : "";
+  const code = codeOf(error);
   if (code in PASSKEY_MESSAGES) return PASSKEY_MESSAGES[code] ?? null;
   return error instanceof Error && error.message.length > 0 ? error.message : "That passkey did not work.";
 }
@@ -39,7 +46,8 @@ export async function sendMagicLink(email: string, next?: string): Promise<AuthC
     email,
     options: { emailRedirectTo: callbackUrl(next), shouldCreateUser: true },
   });
-  return error ? { ok: false, message: error.message } : { ok: true };
+  if (!error) return { ok: true };
+  return { ok: false, message: codeOf(error) === BANNED_CODE ? messages.auth.errors.disabled : error.message };
 }
 
 export async function signInWithGoogle(next?: string): Promise<AuthClientResult> {

@@ -2,6 +2,10 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerSupabase } from "@/services/supabase/server";
 
 const DEFAULT_NEXT = "/account";
+/** The auth service's code for an account an operator has disabled (console module 08). */
+const BANNED_CODE = "user_banned";
+/** Where a refused sign-in goes: the account is switched off, or the link simply did not work. */
+const refusal = (error: { readonly code?: string }): string => (error.code === BANNED_CODE ? "/login?error=disabled" : "/login?error=link");
 const EMAIL_OTP_TYPES = new Set(["magiclink", "email", "signup", "recovery", "invite", "email_change"]);
 
 /** Only same-origin absolute paths may be used as a post-login destination. */
@@ -26,12 +30,17 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const db = await createServerSupabase();
   if (!db) return redirectTo(req, "/login?error=unavailable");
 
+  // A Google sign-in the auth service refused comes back with the refusal in the address, and
+  // nothing to exchange.
+  if (params.get("error_code") === BANNED_CODE) return redirectTo(req, refusal({ code: BANNED_CODE }));
+
   if (code) {
     const { error } = await db.auth.exchangeCodeForSession(code);
-    if (!error) return redirectTo(req, next);
-  } else if (tokenHash && type && EMAIL_OTP_TYPES.has(type)) {
+    return redirectTo(req, error ? refusal(error) : next);
+  }
+  if (tokenHash && type && EMAIL_OTP_TYPES.has(type)) {
     const { error } = await db.auth.verifyOtp({ type: type as "magiclink", token_hash: tokenHash });
-    if (!error) return redirectTo(req, next);
+    return redirectTo(req, error ? refusal(error) : next);
   }
   return redirectTo(req, "/login?error=link");
 }

@@ -53,6 +53,23 @@ describe("GET /auth/callback", () => {
     const res = await get("?code=abc");
     expect(res.headers.get("location")).toBe("http://localhost:3000/login?error=link");
   });
+  // A disabled account (module 08): the auth service refuses with `user_banned`, and the traveller
+  // is told the account is switched off rather than that their link did not work.
+  it("says the account is switched off when the auth service refuses an email link for a banned account", async () => {
+    fake.auth.verifyOtp.mockResolvedValueOnce({ error: { message: "User is banned", code: "user_banned" } });
+    const res = await get("?token_hash=t1&type=magiclink");
+    expect(res.headers.get("location")).toBe("http://localhost:3000/login?error=disabled");
+  });
+  it("says so when a Google sign-in's code is refused for a banned account", async () => {
+    fake.auth.exchangeCodeForSession.mockResolvedValueOnce({ error: { message: "User is banned", code: "user_banned" } });
+    const res = await get("?code=abc");
+    expect(res.headers.get("location")).toBe("http://localhost:3000/login?error=disabled");
+  });
+  it("says so when the auth service sends a banned account back with the refusal in the address", async () => {
+    const res = await get("?error=access_denied&error_code=user_banned&error_description=User+is+banned");
+    expect(res.headers.get("location")).toBe("http://localhost:3000/login?error=disabled");
+    expect(fake.auth.exchangeCodeForSession).not.toHaveBeenCalled();
+  });
   it("reports accounts unavailable when Supabase is not configured", async () => {
     configured = false;
     const res = await get("?code=abc");

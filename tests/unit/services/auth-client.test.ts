@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const supabase = vi.hoisted(() => ({
   auth: {
     signInWithPasskey: vi.fn(),
+    signInWithOtp: vi.fn(),
     registerPasskey: vi.fn(),
     passkey: { list: vi.fn(), delete: vi.fn() },
   },
@@ -37,6 +38,19 @@ describe("passkeys", () => {
   it("says nothing when the reader dismisses the device prompt", async () => {
     supabase.auth.signInWithPasskey.mockResolvedValue({ data: null, error: webAuthnError("ERROR_CEREMONY_ABORTED") });
     await expect(auth.signInWithPasskey()).resolves.toEqual({ ok: false, message: null });
+  });
+
+  // A disabled account (console module 08). The auth service's own words are "User is banned".
+  it("says the account is switched off when a passkey belongs to a disabled account", async () => {
+    supabase.auth.signInWithPasskey.mockResolvedValue({ data: null, error: Object.assign(new Error("User is banned"), { name: "AuthApiError", code: "user_banned" }) });
+    await expect(auth.signInWithPasskey()).resolves.toEqual({ ok: false, message: "This account has been switched off, so it can't sign in." });
+  });
+
+  it("says the same when an email link is refused for a disabled account, and passes any other refusal through", async () => {
+    supabase.auth.signInWithOtp.mockReset().mockResolvedValueOnce({ error: Object.assign(new Error("User is banned"), { code: "user_banned" }) });
+    await expect(auth.sendMagicLink("a@example.com")).resolves.toEqual({ ok: false, message: "This account has been switched off, so it can't sign in." });
+    supabase.auth.signInWithOtp.mockResolvedValueOnce({ error: new Error("Email rate limit exceeded") });
+    await expect(auth.sendMagicLink("a@example.com")).resolves.toEqual({ ok: false, message: "Email rate limit exceeded" });
   });
 
   it("passes a refusal through as a message", async () => {

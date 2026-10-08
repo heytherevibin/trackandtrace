@@ -28,6 +28,8 @@ export const auth = {
     link: "That sign-in link did not work. Request a new one.",
     invalidEmail: "Enter a valid email address.",
     passkey: "That passkey did not work. Try again, or ask for an email link.",
+    /** An account an operator has disabled. Said only to someone who holds its inbox, its Google account or its passkey. */
+    disabled: "This account has been switched off, so it can't sign in.",
   },
   notConfigured: {
     title: "Sign-in is not connected",

@@ -18,6 +18,14 @@ beforeEach(() => {
 }); 
 
 describe("LoginForm", () => {
+  it("says a link did not work, or that the account is switched off, when the callback sent the reader back", () => {
+    const link = render(<LoginForm configured google={false} passkey={false} error="link" />);
+    expect(screen.getByRole("alert")).toHaveTextContent("That sign-in link did not work. Request a new one.");
+    link.unmount();
+    render(<LoginForm configured google={false} passkey={false} error="disabled" />);
+    expect(screen.getByRole("alert")).toHaveTextContent("This account has been switched off, so it can't sign in.");
+  });
+
   it("draws the sign-in sheet with the email well and both routes in", () => {
     render(<LoginForm configured google passkey={false} error={null} />);
     expect(screen.getByRole("heading", { level: 1, name: "Sign in" })).toBeInTheDocument();

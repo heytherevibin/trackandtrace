@@ -91,10 +91,13 @@ export class FakeSupabase {
   readonly auth = {
     getClaims: vi.fn(async () => ({ data: null as { claims: Record<string, unknown> } | null, error: null as { message: string } | null })),
     signOut: vi.fn(async () => ({ error: null })),
-    exchangeCodeForSession: vi.fn(async () => ({ error: null as { message: string } | null })),
-    verifyOtp: vi.fn(async () => ({ error: null as { message: string } | null })),
+    exchangeCodeForSession: vi.fn(async () => ({ error: null as { message: string; code?: string } | null })),
+    verifyOtp: vi.fn(async () => ({ error: null as { message: string; code?: string } | null })),
     admin: { deleteUser: vi.fn(async () => ({ error: null as { message: string } | null })) },
   };
+
+  /** The one function a traveller's own session calls: `session_live`, which a fake session always is. */
+  readonly rpc = vi.fn<(fn: string) => Promise<{ data: unknown; error: { message: string } | null }>>(async () => ({ data: true, error: null }));
 
   from(table: string): Builder {
     return new Builder(this.tables, table, () => {

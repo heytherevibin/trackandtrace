@@ -42,7 +42,8 @@ export function LoginForm({ configured, google, passkey, error }: LoginFormProps
   const [passkeyWaiting, setPasskeyWaiting] = useState(false);
   // Read on the client only: the server cannot know what the reader's device can do.
   const passkeyReady = useSyncExternalStore(subscribeNever, passkeysUsable, noPasskeysOnServer) && passkey;
-  const [message, setMessage] = useState<string | null>(error === "link" ? m.errors.link : null);
+  // What the callback sent the reader back with: a link that did not work, or an account that is switched off.
+  const [message, setMessage] = useState<string | null>(error === "link" ? m.errors.link : error === "disabled" ? m.errors.disabled : null);
   const invalid = message === m.errors.invalidEmail;
 
   const send = async () => {
