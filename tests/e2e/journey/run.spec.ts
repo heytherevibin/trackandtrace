@@ -134,6 +134,49 @@ test.describe("the window-seat run (spec §3.A)", () => {
     }
   });
 
+  // WebKit's scroll anchoring takes a row for its anchor while the row's section entrance lifts it (a transform), and moves
+  // the scroll to follow it: that ends a glide passing over it, with no jump, relayout or resize for the page to hear. The
+  // Tab above left the reader 800 to 2,000 px short of the first card there in 10 runs in 50, and in none of 50 with
+  // anchoring off. Which frame of a glide lands on a rising row is the machine's to say, so the rule is proven as a state:
+  // anchoring is held off in every frame from the Tab until the glide is over, and given back.
+  test("holds the browser's scroll anchoring off from the Tab until its glide is over, then gives it back", async ({ page, isMobile }) => {
+    test.setTimeout(60_000); // the rest wait's own limit (REST_MS), and the page's loads
+    test.skip(isMobile, "the keyboard: one project is enough");
+    await page.goto("/");
+    await waitForJourney(page);
+    await running(page);
+    test.skip(!(await page.evaluate(() => CSS.supports("overflow-anchor", "none"))), "this browser has no scroll anchoring to hold off");
+    const anchoring = () => page.evaluate(() => getComputedStyle(document.documentElement).overflowAnchor);
+    expect(await anchoring()).toBe("auto");
+    await readyTab(page, "#run", "Open Watchlist");
+    // from the link's focus: the page's scroll and its anchoring, a frame at a time, until it has held still for ten
+    await page.evaluate(() => {
+      const seen: { y: number; anchoring: string }[] = [];
+      Reflect.set(window, "__ttGlide", seen);
+      const link = [...document.querySelectorAll<HTMLElement>("#run a")].find((a) => a.textContent?.includes("Open Watchlist"));
+      if (!link) throw new Error("no such link in the run");
+      let held = 0;
+      const tick = () => {
+        const y = window.scrollY;
+        held = seen.length > 0 && seen[seen.length - 1]?.y === y && y !== seen[0]?.y ? held + 1 : 0;
+        seen.push({ y, anchoring: getComputedStyle(document.documentElement).overflowAnchor });
+        if (held < 10 && seen.length < 900) requestAnimationFrame(tick);
+      };
+      link.addEventListener("focus", () => requestAnimationFrame(tick), { once: true });
+    });
+    await pressTab(page);
+    const link = page.getByRole("link", { name: "Open Watchlist →" });
+    await expect(link).toBeFocused();
+    await atTheWindow(page, await stationOf(page, "a[href='/watchlist']"));
+    const seen = await page.evaluate(() => Reflect.get(window, "__ttGlide") as { y: number; anchoring: string }[]);
+    const last = seen.findLastIndex((f, k) => k > 0 && f.y !== seen[k - 1]?.y);
+    const glide = seen.slice(0, last + 1);
+    expect(glide.length, "the Tab glided the page, over more than one frame").toBeGreaterThan(2);
+    expect((glide.at(-1)?.y ?? 0) - (glide[0]?.y ?? 0), "from the page's top to the run").toBeGreaterThan(1000);
+    expect(glide.map((f) => f.anchoring).filter((a) => a !== "none"), "anchoring, in each frame of the glide").toEqual([]);
+    await expect.poll(anchoring).toBe("auto");
+  });
+
   test("on a touch screen each station is a resting point", async ({ page, isMobile }) => {
     test.skip(!isMobile, "touch screens");
     await page.goto("/");

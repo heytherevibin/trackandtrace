@@ -36,10 +36,9 @@ import type { JourneyContext, Teardown } from "./start-journey";
 // glide's course, at most three times, and let go on the reader's own scroll or press. What it is taken up to is the
 // link's target at its landing (its scroll margin), while the address still names it. Every rule for a Tab's glide stands
 // as it was. A link to a section of the running run is run.ts's, as its stations are.
-// The browser's own scroll anchoring is held off while a link's glide is watched (arm's `link`): WebKit's, answering the
-// resize, stopped the glide where it stood with no jump, no "resize" and nothing else to hear (short of 07 by 2,100 px in
-// 10 of 115 runs, none in 105 with it held off). The page keeps its own places without it, as on every browser that has
-// none, and it comes back as the watch lets go.
+// The browser's own scroll anchoring is held off while a glide is watched, a link's or a Tab's, and comes back as the last
+// watch lets go: WebKit's ends a glide where it stands, unheard (a link's as it answers a resize, 2,100 px short of 07 in
+// 10 runs of 115; a Tab's as it follows a row an entrance lifts, up to 2,000 px short of its card, 10 of 50; none since).
 // A link's glide runs the whole way to its target, so "between the two" says nothing of who is moving the page: a
 // scrollbar's drag (no wheel, touch, key or press) anywhere short of the target stood on its course, and a resize then
 // carried that reader on to the target (the review, 2026-10-02). So a link's glide is followed frame by frame against
@@ -66,6 +65,8 @@ const QUIET = 2;
 const HELD = 10;
 /** The most times one glide is taken up. */
 const TAKES = 3;
+/** The watches holding scroll anchoring off: a Shift+Tab into the unpinned run arms two for one glide (run.ts's too). */
+let holds = 0;
 
 /** The events that let go of a glide: the reader's own scroll (place-memory's rule), and a press of the pointer. */
 const OWN = [...HAND, "pointerdown"] as const;
@@ -142,9 +143,9 @@ export interface LinkGlide {
 }
 
 export interface GlideWatch {
-  /** A glide has begun: watch it for a place-keeping jump that cuts it short. `taken`: the takes it has already had (one
-   * carried through the journey's rebuild). `end`: where the browser is gliding the page to, for an in-page link's
-   * glide: followed frame by frame (followGlide), scroll anchoring held off while it is watched. */
+  /** A glide has begun: watch it for a place-keeping jump that cuts it short, scroll anchoring held off meanwhile.
+   * `taken`: the takes it has already had (one carried through the journey's rebuild). `end`: where the browser is
+   * gliding the page to, for an in-page link's glide: followed frame by frame (followGlide). */
   arm(taken?: number, end?: number, link?: LinkGlide): void;
   /** Still watching the glide it was armed for: not let go by the reader's own scroll or pointer, nor by the page. */
   armed(): boolean;
@@ -175,12 +176,12 @@ export function watchGlide(retake: () => number | void): GlideWatch {
   let awaited: { readonly named: () => boolean; readonly from: number; readonly end: number; readonly until: number } | null = null;
   let unbegun = -1; // frames a link's glide just taken up has left the page still; -1 once it moves, or with none asked
 
-  /** Scroll anchoring held off (<html style="overflow-anchor: none">), or given back. */
+  /** Scroll anchoring held off (<html style="overflow-anchor: none">), or given back once no watch holds it. */
   const anchoring = (off: boolean) => {
     if (off === unanchored) return;
     unanchored = off;
-    if (off) document.documentElement.style.setProperty("overflow-anchor", "none");
-    else document.documentElement.style.removeProperty("overflow-anchor");
+    holds += off ? 1 : -1;
+    document.documentElement.style.setProperty("overflow-anchor", holds > 0 ? "none" : ""); // "": the property removed
   };
   const disarm = () => {
     armed = false;
@@ -273,7 +274,7 @@ export function watchGlide(retake: () => number | void): GlideWatch {
       const from = window.scrollY;
       unsure = maybe;
       awaited = end !== undefined && named && !named() ? { named, from, end, until: performance.now() + NAMED_MS } : null;
-      anchoring(end !== undefined && !awaited);
+      anchoring(!awaited);
       follower = end === undefined ? null : followGlide(from, end);
       armed = true;
       takes = taken;

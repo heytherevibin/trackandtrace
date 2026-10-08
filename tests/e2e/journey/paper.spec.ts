@@ -2,7 +2,7 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "../fixtures";
 import { gotoReady } from "../helpers";
 import { frames, motionOff, waitForJourney, waitForLive } from "./journey-helpers";
-import { STAGES, geometry, into, type Stage } from "./paper-helpers";
+import { STAGES, geometry, into, nudge, type Stage } from "./paper-helpers";
 
 // The paper under a pinned stage (owner, 2026-09-30, option D). While 02, the live drawing or the window-seat run is
 // pinned, the whole window's grain holds still with it, and it moves with the page again once the stage lets go. Each
@@ -39,18 +39,17 @@ for (const [name, stage] of Object.entries(STAGES)) {
       expect(Math.abs(paper.bottom - g.toolbar - g.pin.bottom)).toBeLessThanOrEqual(1);
       expect(g.section.overflowY).toBe("clip");
     }
-    // Held: a little more scroll moves neither the pin nor its paper.
+    // Held: a little more scroll moves neither the pin nor its paper, as it lands or in any frame after it.
     await into(page, stage, 0.5);
-    const before = await geometry(page, stage);
-    await page.evaluate(() => window.scrollBy({ top: 24, behavior: "instant" }));
-    await frames(page, 3);
-    const after = await geometry(page, stage);
-    // The page moved under it (by the scroll, or more if the journey kept the reader's place across a relayout)…
-    expect(before.section.top - after.section.top).toBeGreaterThanOrEqual(23);
+    const held = await nudge(page, stage, 24);
+    // The page moved under it, by the scroll…
+    expect(Math.abs(held.moved - 24)).toBeLessThanOrEqual(1);
+    // …and the pin and its paper did not, the stage pinned throughout, until the page came to rest: wherever the browser
+    // then took it (back to its station, on a touch screen's run).
+    expect(held.pinned).toBe(true);
+    expect(held.paper).toBeLessThan(0.5);
+    expect(held.pin).toBeLessThan(0.5);
     await expect(page.locator(stage.section)).toHaveClass(stage.pinned);
-    // …and the pin and its paper did not.
-    expect(after.paper!.top).toBeCloseTo(before.paper!.top, 0);
-    expect(after.pin.top).toBeCloseTo(before.pin.top, 0);
   });
 
   test(`${name}: the sheet takes hold and lets go in the same scroll as the pin, and stays in its section`, async ({ page }) => {

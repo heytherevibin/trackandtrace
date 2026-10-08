@@ -71,3 +71,53 @@ export async function geometry(page: Page, stage: Stage): Promise<Geometry> {
   );
 }
 
+/** What a little more scroll did to a pinned stage: how far the page moved under it as the scroll landed, and the
+ * farthest its pin and its paper stood from where they were, in the task that made the scroll and in every frame after
+ * it until the page had held still for twenty. */
+export interface Nudge {
+  readonly moved: number;
+  readonly pin: number;
+  readonly paper: number;
+  /** Every frame watched found the stage pinned. */
+  readonly pinned: boolean;
+  readonly frames: number;
+}
+
+/** Scrolls `by` px on, instantly, and watches the stage from that task on. The page's move is read as the scroll lands,
+ * in the same task, because what comes after is the browser's own: on a touch screen each station of the run is a
+ * resting point (scroll snap, run.ts's marks), and Chromium glides the page back to the one it left, beginning 2 to 10
+ * frames later and over about 8. A read three frames on met that glide part-way in 6 runs in 120 (the page 9, 10 or
+ * 19 px on, not 24), and at rest the page is back where it began in every run. The pin and the paper are read in every
+ * frame, through that glide, so a sheet that moved for one frame would be seen. */
+export async function nudge(page: Page, stage: Stage, by: number): Promise<Nudge> {
+  return page.evaluate(
+    ([sel, pinSel, pinnedAs, px]) =>
+      new Promise<Nudge>((done) => {
+        const section = document.querySelector<HTMLElement>(sel)!;
+        const pin = section.querySelector<HTMLElement>(pinSel)!;
+        const paper = section.querySelector<HTMLElement>(":scope > .pin-paper")!;
+        const pinnedNow = new RegExp(pinnedAs);
+        const read = () => ({ y: window.scrollY, section: section.getBoundingClientRect().top, pin: pin.getBoundingClientRect().top, paper: paper.getBoundingClientRect().top, pinned: pinnedNow.test(section.className) });
+        const before = read();
+        window.scrollBy({ top: px, behavior: "instant" });
+        const landed = read();
+        const off = { pin: Math.abs(landed.pin - before.pin), paper: Math.abs(landed.paper - before.paper), pinned: before.pinned && landed.pinned };
+        let last = landed.y;
+        let still = 0;
+        let frames = 0;
+        const tick = () => {
+          const now = read();
+          frames += 1;
+          off.pin = Math.max(off.pin, Math.abs(now.pin - before.pin));
+          off.paper = Math.max(off.paper, Math.abs(now.paper - before.paper));
+          off.pinned = off.pinned && now.pinned;
+          still = now.y === last ? still + 1 : 0;
+          last = now.y;
+          if (still >= 20 || frames >= 600) done({ moved: before.section - landed.section, ...off, frames });
+          else requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      }),
+    [stage.section, stage.pin, stage.pinned.source, by] as const,
+  );
+}

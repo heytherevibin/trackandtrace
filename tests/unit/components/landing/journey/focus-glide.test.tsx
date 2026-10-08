@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { startFocusGlide, watchGlide, watchTab } from "@/components/landing/journey/focus-glide";
 import { LAYOUT_EVENT } from "@/components/landing/journey/journey-events";
 import { at, frames, glide, jump, modality, policy, pressTab, reveal, tabOnto, setUpGlideRig } from "./focus-glide-rig";
@@ -232,6 +232,99 @@ describe("never against the reader", () => {
     jump();
     frames(3);
     expect(reveal).not.toHaveBeenCalled();
+  });
+});
+
+// WebKit's scroll anchoring takes a row for its anchor while the row's section entrance lifts it (a transform), and moves
+// the scroll to follow it. Any move of the scroll ends a glide in flight, and this one comes with no jump, no relayout and
+// no resize to hear: a Tab's glide from the page's top to the run stopped 800 to 2,000 px short of its station in 10 runs
+// in 50, focus left off-screen (WCAG 2.4.11), and in none of 50 with anchoring off. So it is held off while a Tab's glide
+// is watched, as it is for a link's (link-glide.test.tsx), and given back as the watch lets go.
+describe("scroll anchoring, held off while a Tab's glide is watched", () => {
+  const anchoring = () => document.documentElement.style.getPropertyValue("overflow-anchor");
+
+  it("is held off from the Tab's focus, and given back once the page has held still for ten frames", () => {
+    const stop = startFocusGlide(testContext());
+    expect(anchoring()).toBe("");
+    tabOnto(policy());
+    expect(anchoring()).toBe("none");
+    frames(5);
+    expect(anchoring()).toBe("none");
+    frames(10);
+    expect(anchoring()).toBe("");
+    stop();
+  });
+
+  it("stays held off through a take-up, until the glide taken up has come to rest", () => {
+    const stop = startFocusGlide(testContext());
+    tabOnto(policy());
+    jump();
+    frames(3);
+    expect(reveal).toHaveBeenCalledTimes(1);
+    expect(anchoring()).toBe("none");
+    frames(10);
+    expect(anchoring()).toBe("");
+    stop();
+  });
+
+  for (const [name, own] of [
+    ["a press of the pointer", () => window.dispatchEvent(new PointerEvent("pointerdown"))],
+    ["a wheel", () => window.dispatchEvent(new WheelEvent("wheel", { deltaY: 120 }))],
+    ["focus moving on", () => policy().blur()],
+  ] as const) {
+    it(`is given back as the reader takes over: ${name}`, () => {
+      const stop = startFocusGlide(testContext());
+      tabOnto(policy());
+      expect(anchoring()).toBe("none");
+      own();
+      expect(anchoring()).toBe("");
+      stop();
+    });
+  }
+
+  it("is given back when no glide begins within six frames of the focus", () => {
+    const stop = startFocusGlide(testContext());
+    modality(policy(), true);
+    pressTab();
+    policy().focus();
+    expect(anchoring()).toBe("none");
+    frames(6);
+    expect(anchoring()).toBe("");
+    stop();
+  });
+
+  it("is never touched by focus that starts no glide: a mouse's, or a Tab stop already in the window", () => {
+    const stop = startFocusGlide(testContext());
+    const set = vi.spyOn(document.documentElement.style, "setProperty");
+    tabOnto(policy(), false);
+    policy().blur();
+    at.box = { top: 140, bottom: 172 };
+    tabOnto(policy());
+    expect(set).not.toHaveBeenCalledWith("overflow-anchor", "none");
+    stop();
+  });
+
+  it("is given back when the journey ends mid-glide", () => {
+    const stop = startFocusGlide(testContext());
+    tabOnto(policy());
+    expect(anchoring()).toBe("none");
+    stop();
+    expect(anchoring()).toBe("");
+  });
+
+  // A Shift+Tab into the run from below it, the run not yet pinned, arms this module's watch and run.ts's for the one
+  // glide; this one lets go as the run pins under it, and run.ts's holds the glide on to its station.
+  it("stays held off while either of two watches holds the glide, and comes back as the last lets go", () => {
+    const [first, second] = [watchGlide(() => undefined), watchGlide(() => undefined)];
+    first.arm();
+    second.arm();
+    expect(anchoring()).toBe("none");
+    first.disarm();
+    expect(anchoring()).toBe("none");
+    second.disarm();
+    expect(anchoring()).toBe("");
+    first.stop();
+    second.stop();
   });
 });
 

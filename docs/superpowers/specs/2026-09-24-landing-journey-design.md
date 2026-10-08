@@ -544,6 +544,26 @@ Decided after J6 (2026-10-02): an in-page link's glide is taken up again, as a T
   that never navigates costs nothing, and the reader's own scroll or press lets go as ever. A link whose default is
   not prevented (the board's) glides in its click's own task, and is as it was.
 
+Decided after J6 (2026-10-04): scroll anchoring is held off while a Tab's glide is watched too, not only a link's.
+- WebKit's scroll anchoring takes a row for its anchor while the row's section entrance lifts it (16 px, by transform)
+  and moves the scroll to follow it, a pixel or three a frame. Any move of the scroll ends a glide in flight, and this
+  one comes with no jump, no relayout and no resize, so nothing was taken up. A Tab from the page's top to the run's
+  first card stopped in whichever section's rows were rising under that frame, 800 to 2,000 px short of the card, focus
+  left outside the window (WCAG 2.4.11). In the nightly's desktop WebKit: 10 runs in 50 with one worker and 3 in 50
+  with three; none in 50 with anchoring off altogether; and none in 50 with anchoring on and the rows held from rising
+  (14 in 50 beside it). Both are needed. A bare page of rows rising under a smooth scroll did not show it in the same
+  WebKit, so something more of the landing takes part, not isolated; and it is measured in Playwright's WebKit only,
+  never on a device.
+- It is not the take-up WebKit does not begin (2026-10-02, above): no take-up was asked for, since no cut was heard.
+  That rule stays a link's.
+- `watchGlide` holds anchoring off for every glide it watches (`focus-glide.ts`'s own and `run.ts`'s), from the Tab's
+  focus until the watch lets go: the reader's own scroll or press, focus moving on, ten still frames, or no glide within
+  six. Two watches can hold one glide (a Shift+Tab into the run from below it, until the run pins), so it comes back as
+  the last lets go. This amends 2026-10-02's "only while a link's glide is watched". When a Tab's glide is taken up did
+  not change: only after a real Tab, at most three times. None short in 100 runs with one worker after.
+- Which frame of a glide lands on a rising row is the machine's to say, so the rule is tested as a state
+  (`run.spec.ts`): anchoring off in every frame from the Tab until the glide is over, then given back.
+
 Found after J6 (2026-10-02): the live pin's sticky top after a resize is its labels' once laid out for the new window.
 - A tablet turned (768×1024 to 1024×768 and back) flips the live chapter's labels between the list and their columns,
   and the pin's sticky top with them (202 px: the words' height above the masthead's foot, or under it). The chapter
