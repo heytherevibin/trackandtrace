@@ -385,6 +385,24 @@ export type Database = {
         Args: { p_environment: string; p_letter: string }
         Returns: undefined
       }
+      console_disable_account: {
+        Args: {
+          p_environment: string
+          p_id: string
+          p_reason: string
+          p_value: string
+        }
+        Returns: undefined
+      }
+      console_enable_account: {
+        Args: {
+          p_environment: string
+          p_id: string
+          p_reason: string
+          p_value: string
+        }
+        Returns: undefined
+      }
       console_export_leads: {
         Args: { p_environment: string; p_filters: string; p_reason: string }
         Returns: Json
@@ -512,6 +530,15 @@ export type Database = {
         }
         Returns: number
       }
+      console_sign_out_account: {
+        Args: {
+          p_environment: string
+          p_id: string
+          p_reason: string
+          p_value: string
+        }
+        Returns: undefined
+      }
       console_sign_out_others: {
         Args: { p_environment: string }
         Returns: number
@@ -543,6 +570,7 @@ export type Database = {
         Args: { p_environment: string; p_id: string; p_tag: string }
         Returns: Json
       }
+      session_live: { Args: never; Returns: boolean }
       subscriptions_confirm: { Args: { p_token_hash: string }; Returns: Json }
       subscriptions_peek: { Args: { p_token_hash: string }; Returns: Json }
       subscriptions_person_id: { Args: { p_email: string }; Returns: string }
