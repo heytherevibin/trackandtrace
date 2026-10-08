@@ -54,9 +54,40 @@ body{margin:0}
 <sc-if value="{{canExport}}" hint-placeholder-val="{{ true }}">
 <p style="margin: 12px 0 0; font-size: 13px; line-height: 20px; color: var(--ink-3);">Open on a larger screen to export.</p>
 </sc-if>
+<sc-if value="{{showPipe}}" hint-placeholder-val="{{ false }}">
+<p style="margin: 12px 0 0; font-size: 13px; line-height: 20px; color: var(--ink-3);">Open on a larger screen to add a business lead or to move one.</p>
+</sc-if>
 </div>
 
 <sc-if value="{{isNoAccess}}" hint-placeholder-val="{{ false }}"><section class="plate state" style="flex: none;"><i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i><h2 class="state-title">This module isn't part of the Viewer role.</h2><p class="state-detail">Ask an Owner if you need it.</p><div class="state-actions"><a href="#" class="btn btn-secondary btn-lg">Back to Overview</a></div></section></sc-if>
+
+<sc-if value="{{showTabs}}" hint-placeholder-val="{{ true }}">
+<div class="tabs tabs-lg" role="tablist" aria-label="Leads" style="flex: none;">
+<button type="button" class="tab" role="tab" aria-selected="{{tabLife}}">Lifecycle</button>
+<button type="button" class="tab" role="tab" aria-selected="{{tabPipe}}">Business pipeline</button>
+</div>
+</sc-if>
+
+<sc-if value="{{showPipeBody}}" hint-placeholder-val="{{ false }}">
+<sc-if value="{{pipeEmpty}}" hint-placeholder-val="{{ false }}">
+<section class="plate state" style="flex: none;"><i class="rm tl"></i><i class="rm tr"></i><i class="rm bl"></i><i class="rm br"></i><h2 class="state-title">No business leads yet.</h2><p class="state-detail">Add one by hand, or mark a lead as a business enquiry on its record, from a larger screen.</p></section>
+</sc-if>
+<sc-if value="{{pipeBoard}}" hint-placeholder-val="{{ true }}">
+<sc-for list="{{board}}" as="c" hint-placeholder-count="5">
+<section style="flex: none; display: flex; flex-direction: column; gap: 8px;">
+<div style="display: flex; align-items: baseline; gap: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--line-strong);"><h2 class="legend" style="margin: 0; color: var(--ink-1);">{{c.name}}</h2><span class="legend-sm tnum">{{c.count}}</span></div>
+<sc-if value="{{c.empty}}" hint-placeholder-val="{{ false }}"><p style="margin: 0; border: 1px dashed var(--line-strong); padding: 14px; font-size: 13px; line-height: 20px; color: var(--ink-3);">No leads here</p></sc-if>
+<sc-for list="{{c.cards}}" as="k" hint-placeholder-count="1">
+<a href="#" aria-label="{{k.openLabel}}" style="border: 1px solid var(--line); background: var(--surface-2); padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; text-decoration: none; color: var(--ink-1);">
+<span style="font-size: 15px; line-height: 22px; font-weight: 500; overflow-wrap: anywhere;">{{k.email}}</span>
+<span style="font-size: 14px; line-height: 20px; color: var(--ink-2);">{{k.about}}</span>
+<span style="display: flex; align-items: center; gap: 8px;"><span class="avatar" style="width: 24px; height: 24px; font-size: 11px;">{{k.initials}}</span><span class="legend-sm tnum">{{k.days}}</span></span>
+</a>
+</sc-for>
+</section>
+</sc-for>
+</sc-if>
+</sc-if>
 
 <sc-if value="{{showArea}}" hint-placeholder-val="{{ true }}">
 <section class="plate" aria-labelledby="life-title" style="flex: none;">
@@ -172,7 +203,11 @@ body{margin:0}
 <li style="display: flex; flex-direction: column; gap: 2px;"><span class="legend-sm tnum">Asha Rao · 3 Sep 2026, 11:05 IST</span><span style="font-size: 14px; line-height: 20px;">Came in from the Diwali campaign.</span></li>
 </ol>
 </div>
-<p style="margin: 0; padding: 14px 16px 16px; border-top: 1px solid var(--line); font-size: 13px; line-height: 20px; color: var(--ink-2);">Open on a larger screen to add a tag or a note, or to delete a lead.</p>
+<div style="padding: 14px 16px 16px; border-top: 1px solid var(--line);">
+<h3 class="legend" style="margin: 0 0 10px;">Business enquiry</h3>
+<p style="margin: 0; font-size: 13px; line-height: 20px; color: var(--ink-3);">Not in the pipeline.</p>
+</div>
+<p style="margin: 0; padding: 14px 16px 16px; border-top: 1px solid var(--line); font-size: 13px; line-height: 20px; color: var(--ink-2);">Open on a larger screen to make changes to this lead.</p>
 </sc-if>
 <sc-if value="{{dLeadP}}" hint-placeholder-val="{{ false }}">
 <div style="padding: 14px 16px 16px; border-top: 1px solid var(--line);">
@@ -217,16 +252,72 @@ body{margin:0}
 <h3 class="legend" style="margin: 0 0 10px;">Notes</h3>
 <p style="margin: 0; font-size: 13px; line-height: 20px; color: var(--ink-3);">No notes yet.</p>
 </div>
-<p style="margin: 0; padding: 14px 16px 16px; border-top: 1px solid var(--line); font-size: 13px; line-height: 20px; color: var(--ink-2);">Open on a larger screen to add a tag or a note, or to delete a lead.</p>
+<div style="padding: 14px 16px 16px; border-top: 1px solid var(--line);">
+<h3 class="legend" style="margin: 0 0 10px;">Business enquiry</h3>
+<p style="margin: 0; font-size: 13px; line-height: 20px; color: var(--ink-3);">Not in the pipeline.</p>
+</div>
+<p style="margin: 0; padding: 14px 16px 16px; border-top: 1px solid var(--line); font-size: 13px; line-height: 20px; color: var(--ink-2);">Open on a larger screen to make changes to this lead.</p>
+</sc-if>
+<sc-if value="{{dLeadH}}" hint-placeholder-val="{{ false }}">
+<div style="padding: 14px 16px 16px; border-top: 1px solid var(--line);">
+<h3 class="legend" style="margin: 0 0 10px;">Subscriptions</h3>
+<div style="display: flex; flex-direction: column; gap: 12px;">
+<div style="display: flex; flex-direction: column; gap: 4px;">
+<span style="display: inline-flex; align-items: center; gap: 10px;"><span style="font-size: 14px; line-height: 20px; font-weight: 500;">News</span></span>
+<span style="font-size: 13px; line-height: 20px; color: var(--ink-3);">Not on this list.</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 4px;">
+<span style="display: inline-flex; align-items: center; gap: 10px;"><span style="font-size: 14px; line-height: 20px; font-weight: 500;">Availability</span></span>
+<span style="font-size: 13px; line-height: 20px; color: var(--ink-3);">Not on this list.</span>
+</div>
+</div>
+</div>
+<div style="padding: 14px 16px 16px; border-top: 1px solid var(--line);">
+<h3 class="legend" style="margin: 0 0 10px;">Account</h3>
+<p style="margin: 0; font-size: 13px; line-height: 20px; color: var(--ink-3);">No account.</p>
+</div>
+<div style="padding: 14px 16px 16px; border-top: 1px solid var(--line);">
+<h3 class="legend" style="margin: 0 0 10px;">Campaign</h3>
+<p style="margin: 0; font-size: 13px; line-height: 20px; color: var(--ink-3);">No campaign recorded.</p>
+</div>
+<div style="padding: 14px 16px 16px; border-top: 1px solid var(--line);">
+<h3 class="legend" style="margin: 0 0 10px;">Timeline</h3>
+<ol style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px;">
+<sc-for list="{{timelineH}}" as="t" hint-placeholder-count="5">
+<li style="display: flex; flex-direction: column; gap: 2px;"><span class="legend-sm tnum">{{t.when}}</span><span style="font-size: 14px; line-height: 20px;">{{t.what}}</span></li>
+</sc-for>
+</ol>
+</div>
+<div style="padding: 14px 16px 16px; border-top: 1px solid var(--line);">
+<h3 class="legend" style="margin: 0 0 10px;">Tags</h3>
+<div style="display: flex; flex-wrap: wrap; gap: 8px;"><span class="tag tag-grey">travel-desk</span></div>
+</div>
+<div style="padding: 14px 16px 16px; border-top: 1px solid var(--line);">
+<h3 class="legend" style="margin: 0 0 10px;">Notes</h3>
+<ol style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px;">
+<li style="display: flex; flex-direction: column; gap: 2px;"><span class="legend-sm tnum">Kiran Das · 17 Sep 2026, 11:24 IST</span><span style="font-size: 14px; line-height: 20px;">Met at the travel trade fair. Wants a call next week.</span></li>
+</ol>
+</div>
+<div style="padding: 14px 16px 16px; border-top: 1px solid var(--line);">
+<h3 class="legend" style="margin: 0 0 4px;">Business enquiry</h3>
+<dl class="kv" style="grid-template-columns: 120px 1fr;">
+<dt class="legend-sm">Stage</dt><dd>New</dd>
+<dt class="legend-sm">Owner</dt><dd>Kiran Das</dd>
+<dt class="legend-sm">Name</dt><dd>Meera Pillai</dd>
+<dt class="legend-sm">Organisation</dt><dd>Acme Travel</dd>
+<dt class="legend-sm">About</dt><dd>Travel desk, about 40 bookings a month</dd>
+</dl>
+</div>
+<p style="margin: 0; padding: 14px 16px 16px; border-top: 1px solid var(--line); font-size: 13px; line-height: 20px; color: var(--ink-2);">Open on a larger screen to make changes to this lead.</p>
 </sc-if>
 <div style="flex-grow: 1;"></div>
-<p style="margin: 0; padding: 14px 16px; border-top: 1px solid var(--line); font-size: 13px; line-height: 20px; color: var(--ink-3);">A sign-up that is never confirmed is deleted after 7 days.</p>
+<p style="margin: 0; padding: 14px 16px; border-top: 1px solid var(--line); font-size: 13px; line-height: 20px; color: var(--ink-3);">{{dFooter}}</p>
 </section>
 </sc-if>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"state":{"editor":"enum","options":["List","Drawer","Drawer revealed","Record: no account","Empty","No access"],"default":"List","section":"State"},"role":{"editor":"enum","options":["Owner","Admin","Support"],"default":"Owner","section":"State"},"defaultTheme":{"editor":"enum","options":["system","light","dark"],"default":"system","section":"Appearance"},"$preview":{"width":390,"height":1900}}'>
-var heights = {"List": 2050, "Drawer": 1410, "Drawer revealed": 1440, "Record: no account": 1200, "Empty": 1260, "No access": 844};
+<script type="text/x-dc" data-dc-script data-props='{"state":{"editor":"enum","options":["List","Drawer","Drawer revealed","Record: no account","Pipeline","Pipeline: empty","Record: business","Empty","No access"],"default":"List","section":"State"},"role":{"editor":"enum","options":["Owner","Admin","Support"],"default":"Owner","section":"State"},"defaultTheme":{"editor":"enum","options":["system","light","dark"],"default":"system","section":"Appearance"},"$preview":{"width":390,"height":1900}}'>
+var heights = {"List": 2115, "Drawer": 1470, "Drawer revealed": 1495, "Record: no account": 1250, "Pipeline": 1225, "Pipeline: empty": 844, "Record: business": 1100, "Empty": 1320, "No access": 844};
 class Component extends DCLogic {
   state = { theme: null, sysDark: false };
   componentDidMount() {
@@ -253,10 +344,13 @@ class Component extends DCLogic {
     // Sample world: Saturday 19 Sep 2026, 14:32 IST, as the other console sheets. The figures agree
     // with ConsoleAnnouncements: 431 confirmed on News, 217 on the Availability list.
     var leadP = st === 'Record: no account' || st === 'Delete: confirm';
-    var drawer = st === 'Drawer' || st === 'Drawer revealed' || leadP;
+    var leadH = st === 'Record: business' || st === 'Remove: confirm';
+    var marking = st === 'Mark as a business enquiry';
+    var pipe = st === 'Pipeline' || st === 'Pipeline: empty' || st === 'Add a business lead' || leadH;
+    var drawer = st === 'Drawer' || st === 'Drawer revealed' || leadP || leadH || marking;
     var exporting = st === 'Export: confirm' || st === 'Export: preparing' || st === 'Export: ready';
     var search = st === 'Search: one match' || st === 'Search: no match';
-    var base = drawer || exporting ? 'List' : st;
+    var base = drawer || exporting || pipe ? 'List' : st;
     // Five statuses, five forms, ONE box: every tag carries a 1px edge (clear unless the form is an
     // outline), so no status is taller or wider-set than another and the column reads as one rule.
     // Suppressed is the solid one, in the alert ink: it is the status that means mail cannot reach them.
@@ -313,7 +407,25 @@ class Component extends DCLogic {
       ['30 Aug 2026, 18:04 IST', 'Confirmed Availability'],
       ['30 Aug 2026, 18:02 IST', 'Signed up for Availability via the pre-booking form']
     ].map(function (t) { return { when: t[0], what: t[1] }; });
+    var timelineH = [['17 Sep 2026, 11:20 IST', 'Added by hand by Kiran Das']].map(function (t) { return { when: t[0], what: t[1] }; });
+    var card = 'border: 1px solid var(--line); background: var(--surface-2); padding: 12px 14px; display: flex; flex-direction: column; gap: 8px;';
+    var board = [
+      ['New', [['h•••@acme-travel.example', 'Travel desk, about 40 bookings a month', 'KD', 'Kiran Das', '2 days in stage'], ['n•••@example.com', 'Bulk checks for a tour group of 60', 'AR', 'Asha Rao', 'Today']]],
+      ['Contacted', [['p•••@example.net', 'Newsletter partner, wants a shared page', 'KD', 'Kiran Das', '5 days in stage']]],
+      ['Qualified', [['v•••@example.in', 'Corporate travel team of 12', 'RI', 'Rohan Iyer', '9 days in stage']]],
+      ['Won', []],
+      ['Lost', [['s•••@example.org', 'Wanted a data feed; not offered', 'AR', 'Asha Rao', '21 days in stage']]]
+    ].map(function (c) {
+      return {
+        name: c[0], count: String(c[1].length), empty: c[1].length === 0,
+        cards: c[1].map(function (k, i) {
+          return { email: k[0], about: k[1], initials: k[2], owner: k[3], days: k[4], openLabel: 'Open the lead ' + k[0], stageLabel: 'Stage of ' + k[0] + ': ' + c[0],
+            style: card + (leadH && c[0] === 'New' && i === 0 ? ' background: var(--accent-wash);' : '') };
+        })
+      };
+    });
     var del = st === 'Delete: confirm';
+    var adding = st === 'Add a business lead';
     var m = members[who];
     return {
       face: dark ? 'night' : 'day', faceH: (heights[st] || 1000) + 'px',
@@ -322,15 +434,25 @@ class Component extends DCLogic {
       cycleTheme: () => this.setState({ theme: themeNext[mode] }),
       role: who, initials: m[1], memberLabel: m[0] + ', ' + who + '. Open the member menu',
       rows: rows, figures: figures, timeline: timeline, timelineP: timelineP,
-      canExport: !noAccess && who !== 'Support',
+      canExport: !noAccess && who !== 'Support' && !pipe,
+      tabLife: pipe ? 'false' : 'true', tabPipe: pipe ? 'true' : 'false',
+      showPipe: pipe, pipeEmpty: st === 'Pipeline: empty', pipeBoard: pipe && st !== 'Pipeline: empty', board: board, timelineH: timelineH,
+      addOpen: adding || marking, addTyped: adding, addFixed: marking,
+      addTitle: marking ? 'Mark as a business enquiry' : 'Add a business lead',
+      addName: marking ? '' : 'Meera Pillai', addOrg: marking ? '' : 'Acme Travel',
+      addAbout: marking ? 'Asked about group bookings for a travel desk' : 'Travel desk, about 40 bookings a month',
+      addOwner: m[0], addAction: marking ? 'Mark as a business enquiry' : 'Add lead',
+      addLegend: marking ? 'Nothing about this lead’s subscriptions changes. It is never added to any email list unless they sign up themselves.' : 'Added by hand for a business conversation. Never added to any email list unless they sign up themselves.',
+      removeOpen: st === 'Remove: confirm', dLeadH: leadH,
+      dFooter: leadH ? 'A business lead is kept until it is deleted.' : 'A sign-up that is never confirmed is deleted after 7 days.',
       stPreparing: st === 'Export: preparing', stReady2: st === 'Export: ready',
       confirmOpen: st === 'Export: confirm' || del,
       confirmTitle: del ? 'Delete the lead p•••@example.net' : 'Export 1,612 leads',
       confirmDetail: del ? 'This removes the person, their 2 consents, 2 tags and notes. A suppression on the address stays. They can sign up again.' : 'The file holds whole addresses, with each lead’s status, source, campaign and tags. It works once, in this browser, for 10 minutes.',
       confirmReason: del ? 'Asked by phone to be removed from our lists.' : 'Monthly review of sign-ups for September.',
-      dLeadA: drawer && !leadP, dLeadP: leadP,
-      dRevealLabel: 'Reveal the address ' + (leadP ? 'p•••@example.net' : 'a•••@example.com'),
-      showMeta: !noAccess, isNoAccess: noAccess, showArea: !noAccess && !drawer,
+      dLeadA: drawer && !leadP && !leadH, dLeadP: leadP,
+      dRevealLabel: 'Reveal the address ' + (leadP ? 'p•••@example.net' : leadH ? 'h•••@acme-travel.example' : 'a•••@example.com'),
+      showMeta: !noAccess, isNoAccess: noAccess, showArea: !noAccess && !pipe && !drawer, showTabs: !noAccess && !drawer, showPipeBody: pipe && !drawer,
       anyValue: 'All', searchValue: search ? 'asha.verma@example.com' : '', hasSearch: search,
       totalCell: '1,612 leads',
       countCell: st === 'Search: one match' ? '1 match' : st === 'Search: no match' ? 'No match' : (base === 'Empty' || base === 'Unavailable') ? '—' : '1–50 of 1,612',
@@ -338,9 +460,9 @@ class Component extends DCLogic {
       hasNext: st !== 'Search: one match', noNext: st === 'Search: one match',
       stRows: base === 'List' || st === 'Search: one match',
       stNoMatch: st === 'Search: no match', stEmpty: base === 'Empty', stError: base === 'Unavailable',
-      drawerOpen: drawer, dMasked: st === 'Drawer' || leadP, dRevealed: st === 'Drawer revealed',
-      dEmail: st === 'Drawer revealed' ? 'asha.verma@example.com' : leadP ? 'p•••@example.net' : 'a•••@example.com',
-      dFirstSeen: 'First seen ' + (leadP ? '30 Aug 2026' : '2 Sep 2026')
+      drawerOpen: drawer, dMasked: st === 'Drawer' || leadP || leadH || marking, dRevealed: st === 'Drawer revealed',
+      dEmail: st === 'Drawer revealed' ? 'asha.verma@example.com' : leadP ? 'p•••@example.net' : leadH ? 'h•••@acme-travel.example' : 'a•••@example.com',
+      dFirstSeen: 'First seen ' + (leadP ? '30 Aug 2026' : leadH ? '17 Sep 2026' : '2 Sep 2026')
     };
   }
 }

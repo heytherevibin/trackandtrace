@@ -31,11 +31,12 @@ const SIGNUP: LeadDetail = {
   timeline: [{ at: "2026-08-30T12:32:00+00:00", kind: "signed_up", list: "availability", source: "pre-booking", subject: null, reason: null }],
   tags: ["beta", "press"],
   notes: [],
+  business: null,
 };
 const WITH_ACCOUNT: LeadDetail = { ...SIGNUP, account: { createdAt: "2026-09-05T04:00:00+00:00", lastSignInAt: null, disabled: false, emailLink: true, google: false, passkeys: 0, savedPnrs: 0 } };
 
 const record = (detail: LeadDetail) => {
-  render(<LeadsBrowser page={{ total: 0, rows: [] }} filters={parseLeadFilters({ lead: PRIYA, news: "subscribed" })} detail={detail} tags={[]} environment="production" />);
+  render(<LeadsBrowser page={{ total: 0, rows: [] }} filters={parseLeadFilters({ lead: PRIYA, news: "subscribed" })} detail={detail} tags={[]} environment="production" members={[]} me="" />);
   return screen.getByRole("dialog", { name: m.record.title });
 };
 const tap = async () => {

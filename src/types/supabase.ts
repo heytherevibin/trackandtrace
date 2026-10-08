@@ -172,6 +172,21 @@ export type Database = {
         Args: { p_can_book: boolean; p_raw_status: string }
         Returns: string
       }
+      console_add_business_lead: {
+        Args: {
+          p_about: string
+          p_email: string
+          p_environment: string
+          p_name: string
+          p_organisation: string
+          p_owner: string
+        }
+        Returns: Json
+      }
+      console_assign_business_lead: {
+        Args: { p_environment: string; p_id: string; p_owner: string }
+        Returns: Json
+      }
       console_audit: {
         Args: {
           p_category?: string
@@ -335,6 +350,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      console_business_members: { Args: never; Returns: Json }
       console_change_role: {
         Args: {
           p_environment: string
@@ -400,7 +416,22 @@ export type Database = {
         Args: { p_address: string; p_environment: string; p_id: string }
         Returns: undefined
       }
+      console_mark_business_lead: {
+        Args: {
+          p_about: string
+          p_environment: string
+          p_id: string
+          p_name: string
+          p_organisation: string
+          p_owner: string
+        }
+        Returns: Json
+      }
       console_me: { Args: never; Returns: Json }
+      console_move_business_lead: {
+        Args: { p_environment: string; p_id: string; p_stage: string }
+        Returns: Json
+      }
       console_my_keys: { Args: never; Returns: Json }
       console_my_sessions: { Args: never; Returns: Json }
       console_note_lead: {
@@ -483,6 +514,10 @@ export type Database = {
           p_value: string
         }
         Returns: undefined
+      }
+      console_unmark_business_lead: {
+        Args: { p_environment: string; p_id: string }
+        Returns: Json
       }
       console_untag_lead: {
         Args: { p_environment: string; p_id: string; p_tag: string }

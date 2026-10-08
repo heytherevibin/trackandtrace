@@ -6,7 +6,8 @@ import { notify } from "@/components/ui/toast";
 import { hasFilters, leadQuery, LEAD_PAGE_SIZE, NO_LEAD_FILTERS, type LeadFilters } from "@/console/leads/filters";
 import { LeadDrawer } from "@/console/leads/lead-drawer";
 import { LeadFilterBar } from "@/console/leads/lead-filter-bar";
-import type { LeadDetail, LeadNote, LeadPage, LeadRow } from "@/console/leads/leads";
+import type { BusinessMember } from "@/console/leads/business";
+import type { LeadBusiness, LeadDetail, LeadNote, LeadPage, LeadRow } from "@/console/leads/leads";
 import { requestFind, requestNote, requestReveal, requestTag } from "@/console/leads/leads-client";
 import { LeadsPlate, type LeadsState, type ShownLead } from "@/console/leads/leads-plate";
 import { consoleMessages } from "@/console/messages";
@@ -34,6 +35,8 @@ export function LeadsBrowser({
   detail,
   tags,
   environment,
+  members,
+  me,
   between,
 }: {
   readonly page: LeadPage | null;
@@ -42,6 +45,9 @@ export function LeadsBrowser({
   readonly tags: readonly string[];
   /** The deployment, for the one act here that is approved under it: Delete lead. */
   readonly environment: string;
+  /** Who may own a business lead, and the signed-in member's own id. */
+  readonly members: readonly BusinessMember[];
+  readonly me: string;
   /** Drawn between the filters and the list: the export's status rows, which the page owns. */
   readonly between?: ReactNode;
   /** The open lead's record; why there is none to draw; or null when no record is open. */
@@ -55,7 +61,7 @@ export function LeadsBrowser({
   const [searching, setSearching] = useState(false);
   // What a write answered, by lead: its tags and notes as the database now holds them. The record
   // shows these at once; the list behind it and the Tag filter are re-read from the server.
-  const [written, setWritten] = useState<Readonly<Record<string, { readonly tags?: readonly string[]; readonly notes?: readonly LeadNote[] }>>>({});
+  const [written, setWritten] = useState<Readonly<Record<string, { readonly tags?: readonly string[]; readonly notes?: readonly LeadNote[]; readonly business?: LeadBusiness | null }>>>({});
 
   async function reveal(id: string): Promise<void> {
     setRevealing(id);
@@ -155,6 +161,14 @@ export function LeadsBrowser({
           tags={written[open]?.tags ?? (typeof detail === "string" ? [] : detail.tags)}
           notes={written[open]?.notes ?? (typeof detail === "string" ? [] : detail.notes)}
           suggestions={tags}
+          // `undefined` is "nothing written yet"; null is "taken out of the pipeline".
+          business={written[open]?.business !== undefined ? (written[open]?.business ?? null) : typeof detail === "string" ? null : detail.business}
+          members={members}
+          me={me}
+          onBusiness={(business) => {
+            setWritten((before) => ({ ...before, [open]: { ...before[open], business } }));
+            router.refresh();
+          }}
           environment={environment}
           onDeleted={() => {
             // Back to the list the member came from, re-read: the lead is no longer in it.

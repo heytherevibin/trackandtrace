@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { ConsoleDb } from "@/console/auth/db";
+import { BUSINESS_STAGES } from "@/console/leads/business";
 import { LEAD_EXPORT_MAX, leadExportFileName, leadsCsv } from "@/console/leads/export";
 import { ACCOUNT_STATUSES, LEAD_ID, LEAD_PAGE_SIZE, LEAD_SOURCES, NEWS_STATUSES, sinceFor, type LeadFilters } from "@/console/leads/filters";
 import { consoleMessages } from "@/console/messages";
@@ -36,6 +37,17 @@ const rowShape = z.object({
 });
 
 const tagsShape = z.array(z.string().min(1));
+
+/** A lead's place in the business pipeline. `ownerName` is null once its owner has left the console. */
+export const businessShape = z.object({
+  stage: z.enum(BUSINESS_STAGES),
+  stageSince: when,
+  ownerId: z.guid().nullable(),
+  ownerName: z.string().nullable(),
+  name: z.string().nullable(),
+  organisation: z.string().nullable(),
+  about: z.string().min(1),
+});
 const notesShape = z.array(z.object({ id: z.guid(), author: z.string().min(1), at: when, body: z.string().min(1) }));
 
 const pageShape = z.object({ total: count, rows: z.array(rowShape) });
@@ -65,15 +77,19 @@ const detailShape = z.object({
   timeline: z.array(
     z.object({
       at: when,
-      kind: z.enum(["signed_up", "confirmed", "unsubscribed", "account_created", "signed_in", "received", "suppressed"]),
+      kind: z.enum(["signed_up", "confirmed", "unsubscribed", "account_created", "signed_in", "received", "suppressed", "added_by_hand"]),
       list: list.nullable(),
       source: z.enum(LEAD_SOURCES).nullable(),
       subject: z.string().nullable(),
       reason: z.string().nullable(),
+      /** Who added a lead by hand. Only that event carries it. */
+      by: z.string().nullable().optional(),
     }),
   ),
   tags: tagsShape,
   notes: notesShape,
+  // Absent on a record read before 20261008090000 was applied: that is "not in the pipeline".
+  business: businessShape.nullable().optional().transform((entry) => entry ?? null),
 });
 
 export type LeadRow = z.infer<typeof rowShape>;
@@ -81,8 +97,24 @@ export type LeadPage = z.infer<typeof pageShape>;
 export type LeadFigures = z.infer<typeof figuresShape>;
 export type LeadDetail = z.infer<typeof detailShape>;
 export type LeadNote = z.infer<typeof notesShape>[number];
+export type LeadBusiness = z.infer<typeof businessShape>;
 
 const unavailable = (): AppError => new AppError("SOURCE_UNAVAILABLE", m.database);
+
+const pipeline = consoleMessages.leads.business.errors;
+
+/** A database refusal in the console's words. Read by message: every console refusal shares a code. */
+export function leadError(error: { readonly message: string }): AppError {
+  const text = error.message;
+  if (text.includes("a console member")) return new AppError("INVALID_INPUT", pipeline.member);
+  if (text.includes("about is empty")) return new AppError("INVALID_INPUT", pipeline.aboutEmpty);
+  if (text.includes("about too long")) return new AppError("INVALID_INPUT", pipeline.aboutLong);
+  if (text.includes("name too long")) return new AppError("INVALID_INPUT", pipeline.nameLong);
+  if (text.includes("not an owner")) return new AppError("INVALID_INPUT", pipeline.notOwner);
+  if (text.includes("already in the pipeline")) return new AppError("INVALID_INPUT", pipeline.already);
+  if (text.includes("not in the pipeline")) return new AppError("INVALID_INPUT", pipeline.notIn);
+  return fromError(error);
+}
 
 function fromError(error: { readonly message: string }): AppError {
   const text = error.message;
@@ -101,7 +133,7 @@ function fromError(error: { readonly message: string }): AppError {
   return unavailable();
 }
 
-function parsed<T>(shape: z.ZodType<T>, data: unknown): T {
+export function parsed<T>(shape: z.ZodType<T>, data: unknown): T {
   const result = shape.safeParse(data);
   if (!result.success) throw unavailable();
   return result.data;

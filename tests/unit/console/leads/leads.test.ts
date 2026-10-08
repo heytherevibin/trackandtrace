@@ -22,6 +22,7 @@ const DETAIL = {
   timeline: [{ at: "2026-09-18T15:42:00+00:00", kind: "signed_in", list: null, source: null, subject: null, reason: null }],
   tags: ["travel-desk"],
   notes: [{ id: "b1111111-1111-4111-8111-111111111111", author: "Kiran Das", at: "2026-09-12T11:10:00+00:00", body: "Asked about group bookings. Wrote from [removed]." }],
+  business: null,
 };
 const NOTES = DETAIL.notes;
 

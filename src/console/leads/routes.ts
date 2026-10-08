@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { BUSINESS_ABOUT_MAX, BUSINESS_NAME_MAX, BUSINESS_STAGES } from "@/console/leads/business";
 import { LEAD_ID, LEAD_NOTE_MAX, LEAD_TAG } from "@/console/leads/filters";
 import { TAP_VALUE_MAX, tapReason } from "@/console/keys/tap-schema";
 import { consoleMessages } from "@/console/messages";
@@ -42,3 +43,27 @@ const digestedObject = z
 export const deleteBody = z.object({ id: leadId, value: digestedObject, reason: tapReason }).strict();
 
 export const exportBody = z.object({ filters: digestedObject, reason: tapReason }).strict();
+
+// The business pipeline's bodies. What a member typed is trimmed and bounded here, in the form's
+// own words; the database bounds it again and scrubs it. None of these carries a reason: none of
+// these acts needs a key.
+
+const b = consoleMessages.leads.business.errors;
+/** A name or an organisation: optional, so empty is allowed and means "not given". */
+const shortText = z.string().trim().max(BUSINESS_NAME_MAX, b.nameLong);
+const about = z.string().trim().min(1, b.aboutEmpty).max(BUSINESS_ABOUT_MAX, b.aboutLong);
+const owner = z.guid();
+const details = { name: shortText, organisation: shortText, about, owner };
+
+/** The WHOLE address, lowered and trimmed. It goes to the database and is never answered back. */
+export const businessAddBody = z
+  .object({ email: z.string().trim().toLowerCase().min(3, m.notAddress).max(254, m.notAddress).regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, m.notAddress), ...details })
+  .strict();
+
+export const businessMarkBody = z.object({ id: leadId, ...details }).strict();
+
+export const businessMoveBody = z.object({ id: leadId, stage: z.enum(BUSINESS_STAGES) }).strict();
+
+export const businessAssignBody = z.object({ id: leadId, owner }).strict();
+
+export const businessRemoveBody = z.object({ id: leadId }).strict();

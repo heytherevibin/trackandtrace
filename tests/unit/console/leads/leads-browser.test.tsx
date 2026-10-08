@@ -43,11 +43,12 @@ const DETAIL: LeadDetail = {
     { id: "b1111111-1111-4111-8111-111111111111", author: "Kiran Das", at: "2026-09-12T11:10:00+00:00", body: "Asked about group bookings. Wrote from [removed]." },
     { id: "b2222222-2222-4222-8222-222222222222", author: "Asha Rao", at: "2026-09-03T05:35:00+00:00", body: "Came in from the Diwali campaign." },
   ],
+  business: null,
 };
 const TAGS = ["beta", "press", "travel-desk", "vip"];
 const NONE = parseLeadFilters({});
 
-const browser = (over: Partial<Parameters<typeof LeadsBrowser>[0]> = {}) => render(<LeadsBrowser page={{ total: 3, rows: ROWS }} filters={NONE} detail={null} tags={TAGS} environment="production" {...over} />);
+const browser = (over: Partial<Parameters<typeof LeadsBrowser>[0]> = {}) => render(<LeadsBrowser page={{ total: 3, rows: ROWS }} filters={NONE} detail={null} tags={TAGS} environment="production" members={[]} me="" {...over} />);
 const table = () => screen.getByRole("table", { name: m.table.caption });
 const tableRow = (text: string) => within(table()).getByRole("row", { name: new RegExp(text.replace(/[.•]/g, "\\$&")) });
 

@@ -1,19 +1,19 @@
 "use client";
 
 import { Dialog as BaseDialog } from "@base-ui/react/dialog";
-
 import { DismissRegular } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Corners } from "@/components/ui/corners";
 import { IconButton } from "@/components/ui/icon-button";
+import type { BusinessMember } from "@/console/leads/business";
+import { BusinessSection } from "@/console/leads/lead-business";
 import { DeleteSection } from "@/console/leads/lead-delete";
 import { NotesSection, TagsSection } from "@/console/leads/lead-marks";
-import type { LeadDetail, LeadNote } from "@/console/leads/leads";
+import type { LeadBusiness, LeadDetail, LeadNote } from "@/console/leads/leads";
 import { NewsTag } from "@/console/leads/news-tag";
-import { RecordSection } from "@/console/leads/record-section";
+import { Facts, RecordSection } from "@/console/leads/record-section";
 import { consoleMessages } from "@/console/messages";
 import { messages } from "@/messages";
-import { cn } from "@/utils/cn";
 import { formatCount, formatDate, formatDateTime } from "@/utils/datetime";
 
 const m = consoleMessages.leads;
@@ -37,23 +37,8 @@ function eventText(e: Event): string {
   if (e.kind === "confirmed") return r.events.confirmed(list);
   if (e.kind === "unsubscribed") return r.events.unsubscribed(list);
   if (e.kind === "received") return r.events.received(e.subject ?? "");
+  if (e.kind === "added_by_hand") return r.events.added_by_hand(e.by ?? null);
   return r.events[e.kind];
-}
-
-/** The sheet's `.kv` with its label column at the drawn 120px, which the shared list's 35% is not. */
-function Facts({ items }: { readonly items: readonly (readonly [string, string])[] }) {
-  return (
-    // Both cells fill the row and share one 24px line, so the two halves of a row's hairline meet
-    // and the label still sits on the value's first line when the value takes two.
-    <dl className="grid grid-cols-[120px_1fr] gap-x-4">
-      {items.map(([label, value], i) => (
-        <div key={label} className="contents">
-          <dt className={cn("legend-sm py-2.5 leading-6", i > 0 && "border-line border-t")}>{label}</dt>
-          <dd className={cn("text-body min-w-0 py-2.5 leading-6 [overflow-wrap:anywhere]", i > 0 && "border-line border-t")}>{value}</dd>
-        </div>
-      ))}
-    </dl>
-  );
 }
 
 function Record({ detail }: { readonly detail: LeadDetail }) {
@@ -127,8 +112,9 @@ function Record({ detail }: { readonly detail: LeadDetail }) {
  * One lead's record (ConsoleLeads.dc.html, Drawer and Drawer revealed): a 480px plate against the
  * right edge on a desktop, the full screen on a phone, in the geometry of the audit log's entry
  * drawer. The address is masked until Reveal, which the database records; the retention line below
- * never scrolls away. It ends with the lead's tags and notes (lead-marks.tsx) and Delete
- * (lead-delete.tsx), which a desktop can use and a phone can only read past.
+ * never scrolls away. It ends with the lead's tags and notes (lead-marks.tsx), its place in the
+ * business pipeline (lead-business.tsx) and Delete (lead-delete.tsx), which a desktop can use and
+ * a phone can only read past.
  *
  * `detail` is the record, or why there is none to draw: it could not be read, or the lead is gone.
  */
@@ -139,11 +125,15 @@ export function LeadDrawer({
   tags,
   notes,
   suggestions,
+  business,
+  members,
+  me,
   environment,
   onReveal,
   onTag,
   onUntag,
   onNote,
+  onBusiness,
   onDeleted,
   onClose,
 }: {
@@ -156,18 +146,25 @@ export function LeadDrawer({
   readonly notes: readonly LeadNote[];
   /** Every tag in use, offered as one is typed. */
   readonly suggestions: readonly string[];
+  /** The lead's place in the business pipeline as it stands now, or null. */
+  readonly business: LeadBusiness | null;
+  /** Who may own a business lead, and the signed-in member among them. */
+  readonly members: readonly BusinessMember[];
+  readonly me: string;
   /** The deployment a delete is approved under: part of what its key tap is minted over. */
   readonly environment: string;
   readonly onReveal: () => void;
   readonly onTag: (tag: string) => Promise<boolean>;
   readonly onUntag: (tag: string) => Promise<boolean>;
   readonly onNote: (body: string) => Promise<boolean>;
+  readonly onBusiness: (business: LeadBusiness | null) => void;
   /** The lead was deleted: there is no record left to show. */
   readonly onDeleted: () => void;
   readonly onClose: () => void;
 }) {
   const record = typeof detail === "string" ? null : detail;
   const masked = revealed === null;
+  const kept = business !== null || (record?.timeline.some((event) => event.kind === "added_by_hand") ?? false);
   return (
     <BaseDialog.Root
       open
@@ -225,13 +222,16 @@ export function LeadDrawer({
                   <Record detail={record} />
                   <TagsSection tags={tags} suggestions={suggestions} onAdd={onTag} onRemove={onUntag} />
                   <NotesSection notes={notes} onAdd={onNote} />
+                  <BusinessSection lead={record} business={business} members={members} me={me} onChange={onBusiness} />
                   <DeleteSection lead={record} environment={environment} tags={tags.length} notes={notes.length} onDeleted={onDeleted} />
                   {/* The phone board's closing line: there, the record is read and nothing is changed. */}
                   <p className="border-line text-ink-2 text-label border-t px-4 pb-4 pt-3.5 sm:hidden">{r.largerScreen}</p>
                 </>
               )}
             </div>
-            <p className="seam text-ink-3 px-5 py-3.5 text-sm leading-5 max-sm:px-4">{r.retention}</p>
+            {/* A lead added by hand has given no consent and is not cleaned up after seven days, in
+                the pipeline or out of it; nor is anyone while they are in it. The line says which. */}
+            <p className="seam text-ink-3 px-5 py-3.5 text-sm leading-5 max-sm:px-4">{kept ? m.business.kept : r.retention}</p>
           </BaseDialog.Popup>
         </BaseDialog.Viewport>
       </BaseDialog.Portal>
