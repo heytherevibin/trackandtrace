@@ -1,7 +1,7 @@
 "use client";
 
 import { animate } from "motion/react";
-import { useLayoutEffect, useRef, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 import { LAYOUT_EVENT } from "@/components/landing/journey/journey-events";
 import { useMotion } from "@/components/motion/use-motion";
 
@@ -107,11 +107,20 @@ export function PlateMorph({ face, children }: { readonly face: string; readonly
       box.style.height = `${before.height}px`;
       box.style.overflow = "clip";
     }
-    const tween: Tween = animate(before.height, measured, {
+    // The tween is of the way there, 0 to 1, and "there" is the face's height as it stands on each frame, not the
+    // height measured above. A face can change its own height after this commit without this component rendering
+    // again: the record's passenger table stacks where the window cannot show it (use-outgrown.ts), and the stacked
+    // record is taller. A tween to the first measure ended that much short, and the plate jumped the rest when it let
+    // go. A face that keeps its height gives the same numbers as before.
+    const from = before.height;
+    const tween: Tween = animate(0, 1, {
       duration: MORPH_S,
       ease: EXPO,
-      onUpdate: (h) => {
-        if (box) box.style.height = `${h}px`;
+      onUpdate: (way) => {
+        // A tween is run to "now" once more as it is stopped. Stopped for a change of face, its own face has left the
+        // page and measures 0: only the tween still current writes.
+        if (grow.current !== tween) return;
+        if (box) box.style.height = `${from + (el.offsetHeight - from) * way}px`;
       },
       onComplete: () => {
         if (grow.current !== tween) return;
@@ -121,6 +130,42 @@ export function PlateMorph({ face, children }: { readonly face: string; readonly
     });
     grow.current = tween;
   });
+
+  // The face's height is kept as it changes, not only as this component renders. A face can change its own height in a
+  // commit of its own (the record's passenger table stacks on a phone, use-outgrown.ts), and two things go by it:
+  // - the next morph starts from the height remembered here: remembered from the commit that drew the face, "Check
+  //   another PNR" cut a stacked record to its table's height for a frame before it shrank;
+  // - the page is told its layout moved (tt:layout) when no morph is running to tell it at its end. With Motion off
+  //   the swap is at once and the page was told in that commit, before the record stacked: the journey had measured
+  //   the page with the table in it, and announced every station too early from there on.
+  // Told a frame later, never from inside the observer: whoever hears it may move boxes that are being observed. And
+  // only for a change at the same width: a change of width is the window's (a resize, a turn), which the journey hears
+  // for itself and settles in its own time. A face told of nothing new tells nobody, so this cannot go round.
+  // Each face is an element of its own (keyed), so each is watched.
+  useEffect(() => {
+    const el = inner.current;
+    if (!el || typeof ResizeObserver === "undefined") return undefined;
+    let width = el.offsetWidth;
+    let telling = 0;
+    const observer = new ResizeObserver(() => {
+      const was = seen.current;
+      if (was?.face !== face) return;
+      const now = { width: el.offsetWidth, height: el.offsetHeight };
+      const moved = now.height !== was.height && now.width === width;
+      width = now.width;
+      seen.current = { face, height: now.height };
+      if (!moved || grow.current || telling) return;
+      telling = requestAnimationFrame(() => {
+        telling = 0;
+        window.dispatchEvent(new Event(LAYOUT_EVENT));
+      });
+    });
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(telling);
+    };
+  }, [face]);
 
   // Motion switched off mid-rise: the face stops where it rests, at once.
   useLayoutEffect(() => {

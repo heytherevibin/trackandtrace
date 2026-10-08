@@ -346,16 +346,29 @@ export function FilterBar({
         {/* Not drawn on either sheet: both offer `Custom` and draw no fields behind it. Two day
             boxes are the smallest honest thing that word can mean, and they only exist while it is
             chosen. On a phone they take a row of their own at the drawn 44px, because there is no
-            room for two dates beside four tabs. */}
+            room for two dates beside four tabs.
+
+            `appearance-none` is what makes those heights true on iOS. A date field that keeps its native
+            appearance is sized there by Safari's own rules, `box-sizing: content-box`, whatever the page's
+            CSS says: the well's two hairlines were added to the drawn height, 42px on an iPad and 46 on an
+            iPhone (src/components/ui/date-field.tsx has the same cure, for the same fault). Without the
+            appearance each is the well's own box, 40 or 44, and a tap still opens iOS's date picker.
+
+            `min-w-[7em]` goes with it. Safari's rules included a least width, and without them an empty
+            box on an iPad is as wide as its own padding, 22px (a member can empty one: iOS's picker has a
+            Reset). 7em is the width Safari gave it, 98px at the bar's 14px, so the box is as wide empty as
+            filled and the row does not move when a day is chosen. With a mouse neither changes anything:
+            Chromium's date field is wider than that already, and draws the same either way, its calendar
+            button included. */}
         {filters.range === "custom" ? (
           <div className="flex flex-wrap items-center gap-2.5 max-sm:w-full max-sm:gap-2">
             <label className="flex items-center gap-2 max-sm:grow">
               <span className="legend whitespace-nowrap text-ink-3">{m.filters.customFrom}</span>
-              <input type="date" className="well h-10 px-2.5 max-sm:h-11 max-sm:grow" value={filters.from ?? ""} onChange={(event) => apply({ from: event.target.value || null })} />
+              <input type="date" className="well h-10 min-w-[7em] appearance-none px-2.5 max-sm:h-11 max-sm:grow" value={filters.from ?? ""} onChange={(event) => apply({ from: event.target.value || null })} />
             </label>
             <label className="flex items-center gap-2 max-sm:grow">
               <span className="legend whitespace-nowrap text-ink-3">{m.filters.customTo}</span>
-              <input type="date" className="well h-10 px-2.5 max-sm:h-11 max-sm:grow" value={filters.to ?? ""} onChange={(event) => apply({ to: event.target.value || null })} />
+              <input type="date" className="well h-10 min-w-[7em] appearance-none px-2.5 max-sm:h-11 max-sm:grow" value={filters.to ?? ""} onChange={(event) => apply({ to: event.target.value || null })} />
             </label>
           </div>
         ) : null}

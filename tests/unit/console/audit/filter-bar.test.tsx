@@ -105,6 +105,24 @@ describe("changing a filter", () => {
     expect(screen.getByLabelText(m.filters.customTo)).toBeInTheDocument();
   });
 
+  // iOS Safari sizes a date field by its own rules for as long as the field keeps its native appearance: it computes
+  // `box-sizing: content-box`, so the well's two hairlines are added to its height. The day boxes came out 42px tall
+  // on an iPad against the drawn 40, and 46 against 44 on an iPhone (iOS 26.5 Simulator). `appearance-none` gives the
+  // well's own box back, as it did for the traveller's date field (#124; tests/e2e/pre-booking.spec.ts holds that one's
+  // computed `appearance`). No engine the suite runs has the fault, and the fixture-mode console draws no page that
+  // needs a member, so what is held here is the declaration that cures it, on both boxes.
+  //
+  // And the least width that goes with it: Safari's own rules gave an empty box 76px of content, and without them an
+  // empty box on an iPad is its padding and hairlines, 22px wide. 7em is 98px at the bar's 14px, what Safari drew.
+  it("gives up the day boxes' native appearance, so iOS sizes them as the page says, and keeps an empty box a day wide", () => {
+    bar({ ...defaultAuditFilters(ENVIRONMENT), range: "custom", from: "2026-09-01", to: null });
+    for (const name of [m.filters.customFrom, m.filters.customTo]) {
+      const box = screen.getByLabelText(name);
+      expect(box).toHaveAttribute("type", "date");
+      expect(box.className.split(/\s+/), name).toEqual(expect.arrayContaining(["appearance-none", "min-w-[7em]"]));
+    }
+  });
+
   // Custom with neither day chosen is not a range: it would ask console_audit for an unbounded scan
   // and a count(*) over two years, under a caption reading "for the chosen dates". Seeding it with
   // the range already on screen is what makes "Custom" mean "refine this".

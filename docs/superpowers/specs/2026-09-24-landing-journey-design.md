@@ -626,6 +626,45 @@ Decided after J6 (2026-10-02): the landing at 200% text, beyond the phone widths
 - The hero's dial runs past the window by design and `main` clips it, at 100% as at 200%: the sweep's layout reading
   leaves it out by name (layout.ts) and still measures everything else `main` clips.
 
+Decided after J6 (the owner, 2026-10-04): the check plate's in-place record no longer keeps its table at 100% text at
+every width. This replaces the line above that kept it.
+- The table cannot wrap below its own least width (309px at 100% for the fixture's party of three) and starts 42px into
+  the page, so in a window under 352px the page cut its fourth column, coach · berth, off, and no reader could bring it
+  back. Each passenger stacks into the labelled record it already used with larger text instead: no scroller, no extra
+  Tab stop, nothing past the frame.
+
+Decided after J6 (the owner, 2026-10-05): one rule, the frame's. The record stacks whenever its frame is narrower than
+its table, at any text size, and is the table only where the frame holds it.
+- Measured for the 2026-10-04 change, the table did not fit its frame until a 394px window: the frame is the window less
+  84px on a phone. From 352px to 393px it had always overhung its frame inside the window (by 40px at 352px, 2px at
+  390px; under 372px it crossed the plate's own border). That band stacks too now, so as drawn the stacked record is
+  what every phone under 394px shows at 100% text, and the table shows from 394px up, to the pixel as it was.
+- The switch is still a ResizeObserver on the record's frame, not CSS, and no size container was added to the landing.
+  It holds no width: `useOutgrown` measures what the table needs from the table itself, against the width inside the
+  frame's border (while stacked it keeps the last measure, reckoned at the present text size), so a longer name or a
+  fifth column moves the width by itself. It reads the frame and never the window, so a phone turned on its side is
+  the table and turned back is stacked, with no window event to wait on. It also judges in a layout effect, before the
+  first paint: a record that cannot fit is never drawn as a table first.
+- The plate's morph follows the record's height as it changes. It tweens to the height the record stands at on each
+  frame, not to the height it first measured (the stacked record is taller, and the plate jumped the difference when
+  the tween let go; the same jump at 200% text, since #117, went with it), and "Check another PNR" starts from the
+  height the record stood at, not from the height remembered when the record was first drawn. `tt:layout` is still
+  told once, when a morph settles, at the face's final height.
+- Stacked, the record's columns are the facts grid's above it (the owner, 2026-10-05): Current stands exactly under
+  Route and Class · quota, Booked under Train, and on every phone Coach · berth has a row of its own beneath them.
+  There is no three across at 384px to 393px any more. Both grids are cut from the same two lengths on the record's
+  frame (a fact's least width and its padding), so they hold as many columns as each other at every width and text
+  size: one column under 13.75rem of frame, two from there. The record never stacks where three would fit (the
+  fixture's table needs 19.3rem, three columns 20.6rem). At 200% text it is two columns at 640px, 768px and 1440px and
+  one, like the facts grid, at 1024px.
+- With Motion off (every property a 0.01ms transition) two things followed from the record stacking in a commit of
+  its own, and both are closed. The stacked record is elements of its own, not the table's with their classes swapped,
+  so it stands at its rest height from its first frame (it was drawn taller for one, and the page shifted twice). And a face that changes
+  its own height while no morph is running tells the page again (`tt:layout`, a frame later, only for a change at the
+  same width: a change of width is the window's, which the journey hears for itself): with Motion off the plate had
+  told the journey in the commit before the record stacked, and every station was announced too early from there on
+  (180px at 360px).
+
 ## 7. What only the user can do
 
 - Approve this spec, then each PR's merge.
