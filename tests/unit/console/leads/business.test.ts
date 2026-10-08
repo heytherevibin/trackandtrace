@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ConsoleDb } from "@/console/auth/db";
 import { BUSINESS_STAGES, daysInStage, initialsOf } from "@/console/leads/business";
-import { addBusinessLead, assignBusinessLead, markBusinessLead, moveBusinessLead, readBusinessMembers, unmarkBusinessLead } from "@/console/leads/business-leads";
+import { addBusinessLead, assignBusinessLead, markBusinessLead, moveBusinessLead, readBusinessMembers, readPipeline, unmarkBusinessLead } from "@/console/leads/business-leads";
 import { readLead } from "@/console/leads/leads";
 import { consoleMessages } from "@/console/messages";
 import { AppError } from "@/services/errors";
@@ -55,6 +55,15 @@ describe("the calls", () => {
     const { db: client, rpc } = db({ data: [{ id: KIRAN, name: "Kiran Das" }] });
     expect(await readBusinessMembers(client)).toEqual([{ id: KIRAN, name: "Kiran Das" }]);
     expect(rpc).toHaveBeenCalledWith("console_business_members");
+  });
+
+  it("reads the board: a card per lead in the pipeline, masked, or throws rather than answering an empty board", async () => {
+    const CARD = { id: ID, email: "m•••@acme-travel.example", stage: "new", stageSince: "2026-09-17T05:50:00+00:00", ownerName: null, about: "Travel desk" };
+    const { db: client, rpc } = db({ data: [CARD] });
+    expect(await readPipeline(client)).toEqual([CARD]);
+    expect(rpc).toHaveBeenCalledWith("console_business_pipeline");
+    expect(await message(readPipeline(db({ error: { message: "connection refused" } }).db))).toBe(m.errors.database);
+    expect(await message(readPipeline(db({ data: [{ ...CARD, email: "meera.pillai@acme-travel.example" }] }).db)), "a card with a whole address is refused, not drawn").toBe(m.errors.database);
   });
 
   it("adds a lead by hand, and answers which lead it is and whether it was new", async () => {

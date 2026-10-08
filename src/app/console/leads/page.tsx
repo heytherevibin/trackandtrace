@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import type { ReactNode } from "react";
 import { createConsoleDb } from "@/console/auth/db";
 import { requireConsoleMember } from "@/console/auth/guard";
 import { ROLE_RANK } from "@/console/auth/member";
@@ -12,10 +11,12 @@ import type { BusinessMember } from "@/console/leads/business";
 import { AddBusinessLead } from "@/console/leads/business-lead-dialog";
 import { readBusinessMembers } from "@/console/leads/business-leads";
 import { FiguresPlate } from "@/console/leads/figures-plate";
-import { parseLeadFilters, type LeadSearchParams } from "@/console/leads/filters";
+import { leadQuery, parseLeadFilters, type LeadSearchParams } from "@/console/leads/filters";
 import { LeadExportButton, LeadExportProvider, LeadExportStatus } from "@/console/leads/lead-export";
 import { readFigures, readLead, readLeads, readTags, type LeadDetail, type LeadFigures, type LeadPage } from "@/console/leads/leads";
 import { LeadsBrowser } from "@/console/leads/leads-browser";
+import { LeadsTabs } from "@/console/leads/leads-tabs";
+import { LeadsHeader } from "@/console/leads/page-header";
 import { consoleMessages } from "@/console/messages";
 import { AppError } from "@/services/errors";
 import { formatTime } from "@/utils/datetime";
@@ -25,27 +26,8 @@ const m = consoleMessages.leads;
 export const metadata: Metadata = { title: m.pageTitle };
 
 /**
- * `action` is the header's buttons: Add a business lead, and Export CSV for the roles that have it.
- * A phone draws neither. Where there would have been an export, the phone board says to open the
- * page on a larger screen instead.
- */
-function Header({ updated, action, exportOnPhone = false }: { readonly updated?: string; readonly action?: ReactNode; readonly exportOnPhone?: boolean }) {
-  return (
-    <header className="mt-6 flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <span className="legend-sm text-accent-text">{m.kicker}</span>
-        <h1 className="optical-hang tracking-head mt-2 text-4xl">{m.title}</h1>
-        <p className="text-ink-1/70 mt-2 max-w-[56ch]">{m.lead}</p>
-        {updated ? <p className="legend mt-3">{m.updated(updated)}</p> : null}
-        {exportOnPhone ? <p className="text-ink-3 text-label mt-3 sm:hidden">{m.export.phone}</p> : null}
-      </div>
-      {action ? <div className="flex flex-wrap items-center gap-3 max-sm:hidden">{action}</div> : null}
-    </header>
-  );
-}
-
-/**
- * Module 06, Leads (first part): everyone who gave us an email, sign-ups and accounts as one list.
+ * Module 06, Leads, the Lifecycle tab: everyone who gave us an email, sign-ups and accounts as one
+ * list. The Business pipeline is its other tab (leads/pipeline/page.tsx).
  * Owner, Admin and Support; a Viewer is drawn No access, as the sheet draws it.
  *
  * The page is given MASKED addresses and nothing else. The four filters, the page number and the
@@ -67,7 +49,7 @@ export default async function LeadsPage({ searchParams }: { readonly searchParam
   if (ROLE_RANK[member.role] < ROLE_RANK.support) {
     return (
       <ConsoleFrame member={member}>
-        <Header />
+        <LeadsHeader />
         <div className="mt-6">
           <NoAccessState role={member.role} />
         </div>
@@ -104,16 +86,17 @@ export default async function LeadsPage({ searchParams }: { readonly searchParam
   return (
     <ConsoleFrame member={member}>
       <LeadExportProvider filters={filters} environment={environment} total={page?.total ?? null}>
-        <Header
+        <LeadsHeader
           updated={formatTime(now)}
-          exportOnPhone={canExport}
+          phoneNote={canExport ? m.export.phone : undefined}
           action={
             <>
-              <AddBusinessLead members={members} me={member.userId} filters={filters} />
+              <AddBusinessLead members={members} me={member.userId} page={leadQuery({ ...filters, lead: null })} />
               {canExport ? <LeadExportButton /> : null}
             </>
           }
         />
+        <LeadsTabs current="lifecycle" />
         <div className="mt-6 flex flex-col gap-6 max-sm:mt-4 max-sm:gap-4">
           <FiguresPlate figures={figures} />
           <LeadsBrowser page={page} filters={filters} detail={detail} tags={tags} environment={environment} members={members} me={member.userId} between={<LeadExportStatus />} />

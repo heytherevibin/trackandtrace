@@ -4,7 +4,7 @@ import { inviteAndSignIn } from "./audit-helpers";
 import { consoleSql, expect, resetConsole, setUpFirstOwner, test } from "./fixtures";
 import { freshAddress, tapThrough } from "./team-helpers";
 import { expectAxeClean, gotoReady } from "../helpers";
-import { layoutBreaks } from "../layout";
+import { layoutBreaks, sidewaysScroll } from "../layout";
 
 const BASE = "http://admin.localhost:4211";
 const m = consoleMessages.leads;
@@ -323,6 +323,99 @@ test.describe("Leads", () => {
     await expect(row).toContainText(m.news.none);
     await expect(row).toContainText(m.sources["added by hand"]);
     expect(await layoutBreaks(page)).toEqual([]);
+  });
+
+  test("the Business pipeline is a board: a card per lead, moved with its Stage picker, opening the same record", async ({ page, baseURL }) => {
+    const owner = await setUpFirstOwner(page, baseURL ?? BASE);
+    const actor = `(select user_id from console.members where email = '${owner.email}')`;
+    const b = m.business;
+    const p = b.board;
+    // Two leads in the pipeline, put there behind the console's back: adding and marking have their
+    // own test above, and this one is about the board.
+    consoleSql(`
+      insert into console.business_leads (person_id, stage, stage_since, owner_id, about) values
+        ('${PENDING.id}', 'new', now() - interval '2 days', ${actor}, 'A card on the board.'),
+        ('${SUBSCRIBED.id}', 'qualified', now(), null, 'Owned by nobody.');`);
+    const column = (name: string) => page.getByRole("region", { name, exact: true });
+
+    await gotoReady(page, "/leads");
+    await page.getByRole("navigation", { name: b.tabs.label }).getByRole("link", { name: b.tabs.pipeline }).click();
+    await expect(page).toHaveURL(/\/leads\/pipeline$/);
+    await expect(page.getByRole("navigation", { name: b.tabs.label }).getByRole("link", { name: b.tabs.pipeline })).toHaveAttribute("aria-current", "page");
+
+    // A card in its stage, masked; an empty stage drawn as one.
+    const card = column(b.stages.new).getByRole("article");
+    await expect(card).toHaveCount(1);
+    await expect(card.getByRole("link", { name: m.table.open(PENDING.masked) })).toBeVisible();
+    await expect(card).toContainText("A card on the board.");
+    await expect(card).toContainText(p.days(2));
+    await expect(column(b.stages.qualified).getByRole("article")).toContainText(p.today);
+    await expect(column(b.stages.won)).toContainText(p.empty);
+    const source = await page.content();
+    expect(source, "a card carries no address").not.toContain(PENDING.email);
+    expect(source).not.toContain(SUBSCRIBED.email);
+    expect(await layoutBreaks(page)).toEqual([]);
+    expect(await sidewaysScroll(page)).toBe(0);
+    await expectAxeClean(page, { allowDesignLockedAccent: true });
+
+    // Moved with the Stage picker: the card changes column, and the move is recorded.
+    await card.getByRole("combobox", { name: p.stageOf(PENDING.masked) }).selectOption("won");
+    await expect(column(b.stages.won).getByRole("article")).toHaveCount(1);
+    await expect(column(b.stages.new)).toContainText(p.empty);
+    expect(consoleSql(`select stage from console.business_leads where person_id = '${PENDING.id}'`)).toBe("won");
+    expect(consoleSql(`select (before ->> 'stage') || '>' || (after ->> 'stage') from console.audit_log where action = 'Moved a business lead' and target = '${PENDING.masked}' and actor_id = ${actor}`)).toBe("new>won");
+
+    // A card opens the lead's record over the board: the same record the list opens.
+    await column(b.stages.won).getByRole("link", { name: m.table.open(PENDING.masked) }).click();
+    await expect(page).toHaveURL(new RegExp(`/leads/pipeline\\?lead=p(:|%3A)${PENDING.id}$`));
+    const record = page.getByRole("dialog", { name: m.record.title });
+    await expect(record.getByRole("combobox", { name: b.stage })).toHaveValue("won");
+    await expect(record.getByText("A card on the board.")).toBeVisible();
+    await expectAxeClean(page, { allowDesignLockedAccent: true });
+
+    // Taken out of the pipeline from its record, the card leaves the board behind it.
+    await record.getByRole("button", { name: b.remove }).click();
+    await page.getByRole("alertdialog", { name: b.removeTitle }).getByRole("button", { name: b.removeConfirm }).click();
+    await expect(record.getByText(b.notIn)).toBeVisible();
+    await record.getByRole("button", { name: "Close" }).click();
+    await expect(page).toHaveURL(/\/leads\/pipeline$/);
+    await expect(column(b.stages.won)).toContainText(p.empty);
+    await expect(column(b.stages.qualified).getByRole("article")).toHaveCount(1);
+
+    // Added from this page, a lead's record opens over the board, not over the list.
+    await page.getByRole("button", { name: b.add }).click();
+    const form = page.getByRole("dialog", { name: b.add });
+    await form.getByLabel(b.email).fill("board@leads-e2e.example");
+    await form.getByLabel(b.about).fill("Added from the board");
+    await form.getByRole("button", { name: b.addAction }).click();
+    await expect(page).toHaveURL(/\/leads\/pipeline\?lead=p(:|%3A)[0-9a-f-]{36}$/);
+    await expect(record.getByText("b•••@leads-e2e.example")).toBeVisible();
+    await record.getByRole("button", { name: "Close" }).click();
+    await expect(column(b.stages.new).getByRole("article")).toContainText("Added from the board");
+  });
+
+  test("on a phone the board is one column of cards that open the record, and nothing moves", async ({ page, baseURL }) => {
+    await setUpFirstOwner(page, baseURL ?? BASE);
+    const b = m.business;
+    consoleSql(`insert into console.business_leads (person_id, stage, about) values ('${PENDING.id}', 'contacted', 'Read on a phone.');`);
+    await page.setViewportSize({ width: 390, height: 844 });
+
+    await gotoReady(page, "/leads/pipeline");
+    await expect(page.getByText(b.board.phone)).toBeVisible();
+    await expect(page.getByRole("button", { name: b.add })).toHaveCount(0);
+    const card = page.getByRole("region", { name: b.stages.contacted, exact: true }).getByRole("article");
+    await expect(card).toContainText("Read on a phone.");
+    await expect(page.getByRole("combobox")).toHaveCount(0);
+    expect(await layoutBreaks(page)).toEqual([]);
+    await expectAxeClean(page, { allowDesignLockedAccent: true });
+
+    // The whole card is the link.
+    const box = await card.boundingBox();
+    if (!box) throw new Error("the card has no box");
+    await page.mouse.click(box.x + box.width - 12, box.y + box.height - 12);
+    const record = page.getByRole("dialog", { name: m.record.title });
+    await expect(record.getByText(PENDING.masked)).toBeVisible();
+    await expect(record.getByText(m.record.largerScreen)).toBeVisible();
   });
 
   test("on a phone the list is cards with nothing to reveal, and the record is the whole screen", async ({ page, baseURL }) => {

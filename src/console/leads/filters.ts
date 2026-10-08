@@ -1,3 +1,4 @@
+import type { Route } from "next";
 import { consoleHref } from "@/console/href";
 
 // What the Leads page's address carries: five filters, the page, and the open lead's id. Never an
@@ -91,3 +92,12 @@ export function sinceFor(seen: SeenRange, now: Date): string | null {
 }
 
 export const hasFilters = (filters: LeadFilters): boolean => filters.news !== null || filters.account !== null || filters.source !== null || filters.tag !== null || filters.seen !== "any";
+
+/**
+ * A page's address with one lead's record open over it: `/leads?news=pending` becomes
+ * `/leads?news=pending&lead=…`, and `/leads/pipeline` becomes `/leads/pipeline?lead=…`. The id is
+ * opaque (`LEAD_ID`), so it is safe there; an address never is.
+ */
+export function leadRecordHref(page: Route, leadId: string): Route {
+  return `${page}${page.includes("?") ? "&" : "?"}lead=${encodeURIComponent(leadId)}` as Route;
+}

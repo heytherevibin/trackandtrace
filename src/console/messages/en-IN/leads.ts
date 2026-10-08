@@ -239,6 +239,25 @@ export const leads = {
     /** Undrawn. */
     removed: "Removed from the pipeline.",
     kept: "A business lead is kept until it is deleted.",
+    tabs: { label: "Leads", lifecycle: "Lifecycle", pipeline: "Business pipeline" },
+    board: {
+      pageTitle: "Business pipeline · Leads · Trakline console",
+      /** The phone board's line: nothing is added or moved from a phone. */
+      phone: "Open on a larger screen to add a business lead or to move one.",
+      empty: "No leads here",
+      today: "Today",
+      days: (n: number) => (n === 1 ? "1 day in stage" : `${n} days in stage`),
+      stageOf: (email: string) => `Stage of ${email}`,
+      /** Undrawn: what a screen reader hears where the initials are drawn. */
+      ownedBy: (name: string) => `Owner: ${name}`,
+      noneTitle: "No business leads yet.",
+      noneDetail: "Add one by hand, or mark a lead as a business enquiry on its record.",
+      noneDetailPhone: "Add one by hand, or mark a lead as a business enquiry on its record, from a larger screen.",
+      /** Undrawn. */
+      unavailableTitle: "Pipeline unavailable",
+      unavailableDetail: "The database didn't answer. Nothing was changed.",
+      retry: "Try again",
+    },
     /** Undrawn, all of them. */
     errors: {
       member: "That address belongs to a console member.",

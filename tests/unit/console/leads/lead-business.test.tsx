@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { parseLeadFilters } from "@/console/leads/filters";
+import { leadQuery, parseLeadFilters } from "@/console/leads/filters";
 import type { LeadBusiness, LeadDetail } from "@/console/leads/leads";
 import { consoleMessages } from "@/console/messages";
 
@@ -50,7 +50,7 @@ beforeEach(() => {
 
 describe("Add a business lead (TC-09)", () => {
   const open = async () => {
-    render(<AddBusinessLead members={MEMBERS} me={ASHA} filters={parseLeadFilters({ news: "pending" })} />);
+    render(<AddBusinessLead members={MEMBERS} me={ASHA} page={leadQuery(parseLeadFilters({ news: "pending" }))} />);
     await userEvent.click(screen.getByRole("button", { name: b.add }));
     return screen.getByRole("dialog", { name: b.add });
   };
