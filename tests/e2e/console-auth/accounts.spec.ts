@@ -1,7 +1,7 @@
 import { consoleMessages } from "@/console/messages";
 import { inviteAndSignIn } from "./audit-helpers";
 import { consoleSql, expect, resetConsole, setUpFirstOwner, test } from "./fixtures";
-import { freshAddress } from "./team-helpers";
+import { freshAddress, tapThrough } from "./team-helpers";
 import { expectAxeClean, gotoReady } from "../helpers";
 import { layoutBreaks, sidewaysScroll } from "../layout";
 
@@ -56,7 +56,9 @@ test.afterAll(() => {
  * 08 Accounts. The list's arithmetic and every state are proven in tests/unit/console/accounts and
  * supabase/tests/console_accounts.test.sql. This proves the path once, in a real browser against
  * the real database: that a whole address and a saved PNR are nowhere in the page, that a search
- * never puts an address in the page's own, and that the two recorded acts left their rows.
+ * never puts an address in the page's own, and that every recorded act left its row. That an
+ * ended session is refused on its very next request is proven where it is enforced, in
+ * supabase/tests/console_account_acts.test.sql.
  */
 test.describe("Accounts", () => {
   test("an Owner filters, finds one account by its whole address, reveals it and reads its record; Support has no Accounts", async ({ page, baseURL }) => {
@@ -177,6 +179,64 @@ test.describe("Accounts", () => {
     }
   });
 
+  test("an account is signed out everywhere, disabled and enabled again, each with a reason and a key, and each recorded", async ({ page, baseURL }) => {
+    const owner = await setUpFirstOwner(page, baseURL ?? BASE);
+    const actor = `(select user_id from console.members where email = '${owner.email}')`;
+    const a = m.acts;
+    const sessions = () => consoleSql(`select count(*) from auth.sessions where user_id = '${ACTIVE.id}'`);
+    const banned = () => consoleSql(`select (banned_until is not null and banned_until > now())::text from auth.users where id = '${ACTIVE.id}'`);
+    const logged = (action: string) => consoleSql(`select target || '|' || reason from console.audit_log where category = 'accounts' and action = '${action}' and actor_id = ${actor}`);
+    const tc01 = page.getByRole("dialog", { name: "Confirm it's you" });
+
+    await gotoReady(page, `/accounts?account=${ACTIVE.id}`);
+    const record = page.getByRole("dialog", { name: m.record.title });
+    await expect(record.getByText(m.record.sessionCount(1))).toBeVisible();
+
+    // Sign out everywhere: asked first, then every session is gone, and they are not disabled.
+    await record.getByRole("button", { name: a.signOut.action }).click();
+    await expect(tc01.getByText(a.signOut.summary(ACTIVE.masked))).toBeVisible();
+    await expect(tc01.getByText(a.signOut.hint(1))).toBeVisible();
+    await expectAxeClean(page, { allowDesignLockedAccent: true });
+    expect(sessions(), "asking ends nothing").toBe("1");
+    await tapThrough(page, "Reported a lost phone and asked us to sign it out.");
+    await expect(page.getByText(a.signOut.done, { exact: true })).toBeVisible();
+    await expect(record.getByText(a.signOut.nobody)).toBeVisible();
+    await expect(record.getByRole("button", { name: a.signOut.action })).toHaveCount(0);
+    expect(sessions()).toBe("0");
+    expect(banned()).toBe("false");
+    expect(logged("Signed an account out everywhere")).toBe(`${ACTIVE.masked}|Reported a lost phone and asked us to sign it out.`);
+
+    // Disable: the confirm says what is kept; afterwards the record says since when and by whom,
+    // offers Enable, and the row behind it reads Disabled.
+    await record.getByRole("button", { name: a.disable.action }).click();
+    await expect(tc01.getByText(a.disable.summary(ACTIVE.masked))).toBeVisible();
+    await expect(tc01.getByText(a.disable.hint)).toBeVisible();
+    expect(banned(), "asking disables nothing").toBe("false");
+    await tapThrough(page, "Automated checks from this account, against the terms.");
+    await expect(page.getByText(a.disable.done, { exact: true })).toBeVisible();
+    await expect(record.getByText(new RegExp(`^Can't sign in since .* IST\\. Disabled by ${owner.name}\\.$`))).toBeVisible();
+    await expect(record.getByRole("button", { name: a.disable.action })).toHaveCount(0);
+    // Found by its markup: the record is a modal, and what is behind a modal has no role to find it by.
+    await expect(page.locator("tr", { hasText: ACTIVE.masked })).toContainText(m.status.disabled);
+    expect(banned()).toBe("true");
+    expect(consoleSql(`select count(*) from public.watchlist_entries where user_id = '${ACTIVE.id}'`), "saved PNRs are kept").toBe("2");
+    expect(consoleSql(`select count(*) from subscriptions.consents where person_id = '${PERSON}' and withdrawn_at is null`), "and so is the subscription").toBe("1");
+    expect(logged("Disabled an account")).toBe(`${ACTIVE.masked}|Automated checks from this account, against the terms.`);
+    expect(await layoutBreaks(page)).toEqual([]);
+    await expectAxeClean(page, { allowDesignLockedAccent: true });
+
+    // Enable: they can sign in again, and nothing else changed.
+    await record.getByRole("button", { name: a.enable.action }).click();
+    await expect(tc01.getByText(a.enable.summary(ACTIVE.masked))).toBeVisible();
+    await tapThrough(page, "Wrote in and agreed to stop the automated checks.");
+    await expect(page.getByText(a.enable.done, { exact: true })).toBeVisible();
+    await expect(record.getByText(m.record.canSignIn)).toBeVisible();
+    await expect(record.getByRole("button", { name: a.disable.action })).toBeVisible();
+    expect(banned()).toBe("false");
+    expect(logged("Enabled an account")).toBe(`${ACTIVE.masked}|Wrote in and agreed to stop the automated checks.`);
+    expect(consoleSql("select count(*) from console.audit_log where category = 'accounts' and (coalesce(after::text, '') || target || coalesce(reason, '')) like '%@accounts-e2e%' and target not like '%•••%'"), "the log holds no whole address").toBe("0");
+  });
+
   test("on a phone the list is cards with nothing to reveal, and the record is the whole screen", async ({ page, baseURL }) => {
     const owner = await setUpFirstOwner(page, baseURL ?? BASE);
     await page.setViewportSize({ width: 390, height: 844 });
@@ -205,6 +265,10 @@ test.describe("Accounts", () => {
       .toEqual([0, 0, 390, 844]);
     await expect(record.getByText(m.record.sessionCount(1))).toBeVisible();
     await expect(record.getByText(m.record.private)).toBeVisible();
+    // Nothing is changed from a phone: no act is drawn, and the record says where to go instead.
+    await expect(record.getByText(m.record.largerScreen)).toBeVisible();
+    await expect(record.getByRole("button", { name: m.acts.signOut.action })).toHaveCount(0);
+    await expect(record.getByRole("button", { name: m.acts.disable.action })).toHaveCount(0);
 
     await record.getByRole("button", { name: m.table.revealLabel(ACTIVE.masked) }).click();
     await expect(record.getByText(ACTIVE.email)).toBeVisible();

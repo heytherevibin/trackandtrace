@@ -7,7 +7,7 @@ import { consoleMessages } from "@/console/messages";
 
 const { push, refresh, requestFindAccount, requestRevealAccount, success, error } = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn(), requestFindAccount: vi.fn(), requestRevealAccount: vi.fn(), success: vi.fn(), error: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push, refresh }) }));
-vi.mock("@/console/accounts/accounts-client", () => ({ requestFindAccount, requestRevealAccount }));
+vi.mock("@/console/accounts/accounts-client", () => ({ requestFindAccount, requestRevealAccount, requestAccountAct: vi.fn() }));
 vi.mock("@/components/ui/toast", () => ({ notify: { success, error } }));
 
 import { AccountsBrowser } from "@/console/accounts/accounts-browser";
@@ -34,7 +34,7 @@ const ROWS = [
 ];
 const DETAIL: AccountDetail = { ...ROWS[0]!, sessions: { count: 2, lastSeenAt: "2026-09-19T02:35:00+00:00" } };
 
-const browser = (over: Partial<Parameters<typeof AccountsBrowser>[0]> = {}) => render(<AccountsBrowser page={{ total: 3, rows: ROWS }} filters={NO_ACCOUNT_FILTERS} detail={null} {...over} />);
+const browser = (over: Partial<Parameters<typeof AccountsBrowser>[0]> = {}) => render(<AccountsBrowser page={{ total: 3, rows: ROWS }} filters={NO_ACCOUNT_FILTERS} detail={null} environment="production" {...over} />);
 const table = () => screen.getByRole("table", { name: m.table.caption });
 const tableRow = (text: string) => within(table()).getByRole("row", { name: new RegExp(text.replace(/[.•]/g, "\\$&")) });
 

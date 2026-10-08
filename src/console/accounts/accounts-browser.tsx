@@ -32,9 +32,12 @@ export function AccountsBrowser({
   page,
   filters,
   detail,
+  environment,
 }: {
   readonly page: AccountPage | null;
   readonly filters: AccountFilters;
+  /** The deployment, for the acts on a record that are approved under it. */
+  readonly environment: string;
   /** The open account's record; why there is none to draw; or null when no record is open. */
   readonly detail: AccountDetail | "unavailable" | "gone" | null;
 }) {
@@ -113,7 +116,17 @@ export function AccountsBrowser({
         onRetry={() => router.refresh()}
       />
       {detail !== null && open !== null ? (
-        <AccountDrawer detail={detail} revealed={revealed[open] ?? null} revealing={revealing === open} onReveal={() => void reveal(open)} onClose={() => router.push(closeHref)} />
+        <AccountDrawer
+          detail={detail}
+          revealed={revealed[open] ?? null}
+          revealing={revealing === open}
+          environment={environment}
+          onReveal={() => void reveal(open)}
+          // The record stays open and is read again, with the list behind it: a disabled account
+          // changes its row too.
+          onChanged={() => router.refresh()}
+          onClose={() => router.push(closeHref)}
+        />
       ) : null}
     </>
   );

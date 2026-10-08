@@ -1,5 +1,5 @@
 /**
- * Module 08, Accounts (first part). Transcribed from ConsoleAccounts.dc.html and
+ * Module 08, Accounts. Transcribed from ConsoleAccounts.dc.html and
  * ConsoleAccountsPhone.dc.html (sheet 24, approved 8 Oct 2026). Strings marked "undrawn" have no
  * board and are this file's own.
  *
@@ -90,8 +90,9 @@ export const accounts = {
     active: "Active",
     canSignIn: "Can sign in.",
     disabled: "Disabled",
-    /** Since when and by whom is drawn; it arrives with Disable, which records both. Until then: */
+    /** Undrawn: an account disabled from outside the console, which records neither when nor by whom. */
     cannotSignIn: "Can't sign in.",
+    cannotSignInSince: (when: string, by: string) => `Can't sign in since ${when} IST. Disabled by ${by}.`,
     account: "Account",
     created: "Created",
     lastSignIn: "Last sign-in",
@@ -114,6 +115,50 @@ export const accounts = {
     unavailable: "This account's record is unavailable: the database didn't answer.",
     /** Undrawn. */
     gone: "That account is no longer here.",
+  },
+
+  /** What a reason-and-key act says when the database refuses it. Undrawn; the audit log's own words. */
+  confirm: {
+    tapMismatch: "That confirmation no longer matches this action. Try again.",
+    refused: "The console wouldn't do that. Reload the page and try again.",
+  },
+
+  acts: {
+    signOut: {
+      title: "Sign out everywhere",
+      detail: "Ends every session on every device, now. They can sign in again.",
+      action: "Sign out everywhere",
+      nobody: "Nobody is signed in, so there is nothing to end.",
+      summary: (email: string) => `Sign out ${email} everywhere`,
+      /** Singular undrawn. */
+      hint: (sessions: number) => `This ends ${sessions === 1 ? "their session" : `their ${sessions} sessions`} on every device, now. They can sign in again straight away.`,
+      /** Undrawn. */
+      done: "Signed out everywhere.",
+    },
+    disable: {
+      title: "Disable",
+      detail: "Signs them out now and stops every sign-in until the account is enabled. Saved PNRs and subscriptions are kept.",
+      action: "Disable",
+      summary: (email: string) => `Disable the account ${email}`,
+      hint: "This signs them out now and stops every sign-in until the account is enabled. Their saved PNRs and subscriptions are kept, and news still reaches them if they are subscribed.",
+      /** Undrawn. */
+      done: "Account disabled.",
+    },
+    enable: {
+      title: "Enable",
+      detail: "Lets them sign in again with the same methods. Nothing else changes.",
+      action: "Enable",
+      summary: (email: string) => `Enable the account ${email}`,
+      hint: "They can sign in again with the same methods. Nothing else changes.",
+      /** Undrawn. */
+      done: "Account enabled.",
+    },
+    /** Undrawn. */
+    errors: {
+      nobody: "Nobody is signed in to that account any more.",
+      alreadyDisabled: "That account is already disabled.",
+      notDisabled: "That account is not disabled.",
+    },
   },
 
   errors: {

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ActsSections } from "@/console/accounts/account-acts";
 import type { AccountDetail } from "@/console/accounts/accounts";
 import { leadHref, StatusTag } from "@/console/accounts/accounts-plate";
 import { signInLine } from "@/console/accounts/sign-in";
@@ -23,7 +24,9 @@ function Record({ detail, shown }: { readonly detail: AccountDetail; readonly sh
             <span>
               <StatusTag disabled />
             </span>
-            <span className="text-ink-2 text-label">{r.cannotSignIn}</span>
+            {/* Since when and by whom, when the console disabled it; an account disabled from
+                outside the console has neither on record. */}
+            <span className="text-ink-2 text-label">{detail.disabledAt && detail.disabledBy ? r.cannotSignInSince(formatDateTime(detail.disabledAt), detail.disabledBy) : r.cannotSignIn}</span>
           </div>
         ) : (
           <div className="flex flex-col gap-1">
@@ -71,7 +74,8 @@ function Record({ detail, shown }: { readonly detail: AccountDetail; readonly sh
 /**
  * One account's record (ConsoleAccounts.dc.html, Record and Record revealed), in the shell every
  * record shares (record-drawer.tsx). The address is masked until Reveal, which the database
- * records; the closing line, that saved PNRs stay private, never scrolls away.
+ * records; the closing line, that saved PNRs stay private, never scrolls away. It ends with the
+ * acts (account-acts.tsx), which a desktop can use and a phone can only read past.
  *
  * `detail` is the record, or why there is none to draw: it could not be read, or the account is gone.
  */
@@ -79,14 +83,20 @@ export function AccountDrawer({
   detail,
   revealed,
   revealing,
+  environment,
   onReveal,
+  onChanged,
   onClose,
 }: {
   readonly detail: AccountDetail | "unavailable" | "gone";
   /** The whole address, once it has been revealed on this visit. */
   readonly revealed: string | null;
   readonly revealing: boolean;
+  /** The deployment an act is approved under: part of what its key tap is minted over. */
+  readonly environment: string;
   readonly onReveal: () => void;
+  /** An act went through: the record and the list behind it are out of date. */
+  readonly onChanged: () => void;
   readonly onClose: () => void;
 }) {
   const record = typeof detail === "string" ? null : detail;
@@ -106,6 +116,9 @@ export function AccountDrawer({
             onReveal={onReveal}
           />
           <Record detail={record} shown={revealed ?? record.email} />
+          <ActsSections account={record} shown={revealed ?? record.email} environment={environment} onDone={onChanged} />
+          {/* The phone board's closing line: there, the record is read and nothing is changed. */}
+          <p className="border-line text-ink-2 text-label border-t px-4 pb-4 pt-3.5 sm:hidden">{r.largerScreen}</p>
         </>
       )}
     </RecordDrawer>

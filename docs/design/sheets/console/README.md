@@ -201,13 +201,16 @@ What the boards draw:
 
 ### As built (8 Oct 2026)
 
-The page is `src/app/console/accounts/page.tsx`; its parts are in `src/console/accounts/`. It is built in two changes, and this is the first: **the list, search, the three filters, the record and Reveal.** Sign out everywhere, Disable and Enable, the check that makes them take effect at once, and the traveller's sign-in line are the second.
+The page is `src/app/console/accounts/page.tsx`; its parts are in `src/console/accounts/`. It is built in two changes: the list, search, the three filters, the record and Reveal first; then Sign out everywhere, Disable and Enable, the check that makes them take effect at once, and the traveller's sign-in line.
 
-- **The record has no acts yet**, and no line telling a phone to use a larger screen: there is nothing to change on either. Both arrive with the second change.
-- **A disabled account reads "Can't sign in."** Since when and by whom is drawn; the second change records both when it disables an account, and the line gains them then.
+- **"At once" is a rule in the database, not a promise in the page.** A traveller's token is good for up to an hour after its session is gone, so the watchlist's rows are answered only while `session_live()` holds: the session row is still there and the account is not banned. The site asks the same question once per request, so a signed-out traveller's pages say so. If that question cannot be answered the traveller stays signed in on the page, and their saved PNRs stay guarded by the rule itself.
+- **Disable is the auth service's own ban**, set a hundred years out, plus every session ended. Nothing of the traveller's is removed.
+- **A disabled account says since when and by whom only when the console disabled it.** One disabled from outside the console reads "Can't sign in.", which no board draws.
+- **The three confirms are the console's own TC-01 dialog**, as every other reason-and-key act uses, where the boards draw a plate with a title block. Each one's sentence under the bold line is the board's; Sign out everywhere counts the sessions it will end.
+- **The traveller's line** is shown for all three ways in: an email link, Google and a passkey.
 - **Sign-in is the column that gives**, as Tags is in Leads: it takes what is left and cuts its words with an ellipsis, the whole of them a hover away and on the record. Below 1360px every other column takes what its words need, on 10px gutters. A revealed address is never cut.
 - **An account nobody has signed in to yet** reads "Never" under Last sign-in, and "Never signed in" on a phone's card; the boards draw every account signed in.
 - **Dates, pickers, the pager and the undrawn states** follow the Leads page (above): "02 Sept 2026", a label beside a native select, Previous and Next as links, and the module's own words for filters that match nobody, a record that could not be read or is no longer there, and part of an address typed into the search.
 - **The filter bar, the record's shell and the pager's steps are shared with Leads** (`src/console/components/`): lifted out of that module unchanged when this one needed the same pieces.
-- **Reading is Owner and Admin, in the database as on the page.** Finding by email and Reveal each write an audit row under the category `accounts`, by the masked address.
+- **Everything is Owner and Admin, in the database as on the page.** Finding by email, Reveal and the three acts each write an audit row under the category `accounts`, by the masked address; an act's row carries its reason, and how many sessions it ended.
 

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { findAccount, readAccount, readAccounts, revealAccount } from "@/console/accounts/accounts";
+import { ACCOUNT_ACTS, accountActValue } from "@/console/accounts/acts";
+import { actOnAccount, findAccount, readAccount, readAccounts, revealAccount } from "@/console/accounts/accounts";
 import { ACCOUNT_PAGE_SIZE, NO_ACCOUNT_FILTERS, accountQuery, hasAccountFilters, parseAccountFilters } from "@/console/accounts/filters";
 import type { ConsoleDb } from "@/console/auth/db";
 import { consoleMessages } from "@/console/messages";
@@ -136,3 +137,40 @@ describe("reveal and find", () => {
     expect((gone as AppError).code).toBe("NOT_FOUND");
   });
 });
+
+describe("the three acts behind a reason and a key", () => {
+  const REASON = "Reported a lost phone and asked us to sign it out.";
+  const g = consoleMessages.accounts;
+
+  it("names each act as the database and its audit row do, and binds a tap to the deployment", () => {
+    expect(ACCOUNT_ACTS).toEqual({ signOut: "Signed an account out everywhere", disable: "Disabled an account", enable: "Enabled an account" });
+    expect(accountActValue("production")).toBe('{"environment":"production"}');
+  });
+
+  it.each([
+    ["signOut", "console_sign_out_account"],
+    ["disable", "console_disable_account"],
+    ["enable", "console_enable_account"],
+  ] as const)("%s calls its function with the tap's own value and reason, untouched", async (act, fn) => {
+    const { db: client, rpc } = db({ data: null });
+    await actOnAccount(client, act, "production", ID, '{"environment":"production"}', REASON);
+    expect(rpc).toHaveBeenCalledWith(fn, { p_environment: "production", p_id: ID, p_value: '{"environment":"production"}', p_reason: REASON });
+  });
+
+  it.each([
+    ["no access", g.errors.noAccess, 403],
+    ["no tap for this action", g.confirm.tapMismatch, 403],
+    ["environment mismatch", g.confirm.refused, 403],
+    ["no such account", g.errors.gone, 404],
+    ["nobody is signed in", g.acts.errors.nobody, 400],
+    ["already disabled", g.acts.errors.alreadyDisabled, 400],
+    ["not disabled", g.acts.errors.notDisabled, 400],
+    ["something nobody planned for", g.errors.database, 503],
+  ])("turns the database's %j into the console's words", async (raised, shown, status) => {
+    const err = await actOnAccount(db({ error: { message: raised } }).db, "disable", "production", ID, "{}", REASON).then(() => null, (e: unknown) => e);
+    expect(err).toBeInstanceOf(AppError);
+    expect((err as AppError).message).toBe(shown);
+    expect((err as AppError).status).toBe(status);
+  });
+});
+

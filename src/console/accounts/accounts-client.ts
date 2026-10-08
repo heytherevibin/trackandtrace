@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import type { AccountRow } from "@/console/accounts/accounts";
+import type { AccountAct } from "@/console/accounts/acts";
 import { consoleApiMessage } from "@/console/api-message";
 import { apiRequest } from "@/services/api-client";
 
@@ -13,6 +14,7 @@ export type Failed = { readonly kind: "failed"; readonly message: string };
 // The row is checked on the server (accounts.ts) before it is sent; here only its presence is.
 const foundSchema = z.object({ ok: z.literal(true), account: z.custom<AccountRow>((value) => typeof value === "object" && value !== null).nullable() }).strict();
 const revealedSchema = z.object({ ok: z.literal(true), address: z.string() }).strict();
+const doneSchema = z.object({ ok: z.literal(true) }).strict();
 
 function post(body: unknown): RequestInit {
   return { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) };
@@ -29,3 +31,12 @@ export async function requestRevealAccount(id: string): Promise<{ readonly kind:
   const result = await apiRequest("/api/accounts/reveal", post({ id }), revealedSchema);
   return result.ok ? { kind: "done", address: result.data.address } : { kind: "failed", message: consoleApiMessage(result.error) };
 }
+
+const ACT_PATHS = { signOut: "/api/accounts/sign-out", disable: "/api/accounts/disable", enable: "/api/accounts/enable" } as const satisfies Record<AccountAct, string>;
+
+/** Sign out everywhere, Disable or Enable, after its tap. `value` and `reason` are the strings the tap was minted over. */
+export async function requestAccountAct(act: AccountAct, id: string, value: string, reason: string): Promise<{ readonly kind: "done" } | Failed> {
+  const result = await apiRequest(ACT_PATHS[act], post({ id, value, reason }), doneSchema);
+  return result.ok ? { kind: "done" } : { kind: "failed", message: consoleApiMessage(result.error) };
+}
+

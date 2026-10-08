@@ -6,6 +6,7 @@ import { parseAccountFilters, type AccountSearchParams } from "@/console/account
 import { createConsoleDb } from "@/console/auth/db";
 import { requireConsoleMember } from "@/console/auth/guard";
 import { ROLE_RANK } from "@/console/auth/member";
+import { consoleEnvironment } from "@/console/auth/session";
 import { ConsoleFrame } from "@/console/components/console-frame";
 import { NoAccessState } from "@/console/components/frame-states";
 import { consoleHref } from "@/console/href";
@@ -36,7 +37,8 @@ function AccountsHeader({ updated }: { readonly updated?: string }) {
  * The page is given MASKED addresses and a COUNT of saved PNRs, and nothing else about either. The
  * three filters, the page number and the open account's id come from the address; an email never
  * does (filters.ts). Reading the list or a record writes no audit row. Revealing an address and
- * looking one up do, and the database writes them (20261010090000_console_accounts.sql).
+ * looking one up do, and the database writes them (20261010090000_console_accounts.sql). Sign out
+ * everywhere, Disable and Enable are recorded too, each behind a reason and a key (20261011090000).
  *
  * Each read fails on its own: a list that could not be read is not "No accounts yet", and a record
  * that could not be read does not take the list down with it.
@@ -76,7 +78,7 @@ export default async function AccountsPage({ searchParams }: { readonly searchPa
     <ConsoleFrame member={member}>
       <AccountsHeader updated={formatTime(now)} />
       <div className="mt-6 flex flex-col gap-6 max-sm:mt-4 max-sm:gap-4">
-        <AccountsBrowser page={page} filters={filters} detail={detail} />
+        <AccountsBrowser page={page} filters={filters} detail={detail} environment={consoleEnvironment()} />
       </div>
     </ConsoleFrame>
   );

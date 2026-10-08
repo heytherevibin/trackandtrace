@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { AccountAct } from "@/console/accounts/acts";
 import { ACCOUNT_ID, ACCOUNT_PAGE_SIZE, type AccountFilters } from "@/console/accounts/filters";
 import type { ConsoleDb } from "@/console/auth/db";
 import { LEAD_ID, NEWS_STATUSES, sinceFor } from "@/console/leads/filters";
@@ -16,6 +17,7 @@ import { AppError } from "@/services/errors";
 // A database error THROWS: "no accounts" and "the database is down" are different pages.
 
 const m = consoleMessages.accounts.errors;
+const guarded = consoleMessages.accounts;
 
 const when = z.iso.datetime({ offset: true });
 const count = z.number().int().nonnegative();
@@ -65,6 +67,12 @@ function fromError(error: { readonly message: string }): AppError {
   if (text.includes("no access")) return new AppError("INVALID_INPUT", m.noAccess, { status: 403 });
   if (text.includes("no such account")) return new AppError("NOT_FOUND", m.gone);
   if (text.includes("not an address")) return new AppError("INVALID_INPUT", m.notAddress);
+  // The reason-and-key acts' own refusals.
+  if (text.includes("no tap for this action")) return new AppError("INVALID_INPUT", guarded.confirm.tapMismatch, { status: 403 });
+  if (text.includes("environment mismatch")) return new AppError("INVALID_INPUT", guarded.confirm.refused, { status: 403 });
+  if (text.includes("nobody is signed in")) return new AppError("INVALID_INPUT", guarded.acts.errors.nobody);
+  if (text.includes("already disabled")) return new AppError("INVALID_INPUT", guarded.acts.errors.alreadyDisabled);
+  if (text.includes("not disabled")) return new AppError("INVALID_INPUT", guarded.acts.errors.notDisabled);
   return unavailable();
 }
 
@@ -109,3 +117,16 @@ export async function findAccount(db: ConsoleDb, environment: string, email: str
   if (error) throw fromError(error);
   return data === null ? null : parsed(rowShape, data);
 }
+
+const ACT_FUNCTIONS = { signOut: "console_sign_out_account", disable: "console_disable_account", enable: "console_enable_account" } as const satisfies Record<AccountAct, string>;
+
+/**
+ * Sign out everywhere, Disable or Enable. `value` and `reason` go through VERBATIM: they are two of
+ * the four strings the member's tap was minted over, and the database spends that tap by
+ * re-digesting its own arguments. Every refusal there comes before the tap is spent.
+ */
+export async function actOnAccount(db: ConsoleDb, act: AccountAct, environment: string, accountId: string, value: string, reason: string): Promise<void> {
+  const { error } = await db.rpc(ACT_FUNCTIONS[act], { p_environment: environment, p_id: accountId, p_value: value, p_reason: reason });
+  if (error) throw fromError(error);
+}
+
