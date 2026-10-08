@@ -101,7 +101,9 @@ describe("ci.yml", () => {
     const shard = ci.slice(ci.search(/^ {2}e2e-shard:$/m), ci.search(/^ {2}console:$/m));
     const job = Number(/^ {4}timeout-minutes: (\d+)$/m.exec(shard)?.[1]);
     const step = /^ {6}- run: npx playwright test --shard=\$\{\{ matrix\.shard \}\}\/4\n {8}timeout-minutes: (\d+)$/m.exec(shard);
-    expect(step?.[1]).toBe("17");
+    // 22, raised from 17 (2026-10-08): shard 1 had come to 13 to 17 minutes on the runner, and a good pull request failed
+    // on the limit alone (#130). The job's limit went up with it, to keep the eight minutes round the step.
+    expect(step?.[1]).toBe("22");
     expect(Number(step?.[1])).toBeLessThan(job);
     // and room around it for a cache-miss setup (npm ci, the browsers) and the report upload: the job's limit must never
     // beat the step's to it, or the blob report is lost with the job (final review)
