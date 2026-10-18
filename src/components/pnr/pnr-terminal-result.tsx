@@ -51,9 +51,9 @@ export function ResultTags({ result, next }: { readonly result: TerminalResult; 
   );
 }
 
-export function NextBox({ next }: { readonly next: { readonly head: string; readonly text: string; readonly big?: string | null; readonly quiet?: boolean } }) {
+export function NextBox({ next, className }: { readonly next: { readonly head: string; readonly text: string; readonly big?: string | null; readonly quiet?: boolean }; readonly className?: string }) {
   return (
-    <div className={cn("next grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 rounded-control border-2 border-edge px-4 py-3 shadow-control max-sm:grid-cols-1", next.quiet ? "bg-paper text-ink-1" : "bg-accent text-on-fill")}>
+    <div className={cn(className, "next grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 rounded-control border-2 border-edge px-4 py-3 shadow-control max-sm:grid-cols-1", next.quiet ? "bg-paper text-ink-1" : "bg-accent text-on-fill")}>
       <span className="legend col-span-full text-current">{next.head}</span>
       <p className="m-0 max-w-none text-sm font-medium leading-5">{next.text}</p>
       {next.big ? <span className="nb-wipe whitespace-nowrap font-display text-3xl leading-8 max-sm:text-2xl max-sm:leading-7">{next.big}</span> : null}
@@ -173,7 +173,8 @@ export function TerminalRecord({ result, onReset, onRetry, onEdit }: { readonly 
         <p className="m-0 mt-2 text-sm leading-5 text-ink-2">{next?.long ?? result.statusLong}</p>
       </div>
       {ok && result.routeNames ? <p className="m-0 -mt-2 text-sm leading-5 text-ink-2">{result.routeNames}</p> : null}
-      {box ? <NextBox next={box} /> : null}
+      {/* Below sm v4 leads the record with what to do (.result-stack .next { order: -1 }); it holds nothing to Tab to. */}
+      {box ? <NextBox next={box} className="max-sm:order-first" /> : null}
       {ok ? <FactsFrame facts={result.facts} pax={result.pax} /> : result.failResponse ? <FailureFrame response={result.failResponse} /> : null}
       <p className="m-0 font-figure text-xs leading-4 text-ink-3">{result.provenance}</p>
       <div className="flex flex-wrap items-center gap-2 max-sm:grid max-sm:grid-cols-2">
