@@ -5,6 +5,7 @@ import { brokenWords, cutText } from "../layout";
 import { LANDING_INSTRUMENTS, collisionsInView, collisionsTopToBottom } from "../journey/collisions";
 import { waitForJourney } from "../journey/journey-helpers";
 import { text200 } from "../text-200";
+import { JOURNEY_DATE } from "../dates";
 
 // Nightly (spec §5, §9; J6-13): the landing top to bottom, Motion on, at fifteen sizes, and with its text at 200% at five
 // of them: the sizes every PR checks, and the narrowest common Android phone (360×740). The sweep is as dense as the
@@ -68,7 +69,7 @@ async function openTrainRun(page: Page): Promise<void> {
   await page.getByLabel("From", { exact: true }).fill("SBC");
   await page.getByLabel("To", { exact: true }).fill("NDLS");
   await page.getByLabel("To", { exact: true }).blur();
-  await page.getByLabel("Journey date").fill("2026-10-15");
+  await page.getByLabel("Journey date").fill(JOURNEY_DATE);
   await page.getByRole("button", { name: "Find trains" }).click();
   await page.getByTestId("train-row").first().getByRole("button", { name: "This train's run", exact: true }).focus();
   const run = page.getByTestId("train-run");
