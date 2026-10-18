@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "../fixtures";
-import { atRest, motionOff, noAnchoring, scrollIntoChapter, scrollIntoRun, scrollToId, waitForJourney, waitForLive } from "./journey-helpers";
+import { atRest, motionOff, noAnchoring, scrollToId, waitForJourney, waitForLive } from "./journey-helpers";
 
 // Night falls (spec §3.F, §5's "theme sweep"; J6-10): the theme button's change sweeps out from it in a widening circle,
 // the drawn train redrawn inside it. Every clip-path animation on ::view-transition-new(root) is recorded as it starts.
@@ -55,8 +55,8 @@ test.describe("Night falls (spec §3.F)", () => {
     await waitForJourney(page);
     await themeButton(page).click();
     // at once, while the circle widens: ::view-transition lets pointer events through to the page (motion.css)
-    await page.locator(".board").getByRole("link", { name: "Operating principles" }).click();
-    await expect(page).toHaveURL(/#principles$/);
+    await page.getByRole("contentinfo").getByRole("link", { name: "Roadmap", exact: true }).click();
+    await expect(page).toHaveURL(/#roadmap$/);
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   });
 
@@ -93,17 +93,15 @@ test.describe("Night falls (spec §3.F)", () => {
 
   // A theme change never moves the reader (J6 Task 7): the toggle is a button, so its click is no Tab stop's glide
   // (focus-glide.ts) and no place-keeping jump (keep-place.ts), and nothing the new theme redraws changes a height
-  // above them. Wherever they are, in the drawing, in the run or below both, with scroll anchoring on and off.
+  // above them. Wherever they are (the roadmap, the terminus), with scroll anchoring on and off.
   for (const anchoring of ["on", "off"] as const)
-    for (const at of ["anatomy", "run", "record"] as const) {
+    for (const at of ["roadmap", "terminus"] as const) {
       test(`the reader stays where they are in #${at} across the sweep (scroll anchoring ${anchoring})`, async ({ page }) => {
         if (anchoring === "off") await noAnchoring(page);
         await recordSweeps(page);
         await page.goto("/");
         await waitForLive(page);
-        if (at === "anatomy") await scrollIntoChapter(page, 0.5);
-        else if (at === "run") await scrollIntoRun(page, 0.5);
-        else await scrollToId(page, at, 100);
+        await scrollToId(page, at, 100);
         await atRest(page);
         const place = () => page.evaluate((id) => ({ y: window.scrollY, top: document.getElementById(id)?.getBoundingClientRect().top ?? Number.NaN }), at);
         const before = await place();

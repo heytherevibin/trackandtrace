@@ -5,6 +5,7 @@ import { cn } from "@/utils/cn";
 export function Led({
   lit = false,
   busy = false,
+  alert = false,
   variant,
   size = "md",
   label,
@@ -12,6 +13,8 @@ export function Led({
 }: {
   readonly lit?: boolean;
   readonly busy?: boolean;
+  /** Neubrutal v4's red lamp: the digits were refused. */
+  readonly alert?: boolean;
   /**
    * industry.css `.lamp.half` (half filled: under way) and `.lamp.ringed` (a heavier ring in the
    * alert ink: halted). Either wins over `lit` and `busy`.
@@ -34,7 +37,7 @@ export function Led({
         // Neubrutal v4 .lamp: 12px, 2px edge; lime when good, orange (blinking) while running.
         "nb:border-2 nb:border-edge",
         size === "sm" ? "nb:size-2" : "nb:size-3",
-        variant === undefined && (busy ? "nb:bg-orange nb-blink" : lit ? "nb:bg-lime" : "nb:bg-transparent"),
+        variant === undefined && (busy ? "nb:bg-orange nb-blink" : lit ? "nb:bg-lime" : alert ? "nb:bg-red" : "nb:bg-transparent"),
         variant === "half" && "nb:after:bg-orange",
         variant === "ringed" && "nb:border-red",
         className,

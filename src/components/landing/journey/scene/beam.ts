@@ -1,4 +1,4 @@
-import { AdditiveBlending, Color, ConeGeometry, DoubleSide, Group, Mesh, MeshBasicMaterial, PlaneGeometry, ShaderMaterial, UniformsLib, UniformsUtils, type Texture } from "three";
+import { AdditiveBlending, NormalBlending, Color, ConeGeometry, DoubleSide, Group, Mesh, MeshBasicMaterial, PlaneGeometry, ShaderMaterial, UniformsLib, UniformsUtils, type Texture } from "three";
 import { radialTexture } from "./glow";
 import type { Rig } from "./rig";
 
@@ -50,9 +50,11 @@ export function poolTexture(): Texture {
 
 export interface Beam {
   readonly group: Group;
-  /** On at Night at full quality, while the headlight is lit (the pantograph at the wire). */
+  /** On at full quality, while the headlight is lit (the pantograph at the wire). */
   set(on: boolean, lit: number): void;
   setColor(color: Color): void;
+  /** Light adds to the dark by Night; by Day (Neubrutal's cream page) it is laid on, or it would not show at all. */
+  setNight(night: boolean): void;
 }
 
 export function createBeam(rig: Rig, pool: Texture): Beam {
@@ -101,6 +103,13 @@ export function createBeam(rig: Rig, pool: Texture): Beam {
     setColor(c) {
       color.value.copy(c);
       poolMaterial.color.copy(c);
+    },
+    setNight(night) {
+      const blending = night ? AdditiveBlending : NormalBlending;
+      material.blending = blending;
+      poolMaterial.blending = blending;
+      material.needsUpdate = true;
+      poolMaterial.needsUpdate = true;
     },
   };
 }

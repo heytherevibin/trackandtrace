@@ -6,7 +6,7 @@ import { StillNoscript } from "./still-svg";
 export function TerminusStage() {
   return (
     <div className="terminus-stage" aria-hidden="true">
-      <span className="legend-sm terminus-caption">{messages.home.terminus.caption}</span>
+      <span className="legend terminus-caption">{messages.home.terminus.caption}</span>
       <StillDrawing kind="terminus" className="terminus-still" />
       <StillNoscript kind="terminus" className="terminus-still" />
     </div>

@@ -1,4 +1,4 @@
-import { AdditiveBlending, CanvasTexture, Color, Sprite, SpriteMaterial, type Texture } from "three";
+import { AdditiveBlending, NormalBlending, CanvasTexture, Color, Sprite, SpriteMaterial, type Texture } from "three";
 import type { Rig } from "./rig";
 
 // Night's steel glow (spec §3.A; prototype v3's lines.js glow and rig.js sprites): one at the headlight, one where the
@@ -32,6 +32,8 @@ export interface Glow {
   /** `on`: Night at full quality. `headUp`: the pantograph is raised to the wire. */
   set(on: boolean, headUp: boolean): void;
   setColor(color: Color): void;
+  /** Light adds to the dark by Night; by Day (Neubrutal's cream page) it is laid on, or it would not show at all. */
+  setNight(night: boolean): void;
 }
 
 export function createGlow(rig: Rig, texture: Texture): Glow {
@@ -52,6 +54,10 @@ export function createGlow(rig: Rig, texture: Texture): Glow {
     },
     setColor(color) {
       material.color.copy(color);
+    },
+    setNight(night) {
+      material.blending = night ? AdditiveBlending : NormalBlending;
+      material.needsUpdate = true;
     },
   };
 }

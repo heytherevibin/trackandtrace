@@ -38,15 +38,15 @@ describe("the engine's pure pieces (spec §3.B–C; v3's engine.js)", () => {
   });
 
   it("poses the live parts from one pose: the scan early, the line side and the Night lights late", () => {
-    applyLive(parts, camera, anatomyPose(0.05, 2), QUALITY[0], true);
+    applyLive(parts, camera, anatomyPose(0.05, 2), QUALITY[0]);
     expect(parts.departure.group.visible).toBe(false);
     expect(world.rig.group.getObjectByName("beam")?.visible).toBe(false);
-    applyLive(parts, camera, anatomyPose(0.95, 2), QUALITY[0], true);
+    applyLive(parts, camera, anatomyPose(0.95, 2), QUALITY[0]);
     expect(parts.departure.group.visible).toBe(true);
     expect(world.rig.group.getObjectByName("beam")?.visible).toBe(true);
-    applyLive(parts, camera, anatomyPose(0.95, 2), QUALITY[1], true);
+    applyLive(parts, camera, anatomyPose(0.95, 2), QUALITY[1]);
     expect(world.rig.group.getObjectByName("beam")?.visible).toBe(false);
-    applyLive(parts, camera, anatomyPose(0.95, 2), QUALITY[2], false);
+    applyLive(parts, camera, anatomyPose(0.95, 2), QUALITY[2]);
     expect(world.rig.coaches.filter((c) => c.obj.visible)).toHaveLength(1);
   });
 
@@ -90,7 +90,7 @@ describe("the engine's pure pieces (spec §3.B–C; v3's engine.js)", () => {
   });
 
   it("turns the scene's palette into the drawing's, and Night into its weights", () => {
-    const p = toLinePalette({ night: true, ground: { r: 0, g: 0, b: 0 }, ink: { r: 1, g: 1, b: 1 }, steel: { r: 1, g: 0, b: 0 }, steelText: { r: 0, g: 0, b: 1 }, scanDark: { r: 0, g: 0, b: 0 }, scanLight: { r: 0, g: 0, b: 0 } });
+    const p = toLinePalette({ night: true, ground: { r: 0, g: 0, b: 0 }, ink: { r: 1, g: 1, b: 1 }, steel: { r: 1, g: 0, b: 0 }, steelText: { r: 0, g: 0, b: 1 }, lamp: { r: 1, g: 0.85, b: 0.24 }, scanDark: { r: 0, g: 0, b: 0 }, scanLight: { r: 0, g: 0, b: 0 } });
     expect(p.ink.equals(new Color(1, 1, 1))).toBe(true);
     expect(weightsFor(true)).toBe(NIGHT_OPACITY);
   });

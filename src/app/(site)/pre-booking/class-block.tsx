@@ -23,7 +23,7 @@ import { cn } from "@/utils/cn";
 // When the row is open the card becomes a BUTTON that picks which class the date table below is
 // showing, because a table of four possible classes with no caption is a guess.
 
-const TAG = "inline-flex items-center whitespace-nowrap px-2 py-px text-2xs leading-normal tracking-head";
+const TAG = "inline-flex max-w-full items-center whitespace-nowrap max-sm:whitespace-normal px-2 py-px text-2xs leading-normal tracking-head";
 
 const m = messages.booking.availability;
 

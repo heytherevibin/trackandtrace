@@ -33,6 +33,13 @@ not a fork:
   Watchlist, Pre-booking, Menu → the left drawer with the product keys, sign in, the Day/Night row and the disclaimer).
   The offline strip (red) and the site notice (yellow) sit under the masthead. The footer is v4's, plus the Motion
   switch; the Updates by email band stays above it, restyled. The page margin is 16–64px, 12px on a phone.
+- Home (batch 3): v4's hero (ticket, kicker, pink-shadow h1, tags) beside the TL-01 plate — keys pressed in blue, the
+  caret key yellow, a notched perforation, the lamp stub and the stepped Validate → Source → Result bar; the record in
+  place (`pnr-terminal-result.tsx`: tag row, big status, the Next box from `next-action.ts`, eight facts, passengers, the
+  failure frame, Save / Share / full record); Recent chips; Sample PNRs in sample mode only; the phone's pinned Run bar
+  (`html[data-runbar]` hides the tab bar). Then Principles, How it works, Reliability, Roadmap, FAQ, and the close: the
+  Terminus train over the yellow plate. The install plate shows after a first good record. The journey is cut to the
+  terminus (still + live three.js arrival, the headlight v4's yellow in both faces); the rest of it is gone.
 
 ## Direction contract
 

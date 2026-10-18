@@ -1,23 +1,22 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { PLATE_EVENT, RESULT_EVENT, RUN_EVENT, emit, type PlateDetail, type ResultDetail, type RunDetail } from "@/components/landing/journey/journey-events";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { TERMINAL_ID } from "@/components/shell/nav-config";
 import { Plate } from "@/components/ui/plate";
-import { SweepBar } from "@/components/ui/sweep-bar";
+import { Button } from "@/components/ui/button";
 import { messages } from "@/messages";
 import { fetchPnr } from "@/services/pnr-source";
 import { recentStore } from "@/services/stores/recent-store";
 import type { PnrOutcome } from "@/types/domain";
 import { cn } from "@/utils/cn";
 import { formatPnr } from "@/utils/pnr";
-import { PnrActions, PnrCells, PnrEntry, PnrField, PnrHint, PnrInput, PnrStub, useShake } from "./pnr-field";
+import { Perforation, PnrField, PnrStub, useShake } from "./pnr-field";
 import { TerminalRecord } from "./pnr-terminal-result";
 import { MIN_RUNNING_MS, fieldStatus, terminalResult, type TerminalResult } from "./pnr-terminal-state";
 import { PlateMorph } from "./plate-morph";
-import { RecentChecks } from "./recent-checks";
+import { RecentChecks, SamplePnrs } from "./recent-checks";
 
-// The live check plates on the landing sheet. Run makes one real request through
+// The live check plate on the landing sheet. Run makes one real request through
 // the PNR API (never a local port of the fixture), holds the running state long
 // enough to read, and renders what came back in place.
 
@@ -37,7 +36,7 @@ async function request(pnr: string): Promise<PnrOutcome> {
   }
 }
 
-function useCheckPlate(sampleMode: boolean, connected: boolean, hero: boolean) {
+function useCheckPlate(sampleMode: boolean, connected: boolean) {
   const [digits, setDigits] = useState("");
   const [attempted, setAttempted] = useState(false);
   const [phase, setPhase] = useState<Phase>("entry");
@@ -62,27 +61,28 @@ function useCheckPlate(sampleMode: boolean, connected: boolean, hero: boolean) {
     inputRef.current.focus();
   });
 
-  // The hero dial (the landing journey) follows the plate through these; nothing here waits on it.
-  useEffect(() => {
-    emit<PlateDetail>(PLATE_EVENT, { hero, digits: digits.length, running: phase === "running", done: phase === "done" });
-  }, [hero, digits.length, phase]);
-
   const status = fieldStatus({ digits, attempted, running: phase === "running" });
   const focus = () => inputRef.current?.focus();
 
-  const run = async () => {
-    if (phase !== "entry") return;
-    if (digits.length !== 10) {
+  const digitsRef = useRef(digits);
+  digitsRef.current = digits;
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
+
+  const run = () => runWith(digits);
+
+  async function runWith(pnr: string) {
+    if (phaseRef.current === "running") return;
+    if (pnr.length !== 10) {
       setAttempted(true);
       shake();
       return;
     }
-    const pnr = digits;
     const id = runId.current + 1;
     runId.current = id;
     const attemptedAt = new Date();
+    phaseRef.current = "running";
     setPhase("running");
-    emit<RunDetail>(RUN_EVENT, { hero });
     setAnnouncement("");
     const [outcome] = await Promise.all([request(pnr), wait(MIN_RUNNING_MS)]);
     if (runId.current !== id) return;
@@ -90,9 +90,8 @@ function useCheckPlate(sampleMode: boolean, connected: boolean, hero: boolean) {
     recentStore.push(view.recent);
     setResult(view);
     setPhase("done");
-    emit<ResultDetail>(RESULT_EVENT, { hero, kind: view.kind, chartAt: view.chartAt });
     setAnnouncement(messages.check.result.announce(view.statusShort, formatPnr(pnr)));
-  };
+  }
 
   const load = (next: string) => {
     setDigits(next);
@@ -125,13 +124,73 @@ function useCheckPlate(sampleMode: boolean, connected: boolean, hero: boolean) {
       load("");
     },
     load,
+    /** Run again with the same digits (a failure's Try again). */
+    retry: () => {
+      setPhase("entry");
+      setResult(null);
+      window.setTimeout(() => void runWith(digitsRef.current), 0);
+    },
+    /** Back to the entry with the digits kept (a no-record answer's Edit the digits). */
+    edit: () => {
+      focusPending.current = true;
+      setPhase("entry");
+      setResult(null);
+    },
+    /** Put a PNR in and run it at once (a sample chip). */
+    runNow: (next: string) => {
+      load(next);
+      window.setTimeout(() => void runWith(next), 0);
+    },
   };
 }
 
-/** The hero plate: "PNR check — live request · Form TL-01", with the recent strip along its foot. */
-export function PnrTerminal({ sampleMode, connected = false }: { readonly sampleMode: boolean; readonly connected?: boolean }) {
-  const plate = useCheckPlate(sampleMode, connected, true);
+const PHONE = "(max-width: 39.99rem)";
+function subscribePhone(onChange: () => void): () => void {
+  const query = window.matchMedia(PHONE);
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+}
+const isPhone = () => window.matchMedia(PHONE).matches;
+const notPhone = () => false;
+
+/** Below 640px, while the PNR field has focus: Run pinned above the keyboard, the tab bar stepping aside (v4 .runbar).
+ *  Rendered on a phone only, so nothing else ever reads its copy of the counter. */
+function RunBar({ shown: wanted, counter, running, onRun }: { readonly shown: boolean; readonly counter: string; readonly running: boolean; readonly onRun: () => void }) {
+  const phone = useSyncExternalStore(subscribePhone, isPhone, notPhone);
+  const shown = wanted && phone;
+  useEffect(() => {
+    const root = document.documentElement;
+    if (shown) root.dataset.runbar = "";
+    else delete root.dataset.runbar;
+    return () => {
+      delete root.dataset.runbar;
+    };
+  }, [shown]);
+  if (!shown) return null;
+  return (
+    <div aria-hidden="true" className="fixed bottom-0 left-0 z-nav flex w-screen items-center gap-3 border-t-2 border-edge bg-canvas px-3 pb-[calc(12px+var(--safe-bottom))] pt-3 sm:hidden">
+      <span className="legend flex-1 text-ink-2">{counter}</span>
+      {/* Mouse-down, not click: the field keeps focus, so the keyboard stays up while the check runs. */}
+      <Button variant="primary" tabIndex={-1} onMouseDown={(event) => event.preventDefault()} onClick={onRun} className="min-w-35">
+        {running ? messages.check.submitting : messages.check.submit}
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * The hero plate, as Neubrutal v4 draws it: "PNR check — live request · Form TL-01"; the entry, the perforation and the
+ * stub, or the record in place; then the device's recent checks and, in sample mode only, the sample PNRs.
+ * `onResult` tells the hero when a record came back, for the install plate (v4 shows it after a first good check).
+ */
+export function PnrTerminal({ sampleMode, connected = false, onResult }: { readonly sampleMode: boolean; readonly connected?: boolean; readonly onResult?: (ok: boolean) => void }) {
+  const plate = useCheckPlate(sampleMode, connected);
+  const [focused, setFocused] = useState(false);
   const m = messages.check;
+  const done = plate.phase === "done" && plate.result !== null;
+  useEffect(() => {
+    if (done && plate.result) onResult?.(plate.result.kind === "ok");
+  }, [done, plate.result, onResult]);
   return (
     <Plate
       as="div"
@@ -139,13 +198,14 @@ export function PnrTerminal({ sampleMode, connected = false }: { readonly sample
       data-testid="hero-instrument"
       title={m.plate.title}
       meta={[m.plate.form]}
-      padding="md"
-      className={cn("ground", plate.shaking && "shake")}
+      padding="sm"
+      bodyClassName="max-sm:p-3"
+      className={cn("scroll-mt-[140px]", plate.shaking && "shake")}
       onAnimationEnd={plate.onAnimationEnd}
     >
-      <PlateMorph face={plate.phase === "done" && plate.result ? "record" : "entry"}>
-        {plate.phase !== "done" || !plate.result ? (
-          <>
+      <PlateMorph face={done ? "record" : "entry"}>
+        {!done || !plate.result ? (
+          <div onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}>
             <PnrField
               id="pnr-a"
               digits={plate.digits}
@@ -156,61 +216,16 @@ export function PnrTerminal({ sampleMode, connected = false }: { readonly sample
               inputRef={plate.inputRef}
               onActivate={plate.focus}
             />
-            <div aria-hidden="true" className="perforation -mx-5 my-[18px]" />
+            <Perforation />
             <PnrStub status={plate.status} showClear={plate.digits.length > 0 && plate.phase !== "running"} onClear={plate.clear} onRun={plate.run} />
-          </>
+          </div>
         ) : (
-          <TerminalRecord result={plate.result} full onReset={plate.reset} />
+          <TerminalRecord result={plate.result} onReset={plate.reset} onRetry={plate.retry} onEdit={plate.edit} />
         )}
       </PlateMorph>
-      <RecentChecks
-        onPick={(pnr) => {
-          plate.load(pnr);
-        }}
-      />
-      <p className="sr-only" aria-live="polite">
-        {plate.announcement}
-      </p>
-    </Plate>
-  );
-}
-
-/** The closing plate: a second, compact check with the lead line above the cells and the hint beside Run. */
-export function PnrClosingTerminal({
-  sampleMode,
-  connected = false,
-  title,
-  meta,
-  lead,
-}: {
-  readonly sampleMode: boolean;
-  readonly connected?: boolean;
-  readonly title: string;
-  readonly meta: string;
-  readonly lead: string;
-}) {
-  const plate = useCheckPlate(sampleMode, connected, false);
-  const running = plate.phase === "running";
-  return (
-    <Plate as="div" title={title} meta={[meta]} cells="wide" padding="lg" className={cn(plate.shaking && "shake")} onAnimationEnd={plate.onAnimationEnd}>
-      <PlateMorph face={plate.phase === "done" && plate.result ? "record" : "entry"}>
-        {plate.phase !== "done" || !plate.result ? (
-          <>
-            <p className="mb-4 text-body leading-normal text-ink-1/78">{lead}</p>
-            <PnrEntry className="max-w-[640px]">
-              <PnrInput id="pnr-b" ariaLabel={messages.check.label} digits={plate.digits} status={plate.status} onDigits={plate.type} onEnter={plate.run} inputRef={plate.inputRef} />
-              <PnrCells digits={plate.digits} status={plate.status} onActivate={plate.focus} />
-            </PnrEntry>
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <PnrHint inputId="pnr-b" digits={plate.digits} status={plate.status} sampleMode={sampleMode} className="min-w-0 flex-1 leading-normal" />
-              <PnrActions running={running} showClear={plate.digits.length > 0 && !running} onClear={plate.clear} onRun={plate.run} />
-            </div>
-            {running ? <SweepBar className="mt-3.5" /> : null}
-          </>
-        ) : (
-          <TerminalRecord result={plate.result} full={false} onReset={plate.reset} />
-        )}
-      </PlateMorph>
+      <RecentChecks onPick={(pnr) => plate.load(pnr)} />
+      {sampleMode ? <SamplePnrs onPick={plate.runNow} /> : null}
+      <RunBar shown={focused && !done} counter={m.counter(plate.digits.length)} running={plate.phase === "running"} onRun={plate.run} />
       <p className="sr-only" aria-live="polite">
         {plate.announcement}
       </p>

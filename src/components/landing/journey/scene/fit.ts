@@ -1,5 +1,4 @@
 import { Box3, Line, Matrix4, Mesh, Vector3, type Camera, type Group, type Object3D, type PerspectiveCamera } from "three";
-import type { Box } from "../labels-layout";
 import { lerp } from "./math";
 import type { Rig, RigPartId } from "./rig";
 
@@ -8,6 +7,14 @@ import type { Rig, RigPartId } from "./rig";
 // the camera dollies back along its line of sight and slides only as far as it must. The result depends only on the
 // pose, so scrolling back and forth lands on the same frame. Anything under a part flagged userData.noFit (the Night
 // beam) is light, not the drawing, and never counts.
+
+/** A box on the page, in window coordinates. */
+export interface Box {
+  readonly l: number;
+  readonly t: number;
+  readonly r: number;
+  readonly b: number;
+}
 
 export interface Rect {
   readonly x: number;

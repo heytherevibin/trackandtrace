@@ -124,7 +124,7 @@ describe("ci.yml", () => {
   // made shard 2 the slowest of every run: 11.8, 12.3, 11.8, 11.4 and 11.6 minutes against 7.7 for the others' mean (the
   // five runs to 36746923546). Its later specs run after the phone's, so its live drawing and its run fall to different
   // shards.
-  it("runs the desktop suite's later specs after the phone's, so live-drawing and run fall to different shards", async () => {
+  it("runs the desktop suite's later specs after the phone's, every spec once on the desktop and once on the phone", async () => {
     const { default: config } = await import("../../playwright.config");
     const projects = config.projects ?? [];
     expect(projects.map((p) => p.name)).toEqual(["desktop", "mobile", "desktop", "console-desktop", "console-mobile"]);
@@ -136,15 +136,16 @@ describe("ci.yml", () => {
     const specs = readdirSync(join(process.cwd(), "tests/e2e"), { recursive: true, encoding: "utf8" })
       .filter((f) => f.endsWith(".spec.ts") && !/^(console(-auth)?|production|nightly)\//.test(f))
       .map((f) => join(process.cwd(), "tests/e2e", f));
-    expect(specs.length).toBeGreaterThan(40);
+    expect(specs.length).toBeGreaterThan(30); // the journey was cut to its terminus on 2026-10-18, its specs with it
     // every spec runs on the phone, and on the desktop exactly once
     for (const spec of specs) {
       expect(runs(1, spec), spec).toBe(true);
       expect([runs(0, spec), runs(2, spec)].filter(Boolean), spec).toHaveLength(1);
     }
+    // The journey is the terminus alone since 2026-10-18 (its run is gone): live-drawing still runs in the first half.
     const at = (name: string) => specs.find((s) => s.endsWith(`journey/${name}.spec.ts`)) ?? "";
     expect(runs(0, at("live-drawing"))).toBe(true);
-    expect(runs(2, at("run"))).toBe(true);
+    expect(runs(2, at("night-falls"))).toBe(true);
   });
 });
 

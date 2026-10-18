@@ -46,7 +46,7 @@ export const COUNT_CHIP = "rounded-control border-2 border-edge bg-paper px-1.5 
 /** In-page anchors on the landing sheet. The landing sections must carry these ids. */
 export const LANDING_SECTIONS: readonly { readonly id: string; readonly label: string }[] = [
   { id: "how", label: messages.shell.nav.sections.how },
-  { id: "record", label: messages.shell.nav.sections.record },
+  { id: "reliability", label: messages.shell.nav.sections.reliability },
   { id: "roadmap", label: messages.shell.nav.sections.roadmap },
   { id: "faq", label: messages.shell.nav.sections.faq },
 ];

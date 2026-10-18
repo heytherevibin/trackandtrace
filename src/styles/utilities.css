@@ -306,3 +306,56 @@
 @utility z-skip {
   z-index: var(--z-skip);
 }
+
+/* Neubrutal v4's display sizes, as drawn (inline in the prototype; the contract keeps arbitrary sizes out of classes).
+   nb-hero: the landing's h1; nb-page: an app page's h1; nb-section: a section's h2; nb-status: a record's big status;
+   nb-title: a plate's own h2 (24/28). Each steps down on a phone as v4's media rules do. */
+@utility nb-hero {
+  font-size: clamp(32px, 4.4vw, 56px);
+  line-height: 1;
+  @media (max-width: 39.99rem) {
+    font-size: 26px;
+    line-height: 1.02;
+  }
+}
+@utility nb-page {
+  font-size: clamp(28px, 4vw, 40px);
+  line-height: 1.05;
+  @media (max-width: 39.99rem) {
+    font-size: 30px;
+    line-height: 1.02;
+  }
+}
+@utility nb-section {
+  font-size: clamp(24px, 2.8vw, 40px);
+  line-height: 1.1;
+  @media (max-width: 39.99rem) {
+    font-size: 24px;
+    line-height: 28px;
+    overflow-wrap: anywhere;
+  }
+}
+@utility nb-status {
+  font-size: clamp(24px, 2.8vw, 32px);
+  line-height: 1.05;
+  @media (max-width: 39.99rem) {
+    font-size: 24px;
+    line-height: 28px;
+    overflow-wrap: anywhere;
+  }
+}
+@utility nb-title {
+  font-size: 24px;
+  line-height: 28px;
+}
+/* The hard shadows under v4's headings: pink under an h1, yellow under a section's h2 (dark-pink and dark-yellow by
+   Night, neubrutal.css). */
+@utility nb-shadow-pink {
+  text-shadow: 4px 4px 0 var(--h1-shadow);
+  @media (max-width: 39.99rem) {
+    text-shadow: 3px 3px 0 var(--h1-shadow);
+  }
+}
+@utility nb-shadow-yellow {
+  text-shadow: 3px 3px 0 var(--h2-shadow);
+}

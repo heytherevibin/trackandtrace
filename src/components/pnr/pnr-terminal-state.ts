@@ -4,14 +4,14 @@ import type { PassengerSeat, PnrOutcome, PnrResult, TicketStatus } from "@/types
 import { formatTime } from "@/utils/datetime";
 import { formatPnr } from "@/utils/pnr";
 import { statusDescription, statusLabel } from "@/utils/status-tone";
-import { chartValue, sourceTagFor, timeValue } from "./record-values";
+import { chartValue, distanceValue, sourceTagFor, timeValue } from "./record-values";
 import { publicSourceOf } from "@/utils/source";
 
 // The check plate's behaviour as pure functions: the drawn `formVals` states and
 // the `buildResult` view, fed by the real outcome instead of a local port.
 
 export type FieldStatus = "idle" | "partial" | "ready" | "invalid" | "running";
-export type LampState = "off" | "lit" | "busy";
+export type LampState = "off" | "lit" | "busy" | "alert";
 
 /** The running state is held at least this long so the sweep reads. */
 export const MIN_RUNNING_MS = 900;
@@ -24,11 +24,12 @@ export function fieldStatus({ digits, attempted, running }: { readonly digits: s
   return digits.length === 0 ? "idle" : "partial";
 }
 
-export function hintFor(status: FieldStatus, digits: string, sampleMode: boolean): string {
+export function hintFor(status: FieldStatus, digits: string): string {
   const m = messages.check;
   switch (status) {
     case "idle":
-      return sampleMode ? m.hints.idleSample : m.hints.idle;
+      // v4: the sample PNRs are their own row on the plate (sample mode), so the hint stays the ticket's.
+      return m.hints.idle;
     case "partial":
       return m.progress(digits.length);
     case "ready":
@@ -44,7 +45,7 @@ export function lampFor(status: FieldStatus): { readonly state: LampState; reado
   const m = messages.check.lamp;
   if (status === "running") return { state: "busy", label: m.running };
   if (status === "ready") return { state: "lit", label: m.ready };
-  if (status === "invalid") return { state: "off", label: m.invalid };
+  if (status === "invalid") return { state: "alert", label: m.invalid };
   return { state: "off", label: m.idle };
 }
 
@@ -83,6 +84,14 @@ export interface TerminalResult {
   readonly recent: RecentCheck;
   /** The source's own chart time (spec §3.A, Hero), for an ok result; null otherwise. Never computed here. */
   readonly chartAt: string | null;
+  /** The record itself, for an ok result: the Next box counts down from it as the minutes pass (next-action.ts). */
+  readonly record: PnrResult | null;
+  /** "Bengaluru → New Delhi", where the source named both ends; null otherwise. */
+  readonly routeNames: string | null;
+  /** The failure frame's Response (v4): No record, Held back, Refused or Not received; null for a record. */
+  readonly failResponse: string | null;
+  /** Seconds the rate limit asks to wait, when it said. */
+  readonly retryAfter?: number;
 }
 
 /** A status as the passenger table writes it: CNF, RAC 4, WL 9. */
@@ -113,20 +122,28 @@ export function statusBigFor(result: PnrResult): string {
   return statusLabel(result.lead.status, result.lead.position);
 }
 
+/** v4's eight facts, in its order. A fact the source did not send reads Not returned (record-values.ts). */
 export function factsFor(result: PnrResult): readonly TerminalFact[] {
   const f = messages.check.result.facts;
   const v = messages.check.result.values;
   const { snapshot, lead } = result;
   const train = snapshot.train;
+  const chart = snapshot.chartPrepared === true && snapshot.chartTime ? v.chartPreparedAt(snapshot.chartTime) : chartValue(snapshot, v.chart);
   return [
-    { label: f.train, value: train.number },
+    { label: f.train, value: train.name ? v.pair(train.number, train.name) : train.number },
     { label: f.route, value: v.route(train.from.code, train.to.code) },
     { label: f.journey, value: snapshot.journeyDateLabel },
-    { label: f.classQuota, value: v.pair(snapshot.cls, lead.quota) },
     { label: f.departs, value: timeValue(train.depTime, v.departs) },
-    ...(lead.coach && lead.berth ? [{ label: f.coachBerth, value: v.pair(lead.coach, lead.berth) }] : []),
-    { label: f.chart, value: chartValue(snapshot, v.chart) },
+    { label: f.classQuota, value: v.pair(snapshot.cls, lead.quota) },
+    { label: f.distance, value: distanceValue(train.distanceKm) },
+    { label: f.chart, value: chart },
+    { label: f.coachBerth, value: lead.coach && lead.berth ? v.pair(lead.coach, lead.berth) : messages.check.result.passengers.notAllocated },
   ];
+}
+
+function routeNamesFor(result: PnrResult): string | null {
+  const { from, to } = result.snapshot.train;
+  return from.city && to.city ? messages.check.result.values.route(from.city, to.city) : null;
 }
 
 export function recentLabelFor(result: PnrResult): string {
@@ -147,7 +164,7 @@ export function terminalResult(outcome: PnrOutcome, { pnr, attemptedAt, sampleMo
   const r = messages.check.result;
   const attempted = formatTime(attemptedAt);
   const checkedAt = attemptedAt.toISOString();
-  const base = { pnr, pnrLabel: r.pnr(formatPnr(pnr)), facts: [], pax: [], chartAt: null } as const;
+  const base = { pnr, pnrLabel: r.pnr(formatPnr(pnr)), facts: [], pax: [], chartAt: null, record: null, routeNames: null } as const;
   const activeSource = sampleMode ? r.sources.fixture : r.sources.live;
 
   if (outcome.ok) {
@@ -163,7 +180,10 @@ export function terminalResult(outcome: PnrOutcome, { pnr, attemptedAt, sampleMo
       sample: tag === "sample",
       provenance: r.provenance.retrieved(formatTime(result.checkedAt), r.sources[publicSourceOf(result.snapshot.source)]),
       facts: factsFor(result),
-      pax: result.snapshot.pax.length > 1 ? paxRows(result.snapshot.pax) : [],
+      pax: paxRows(result.snapshot.pax),
+      record: result,
+      routeNames: routeNamesFor(result),
+      failResponse: null,
       recent: { pnr, label: recentLabelFor(result), status: result.lead.status, position: result.lead.position, checkedAt: result.checkedAt },
       chartAt: result.snapshot.chartAt ?? null,
     };
@@ -179,6 +199,7 @@ export function terminalResult(outcome: PnrOutcome, { pnr, attemptedAt, sampleMo
         statusLong: r.notFound.long,
         sample: sampleMode,
         provenance: r.provenance.retrievedOnly(attempted, activeSource),
+        failResponse: r.failure.noRecord,
         recent: { pnr, status: "NOT_FOUND", position: null, checkedAt },
       };
     case "RATE_LIMITED":
@@ -190,6 +211,8 @@ export function terminalResult(outcome: PnrOutcome, { pnr, attemptedAt, sampleMo
         statusLong: r.limited.long(typeof outcome.retryAfter === "number" ? r.limited.retry(outcome.retryAfter) : r.limited.retryLater),
         sample: false,
         provenance: r.provenance.heldBack(attempted),
+        failResponse: r.failure.heldBack,
+        retryAfter: typeof outcome.retryAfter === "number" ? outcome.retryAfter : undefined,
         recent: { pnr, label: r.limited.short, checkedAt },
       };
     case "INVALID":
@@ -201,6 +224,7 @@ export function terminalResult(outcome: PnrOutcome, { pnr, attemptedAt, sampleMo
         statusLong: r.refused.long,
         sample: false,
         provenance: r.provenance.refused(attempted),
+        failResponse: r.failure.refused,
         recent: { pnr, label: r.refused.short, checkedAt },
       };
     case "SOURCE_UNAVAILABLE":
@@ -213,6 +237,7 @@ export function terminalResult(outcome: PnrOutcome, { pnr, attemptedAt, sampleMo
         statusLong: connected ? outcome.message : r.unavailable.long,
         sample: false,
         provenance: connected ? r.provenance.noAnswer(attempted) : r.provenance.silent(attempted),
+        failResponse: r.failure.notReceived,
         recent: { pnr, label: r.unavailable.short, checkedAt },
       };
   }

@@ -19,6 +19,8 @@ export interface ScenePalette {
   readonly steel: Rgb;
   /** --accent-text: the dimension lines, the scan's gate, the glow and the beam. */
   readonly steelText: Rgb;
+  /** --accent in both faces: the headlight's glow and beam (Neubrutal v4's yellow). */
+  readonly lamp: Rgb;
   readonly scanDark: Rgb;
   readonly scanLight: Rgb;
 }
@@ -57,6 +59,7 @@ export function readPalette(read: (token: PaletteToken) => string, night: boolea
     ink,
     steel: night ? accentText : accent,
     steelText: accentText,
+    lamp: accent,
     scanDark: night ? mix(accent, ground, 0.5) : mix(accent, ink, 0.4),
     scanLight: night ? mix(accent, ink, 0.3) : mix(accent, ground, 0.5),
   };

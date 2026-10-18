@@ -29,7 +29,7 @@ const CELL = "font-display text-label font-semibold uppercase leading-6 tracking
 // Set in caps like every other control on the sheet. `uppercase` is CSS, not copy: the accessible
 // name stays "Only what I can book", so a screen reader and a test both still read the sentence.
 const CHIP =
-  "press relative inline-flex min-h-8 cursor-pointer select-none items-center justify-center max-w-full shrink-0 whitespace-normal border px-2.5 py-1 font-display text-label font-semibold uppercase leading-none tracking-caps max-sm:h-11";
+  "press relative inline-flex min-h-8 cursor-pointer select-none items-center justify-center max-w-full shrink-0 whitespace-normal border px-2.5 py-1 font-display text-label font-semibold uppercase leading-none tracking-caps max-sm:h-11 max-w-full wrap-anywhere";
 const ON = "border-accent bg-accent-soft text-accent-soft-ink";
 const OFF = "border-line bg-transparent text-ink-1 hover:bg-ink-1/7";
 
@@ -158,7 +158,7 @@ export function TrainsPlate({
           {m.title}
         </h2>
         {answer && !refusal ? (
-          <span className={cn(CELL, "whitespace-nowrap border-l border-line px-5 py-2.5 text-ink-1/70", plateCellClass(0))}>
+          <span className={cn(CELL, "whitespace-nowrap max-sm:whitespace-normal max-sm:wrap-anywhere border-l border-line px-5 py-2.5 text-ink-1/70", plateCellClass(0))}>
             {m.count(rows.length, answer.leadClass)}
           </span>
         ) : null}
@@ -166,7 +166,7 @@ export function TrainsPlate({
         {sampleData ? (
           <span
             title={messages.common.sampleDataHint}
-            className={cn(CELL, "whitespace-nowrap border-l border-line px-5 py-2.5 text-ink-1/70", plateCellClass(1))}
+            className={cn(CELL, "whitespace-nowrap max-sm:whitespace-normal max-sm:wrap-anywhere border-l border-line px-5 py-2.5 text-ink-1/70", plateCellClass(1))}
           >
             {messages.common.sampleData}
           </span>
@@ -180,11 +180,11 @@ export function TrainsPlate({
       ) : (
         <>
           <div className="flex flex-wrap items-center gap-x-5 gap-y-3 border-b border-line px-5 py-3">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <div className="flex min-w-0 max-w-full flex-wrap items-center gap-x-3 gap-y-2">
               <span className="legend-sm" id="tl02-sort">
                 {m.sort.label}
               </span>
-              <div role="group" aria-labelledby="tl02-sort" className="flex flex-wrap gap-2">
+              <div role="group" aria-labelledby="tl02-sort" className="flex min-w-0 max-w-full flex-wrap gap-2">
                 {SORTS.map(({ key, label }) => (
                   <button key={key} type="button" aria-pressed={sort === key} className={cn(CHIP, sort === key ? ON : OFF)} onClick={() => setSort(key)}>
                     {label}

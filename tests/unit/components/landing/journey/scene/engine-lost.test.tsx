@@ -67,7 +67,7 @@ vi.mock("@/components/landing/journey/scene/world", async (importOriginal) => {
 });
 
 const INK = { r: 0, g: 0, b: 0 };
-const palette: ScenePalette = { night: false, ground: INK, ink: INK, steel: INK, steelText: INK, scanDark: INK, scanLight: INK };
+const palette: ScenePalette = { night: false, ground: INK, ink: INK, steel: INK, steelText: INK, lamp: INK, scanDark: INK, scanLight: INK };
 const options = { palette, coaches: 1, words: { platform: "Platform", departures: "Departures" }, family: "serif" };
 const pause = () => Promise.resolve();
 const heard: WebglDetail[] = [];

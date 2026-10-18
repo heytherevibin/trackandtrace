@@ -26,7 +26,8 @@ export function plateCellClass(index: number): string {
 
 // Neubrutal v4 .hd (nb:): the title block is ruled with the 2px edge; its cells are Space Mono 700 12/16 caps,
 // 12px × 16px, the title in ink and the meta in ink-3.
-const NB_CELL = "nb:font-figure nb:font-bold nb:text-xs nb:tracking-wide nb:px-4 nb:py-3";
+// A meta cell keeps to one line as drawn, and wraps (anywhere) only where it could not fit: text made larger on a phone.
+const NB_CELL = "nb:font-figure nb:font-bold nb:text-xs nb:tracking-wide nb:px-4 nb:py-3 nb:whitespace-normal nb:wrap-anywhere";
 
 export interface PlateProps extends Omit<HTMLAttributes<HTMLElement>, "title"> {
   readonly as?: "section" | "div" | "article" | "aside" | "figure";

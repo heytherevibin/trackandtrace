@@ -42,7 +42,7 @@ export function SavedPlate({
           {title}
         </span>
         {sampleData ? (
-          <span title={messages.common.sampleDataHint} className={`${HEAD_CELL} whitespace-nowrap border-l border-line text-ink-1/70 ${plateCellClass(0)}`}>
+          <span title={messages.common.sampleDataHint} className={`${HEAD_CELL} whitespace-nowrap max-sm:whitespace-normal max-sm:wrap-anywhere border-l border-line text-ink-1/70 ${plateCellClass(0)}`}>
             {messages.common.sampleData}
           </span>
         ) : null}

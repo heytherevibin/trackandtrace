@@ -84,6 +84,9 @@ export async function navigateFromMasthead(page: Page, name: string, isMobile: b
 export async function axeResults(page: Page): Promise<Awaited<ReturnType<AxeBuilder["analyze"]>>> {
   // Park the pointer so no hover tint is mid-transition when colours are sampled.
   await page.mouse.move(0, 0);
+  // And let every finite animation land: a record's pieces rise in from opacity 0 (Neubrutal v4's .result-stack), and a
+  // colour sampled mid-rise is not the colour the reader is left with. Infinite ones (a blinking caret) never end.
+  await page.evaluate(() => Promise.all(document.getAnimations().filter((a) => a.effect?.getComputedTiming().iterations !== Infinity).map((a) => a.finished.catch(() => undefined))));
   await page.evaluate(() => document.documentElement.style.setProperty("--page-grain", "none"));
   await page.waitForTimeout(200);
   try {

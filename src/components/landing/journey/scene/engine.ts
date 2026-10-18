@@ -73,12 +73,14 @@ export interface LiveParts {
 }
 
 /** One frame's pose for everything live: the shared rig and camera (applyPose), then the scan, the line side, and
- * the Night glow and beam (Night at full quality only; the beam lights as the pantograph reaches the wire). */
-export function applyLive(parts: LiveParts, camera: PerspectiveCamera, pose: Pose, quality: Quality, night: boolean): void {
+ * the headlight's glow and beam (at full quality, in both faces since Neubrutal v4's yellow headlight; the beam lights
+ * as the pantograph reaches the wire). */
+export function applyLive(parts: LiveParts, camera: PerspectiveCamera, pose: Pose, quality: Quality): void {
   applyPose(parts.world, camera, pose, { coaches: quality.coaches });
   parts.departure.group.visible = pose.lineside;
   parts.scan.set(pose.scan);
-  const effects = night && quality.effects;
+  // The face only sets the light's blending (setPalette); the light itself shows by Day too.
+  const effects = quality.effects;
   parts.glow.set(effects, pose.panto > 0.6);
   parts.beam.set(effects, pose.panto > 0.6 ? smoothstep(0.6, 1, pose.panto) : 0);
 }
@@ -247,8 +249,11 @@ export async function createEngine(canvas: HTMLCanvasElement, options: EngineOpt
     restyle(world.style, line, weightsFor(p.night));
     if (scene.fog instanceof Fog) scene.fog.color.copy(line.ground);
     parts.scan.setColors(srgb(p.scanDark), srgb(p.scanLight), line.steelText, p.night);
-    parts.glow.setColor(line.steelText);
-    parts.beam.setColor(line.steelText);
+    // The headlight is the yellow lamp (Neubrutal v4), laid on by Day and added to the dark by Night.
+    parts.glow.setColor(srgb(p.lamp));
+    parts.beam.setColor(srgb(p.lamp));
+    parts.glow.setNight(p.night);
+    parts.beam.setNight(p.night);
     departure.setInk(p.ink);
     night = p.night;
   };
@@ -333,7 +338,7 @@ export async function createEngine(canvas: HTMLCanvasElement, options: EngineOpt
       views.delete(id);
     },
     frame,
-    live: (pose, quality, isNight) => applyLive(parts, camera, pose, quality, isNight),
+    live: (pose, quality) => applyLive(parts, camera, pose, quality),
     setPalette,
     night: () => night,
     setQuality: (next) => {

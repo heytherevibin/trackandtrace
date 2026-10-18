@@ -6,8 +6,8 @@ vi.mock("next/navigation", () => ({ usePathname: () => at.path }));
 
 import { FooterSections } from "@/components/shell/footer-sections";
 
-const NAMES = ["How it works", "The record", "Roadmap", "FAQ"] as const;
-const IDS = ["how", "record", "roadmap", "faq"] as const;
+const NAMES = ["How it works", "Reliability", "Roadmap", "FAQ"] as const;
+const IDS = ["how", "reliability", "roadmap", "faq"] as const;
 
 describe("FooterSections", () => {
   it("lists the landing's sections as plain in-page links on the landing, like the other footer columns", () => {

@@ -173,7 +173,7 @@ export function PreBookingForm() {
           <h2 id={`${ids}-form`} className={`${CELL} min-w-[min(14ch,100%)] flex-1 px-5 py-2.5 ${PLATE_TITLE_STACK}`}>
             {m.form.title}
           </h2>
-          <span className={cn(CELL, "whitespace-nowrap border-l border-line px-5 py-2.5 text-ink-1/70", plateCellClass(0))}>{m.form.sheet}</span>
+          <span className={cn(CELL, "whitespace-nowrap max-sm:whitespace-normal max-sm:wrap-anywhere border-l border-line px-5 py-2.5 text-ink-1/70", plateCellClass(0))}>{m.form.sheet}</span>
         </div>
         {/* The fields' padding from the plate is 20px as drawn and does not grow with the text: at 200% the date field needs
             every pixel of its column to show a whole date. */}

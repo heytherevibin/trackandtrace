@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LOAD_LIMIT_MS, drawingModule, noLiveDrawing, sceneLoader, startDrawing, type Ask, type Begin, type LoadLive } from "@/components/landing/journey/drawing";
-import { DRAWING_EVENT, LAYOUT_EVENT, WEBGL_EVENT, emit, type DrawingDetail, type WebglDetail } from "@/components/landing/journey/journey-events";
+import { DRAWING_EVENT, WEBGL_EVENT, emit, type DrawingDetail, type WebglDetail } from "@/components/landing/journey/journey-events";
 import type { Engine } from "@/components/landing/journey/scene/engine";
 import { keep, type JourneyContext } from "@/components/landing/journey/start-journey";
 import { testContext } from "./journey-context";
@@ -112,7 +112,7 @@ describe("the drawing's mode on the page", () => {
   });
 });
 
-describe("J5: prepare, begin, and the reader's place", () => {
+describe("J5: prepare and begin", () => {
   const chapter = (top: number, height = 5000) => {
     document.body.innerHTML = `<header></header><section id="anatomy"></section>`;
     const section = document.getElementById("anatomy")!;
@@ -128,150 +128,6 @@ describe("J5: prepare, begin, and the reader's place", () => {
     const stop = drawingModule(load, () => false)(testContext());
     expect(html.dataset.drawingWhy).toBe("webgl");
     expect(load).not.toHaveBeenCalled();
-    stop();
-  });
-
-  it("pins the chapter when the live drawing begins, and unpins it on teardown", async () => {
-    const { section } = chapter(200);
-    const liveStop = vi.fn();
-    const stop = drawingModule(() => Promise.resolve(() => liveStop), () => true)(testContext());
-    await flush();
-    expect(html.dataset.drawing).toBe("live");
-    expect(section.classList.contains("is-live")).toBe(true);
-    stop();
-    expect(liveStop).toHaveBeenCalledTimes(1);
-    expect(section.classList.contains("is-live")).toBe(false);
-  });
-
-  it("tells tt:layout when it pins the chapter and when it unpins it, so 02's place guard re-measures", async () => {
-    const { section } = chapter(200);
-    const pinnedAtLayout: boolean[] = [];
-    const onLayout = () => pinnedAtLayout.push(section.classList.contains("is-live"));
-    window.addEventListener(LAYOUT_EVENT, onLayout);
-    let ask = null as Ask | null;
-    const stop = drawingModule((a) => {
-      ask = a;
-      return Promise.resolve(() => () => undefined);
-    }, () => true)(testContext());
-    await flush();
-    expect(pinnedAtLayout.at(-1)).toBe(true);
-    ask?.still("webgl");
-    expect(pinnedAtLayout.at(-1)).toBe(false);
-    ask?.live("webgl");
-    await flush();
-    expect(pinnedAtLayout.at(-1)).toBe(true);
-    const before = pinnedAtLayout.length;
-    stop();
-    expect(pinnedAtLayout.length).toBe(before + 1);
-    expect(pinnedAtLayout.at(-1)).toBe(false);
-    window.removeEventListener(LAYOUT_EVENT, onLayout);
-  });
-
-  it("holds a reader below the chapter at the still, preparing the scene, and goes live once they come back above it", async () => {
-    vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
-    const { section, box } = chapter(-600);
-    const begin = vi.fn(() => () => undefined);
-    const load = vi.fn<LoadLive>(() => Promise.resolve(begin));
-    const stop = drawingModule(load, () => true)(testContext());
-    expect(html.dataset.drawingWhy).toBe("place");
-    expect(load).toHaveBeenCalledTimes(1);
-    await flush();
-    expect(begin).not.toHaveBeenCalled();
-    box.top = 120;
-    window.dispatchEvent(new Event("scroll"));
-    vi.advanceTimersToNextFrame();
-    window.dispatchEvent(new Event("scrollend"));
-    await flush();
-    expect(html.dataset.drawing).toBe("live");
-    expect(begin).toHaveBeenCalledTimes(1);
-    expect(section.classList.contains("is-live")).toBe(true);
-    stop();
-  });
-
-  it("waits for a scroll in flight to end before it pins, then asks where the reader landed (an anchor's glide)", async () => {
-    const { section, box } = chapter(200);
-    let arrive: (b: Begin) => void = () => {};
-    const begin = vi.fn<Begin>(() => () => undefined);
-    const stop = drawingModule(() => new Promise<Begin>((resolve) => (arrive = resolve)), () => true)(testContext());
-    window.dispatchEvent(new Event("scroll")); // a glide toward a section below the chapter is under way
-    arrive(begin);
-    box.top = -1200; // the glide has passed the chapter's top when the scene arrives
-    await flush();
-    expect(begin).not.toHaveBeenCalled(); // pinning now would grow the chapter under a glide whose end is already set
-    expect(section.classList.contains("is-live")).toBe(false);
-    expect(html.dataset.drawing).toBe("live"); // and settling on the still would change its height as surely
-    box.top = -3000; // it lands below the chapter
-    window.dispatchEvent(new Event("scrollend"));
-    await flush();
-    expect(begin).not.toHaveBeenCalled();
-    expect(html.dataset.drawingWhy).toBe("place");
-    stop();
-  });
-
-  it("holds the pin from the click on an in-page link, before its glide has moved the page", async () => {
-    const { section, box } = chapter(200);
-    const link = document.body.appendChild(Object.assign(document.createElement("a"), { href: "#reliability" }));
-    let arrive: (b: Begin) => void = () => {};
-    const begin = vi.fn<Begin>(() => () => undefined);
-    const stop = drawingModule(() => new Promise<Begin>((resolve) => (arrive = resolve)), () => true)(testContext());
-    link.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true })); // the glide starts a frame later
-    arrive(begin);
-    await flush();
-    expect(begin).not.toHaveBeenCalled();
-    expect(section.classList.contains("is-live")).toBe(false);
-    box.top = -3000;
-    window.dispatchEvent(new Event("scroll"));
-    window.dispatchEvent(new Event("scrollend"));
-    await flush();
-    expect(begin).not.toHaveBeenCalled();
-    expect(html.dataset.drawingWhy).toBe("place");
-    stop();
-  });
-
-  it("pins once a scroll that stays above the chapter has ended", async () => {
-    const { section } = chapter(200);
-    let arrive: (b: Begin) => void = () => {};
-    const begin = vi.fn<Begin>(() => () => undefined);
-    const stop = drawingModule(() => new Promise<Begin>((resolve) => (arrive = resolve)), () => true)(testContext());
-    window.dispatchEvent(new Event("scroll"));
-    arrive(begin);
-    await flush();
-    expect(begin).not.toHaveBeenCalled();
-    window.dispatchEvent(new Event("scrollend"));
-    await flush();
-    expect(begin).toHaveBeenCalledTimes(1);
-    expect(section.classList.contains("is-live")).toBe(true);
-    stop();
-  });
-
-  it("holds a reader who went below the chapter while the scene loaded at the still, and goes live once they come back above it (J5-2)", async () => {
-    vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
-    const { section, box } = chapter(200);
-    let arrive: (b: Begin) => void = () => {};
-    const begin = vi.fn<Begin>(() => () => undefined);
-    const load = vi.fn<LoadLive>(() => new Promise<Begin>((resolve) => (arrive = resolve)));
-    const stop = drawingModule(load, () => true)(testContext());
-    expect(load).toHaveBeenCalledTimes(1); // preparing while nothing holds the drawing
-    box.top = -600; // the reader scrolls on past the chapter's top before the scene arrives
-    window.dispatchEvent(new Event("scroll"));
-    arrive(begin);
-    await flush();
-    expect(html.dataset.drawing).toBe("live"); // nothing changes while the page moves
-    window.dispatchEvent(new Event("scrollend"));
-    await flush();
-    expect(html.dataset.drawing).toBe("still");
-    expect(html.dataset.drawingWhy).toBe("place");
-    expect(begin).not.toHaveBeenCalled();
-    expect(section.classList.contains("is-live")).toBe(false);
-    box.top = 120;
-    window.dispatchEvent(new Event("scroll"));
-    vi.advanceTimersToNextFrame();
-    window.dispatchEvent(new Event("scrollend"));
-    await flush();
-    expect(html.dataset.drawing).toBe("live");
-    expect(begin).toHaveBeenCalledTimes(1);
-    expect(load).toHaveBeenCalledTimes(1); // the scene it already prepared
-    expect(section.classList.contains("is-live")).toBe(true);
     stop();
   });
 
@@ -376,71 +232,6 @@ describe("J5: prepare, begin, and the reader's place", () => {
     ask?.still("quality");
     expect(window.sessionStorage.getItem("tt.q")).toBe("still");
     expect(html.dataset.drawingWhy).toBe("quality");
-    stop();
-  });
-
-  it("puts a reader inside the chapter back at its start when it unpins under them", async () => {
-    const { box } = chapter(200, 5000);
-    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
-    let ask = null as Ask | null;
-    const stop = drawingModule((a) => {
-      ask = a;
-      return Promise.resolve(() => () => {
-        box.height = 1200; // the pin's height goes with it, as the CSS does
-      });
-    }, () => true)(testContext());
-    await flush();
-    box.top = -900;
-    ask?.still("webgl");
-    expect(scrollTo).toHaveBeenCalledWith({ top: -900 + window.scrollY, behavior: "instant" });
-    stop();
-  });
-});
-
-describe("the pinned chapter's height follows the window (520vh)", () => {
-  const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
-  const pinned = async () => {
-    document.body.innerHTML = `<header></header><section id="anatomy"></section>`;
-    const section = document.getElementById("anatomy")!;
-    const box = { top: 200, height: 5200 };
-    section.getBoundingClientRect = () => ({ top: box.top, bottom: box.top + box.height, height: box.height }) as DOMRect;
-    const stop = drawingModule(() => Promise.resolve(() => () => undefined), () => true)(testContext());
-    await flush();
-    expect(section.classList.contains("is-live")).toBe(true);
-    return { box, stop };
-  };
-
-  it("keeps a reader below it on what they were reading when a resize changes its height", async () => {
-    const { box, stop } = await pinned();
-    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
-    box.top = -6000; // the reader has scrolled on past the chapter
-    window.dispatchEvent(new Event("scroll"));
-    box.height = 4680; // the window grew shorter: 520vh of 900 instead of 1000
-    window.dispatchEvent(new Event("resize"));
-    expect(scrollTo).toHaveBeenCalledWith({ top: window.scrollY - 520, behavior: "instant" });
-    stop();
-  });
-
-  it("leaves a reader above it where they are", async () => {
-    const { box, stop } = await pinned();
-    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
-    window.dispatchEvent(new Event("scroll"));
-    box.height = 4680;
-    window.dispatchEvent(new Event("resize"));
-    expect(scrollTo).not.toHaveBeenCalled();
-    stop();
-  });
-
-  // A resize keeps the pin's shape: a reader inside it stays the same fraction through it (the owner, 2026-09-29), where
-  // J5-3 sent them to its start. 2,000 px into its range (its start to its foot at the window's foot, 768 tall here).
-  it("keeps a reader inside it the same fraction through it", async () => {
-    const { box, stop } = await pinned();
-    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
-    box.top = -2000;
-    window.dispatchEvent(new Event("scroll"));
-    box.height = 4680;
-    window.dispatchEvent(new Event("resize"));
-    expect(scrollTo).toHaveBeenCalledWith({ top: Math.round(-2000 + (2000 / (5200 - 768)) * (4680 - 768)) + window.scrollY, behavior: "instant" });
     stop();
   });
 

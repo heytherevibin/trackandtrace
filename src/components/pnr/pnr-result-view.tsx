@@ -7,10 +7,8 @@ import { notify } from "@/components/ui/toast";
 import { messages } from "@/messages";
 import { fetchPnr } from "@/services/pnr-source";
 import { recentStore } from "@/services/stores/recent-store";
-import { buildShareText, buildShareUrl, shareOrCopy } from "@/services/stores/share";
 import { useWatchlist } from "@/services/stores/watchlist-store";
-import { deleteWatchlist, listWatchlist, saveWatchlist } from "@/services/watchlist-api";
-import type { HistoryPoint, PnrResult } from "@/types/domain";
+import type { PnrResult } from "@/types/domain";
 import { formatPnr } from "@/utils/pnr";
 import { formatTime } from "@/utils/datetime";
 import { statusLabel } from "@/utils/status-tone";
@@ -19,6 +17,7 @@ import { PassengerTable } from "./passenger-table";
 import { ProvenancePanel } from "./provenance-panel";
 import { ResultActions } from "./result-actions";
 import { StatusBand } from "./status-band";
+import { pointFor, useSaveAndShare, watchLabelFor } from "./use-save-share";
 
 export interface PnrResultInitial {
   readonly result: PnrResult;
@@ -26,42 +25,20 @@ export interface PnrResultInitial {
   readonly latencyMs: number;
 }
 
-function labelFor(result: PnrResult): string {
-  const t = result.snapshot.train;
-  return `${t.number} · ${t.from.code}→${t.to.code} · ${result.snapshot.journeyDateLabel}`;
-}
-
-function pointFor(result: PnrResult): HistoryPoint {
-  return { at: result.checkedAt, status: result.lead.status, position: result.lead.position };
-}
-
 /** The result sheet. Server-rendered from the loader; refresh, share, and save happen here. */
 export function PnrResultView({ pnr, initial }: { readonly pnr: string; readonly initial: PnrResultInitial }) {
   const m = messages.result;
   const user = useUser();
-  const { entries, available, upsert, remove } = useWatchlist();
+  const { entries, upsert } = useWatchlist();
   const [state, setState] = useState(initial);
   const [refreshing, setRefreshing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [serverSaved, setServerSaved] = useState<boolean | null>(null);
   const [announcement, setAnnouncement] = useState("");
   const { result, cached, latencyMs } = state;
-  const saved = user ? serverSaved === true : entries.some((e) => e.pnr === pnr);
+  const { saved, saving, share, toggleSave } = useSaveAndShare(pnr, result);
 
   useEffect(() => {
-    recentStore.push({ pnr, label: labelFor(result), status: result.lead.status, position: result.lead.position, checkedAt: result.checkedAt });
+    recentStore.push({ pnr, label: watchLabelFor(result), status: result.lead.status, position: result.lead.position, checkedAt: result.checkedAt });
   }, [pnr, result]);
-
-  useEffect(() => {
-    if (!user) return;
-    let cancelled = false;
-    void listWatchlist().then((out) => {
-      if (!cancelled) setServerSaved(out.ok ? out.data.some((e) => e.pnr === pnr) : false);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [user, pnr]);
 
   const refresh = async () => {
     setRefreshing(true);
@@ -74,39 +51,7 @@ export function PnrResultView({ pnr, initial }: { readonly pnr: string; readonly
     const next = out.outcome.result;
     setState({ result: next, cached: out.cached, latencyMs: out.latencyMs });
     setAnnouncement(m.updated(statusLabel(next.lead.status, next.lead.position), formatTime(next.checkedAt)));
-    if (!user && entries.some((e) => e.pnr === pnr)) upsert(pnr, labelFor(next), pointFor(next));
-  };
-
-  const share = async () => {
-    const outcome = await shareOrCopy({ title: messages.common.productName, text: buildShareText(result), url: buildShareUrl(window.location.origin, pnr) }, navigator);
-    if (outcome === "copied") notify.success(m.actions.copied, m.actions.shareHint);
-    else if (outcome === "failed") notify.error(m.actions.shareFailed);
-  };
-
-  const toggleSave = async () => {
-    if (user) {
-      setSaving(true);
-      const out = saved ? await deleteWatchlist(pnr) : await saveWatchlist({ pnr, label: labelFor(result), checks: [pointFor(result)] });
-      setSaving(false);
-      if (!out.ok) {
-        notify.error(m.actions.saveFailed, out.error.message);
-        return;
-      }
-      setServerSaved(!saved);
-      notify.success(saved ? m.actions.removed : m.actions.savedToAccount);
-      return;
-    }
-    if (!available) {
-      notify.error(m.actions.storageUnavailable);
-      return;
-    }
-    if (saved) {
-      remove(pnr);
-      notify.success(m.actions.removed);
-    } else {
-      upsert(pnr, labelFor(result), pointFor(result));
-      notify.success(m.actions.savedOnDevice);
-    }
+    if (!user && entries.some((e) => e.pnr === pnr)) upsert(pnr, watchLabelFor(next), pointFor(next));
   };
 
   const s = result.snapshot;
@@ -120,7 +65,7 @@ export function PnrResultView({ pnr, initial }: { readonly pnr: string; readonly
         title={m.title(s.train.from.code, s.train.to.code)}
         lead={m.lead(m.trainLine(s.train.number, s.train.name), s.journeyDateLabel, s.cls)}
         meta={<span className="tnum">{m.pnr(formatPnr(pnr))}</span>}
-        actions={<ResultActions refreshing={refreshing} onRefresh={() => void refresh()} onShare={() => void share()} saved={saved} saving={saving} onToggleSave={() => void toggleSave()} />}
+        actions={<ResultActions refreshing={refreshing} onRefresh={() => void refresh()} onShare={share} saved={saved} saving={saving} onToggleSave={toggleSave} />}
       />
       <StatusBand className="mt-8" result={result} cached={cached} />
       <div className="mt-[28px] grid grid-cols-[minmax(0,1fr)] items-start gap-[28px] lg:grid-cols-[minmax(0,1.25fr)_minmax(0,.75fr)]">

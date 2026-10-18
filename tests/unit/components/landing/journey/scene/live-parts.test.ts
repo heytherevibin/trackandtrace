@@ -60,6 +60,20 @@ describe("the line side (v3's scene/departure.js)", () => {
   });
 });
 
+describe("the headlight's light by face (Neubrutal v4: a yellow lamp, Day and Night)", () => {
+  it("adds its light to the dark by Night and lays it on by Day, where adding would not show on cream", async () => {
+    const { AdditiveBlending, NormalBlending } = await import("three");
+    const own = buildRig(style, { coaches: 1 });
+    const glow = createGlow(own, new Texture());
+    const sprite = own.cabFront.children.find((c): c is Sprite => c instanceof Sprite);
+    if (!sprite) throw new Error("no glow sprite");
+    glow.setNight(true);
+    expect(sprite.material.blending).toBe(AdditiveBlending);
+    glow.setNight(false);
+    expect(sprite.material.blending).toBe(NormalBlending);
+  });
+});
+
 describe("the Night glow and the headlight beam", () => {
   it("hangs the glow on the headlight and on the raised pantograph's head", () => {
     const glow = createGlow(rig, new Texture());

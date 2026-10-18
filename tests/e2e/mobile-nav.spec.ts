@@ -6,7 +6,7 @@ import { gotoReady, openMasthead } from "./helpers";
 // opens a drawer from the left with the four product keys. The landing's section anchors live in the footer.
 
 const PRODUCT = ["Check a PNR", "Watchlist", "Pre-booking", "Accuracy"] as const;
-const SECTIONS = ["How it works", "The record", "Roadmap", "FAQ"] as const;
+const SECTIONS = ["How it works", "Reliability", "Roadmap", "FAQ"] as const;
 
 test("the tab bar sits at the foot of the window and marks the current page", async ({ page, isMobile }) => {
   test.skip(!isMobile, "phone-only surface");

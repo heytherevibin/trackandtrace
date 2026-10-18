@@ -52,7 +52,7 @@ export function LegalDocument({
                   <span aria-hidden="true" className="font-display text-label font-semibold tracking-caps text-accent-text tnum">
                     {sectionNumber(index)}
                   </span>
-                  <span className="min-w-0">{s.title}</span>
+                  <span className="min-w-0 wrap-break-word">{s.title}</span>
                 </a>
               </li>
             ))}
