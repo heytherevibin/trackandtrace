@@ -28,6 +28,18 @@ export const shell = {
     light: "Day",
     dark: "Night",
     cycle: (current: string, next: string) => `Theme: ${current}. Switch to ${next}`,
+    /** The menu drawer's row (v4): "Theme · Day" beside its switch. */
+    row: (current: string) => `Theme · ${current}`,
+  },
+  /** Neubrutal v4 shell copy. */
+  brandHome: "Trakline, home",
+  menuDisclaimer: "Not affiliated with IRCTC or Indian Railways.",
+  offline: "Offline. Results cannot be fetched until the connection returns.",
+  tabs: {
+    check: "Check",
+    watchlist: "Watchlist",
+    preBooking: "Pre-booking",
+    menu: "Menu",
   },
   footer: {
     product: "Product",

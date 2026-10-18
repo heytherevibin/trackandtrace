@@ -2,21 +2,30 @@ import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import { enterPnr, gotoReady } from "./helpers";
 
-/** The masthead's nav control at this width: the hamburger on a phone, a nav box on desktop. */
+/** The nav control at this width: the tab bar's Menu on a phone, a masthead nav key on desktop (Neubrutal v4). */
 function mastheadNavControl(page: Page, isMobile: boolean): Locator {
-  const banner = page.getByRole("banner");
-  return isMobile ? banner.getByRole("button", { name: "Open menu" }) : banner.getByRole("link", { name: "Watchlist", exact: true });
+  return isMobile
+    ? page.getByRole("navigation", { name: "Sections" }).getByRole("button", { name: "Menu" })
+    : page.getByRole("banner").getByRole("link", { name: "Watchlist", exact: true });
 }
 
-// Every button in the app settles inward while pressed and springs back on release. The press is a
-// transform only, so nothing around the button moves (stable), and it eases in and out (smooth).
+// Every button in the app answers a press and springs back on release, as a transform only, so nothing around it
+// moves (stable) and it eases in and out (smooth). Two presses: a key with v4's hard shadow presses into it (translate
+// 3px, 3px: .nb-press); anything else settles inward (scale, motion.css).
 
-async function scaleOf(target: Locator): Promise<number> {
+interface Pressed {
+  readonly scale: number;
+  readonly x: number;
+  readonly y: number;
+}
+
+async function transformOf(target: Locator): Promise<Pressed> {
   return target.evaluate((el) => {
     const t = getComputedStyle(el).transform;
-    if (t === "none") return 1;
-    const m = t.match(/matrix\(([^,]+),/);
-    return m ? Number.parseFloat(m[1]!) : 1;
+    const m = t.match(/matrix\(([^)]+)\)/);
+    if (!m) return { scale: 1, x: 0, y: 0 };
+    const [a, , , , e, f] = m[1]!.split(",").map((v) => Number.parseFloat(v));
+    return { scale: a ?? 1, x: e ?? 0, y: f ?? 0 };
   });
 }
 
@@ -34,18 +43,20 @@ async function expectPressAnimates(page: Page, target: Locator, label: string): 
   await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
   await page.mouse.down();
   await page.waitForTimeout(250);
-  const pressed = await scaleOf(target);
+  const pressed = await transformOf(target);
   const layoutPressed = await target.evaluate((el) => ({ x: (el as HTMLElement).offsetLeft, y: (el as HTMLElement).offsetTop, w: (el as HTMLElement).offsetWidth, h: (el as HTMLElement).offsetHeight }));
   // Release away from the target so the press does not trigger navigation or state changes.
   await page.mouse.move(0, 0);
   await page.mouse.up();
   await page.waitForTimeout(350);
-  const released = await scaleOf(target);
+  const released = await transformOf(target);
 
-  expect(pressed, `${label} settles while pressed`).toBeLessThan(0.99);
-  expect(pressed, `${label} settles only slightly`).toBeGreaterThan(0.9);
+  const intoShadow = Math.abs(pressed.x - 3) < 0.5 && Math.abs(pressed.y - 3) < 0.5;
+  const inward = pressed.scale < 0.99 && pressed.scale > 0.9;
+  expect(intoShadow || inward, `${label} presses: into its shadow, or settling slightly (${JSON.stringify(pressed)})`).toBe(true);
   expect(layoutPressed, `${label} keeps its layout box`).toEqual(layoutBefore);
-  expect(released, `${label} springs back`).toBeCloseTo(1, 2);
+  expect(released.scale, `${label} springs back`).toBeCloseTo(1, 2);
+  expect(Math.abs(released.x) + Math.abs(released.y), `${label} comes back out of its shadow`).toBeLessThan(0.5);
 }
 
 test("buttons on the landing press and release smoothly", async ({ page, isMobile }) => {

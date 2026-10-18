@@ -11,81 +11,82 @@ import { PRIMARY_NAV } from "./nav-config";
 import { SoundToggle } from "./sound-toggle";
 
 /**
- * The footer of every traveller page (the owner, 2026-10-01): brand and disclaimer, Sections, Product and Company;
- * then one bar with the copyright, service status, the clock, and the Motion and Sound switches. The sign-up is not
- * here: it is the band above (updates-band.tsx). Sound shows only while the landing's journey runs
- * (html[data-journey="on"] .sound-toggle, journey-island.css), since only the journey can sound.
+ * The footer of every traveller page, as Neubrutal v4 draws it: ruled off with the 2px edge; the edged mark, TRAKLINE and
+ * the disclaimer, then Sections, Product and Company (two columns on a phone, the brand above them); then one bar with
+ * the copyright and the status lamp with the IST clock. The bar keeps the Motion switch (the owner, 2026-10-18), and
+ * Sound while the journey still runs. The sign-up is the band above (updates-band.tsx).
  */
 export function Footer() {
   const m = messages.shell.footer;
   const status = serviceStatus();
   const year = new Date().getFullYear();
   return (
-    <footer className="border-t border-line">
-      <div className="page-frame flex flex-wrap gap-x-[clamp(32px,4vw,72px)] gap-y-10 py-12">
-        <div data-footer-column="" className="max-w-[30rem] flex-[1.4_1_240px]">
+    // On a phone the tab bar is fixed over the foot of the window, so the footer leaves 84px under its last line (v4) and
+    // still ends the page.
+    <footer className="border-t-2 border-edge max-sm:pb-[84px]">
+      {/* The brand, then the three link columns as one group (the owner, 2026-10-01: Company never wraps alone between 640
+          and 768px, where v4's own grid would leave it). On a phone, v4's two columns under the brand. */}
+      <div className="page-frame flex flex-wrap gap-8 py-12 max-sm:gap-y-6 max-sm:pb-6 max-sm:pt-8">
+        <div data-footer-column="" className="max-w-[36ch] flex-[1.4_1_240px] max-sm:basis-full">
           <span className="inline-flex items-center gap-2.5">
-            <Mark size={24} />
-            <span className="flex flex-col leading-stack">
-              <span className="font-display text-lead font-semibold uppercase tracking-brand">{messages.common.productName}</span>
-              <span className="font-display text-2xs font-semibold uppercase tracking-caps text-ink-1/70">{messages.common.descriptor}</span>
+            <span className="inline-flex overflow-hidden rounded-plate border-2 border-edge">
+              <Mark size={20} className="block" />
             </span>
+            <span className="font-display text-base uppercase leading-6">{messages.common.productName}</span>
           </span>
-          <p className="mt-4 text-sm text-ink-1/74">{messages.common.footerDisclaimer}</p>
+          <p className="m-0 mt-3 text-sm leading-5 text-ink-2">{messages.common.footerDisclaimer}</p>
         </div>
-        {/* The three link columns. From sm they are one flex item, three equal columns on one row, so when the row is
-            too narrow for all four the brand takes a row and the three stay together (at 768px Company used to wrap
-            alone). Its basis and growth are the three columns' own (3 × 130px and the two gaps between them), so a row
-            that holds all four is drawn exactly as before. Below sm it steps aside (contents) and the phone's wrap is
-            unchanged. */}
-        <div className="max-sm:contents sm:grid sm:flex-[3_1_calc(390px+2*clamp(32px,4vw,72px))] sm:grid-cols-3 sm:gap-x-[clamp(32px,4vw,72px)]">
-          <div data-footer-column="" className="min-w-0 flex-[1_1_130px]">
-            <p className={COLUMN_HEAD}>{m.sections}</p>
-            <FooterSections />
-          </div>
-          <div data-footer-column="" className="min-w-0 flex-[1_1_130px]">
-            <p className={COLUMN_HEAD}>{m.product}</p>
-            <ul className={COLUMN_LIST}>
-              {PRIMARY_NAV.map(({ href, label }) => (
-                <li key={href}>
-                  <Link href={href === "/" ? "/#terminal" : href} className={COLUMN_LINK}>
-                    {label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div data-footer-column="" className="min-w-0 flex-[1_1_130px]">
-            <p className={COLUMN_HEAD}>{m.company}</p>
-            <ul className={COLUMN_LIST}>
-              <li>
-                <Link href="/privacy" className={COLUMN_LINK}>
-                  {m.privacy}
+        <div className="grid min-w-0 flex-[3_1_calc(390px+4rem)] grid-cols-3 gap-8 max-sm:basis-full max-sm:grid-cols-2 max-sm:gap-x-4 max-sm:gap-y-6">
+        <div data-footer-column="" className="min-w-0">
+          <p className={COLUMN_HEAD}>{m.sections}</p>
+          <FooterSections />
+        </div>
+        <div data-footer-column="" className="min-w-0">
+          <p className={COLUMN_HEAD}>{m.product}</p>
+          <ul className={COLUMN_LIST}>
+            {PRIMARY_NAV.map(({ href, label }) => (
+              <li key={href}>
+                <Link href={href === "/" ? "/#terminal" : href} className={COLUMN_LINK}>
+                  {label}
                 </Link>
               </li>
-              <li>
-                <Link href="/tos" className={COLUMN_LINK}>
-                  {m.terms}
-                </Link>
-              </li>
-              <li>
-                <Link href="/account" className={COLUMN_LINK}>
-                  {messages.shell.nav.account}
-                </Link>
-              </li>
-            </ul>
-          </div>
+            ))}
+          </ul>
+        </div>
+        <div data-footer-column="" className="min-w-0">
+          <p className={COLUMN_HEAD}>{m.company}</p>
+          <ul className={COLUMN_LIST}>
+            <li>
+              <Link href="/privacy" className={COLUMN_LINK}>
+                {m.privacy}
+              </Link>
+            </li>
+            <li>
+              <Link href="/tos" className={COLUMN_LINK}>
+                {m.terms}
+              </Link>
+            </li>
+            <li>
+              <Link href="/account" className={COLUMN_LINK}>
+                {messages.shell.nav.account}
+              </Link>
+            </li>
+          </ul>
+        </div>
         </div>
       </div>
-      <div className="border-t border-line">
-        <div className="page-frame flex flex-wrap items-center justify-between gap-x-6 gap-y-3 py-4">
-          <p className="m-0 font-display text-xs font-semibold uppercase tracking-caps text-ink-1/70">{m.copyright(year)}</p>
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-            <ServicePill status={status} />
-            <IstClock />
+      <div className="border-t-2 border-edge">
+        <div className="legend page-frame flex flex-wrap items-center justify-between gap-x-6 gap-y-2 py-4">
+          <span>{m.copyright(year)}</span>
+          <span className="inline-flex flex-wrap items-center gap-x-6 gap-y-2">
+            <span className="inline-flex flex-wrap items-center gap-2">
+              <ServicePill status={status} />
+              <span aria-hidden="true">·</span>
+              <IstClock />
+            </span>
             <MotionToggle />
             <SoundToggle />
-          </div>
+          </span>
         </div>
       </div>
     </footer>

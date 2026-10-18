@@ -41,10 +41,10 @@ test("in-page anchors still glide", async ({ page, isMobile }) => {
   expect(await html.evaluate((el) => getComputedStyle(el).scrollBehavior)).toBe("smooth");
 });
 
+// Neubrutal v4: the key presses 3px into its hard shadow (.nb-press) and eases back out of it on release.
 test("the theme button eases back from its press while the theme changes", async ({ page }) => {
   await gotoReady(page, "/watchlist");
   const button = page.getByRole("banner").getByRole("button", { name: /^Theme:/ });
-  // On a phone the button sits in the sideways-scrolling nav strip; bring it into view first.
   await button.scrollIntoViewIfNeeded();
   const box = (await button.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
@@ -56,7 +56,8 @@ test("the theme button eases back from its press while the theme changes", async
     const tick = () => {
       const el = document.querySelector('header button[aria-label^="Theme"]');
       const t = el ? getComputedStyle(el).transform : "none";
-      w.__scale.push(t === "none" ? 1 : Number.parseFloat(t.slice(7)));
+      // The press's x offset, matrix(a, b, c, d, e, f)'s e: 3 while held, 0 at rest.
+      w.__scale.push(t === "none" ? 0 : Number.parseFloat(t.slice(7, -1).split(",")[4] ?? "0"));
       if (w.__scale.length < 40) requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
@@ -65,9 +66,9 @@ test("the theme button eases back from its press while the theme changes", async
   await page.waitForTimeout(900);
   await expect(page.locator("html")).toHaveAttribute("data-theme", /light|dark/);
   const scale = await page.evaluate(() => (window as unknown as { __scale: number[] }).__scale);
-  const easing = scale.filter((s) => s > 0.965 && s < 0.995);
+  const easing = scale.filter((s) => s > 0.15 && s < 2.85);
   expect(easing.length, `release frames: ${scale.map((s) => s.toFixed(3)).join(" ")}`).toBeGreaterThanOrEqual(2);
-  expect(scale.at(-1)).toBeCloseTo(1, 2);
+  expect(scale.at(-1)).toBeCloseTo(0, 2);
 });
 
 test("the PNR entry draws no outline around its cells", async ({ page }) => {
@@ -87,7 +88,7 @@ test("focusing a masthead control while scrolled down never moves the page", asy
   const start = await page.evaluate(() => Math.round(window.scrollY));
   expect(start).toBeGreaterThan(0);
   const banner = page.getByRole("banner");
-  const navControl = isMobile ? banner.getByRole("button", { name: "Open menu" }) : banner.getByRole("link", { name: "Accuracy", exact: true });
+  const navControl = isMobile ? page.getByRole("navigation", { name: "Sections" }).getByRole("button", { name: "Menu" }) : banner.getByRole("link", { name: "Accuracy", exact: true });
   for (const target of [navControl, banner.getByRole("button", { name: /^Theme:/ }), banner.getByTestId("sign-in")]) {
     await target.evaluate((el) => (el as HTMLElement).focus());
     await page.waitForTimeout(500);

@@ -8,19 +8,22 @@ import { IconButton } from "@/components/ui/icon-button";
 import { messages } from "@/messages";
 import { useInstallPrompt } from "@/services/stores/install-prompt";
 
-/** A small plate above the tab bar offering the install; dismissal sleeps it for a month. */
+/**
+ * A small plate offering the install; dismissal sleeps it for a month. On a phone it floats above the tab bar (60px and
+ * its 2px rule, tab-bar.tsx), never over it.
+ */
 export function InstallPrompt() {
   const { platform, visible, install, dismiss } = useInstallPrompt();
   if (!visible) return null;
   const m = messages.shell.install;
   return (
-    <aside className="fixed inset-x-0 bottom-0 z-nav px-3 pb-[calc(var(--safe-bottom)+12px)] md:bottom-4 md:left-auto md:right-4 md:w-auto md:px-0 md:pb-0" aria-label={m.title} data-testid="install-prompt">
+    <aside className="fixed inset-x-0 bottom-0 z-nav px-3 pb-[calc(var(--safe-bottom)+12px)] max-sm:pb-[calc(var(--safe-bottom)+74px)] md:bottom-4 md:left-auto md:right-4 md:w-auto md:px-0 md:pb-0" aria-label={m.title} data-testid="install-prompt">
       <div className="blueprint mx-auto flex w-full max-w-prose items-center gap-3 bg-surface-2 p-3 shadow-2 md:w-96">
         <Corners />
         <Mark size={32} />
         <div className="min-w-0 flex-1">
-          <p className="caps text-label text-ink-1">{m.title}</p>
-          <p className="text-label text-ink-3">{platform === "ios" ? m.iosHint : m.detail}</p>
+          <p className="caps text-sm text-ink-1">{m.title}</p>
+          <p className="font-figure text-xs text-ink-3">{platform === "ios" ? m.iosHint : m.detail}</p>
         </div>
         {platform === "chromium" ? (
           <Button variant="primary" size="sm" onClick={install}>

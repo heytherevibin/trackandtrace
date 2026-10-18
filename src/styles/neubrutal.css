@@ -206,6 +206,26 @@
   background: repeating-linear-gradient(135deg, var(--accent) 0 6px, var(--edge) 6px 8px);
 }
 
+/* The shell (batch 2). The page's margin is v4's: 16px to 64px, 12px on a phone. The second selector outranks
+   tokens.css's :root:not(:has(#hero-title)), whose id makes it heavier than the attribute alone. */
+:root[data-face="neubrutal"],
+:root[data-face="neubrutal"]:not(:has(#hero-title)) {
+  --gutter: clamp(16px, 5vw, 64px);
+}
+@media (max-width: 39.99rem) {
+  :root[data-face="neubrutal"],
+  :root[data-face="neubrutal"]:not(:has(#hero-title)) {
+    --gutter: 12px;
+  }
+}
+/* The drawer's hard shadow falls to its right; the tab bar steps aside for the pinned Run bar. */
+:root[data-face="neubrutal"] .drawer-shadow {
+  box-shadow: 6px 0 0 var(--shadow);
+}
+:root[data-face="neubrutal"][data-runbar] .tab-bar {
+  display: none;
+}
+
 /* v4 motion vocabulary, shared by the page batches. All collapse under reduced motion (motion.css). */
 @keyframes nb-pop {
   0% {

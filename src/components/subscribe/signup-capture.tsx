@@ -11,23 +11,24 @@ const EMAIL = z.email().max(254);
 
 export type CapturePlace = "band" | "pre-booking";
 
+// v4 .btn.primary and v4's links.
 const BUTTON =
-  "press relative inline-flex cursor-pointer select-none items-center justify-center gap-1.5 max-w-full shrink-0 whitespace-normal border font-display font-semibold no-underline disabled:cursor-not-allowed disabled:opacity-45 aria-disabled:cursor-not-allowed aria-disabled:opacity-45 px-[12.24px] py-[6.8px] text-sm leading-[1.2] border-accent-strong bg-accent-strong text-accent-ink hover:bg-accent-strong-hover active:bg-accent-strong-active";
-const LINK = "text-accent-text underline underline-offset-4 hover:text-accent-soft-ink";
+  "nb-press relative inline-flex cursor-pointer select-none items-center justify-center gap-2 max-w-full shrink-0 whitespace-normal rounded-control border-2 border-edge bg-accent px-4 font-structure text-sm font-bold leading-5 text-on-fill no-underline shadow-control hover:bg-lime disabled:cursor-not-allowed disabled:opacity-55 aria-disabled:cursor-not-allowed aria-disabled:opacity-55";
+const LINK = "text-link underline decoration-2 underline-offset-3 hover:bg-accent hover:text-on-fill";
 
 /** What differs between the two places: the form, the button, and the two lines around it. */
 const PLACE: Record<CapturePlace, { form: string; button: string; sent: string; consent: string }> = {
   band: {
     form: "flex flex-col gap-1.5",
     button: "h-11 flex-[1_0_auto] px-5",
-    sent: "m-0 text-sm text-ink-1/78",
-    consent: "mt-2.5 m-0 text-2xs leading-normal text-ink-1/70",
+    sent: "m-0 text-sm text-ink-2",
+    consent: "mt-2.5 m-0 font-figure text-xs leading-4 text-ink-3",
   },
   "pre-booking": {
     form: "mt-3.5 flex max-w-[52ch] flex-col gap-1.5",
     button: "h-11 flex-[1_0_auto]",
-    sent: "mt-3.5 m-0 text-sm text-ink-1/78",
-    consent: "mt-2.5 m-0 max-w-[60ch] text-2xs leading-normal text-ink-1/70",
+    sent: "mt-3.5 m-0 text-sm text-ink-2",
+    consent: "mt-2.5 m-0 max-w-[60ch] font-figure text-xs leading-4 text-ink-3",
   },
 };
 

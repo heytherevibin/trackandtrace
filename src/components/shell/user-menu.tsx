@@ -3,52 +3,58 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Suspense } from "react";
-import { PersonFilled, SignOutRegular } from "@/components/icons";
+import { SignOutRegular } from "@/components/icons";
 import { messages } from "@/messages";
 import { useUser } from "@/components/session/session-provider";
-import { Avatar } from "@/components/ui/avatar";
-import { buttonClassName } from "@/components/ui/button";
 import { EmailText } from "@/components/ui/email-text";
 import { MenuContent, MenuItem, MenuLinkItem, MenuRoot, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
 import { signOutEverywhere } from "@/services/auth-client";
 import { cn } from "@/utils/cn";
-import { MASTHEAD_CONTROL } from "./nav-config";
+import { MASTHEAD_KEY } from "./nav-config";
 
-/**
- * SIGN IN keeps only its icon (its name stays, visually hidden) below xs, and wherever the masthead is narrower than
- * 16.5rem, which is where its one row, the menu, the mark and the controls, stops holding the full label: text made
- * larger (200% on a 390px phone). At 100% text, 16.5rem is 264px, inside xs already, so the drawn masthead is unchanged.
- * The query container is top-nav.tsx's inner div, never the sticky header.
- */
-const COMPACT = "max-xs:w-9 max-xs:justify-center max-xs:px-0 @max-[16.5rem]:w-9 @max-[16.5rem]:justify-center @max-[16.5rem]:px-0";
-
-function Placeholder() {
-  return <span className="inline-block h-9 w-9 border border-line xs:@min-[16.5rem]:w-[104px]" aria-hidden="true" />;
+/** v4's signed-out avatar: a person, 20px, drawn in the key's ink. */
+function Person() {
+  return (
+    <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="block">
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" />
+    </svg>
+  );
 }
 
+function Placeholder() {
+  return <span className={cn(MASTHEAD_KEY, "pointer-events-none")} aria-hidden="true" />;
+}
+
+/**
+ * The masthead's 40px sign-in key (v4 .mh-avatar). Signed out, a person that leads to sign in. Signed in, the initial
+ * in Archivo Black on pink, which keeps the account menu (the owner, 2026-10-18): Account, Watchlist, Sign out.
+ */
 function UserMenuInner() {
   const router = useRouter();
   const user = useUser();
   if (!user) {
     return (
-      <Link href="/login" className={cn(buttonClassName({ variant: "secondary" }), MASTHEAD_CONTROL, "py-0", COMPACT)} data-testid="sign-in">
-        <PersonFilled className="size-5 shrink-0" aria-hidden="true" />
-        <span className="max-xs:sr-only @max-[16.5rem]:sr-only">{messages.shell.nav.signIn}</span>
+      <Link href="/login" aria-label={messages.shell.nav.signIn} title={messages.shell.nav.signIn} className={MASTHEAD_KEY} data-testid="sign-in">
+        <Person />
       </Link>
     );
   }
   const name = user.name ?? user.email ?? messages.shell.nav.account;
+  const initial = name.trim().charAt(0).toUpperCase() || "?";
   return (
     <MenuRoot>
-      <MenuTrigger className="press inline-flex size-9 items-center justify-center border border-line hover:border-line-strong" aria-label={messages.shell.nav.account} data-testid="account-menu">
-        <Avatar name={name} src={user.avatarUrl} size="sm" />
+      <MenuTrigger className={cn(MASTHEAD_KEY, "bg-pink text-on-fill")} aria-label={messages.shell.nav.account} title={messages.shell.nav.account} data-testid="account-menu">
+        <span aria-hidden="true" className="font-display text-sm leading-4">
+          {initial}
+        </span>
       </MenuTrigger>
       <MenuContent>
         {/* Wrapped, never cut short: the popup holds to the window (menu.tsx), and these lines wrap inside it. */}
         <div className="px-3 py-2">
           <p className="wrap-break-word text-sm font-medium text-ink-1">{name}</p>
           {user.email && user.name ? (
-            <p className="text-label text-ink-3">
+            <p className="font-figure text-xs text-ink-3">
               <EmailText email={user.email} />
             </p>
           ) : null}

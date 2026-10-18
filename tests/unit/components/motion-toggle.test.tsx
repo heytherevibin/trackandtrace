@@ -55,8 +55,8 @@ describe("MotionToggle", () => {
     expect(toggle).toHaveAccessibleDescription("Your device asks for reduced motion");
   });
 
-  it("labels itself in the footer bar's legend voice", () => {
+  it("labels itself in the footer bar's legend voice (v4: Space Mono 12/16 caps)", () => {
     render(<MotionToggle />);
-    expect(screen.getByText("Motion")).toHaveClass("font-display", "uppercase", "tracking-caps");
+    expect(screen.getByText("Motion")).toHaveClass("legend");
   });
 });

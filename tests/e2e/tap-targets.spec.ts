@@ -34,10 +34,10 @@ test("/ on a phone on its side answers a finger across 44px", async ({ page, isM
   expect(report(await undersizedTargets(page))).toEqual([]);
 });
 
-test("the masthead sheet's controls answer a finger too", async ({ page, isMobile }) => {
-  test.skip(!isMobile, "the sheet is the phone's nav");
+test("the menu drawer's controls answer a finger too", async ({ page, isMobile }) => {
+  test.skip(!isMobile, "the drawer is the phone's nav");
   await gotoReady(page, "/");
-  await page.getByRole("banner").getByRole("button", { name: "Open menu" }).click();
+  await page.getByRole("navigation", { name: "Sections" }).getByRole("button", { name: "Menu" }).click();
   const sheet = page.getByRole("dialog", { name: "Menu" });
   await expect(sheet).toBeVisible();
   // Visible is not arrived: the sheet slides in from off-screen left, and a control measured
