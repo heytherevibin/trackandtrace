@@ -6,6 +6,26 @@ B sheets' inline styles, not reinterpreted. Adopted 2026-09-17 from the Claude D
 "App landing page redesign" (`Landing Redesign B.dc.html` plus the Watchlist, Pre-booking,
 Accuracy, and Sign in B pages). It replaces the Rhythm Machine Step Row.
 
+## Neubrutal face (the traveller site, from 2026-10-18)
+
+The traveller site is being redrawn to Claude Design **"Trakline Industry — Neubrutal v4"** (handoff: `tokens.css`
+TT-200 and the component map), in batched PRs. The console keeps Industry steel, as below. The face is an attribute,
+not a fork:
+
+- `<html data-face="neubrutal">` is set by `src/app/(site)/layout.tsx` only. `src/styles/neubrutal.css` holds the v4
+  palette by its own names (`--bg`, `--paper`, `--edge`, `--accent` yellow, `--pink`, `--lime`, `--blue`, `--link`,
+  `--red`, `--orange`, `--on-fill`, `--on-red`) and maps every steel role onto it, so unconverted pages already wear
+  the face. `tests/unit/styles/neubrutal.contract.test.ts` holds it to the drawn values and its own AA pairings.
+- Shared utilities read face variables with steel fallbacks (`--edge-w`, `--plate-shadow`, `--legend-face`, …), so the
+  console renders exactly as before.
+- Primitives carry the face as `nb:` classes (`@custom-variant nb`, tokens.css), plus `.nb-press` (press into the
+  hard shadow), `.nb-blink` and `.nb-stripes`. Neubrutal-only tokens: `rounded-control` 3px, `rounded-plate` 4px,
+  `shadow-control` / `shadow-control-sm` / `shadow-plate` / `shadow-pressed`, `font-structure` (Space Grotesk),
+  `font-figure` (Space Mono), and colours `canvas paper edge pink lime blue link red orange on-fill on-red`.
+- Type: Archivo Black 400 caps for display, Space Grotesk 700 for structure, Inter for copy, Space Mono for figures and
+  legends (`siteFontVars`, fonts.ts). A colour may never share a name with a type size (`text-page` is a size).
+- One departure from v4, for AA: Night prints ink, not white, on red (`--on-red`; white on #ff6b6b is 2.78:1).
+
 ## Direction contract
 
 - **THESIS** — A PNR check is a drawing of a record. Every surface is a technical sheet: nothing is decorated, everything is labelled.

@@ -21,8 +21,12 @@ export const PLATE_TITLE_STACK = "max-sm:basis-full";
 
 /** A meta or action cell: behind a hairline beside the title; below sm, sharing the row under it. */
 export function plateCellClass(index: number): string {
-  return cn("max-sm:flex-1 max-sm:border-t max-sm:border-line", index === 0 && "max-sm:border-l-0");
+  return cn("max-sm:flex-1 max-sm:border-t max-sm:border-line nb:max-sm:border-t-2", index === 0 && "max-sm:border-l-0");
 }
+
+// Neubrutal v4 .hd (nb:): the title block is ruled with the 2px edge; its cells are Space Mono 700 12/16 caps,
+// 12px × 16px, the title in ink and the meta in ink-3.
+const NB_CELL = "nb:font-figure nb:font-bold nb:text-xs nb:tracking-wide nb:px-4 nb:py-3";
 
 export interface PlateProps extends Omit<HTMLAttributes<HTMLElement>, "title"> {
   readonly as?: "section" | "div" | "article" | "aside" | "figure";
@@ -69,16 +73,16 @@ export function PlateHeader({
 }: Pick<PlateProps, "title" | "titleId" | "headingLevel" | "meta" | "actions" | "cells" | "titleMinCh" | "stack" | "metaWraps">) {
   const Heading = headingLevel === 1 ? "h1" : headingLevel === 2 ? "h2" : headingLevel === 3 ? "h3" : "span";
   return (
-    <div className={cn("flex flex-wrap items-stretch border-b border-line", metaWraps && "max-sm:@container")}>
-      <Heading id={titleId} className={cn("legend flex-1 leading-6 text-ink-1", MIN_CH[titleMinCh], CELL[cells], stack && (meta.length > 0 || actions) && PLATE_TITLE_STACK)}>
+    <div className={cn("flex flex-wrap items-stretch border-b border-line nb:border-b-2 nb:rounded-t-plate nb:overflow-hidden", metaWraps && "max-sm:@container")}>
+      <Heading id={titleId} className={cn("legend flex-1 leading-6 text-ink-1", MIN_CH[titleMinCh], CELL[cells], NB_CELL, "nb:text-ink-1", stack && (meta.length > 0 || actions) && PLATE_TITLE_STACK)}>
         {title}
       </Heading>
       {meta.map((cell, i) => (
-        <span key={i} className={cn("legend whitespace-nowrap border-l border-line leading-6", metaWraps && "@max-[11rem]:whitespace-normal", CELL[cells], stack && plateCellClass(i))}>
+        <span key={i} className={cn("legend whitespace-nowrap border-l border-line leading-6 nb:border-l-2", metaWraps && "@max-[11rem]:whitespace-normal", CELL[cells], NB_CELL, stack && plateCellClass(i))}>
           {cell}
         </span>
       ))}
-      {actions ? <span className={cn("flex items-center gap-2 border-l border-line px-3 py-1.5", stack && plateCellClass(meta.length))}>{actions}</span> : null}
+      {actions ? <span className={cn("flex items-center gap-2 border-l border-line px-3 py-1.5 nb:border-l-2", stack && plateCellClass(meta.length))}>{actions}</span> : null}
     </div>
   );
 }

@@ -22,6 +22,29 @@ export const DARK = {
   line: "#2f2f2f",
 } as const;
 
+// The traveller site's Neubrutal face (src/styles/neubrutal.css). The console keeps LIGHT and DARK above.
+export const NEUBRUTAL_LIGHT = {
+  bg: "#fff8e7",
+  paper: "#ffffff",
+  ink1: "#111111",
+  ink3: "#4f4f4f",
+  edge: "#111111",
+  accent: "#ffd93d",
+  pink: "#ff8fcf",
+  link: "#1a36d6",
+} as const;
+
+export const NEUBRUTAL_DARK = {
+  bg: "#0e0e0f",
+  paper: "#1a1a1c",
+  ink1: "#f4f4f4",
+  ink3: "#bebebe",
+  edge: "#e9e9e9",
+  accent: "#ffd93d",
+  pink: "#ff8fcf",
+  link: "#9dbdff",
+} as const;
+
 // The mark keeps its own plate on both faces: three keys and a lit lamp.
 export const MARK = {
   plate: "#1a1a1c",

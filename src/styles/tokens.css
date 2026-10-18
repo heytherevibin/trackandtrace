@@ -1,6 +1,11 @@
 /* Theme attribute lives on <html>. Tokens swap per face, so `dark:` is rarely needed. */
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
+/* The traveller site's Neubrutal face (neubrutal.css): nb:… applies only under <html data-face="neubrutal">, so the
+   console, which shares every primitive, keeps steel. :where() adds no specificity, so nb: classes win over their plain
+   counterparts by Tailwind's variant order alone. */
+@custom-variant nb (&:where([data-face="neubrutal"] *));
+
 /* Hover only for fine pointers: touch never gets a stuck hover state. */
 @custom-variant hover {
   @media (hover: hover) and (pointer: fine) {
@@ -85,6 +90,9 @@
   /* The wireframe world is square. Only lamps, route stops and the journey's instruments (dials, the station clock, the route map) are round. */
   --radius-none: 0;
   --radius-full: 9999px;
+  /* Neubrutal shapes (nb: only): controls 3px, plates 4px. */
+  --radius-control: 3px;
+  --radius-plate: 4px;
 
   --ease-out: cubic-bezier(0.25, 1, 0.5, 1);
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
@@ -135,15 +143,36 @@
   --color-mark: var(--mark);
   --color-focus: var(--focus-ring);
   --color-backdrop: var(--backdrop);
+  /* The Neubrutal palette by its own names (nb: only; undefined on the console). */
+  --color-canvas: var(--bg);
+  --color-paper: var(--paper);
+  --color-edge: var(--edge);
+  --color-pink: var(--pink);
+  --color-lime: var(--lime);
+  --color-blue: var(--blue);
+  --color-link: var(--link);
+  --color-red: var(--red);
+  --color-orange: var(--orange);
+  --color-on-fill: var(--on-fill);
+  --color-on-red: var(--on-red);
   --shadow-1: var(--elevation-1);
   --shadow-2: var(--elevation-2);
   --shadow-3: var(--elevation-3);
+  /* Neubrutal hard shadows (nb: only): a control's 3px, a plate's 6px (5px at night), and pressed flat. */
+  --shadow-control: 3px 3px 0 var(--line);
+  --shadow-control-sm: 2px 2px 0 var(--line);
+  --shadow-plate: var(--plate-shadow);
+  --shadow-pressed: 0 0 0 var(--line);
 
   /* next/font sets the face variables on <html>; roles are mapped here.
      Barlow Condensed is the heading, legend, and figure voice; Barlow carries body copy. */
   --font-sans: var(--font-face-body), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-face-heading), var(--font-face-body), ui-sans-serif, system-ui, sans-serif;
   --font-label: var(--font-face-heading), var(--font-face-body), ui-sans-serif, system-ui, sans-serif;
+  /* Neubrutal roles (nb: only; on the console they fall back to the steel faces): Space Grotesk for plate titles,
+     buttons and labels; Space Mono for figures, legends and meta. */
+  --font-structure: var(--font-face-structure, var(--font-face-heading)), ui-sans-serif, system-ui, sans-serif;
+  --font-figure: var(--font-face-figure, var(--font-face-heading)), ui-monospace, monospace;
 }
 
 :root {

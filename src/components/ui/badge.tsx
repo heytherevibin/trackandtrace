@@ -9,13 +9,15 @@ import { cn } from "@/utils/cn";
 
 export type TagVariant = "accent" | "outline" | "neutral" | "steel";
 
-// .tag has no edge; only .tag-outline draws one.
+// .tag has no edge; only .tag-outline draws one. Neubrutal v4 (nb:): every .tag is edged; .tag.fill (accent) is
+// pink, the rest sit on paper in ink.
 const VARIANT: Record<TagVariant, string> = {
-  accent: "bg-accent-soft text-accent-soft-ink",
-  outline: "border border-accent text-accent-text",
-  neutral: "bg-surface-1 text-ink-2",
-  steel: "border border-accent-text text-accent-text",
+  accent: "bg-accent-soft text-accent-soft-ink nb:bg-pink nb:text-on-fill",
+  outline: "border border-accent text-accent-text nb:bg-paper nb:text-ink-1",
+  neutral: "bg-surface-1 text-ink-2 nb:bg-paper nb:text-ink-1",
+  steel: "border border-accent-text text-accent-text nb:bg-paper nb:text-ink-1",
 };
+const NB_TAG = "nb:min-h-7 nb:gap-2 nb:border-2 nb:border-edge nb:rounded-control nb:px-2.5 nb:py-0 nb:font-figure nb:text-xs nb:font-normal nb:uppercase nb:tracking-wide";
 
 export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   readonly variant?: TagVariant | "soft";
@@ -33,6 +35,7 @@ export function Badge({ variant, tone, icon, caps = false, className, children, 
       className={cn(
         "inline-flex items-center gap-1.5 whitespace-nowrap px-2.5 py-[3px] text-2xs leading-normal tracking-head",
         VARIANT[resolved],
+        NB_TAG,
         // The console frame's own tags (environment, CONSOLE, the member's role): condensed capitals.
         caps && "font-display font-semibold uppercase tracking-caps",
         className,

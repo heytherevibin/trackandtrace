@@ -10,6 +10,10 @@ const twMerge = extendTailwindMerge({
       text: ["2xs", "label", "body", "lead", "page", "hero", "signin"],
       tracking: ["caps", "brand", "wide", "head", "display"],
       leading: ["stack"],
+      // The Neubrutal face's own roles (tokens.css): without them merge reads font-structure as a weight and drops it.
+      font: ["structure", "figure"],
+      shadow: ["control", "control-sm", "plate", "pressed"],
+      radius: ["control", "plate"],
     },
   },
 });

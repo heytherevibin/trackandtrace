@@ -1,0 +1,286 @@
+/* Trakline — the Neubrutal face (Claude Design "Trakline Industry — Neubrutal v4", handoff/tokens.css TT-200).
+   The traveller site's document wears it: <html data-face="neubrutal"> (src/app/(site)/layout.tsx). The console's
+   document never does, so it keeps Industry steel from theme.css untouched.
+
+   Two layers. The v4 palette by its own names (--bg, --paper, --edge, --accent …), exactly as drawn. Then every steel
+   role name the components already speak, mapped onto it, so the whole site changes face at once and each page batch
+   only has to change what v4 draws differently. Literal colours only: the contract test computes contrast from them
+   (tests/unit/styles/neubrutal.contract.test.ts). */
+
+:root[data-face="neubrutal"] {
+  color-scheme: light;
+
+  /* v4 palette, Day */
+  --bg: #fff8e7;
+  --paper: #ffffff;
+  --edge: #111111;
+  --shadow: #111111;
+  --rule: rgba(17, 17, 17, 0.2);
+  --accent: #ffd93d;
+  --pink: #ff8fcf;
+  --lime: #a3e635;
+  --blue: #1e40ff;
+  --link: #1a36d6;
+  --red: #d6233a;
+  --orange: #ff8c42;
+  --on-fill: #111111;
+  /* Words on a red fill: white by day, as drawn. */
+  --on-red: #ffffff;
+  --ink-1: #111111;
+  --ink-2: #2b2b2b;
+  --ink-3: #4f4f4f;
+  /* The h1's hard pink shadow (dark-pink at night), and the h2's yellow one. */
+  --h1-shadow: #ff8fcf;
+  --h2-shadow: #ffd93d;
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256'%3E%3Cfilter id='g' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .114 0 0 0 0 .122 0 0 0 0 .125 0 0 0 .9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)' opacity='.04'/%3E%3C/svg%3E");
+
+  /* Steel roles, mapped. Grounds: page, then paper for every plate, well, menu and sheet. */
+  --surface-0: #fff8e7;
+  --surface-1: #ffffff;
+  --surface-2: #ffffff;
+  --surface-3: #ffffff;
+  --ink-inverse: #fff8e7;
+  --ink-alert: #d6233a;
+  /* Readable "steel" text becomes the link blue; the solid object becomes the yellow key, lime on hover. */
+  --accent-text: #1a36d6;
+  --accent-strong: #ffd93d;
+  --accent-strong-hover: #a3e635;
+  --accent-strong-active: #ffd93d;
+  --accent-ink: #111111;
+  --accent-soft: #ff8fcf;
+  --accent-soft-ink: #111111;
+  --accent-wash: rgba(255, 217, 61, 0.35);
+  --accent-busy: #ff8c42;
+  /* Status facts: open berths lime, a queue yellow, closed plain paper. Never a severity ramp. */
+  --open-soft: #a3e635;
+  --open-soft-ink: #111111;
+  --queued-soft: #ffd93d;
+  --queued-soft-ink: #111111;
+  --closed-soft: #ffffff;
+  --closed-soft-ink: #2b2b2b;
+  /* Every border is the edge (v4: --edge replaces --line, --line-strong and --mark). */
+  --line: #111111;
+  --line-strong: #111111;
+  --mark: #111111;
+  --focus-ring: #1e40ff;
+  --backdrop: rgba(17, 17, 17, 0.55);
+  --skeleton-base: #f1e7cc;
+  --skeleton-sheen: rgba(255, 255, 255, 0.6);
+  --selection-bg: #ffd93d;
+  --selection-fg: #111111;
+  --scrollbar-thumb: #111111;
+  /* Hard offset shadows: control, plate, and the plate again for anything that floats. */
+  --elevation-1: 3px 3px 0 #111111;
+  --elevation-2: 6px 6px 0 #111111;
+  --elevation-3: 6px 6px 0 #111111;
+
+  /* Shape and type the face sets for the shared utilities (utilities.css reads these with steel fallbacks). */
+  --edge-w: 2px;
+  --radius-control-v: 3px;
+  --radius-plate-v: 4px;
+  --plate-fill: var(--paper);
+  --plate-shadow: 6px 6px 0 var(--shadow);
+  --control-shadow: 3px 3px 0 var(--edge);
+  --corner-display: none;
+  --heading-weight: 400;
+  --heading-tracking: 0;
+  --legend-face: var(--font-face-figure);
+  --legend-weight: 400;
+  --legend-tracking: 0.04em;
+  --kicker-color: var(--link);
+  --legend-size: 12px;
+  --legend-leading: 16px;
+  --figure-face: var(--font-face-figure);
+  --figure-weight: 400;
+  --caps-face: var(--font-face-structure);
+  --caps-weight: 700;
+  --caps-tracking: 0.04em;
+  --well-caret: var(--ink-1);
+  --well-focus-edge: var(--edge);
+  --focus-w: 3px;
+  --link-thickness: 2px;
+  --link-offset: 3px;
+}
+
+:root[data-face="neubrutal"][data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #0e0e0f;
+  --paper: #1a1a1c;
+  --edge: #e9e9e9;
+  --shadow: #e9e9e9;
+  --rule: rgba(233, 233, 233, 0.25);
+  --accent: #ffd93d;
+  --pink: #ff8fcf;
+  --lime: #a3e635;
+  --blue: #3b5bff;
+  --link: #9dbdff;
+  --red: #ff6b6b;
+  --orange: #ff8c42;
+  --on-fill: #111111;
+  /* v4 drew white on #ff6b6b at night (2.78:1); ink reads at 6.8:1. */
+  --on-red: #111111;
+  --ink-1: #f4f4f4;
+  --ink-2: #dadada;
+  --ink-3: #bebebe;
+  --h1-shadow: #b8237a;
+  --h2-shadow: #7a6100;
+  --grain: none;
+
+  --surface-0: #0e0e0f;
+  --surface-1: #1a1a1c;
+  --surface-2: #1a1a1c;
+  --surface-3: #1a1a1c;
+  --ink-inverse: #0e0e0f;
+  --ink-alert: #ff6b6b;
+  --accent-text: #9dbdff;
+  --accent-strong: #ffd93d;
+  --accent-strong-hover: #a3e635;
+  --accent-strong-active: #ffd93d;
+  --accent-ink: #111111;
+  --accent-soft: #ff8fcf;
+  --accent-soft-ink: #111111;
+  --accent-wash: rgba(255, 217, 61, 0.18);
+  --accent-busy: #ff8c42;
+  --open-soft: #a3e635;
+  --open-soft-ink: #111111;
+  --queued-soft: #ffd93d;
+  --queued-soft-ink: #111111;
+  --closed-soft: #1a1a1c;
+  --closed-soft-ink: #dadada;
+  --line: #e9e9e9;
+  --line-strong: #e9e9e9;
+  --mark: #e9e9e9;
+  --focus-ring: #ffd93d;
+  --backdrop: rgba(0, 0, 0, 0.7);
+  --skeleton-base: #26262a;
+  --skeleton-sheen: rgba(255, 255, 255, 0.08);
+  --selection-bg: #ffd93d;
+  --selection-fg: #111111;
+  --scrollbar-thumb: #e9e9e9;
+  --elevation-1: 3px 3px 0 #e9e9e9;
+  --elevation-2: 5px 5px 0 #e9e9e9;
+  --elevation-3: 5px 5px 0 #e9e9e9;
+
+  --plate-shadow: 5px 5px 0 var(--shadow);
+}
+
+/* Fonts: Archivo Black for display, Space Grotesk for structure, Inter for copy, Space Mono for figures and legends.
+   next/font declares the four faces on <html> (fonts.ts siteFontVars); the face points the shared roles at them. */
+:root[data-face="neubrutal"] {
+  --font-face-body: var(--font-face-inter);
+  --font-face-heading: var(--font-face-archivo);
+  --font-face-structure: var(--font-face-grotesk);
+  --font-face-figure: var(--font-face-mono);
+}
+
+@layer base {
+  :root[data-face="neubrutal"] h1,
+  :root[data-face="neubrutal"] h2,
+  :root[data-face="neubrutal"] h3 {
+    text-wrap: balance;
+  }
+  :root[data-face="neubrutal"] h1 {
+    hanging-punctuation: first;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    :root[data-face="neubrutal"] a:hover {
+      color: #111111;
+      background: var(--accent);
+    }
+  }
+}
+
+/* Press, as v4 draws it: a control with a hard shadow presses into it (translate 3,3, shadow gone) rather than
+   shrinking. Unlayered, after motion.css's scale press, and more specific, so it replaces it for .nb-press. */
+:root[data-face="neubrutal"] :where(.nb-press):active:not(:focus-visible):not(:disabled):not([aria-disabled="true"]) {
+  transform: translate(3px, 3px);
+  box-shadow: 0 0 0 var(--edge);
+}
+
+/* A running lamp blinks orange and yellow; the running bar is yellow striped with the edge (v4 .step, the TL-01 bar). */
+:root[data-face="neubrutal"] .nb-blink {
+  animation: nb-blink 0.6s steps(1) infinite;
+}
+:root[data-face="neubrutal"] .nb-stripes {
+  background: repeating-linear-gradient(135deg, var(--accent) 0 6px, var(--edge) 6px 8px);
+}
+
+/* v4 motion vocabulary, shared by the page batches. All collapse under reduced motion (motion.css). */
+@keyframes nb-pop {
+  0% {
+    transform: translate(3px, 3px) scale(0.92);
+  }
+  60% {
+    transform: translate(3px, 3px) scale(1.06);
+  }
+  100% {
+    transform: translate(3px, 3px) scale(1);
+  }
+}
+@keyframes nb-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes nb-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20%,
+  60% {
+    transform: translateX(-5px);
+  }
+  40%,
+  80% {
+    transform: translateX(5px);
+  }
+}
+@keyframes nb-blink {
+  0%,
+  100% {
+    background: var(--orange);
+  }
+  50% {
+    background: var(--accent);
+  }
+}
+@keyframes nb-throb {
+  0%,
+  100% {
+    transform: none;
+  }
+  50% {
+    transform: scale(1.04);
+  }
+}
+@keyframes nb-wipe {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes nb-slidein {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes nb-flash {
+  0% {
+    background: var(--accent);
+  }
+  100% {
+    background: transparent;
+  }
+}
