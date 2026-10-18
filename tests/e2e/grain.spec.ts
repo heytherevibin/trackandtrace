@@ -3,9 +3,10 @@ import { expect, test } from "./fixtures";
 import { axeResults, gotoReady } from "./helpers";
 import { scrollIntoRun, waitForJourney } from "./journey/journey-helpers";
 
-// The page ground is film grain (owner, 2026-09-29): fine noise painted on the traveller site's canvas, in both
-// themes, and nothing else — no grid. The console keeps its flat surfaces, and the grain steps aside wherever the
-// reader has asked for plainer colours (forced colours, more contrast) and on paper.
+// The page ground is film grain (owner, 2026-09-29): fine noise painted on the traveller site's canvas, and nothing
+// else — no grid. Neubrutal v4 (2026-10-18) keeps it by Day, on the cream page at .04, and draws the Night page flat
+// (its --grain is none). The console keeps its flat surfaces, and the grain steps aside wherever the reader has asked
+// for plainer colours (forced colours, more contrast) and on paper.
 
 interface Ground {
   readonly image: string;
@@ -30,21 +31,24 @@ async function ground(page: Page): Promise<Ground> {
 }
 
 const GRAIN = /^url\("[^"]+"\)$/;
+/** v4's page colours: cream by Day, near-black by Night. */
+const PAGE = { light: "rgb(255, 248, 231)", dark: "rgb(14, 14, 15)" } as const;
 
 for (const [theme, face] of [["light", "Day"], ["dark", "Night"]] as const) {
   test.describe(`${face}`, () => {
     test.use({ colorScheme: theme });
     for (const route of ["/", "/pre-booking", "/privacy"] as const) {
-      test(`${route} paints film grain on the page canvas, and no grid`, async ({ page }) => {
+      test(`${route} paints ${theme === "light" ? "film grain" : "the flat page"} on the canvas, and no grid`, async ({ page }) => {
         await page.addInitScript((t) => window.localStorage.setItem("tt.theme", t), theme);
         await gotoReady(page, route);
         await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
         const g = await ground(page);
-        // One layer, an image: the grain. A grid would be a second layer, or a gradient.
-        expect(g.image).toMatch(GRAIN);
+        // By Day one layer, an image: the grain. A grid would be a second layer, or a gradient. By Night, none.
+        if (theme === "light") expect(g.image).toMatch(GRAIN);
+        else expect(g.image).toBe("none");
         expect(g.image).not.toMatch(/gradient/);
         // On the page colour, and scrolling with the page like paper, never fixed to the window.
-        expect(g.color).toBe(theme === "light" ? "rgb(242, 242, 243)" : "rgb(0, 0, 0)");
+        expect(g.color).toBe(PAGE[theme]);
         expect(g.attachment).toBe("scroll");
         // Nothing between the canvas and the content repaints the flat colour over it.
         expect(g.covers).toEqual([]);
@@ -53,7 +57,7 @@ for (const [theme, face] of [["light", "Day"], ["dark", "Night"]] as const) {
   });
 }
 
-test("the grain changes with the theme: ink by day, white by night", async ({ page }) => {
+test("the grain is Day's alone: ink noise by day, the flat page by night", async ({ page }) => {
   await gotoReady(page, "/privacy");
   await page.evaluate(() => window.localStorage.setItem("tt.theme", "light"));
   await gotoReady(page, "/privacy");
@@ -64,8 +68,7 @@ test("the grain changes with the theme: ink by day, white by night", async ({ pa
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   const night = (await ground(page)).image;
   expect(day).toMatch(GRAIN);
-  expect(night).toMatch(GRAIN);
-  expect(night).not.toBe(day);
+  expect(night).toBe("none");
 });
 
 test("the console's host has no grain", async ({ page, baseURL }) => {
@@ -80,6 +83,7 @@ for (const [name, media] of [
   ["print", { media: "print" }],
 ] as const) {
   test(`${name}: no grain`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "light" });
     await gotoReady(page, "/privacy");
     expect((await ground(page)).image).toMatch(GRAIN);
     await page.emulateMedia(media);
@@ -133,7 +137,9 @@ for (const theme of ["light", "dark"] as const) {
         const s = getComputedStyle(el);
         return { color: s.backgroundColor, image: s.backgroundImage };
       });
-      expect(fill).toEqual({ color: theme === "light" ? "rgb(242, 242, 243)" : "rgb(0, 0, 0)", image: "none" });
+      // Flat, never the grain: paper when still, the page colour in the run, where the stations take the ground.
+      expect(fill.image).toBe("none");
+      expect(fill.color).not.toBe("rgba(0, 0, 0, 0)");
       expect(await steelShare(page, figure)).toBeLessThan(0.2);
     });
   }
@@ -155,16 +161,17 @@ for (const theme of ["light", "dark"] as const) {
         const overImage = contrast(results.incomplete).filter((n) => n.any.some((c) => (c.data as { messageKey?: string } | null)?.messageKey === "bgImage"));
         expect(overImage.map((n) => n.target.join(" "))).toEqual([]);
         expect(contrast(results.passes).length).toBeGreaterThan(30);
-        // …and the page keeps its grain afterwards: the scan's switch is its own.
-        expect((await ground(page)).image).toMatch(GRAIN);
+        // …and the page keeps its ground afterwards (grain by Day, flat by Night): the scan's switch is its own.
+        if (theme === "light") expect((await ground(page)).image).toMatch(GRAIN);
+        else expect((await ground(page)).image).toBe("none");
       });
     }
   });
 }
 
-// The masthead is the page's own paper, grained like it, so it does not read as a flat band a tone off the grain's
-// mean (night: #000 against the grain's ~#080808). It stays opaque: it hides what scrolls under it, and its hairline
-// marks the one edge where its still grain meets the moving page. The menu sheet floats over a scrim and stays flat.
+// The masthead is the page's own paper, grained like it by Day, so it does not read as a flat band a tone off the
+// grain's mean. It stays opaque: it hides what scrolls under it, and its rule marks the one edge where its still ground
+// meets the moving page. The menu drawer floats over a scrim and stays flat.
 for (const theme of ["light", "dark"] as const) {
   test(`the masthead carries the grain, and stays opaque (${theme})`, async ({ page }) => {
     await page.addInitScript((t) => window.localStorage.setItem("tt.theme", t), theme);
@@ -173,7 +180,8 @@ for (const theme of ["light", "dark"] as const) {
       const s = getComputedStyle(el);
       return { color: s.backgroundColor, image: s.backgroundImage };
     });
-    expect(fill.color).toBe(theme === "light" ? "rgb(242, 242, 243)" : "rgb(0, 0, 0)");
-    expect(fill.image).toMatch(GRAIN);
+    expect(fill.color).toBe(PAGE[theme]);
+    if (theme === "light") expect(fill.image).toMatch(GRAIN);
+    else expect(fill.image).toBe("none");
   });
 }

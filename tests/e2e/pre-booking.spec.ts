@@ -2,6 +2,7 @@ import { expect, test } from "./fixtures";
 import { gotoReady } from "./helpers";
 import { dismissInstall } from "./journey/journey-helpers";
 import { text200 } from "./text-200";
+import { JOURNEY_DATE } from "./dates";
 
 // Form TL-02 v2 as the sheet draws it: stations, a date and the classes you would travel in, then
 // every train on that route with the first of those classes answered.
@@ -16,7 +17,7 @@ async function pickRoute(page: import("@playwright/test").Page, from: string, to
   await page.getByLabel("To", { exact: true }).blur();
 }
 
-async function search(page: import("@playwright/test").Page, date = "2026-10-15"): Promise<void> {
+async function search(page: import("@playwright/test").Page, date = JOURNEY_DATE): Promise<void> {
   await page.getByLabel("Journey date").fill(date);
   await page.getByRole("button", { name: "Find trains" }).click();
 }
@@ -71,7 +72,7 @@ test("a pair with no trains says so, and is never searched", async ({ page }) =>
   // Said twice on purpose: once under the field that is wrong, once as the lifecycle stop that failed.
   await expect(page.getByText(/No trains run SBC/i)).toHaveCount(2);
   await expect(page.getByLabel("Journey date")).toBeVisible();
-  await page.getByLabel("Journey date").fill("2026-10-15");
+  await page.getByLabel("Journey date").fill(JOURNEY_DATE);
   // Searching would spend a request to learn what the railway already answered for free.
   await expect(page.getByRole("button", { name: "Find trains" })).toBeDisabled();
   await expect(page.getByTestId("train-row")).toHaveCount(0);

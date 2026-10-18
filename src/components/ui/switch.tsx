@@ -5,10 +5,14 @@ import type { ReactNode } from "react";
 import { cn } from "@/utils/cn";
 
 /** The square track, steel when on, and its thumb. The footer's switches share them and label as legends. */
+// Neubrutal v4 .switch (nb:): a 44 × 24 paper track with the 2px edge; the 16px square thumb is the edge colour off and
+// lime on, sliding 20px.
 export const SWITCH_TRACK =
-  "relative inline-flex h-5 w-9 shrink-0 items-center border border-line-strong bg-surface-1 transition-colors data-[checked]:border-accent-strong data-[checked]:bg-accent-strong";
+  "relative inline-flex h-5 w-9 shrink-0 items-center border border-line-strong bg-surface-1 transition-colors data-[checked]:border-accent-strong data-[checked]:bg-accent-strong " +
+  "nb:h-6 nb:w-11 nb:border-2 nb:border-edge nb:rounded-control nb:bg-paper nb:data-[checked]:border-edge nb:data-[checked]:bg-paper";
 export const SWITCH_THUMB =
-  "block size-3.5 translate-x-0.5 bg-ink-3 transition-transform duration-(--duration-fast) ease-out data-[checked]:translate-x-4.5 data-[checked]:bg-accent-ink";
+  "block size-3.5 translate-x-0.5 bg-ink-3 transition-transform duration-(--duration-fast) ease-out data-[checked]:translate-x-4.5 data-[checked]:bg-accent-ink " +
+  "nb:size-4 nb:bg-edge nb:data-[checked]:translate-x-5 nb:data-[checked]:bg-lime";
 
 /** A square toggle: hairline track, steel when on. */
 export function Switch({

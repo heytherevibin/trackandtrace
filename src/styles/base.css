@@ -61,9 +61,10 @@
   h3,
   h4 {
     font-family: var(--font-display);
-    font-weight: 600;
+    /* Steel draws condensed 600 at .02em; the Neubrutal face sets Archivo Black 400, no tracking (neubrutal.css). */
+    font-weight: var(--heading-weight, 600);
     text-transform: uppercase;
-    letter-spacing: 0.02em;
+    letter-spacing: var(--heading-tracking, 0.02em);
     text-wrap: pretty;
   }
   p {
@@ -129,7 +130,7 @@
     outline: none;
   }
   :focus-visible {
-    outline: 2px solid var(--focus-ring);
+    outline: var(--focus-w, 2px) solid var(--focus-ring);
     outline-offset: 2px;
   }
   input:focus-visible,
@@ -140,8 +141,8 @@
 
   a {
     color: var(--accent-text);
-    text-underline-offset: 0.15em;
-    text-decoration-thickness: 1px;
+    text-underline-offset: var(--link-offset, 0.15em);
+    text-decoration-thickness: var(--link-thickness, 1px);
   }
   @media (hover: hover) and (pointer: fine) {
     a:hover {
@@ -166,6 +167,8 @@
     height: 11px;
     color: var(--mark);
     pointer-events: none;
+    /* The Neubrutal face draws no registration marks: its plates carry a hard shadow instead. */
+    display: var(--corner-display, block);
   }
   .corner::before,
   .corner::after {

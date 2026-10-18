@@ -1,4 +1,5 @@
 import { expect, test } from "./fixtures";
+import { JOURNEY_DATE } from "./dates";
 
 // The two endpoints the pre-booking form will use, exercised as the form will use them. No page
 // reaches them yet, so this is the only thing that proves the handlers are wired at all: the unit
@@ -33,7 +34,7 @@ test("the route endpoint refuses a pair it cannot read", async ({ request }) => 
   expect((await res.json()) as { ok: boolean }).toMatchObject({ ok: false });
 });
 
-const JOURNEY = { trainNo: "12627", from: "SBC", to: "NDLS", journeyDate: "2026-10-15", travelClass: "3A", quota: "GN" };
+const JOURNEY = { trainNo: "12627", from: "SBC", to: "NDLS", journeyDate: JOURNEY_DATE, travelClass: "3A", quota: "GN" };
 
 test("the availability endpoint answers one journey with its days", async ({ request }) => {
   const res = await request.post("/api/availability", { data: JOURNEY });
@@ -59,7 +60,7 @@ test("the availability endpoint refuses a journey it cannot read, before spendin
   }
 });
 
-const SEARCH = { from: "SBC", to: "NDLS", journeyDate: "2026-10-15", quota: "GN", classes: ["SL", "3A", "2A"] };
+const SEARCH = { from: "SBC", to: "NDLS", journeyDate: JOURNEY_DATE, quota: "GN", classes: ["SL", "3A", "2A"] };
 
 test("the search endpoint answers every chosen class of every train on the pair", async ({ request }) => {
   const res = await request.post("/api/route-availability", { data: SEARCH });
@@ -121,7 +122,7 @@ test("a repeated class is one class, not a way past the cap", async ({ request }
 });
 
 test("opening a row asks for several classes at once", async ({ request }) => {
-  const res = await request.post("/api/availability", { data: { trainNo: "12627", from: "SBC", to: "NDLS", journeyDate: "2026-10-15", quota: "GN", travelClasses: ["3A", "2A"] } });
+  const res = await request.post("/api/availability", { data: { trainNo: "12627", from: "SBC", to: "NDLS", journeyDate: JOURNEY_DATE, quota: "GN", travelClasses: ["3A", "2A"] } });
   expect(res.ok()).toBe(true);
   const body = (await res.json()) as { ok: boolean; answers: Record<string, { days: unknown[] }>; failedClasses: string[] };
   expect(body.ok).toBe(true);

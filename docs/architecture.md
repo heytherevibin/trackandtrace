@@ -75,6 +75,7 @@ PNRs never travel in an address, because request paths and query strings are rec
 ## Testing
 
 - `tests/unit` — pure logic and jsdom component tests (Vitest projects; `.test.ts` node, `.test.tsx` jsdom).
+- `tests/unit/styles/neubrutal.contract.test.ts` — the traveller site's Neubrutal face (`src/styles/neubrutal.css`, worn as `<html data-face="neubrutal">` by the site layout only): the v4 palette as drawn, every steel role mapped, AA for its inks and fills, colour names never shadowing type sizes, and the console never wearing it.
 - `tests/unit/tokens.contract.test.ts` — the design-system guard: AA contrast for every text role on every surface in both faces, the design-locked steel pairing held at 3:1, parity with `brand-colors.ts`, the Industry vocabulary (no rounded corners, signal tones, or instrument tokens), banned arbitrary size classes, spacing rhythm, no raw hex, 500-line cap.
 - `tests/unit/utils/cn.test.ts` — class merging keeps the custom type scale (`text-label`, `text-body`, …) beside colours.
 - `tests/integration` — route handlers against an in-memory Supabase fake.

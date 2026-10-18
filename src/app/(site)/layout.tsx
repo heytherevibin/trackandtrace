@@ -1,12 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import "../globals.css";
-import { DARK, LIGHT } from "@/components/brand/brand-colors";
+import { NEUBRUTAL_DARK, NEUBRUTAL_LIGHT } from "@/components/brand/brand-colors";
 import { MOTION_BOOT_SCRIPT } from "@/components/motion/motion-boot";
 import { Providers } from "@/components/providers";
 import { AppShell } from "@/components/shell/app-shell";
 import { PwaRegister } from "@/components/shell/pwa-register";
 import { currentUser } from "@/services/session";
-import { fontVars } from "../fonts";
+import { siteFontVars } from "../fonts";
 
 export const metadata: Metadata = {
   title: {
@@ -28,8 +28,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: LIGHT.surface0 },
-    { media: "(prefers-color-scheme: dark)", color: DARK.surface0 },
+    { media: "(prefers-color-scheme: light)", color: NEUBRUTAL_LIGHT.bg },
+    { media: "(prefers-color-scheme: dark)", color: NEUBRUTAL_DARK.bg },
   ],
   width: "device-width",
   initialScale: 1,
@@ -40,7 +40,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   // Un-awaited on purpose: the shell streams and loading boundaries still show.
   const userPromise = currentUser();
   return (
-    <html lang="en" className={fontVars} data-ground="grain" data-scroll-behavior="smooth" suppressHydrationWarning>
+    <html lang="en" className={siteFontVars} data-face="neubrutal" data-ground="grain" data-scroll-behavior="smooth" suppressHydrationWarning>
       <head>
         {/* Motion, before first paint: html[data-motion] (motion-boot.ts). Inline, as the traveller CSP allows. */}
         <script dangerouslySetInnerHTML={{ __html: MOTION_BOOT_SCRIPT }} />

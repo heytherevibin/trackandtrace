@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { LIGHT } from "@/components/brand/brand-colors";
+import { NEUBRUTAL_LIGHT } from "@/components/brand/brand-colors";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
@@ -9,8 +9,8 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: "/",
     display: "standalone",
     orientation: "portrait",
-    background_color: LIGHT.surface0,
-    theme_color: LIGHT.surface0,
+    background_color: NEUBRUTAL_LIGHT.bg,
+    theme_color: NEUBRUTAL_LIGHT.bg,
     categories: ["travel", "utilities"],
     icons: [{ src: "/icon.svg", sizes: "any", type: "image/svg+xml" }],
   };

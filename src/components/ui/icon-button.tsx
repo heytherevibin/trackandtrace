@@ -5,12 +5,14 @@ import { Spinner } from "./spinner";
 type Variant = "ghost" | "secondary" | "key";
 type Size = "sm" | "md" | "lg";
 
+// Neubrutal v4 (nb:): the masthead's 40px keys. Edged keys sit on paper with the control shadow and turn pink.
+const NB_KEY = "nb:border-2 nb:border-edge nb:rounded-control nb:bg-paper nb:text-ink-1 nb:shadow-control nb:hover:bg-pink nb:hover:text-on-fill nb-press";
 const VARIANT: Record<Variant, string> = {
-  ghost: "border-transparent text-accent-text hover:bg-accent/10 active:bg-accent/20",
-  secondary: "border-line text-ink-1 hover:bg-ink-1/7 active:bg-ink-1/14",
-  key: "border-line text-ink-1 hover:bg-ink-1/7 active:bg-ink-1/14",
+  ghost: "border-transparent text-accent-text hover:bg-accent/10 active:bg-accent/20 nb:rounded-control nb:text-link nb:hover:bg-accent nb:hover:text-on-fill",
+  secondary: `border-line text-ink-1 hover:bg-ink-1/7 active:bg-ink-1/14 ${NB_KEY}`,
+  key: `border-line text-ink-1 hover:bg-ink-1/7 active:bg-ink-1/14 ${NB_KEY}`,
 };
-const SIZE: Record<Size, string> = { sm: "size-8", md: "size-9", lg: "size-11" };
+const SIZE: Record<Size, string> = { sm: "size-8", md: "size-9 nb:size-10", lg: "size-11" };
 
 export interface IconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> {
   /** Required: becomes the accessible name. */

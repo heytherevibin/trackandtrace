@@ -18,13 +18,20 @@ export function ToastHost() {
       toastOptions={{
         unstyled: true,
         classNames: {
-          toast: "z-toast flex w-full max-w-narrow items-center gap-3 border border-line bg-surface-2 px-4 py-3 text-sm text-ink-1 shadow-2",
+          // Neubrutal v4 toast (nb:): a lime plate, ink words, the hard plate shadow.
+          toast:
+            "z-toast flex w-full max-w-narrow items-center gap-3 border border-line bg-surface-2 px-4 py-3 text-sm text-ink-1 shadow-2 " +
+            "nb:border-2 nb:border-edge nb:rounded-plate nb:bg-lime nb:py-2 nb:pr-2 nb:font-semibold nb:text-on-fill nb:shadow-plate",
           title: "font-medium",
-          description: "text-ink-2",
-          actionButton: "press ml-auto h-8 border border-accent-strong bg-accent-strong px-2.5 font-display text-label font-semibold text-accent-ink hover:bg-accent-strong-hover",
-          cancelButton: "press ml-auto h-8 border border-line px-2.5 font-display text-label font-semibold text-ink-1",
-          success: "border-l-2 border-l-accent",
-          error: "border-l-2 border-l-ink-alert",
+          description: "text-ink-2 nb:text-on-fill",
+          actionButton:
+            "press ml-auto h-8 border border-accent-strong bg-accent-strong px-2.5 font-display text-label font-semibold text-accent-ink hover:bg-accent-strong-hover " +
+            "nb:border-2 nb:border-edge nb:rounded-control nb:bg-paper nb:px-3 nb:font-structure nb:font-bold nb:text-xs nb:text-ink-1 nb:shadow-control nb:hover:bg-pink nb-press",
+          cancelButton:
+            "press ml-auto h-8 border border-line px-2.5 font-display text-label font-semibold text-ink-1 " +
+            "nb:border-2 nb:border-edge nb:rounded-control nb:bg-paper nb:px-3 nb:font-structure nb:font-bold nb:text-xs nb-press",
+          success: "border-l-2 border-l-accent nb:border-l-edge",
+          error: "border-l-2 border-l-ink-alert nb:bg-red nb:text-on-red nb:border-l-edge",
           info: "border-line",
         },
       }}

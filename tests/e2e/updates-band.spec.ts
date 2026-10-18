@@ -4,6 +4,7 @@ import { expect, test } from "./fixtures";
 import { PNR, axeResults, gotoReady, holdJourney } from "./helpers";
 import { brokenWords, cutText, layoutBreaks } from "./layout";
 import { UNSUBSCRIBE } from "./subscribe-link";
+import { JOURNEY_DATE } from "./dates";
 
 // The "Updates by email" band (the owner, 2026-10-01): the sign-up left the footer and stands between the page and
 // the footer, full on the landing, slim on the app pages, absent where a page asks for an address of its own or is
@@ -338,7 +339,7 @@ test.describe("the pre-booking plate's form keeps the same floor", () => {
       await page.getByLabel("From", { exact: true }).fill("SBC");
       await page.getByLabel("To", { exact: true }).fill("NDLS");
       await page.getByLabel("To", { exact: true }).blur();
-      await page.getByLabel("Journey date").fill("2026-10-15");
+      await page.getByLabel("Journey date").fill(JOURNEY_DATE);
       await page.getByRole("button", { name: "Find trains" }).click();
       const field = page.getByRole("main").locator("input[name='email']");
       const plate = field.locator("xpath=ancestor::form[1]");

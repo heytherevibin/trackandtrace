@@ -4,6 +4,7 @@ import { waitForJourney } from "./journey/journey-helpers";
 import { cutText, layoutBreaks } from "./layout";
 import { UNSUBSCRIBE } from "./subscribe-link";
 import { report, undersizedTargets } from "./targets";
+import { JOURNEY_DATE } from "./dates";
 
 // Every traveller page with its text at 200% (WCAG 1.4.4 Resize Text, 1.4.10 Reflow), at every width from a 280px phone
 // to a 1440px desk: nothing scrolls sideways, no text is cut, no word is broken where its line could have held it (a
@@ -67,7 +68,7 @@ async function searchTrains(page: Page): Promise<void> {
   await page.getByLabel("From", { exact: true }).fill("SBC");
   await page.getByLabel("To", { exact: true }).fill("NDLS");
   await page.getByLabel("To", { exact: true }).blur();
-  await page.getByLabel("Journey date").fill("2026-10-15");
+  await page.getByLabel("Journey date").fill(JOURNEY_DATE);
   // the route has answered: the button is offered only then
   await expect(page.getByRole("button", { name: "Find trains" })).toBeEnabled({ timeout: 30_000 });
   await page.getByRole("button", { name: "Find trains" }).click();

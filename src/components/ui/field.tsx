@@ -12,11 +12,12 @@ export function Field({ className, ...rest }: ComponentProps<typeof BaseField.Ro
 }
 
 export function FieldLabel({ className, ...rest }: ComponentProps<typeof BaseField.Label>) {
-  return <BaseField.Label className={cn("legend-md text-accent-text", className)} {...rest} />;
+  // Neubrutal v4 (nb:): field labels are Space Grotesk 700 14/20 caps in ink.
+  return <BaseField.Label className={cn("legend-md text-accent-text nb:font-structure nb:font-bold nb:text-sm nb:tracking-wide nb:text-ink-1", className)} {...rest} />;
 }
 
 export function FieldHint({ className, ...rest }: ComponentProps<typeof BaseField.Description>) {
-  return <BaseField.Description className={cn("text-label text-ink-3", className)} {...rest} />;
+  return <BaseField.Description className={cn("text-label text-ink-3 nb:font-figure nb:text-xs", className)} {...rest} />;
 }
 
 export function FieldError({ className, children, ...rest }: ComponentProps<typeof BaseField.Error> & { readonly children?: ReactNode }) {
