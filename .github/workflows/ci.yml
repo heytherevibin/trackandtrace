@@ -1,11 +1,12 @@
 # Checks every pull request into main and every push to main, and every pull request into feat/neubrutal, the
-# Neubrutal v4 redesign's integration branch (its batches merge there before one PR takes it to main).
+# Neubrutal v4 redesign's integration branch (its batches merge there before one PR takes it to main), or into one of
+# its batch branches (feat/neubrutal-*), where the next batch is stacked until the one under it merges.
 # No secrets: every test runs on the sample-data fixture.
 name: CI
 
 on:
   pull_request:
-    branches: [main, feat/neubrutal]
+    branches: [main, feat/neubrutal, "feat/neubrutal-*"]
   push:
     branches: [main]
   workflow_dispatch:
