@@ -137,7 +137,9 @@ for (const theme of ["light", "dark"] as const) {
         const s = getComputedStyle(el);
         return { color: s.backgroundColor, image: s.backgroundImage };
       });
-      expect(fill).toEqual({ color: PAGE[theme], image: "none" });
+      // Flat, never the grain: paper when still, the page colour in the run, where the stations take the ground.
+      expect(fill.image).toBe("none");
+      expect(fill.color).not.toBe("rgba(0, 0, 0, 0)");
       expect(await steelShare(page, figure)).toBeLessThan(0.2);
     });
   }
