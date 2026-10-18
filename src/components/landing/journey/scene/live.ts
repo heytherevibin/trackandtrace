@@ -1,38 +1,28 @@
 import { animate, onScroll, type ScrollObserver } from "animejs";
-import { Vector3, type PerspectiveCamera } from "three";
 import { QUALITY_STORAGE_KEY } from "@/components/motion/motion-boot";
 import { messages } from "@/messages";
 import { storedQuality, type Ask, type Begin } from "../drawing";
 import { createGovernor, nextFrame, startLevel } from "../governor";
-import { DEPART_EVENT, LAYOUT_EVENT, THEME_EVENT, emit } from "../journey-events";
-import type { Box } from "../labels-layout";
-import { createLiveLabels, relayWith, revealOf, wipe } from "../live-labels";
+import { LAYOUT_EVENT, THEME_EVENT } from "../journey-events";
 import { SMOOTH } from "../motion-tokens";
 import { track } from "../observers";
-import { anatomyPose, terminusPose, type AnatomyPose } from "../pose";
+import { terminusPose } from "../pose";
 import type { JourneyContext, Teardown } from "../start-journey";
-import { isPartId } from "../train-parts";
 import { QUALITY, createEngine, type Engine } from "./engine";
-import type { Rect } from "./fit";
-import { smoothstep } from "./math";
 import { readPalette, systemReader, tokenReader, type ScenePalette } from "./palette";
-import type { RigPartId } from "./rig";
 import { SCENE_CHUNK_MARK } from "./scene-mark";
 
-// The live drawn train (spec §3.A–C; prototype v3's journey.js): the scene chunk's only door. The drawing chapter,
-// pinned while a scan gate sweeps the steel locomotive into its drawing; it turns, comes apart into labelled parts,
-// shows its dimensions, takes its coaches and departs past the line side (tt:depart, the horn's cue). And the terminus
-// arrival above the closing plate. Anime.js turns scroll into progress; one render loop draws while a stage shows,
-// and a governor steps quality down when frames run long. The engine is kept for the journey's life (J5-4).
+// The live drawn train (spec §3.A; prototype v3's journey.js), cut down on 2026-10-18 to the one stage Neubrutal v4
+// keeps: the train arriving at the terminus, above the closing plate, drawn in the page's ink with a yellow headlight.
+// Anime.js turns scroll into progress; one render loop draws while the stage shows, and a governor steps quality down
+// when frames run long. The engine is kept for the journey's life (J5-4).
 
 export { SCENE_CHUNK_MARK };
 
 interface JourneyProbe {
-  anatomy(): number;
   terminus(): number;
   quality(): number;
   night(): boolean;
-  box(): Box | null;
   inked(selector: string): number;
 }
 declare global {
@@ -109,114 +99,20 @@ export async function prepareLive(ask: Ask, ctx: JourneyContext): Promise<Begin>
 }
 
 function startLive(engine: Engine, ask: Ask): Teardown {
-  const section = document.getElementById("anatomy");
-  const stageA = section?.querySelector<HTMLElement>(".anatomy-stage");
-  const labels = section ? createLiveLabels(section) : null;
-  if (!section || !stageA || !labels) throw new Error("the drawing chapter's markup is missing");
   const stageT = document.querySelector<HTMLElement>(".terminus-stage");
-  const { pin } = labels;
-  const dims = [...pin.querySelectorAll<HTMLElement>(".dim-label")];
-  const { rig, camera } = engine.world;
-  const A = { p: 0 };
+  if (!stageT) throw new Error("the terminus's markup is missing");
   const T = { p: 0 };
-  const target = new Vector3();
-  const pickCamera: PerspectiveCamera = camera.clone();
-  let poseA: AnatomyPose | null = null;
-  let rectA: Rect | null = null;
-  let zone: Box | null = null;
-  let alive = true;
   let drawnKey = "";
   engine.setPalette(palette()); // the theme may have changed while nothing live listened
   engine.canvas.hidden = false; // this module owns the canvas element: it shows only while the drawing is live
 
-  // ---- pointing: a label lights its part, a part lights its label (fine pointers only)
-  let hot: RigPartId | null = null;
-  const setHot = (id: RigPartId | null) => {
-    if (id === hot) return;
-    hot = id;
-    rig.setHighlight(id);
-    for (const l of labels.labels) l.classList.toggle("is-hot", l.dataset.part === id);
-    engine.frame();
-  };
-  const fine = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
-  const onStageMove = (e: PointerEvent) => {
-    if (!rectA || !poseA || poseA.callouts < 0.5) return setHot(null);
-    setHot(engine.pick(e.clientX, e.clientY, rectA, pickCamera));
-  };
-  const onStageLeave = () => setHot(null);
-  const pointing = fine
-    ? labels.labels.map((label) => {
-        const enter = () => {
-          const part = label.dataset.part ?? "";
-          setHot(isPartId(part) ? part : null);
-        };
-        label.addEventListener("pointerenter", enter);
-        label.addEventListener("pointerleave", onStageLeave);
-        return () => {
-          label.removeEventListener("pointerenter", enter);
-          label.removeEventListener("pointerleave", onStageLeave);
-        };
-      })
-    : [];
-  if (fine) {
-    stageA.addEventListener("pointermove", onStageMove);
-    stageA.addEventListener("pointerleave", onStageLeave);
-  }
+  engine.addView("terminus", { el: stageT, bleed: true, update: ({ aspect, quality, night: isNight }) => engine.live(terminusPose(T.p, aspect), quality, isNight) });
 
-  // ---- after each anatomy frame: the labels, their leaders and the dimension figures
-  const placeOverlay = () => {
-    const pose = poseA;
-    const rect = rectA;
-    if (!pose || !rect) return;
-    pickCamera.copy(camera);
-    labels.draw((part) => engine.project(rig.anchor(part), rect), (i) => revealOf(i, pose.callouts));
-    const pr = pin.getBoundingClientRect();
-    for (const el of dims) {
-      const s = engine.project(rig.dimAnchor(el.dataset.dim === "height" ? "height" : "length"), rect);
-      el.style.transform = `translate(${(s.x - pr.left).toFixed(1)}px, ${(s.y - pr.top).toFixed(1)}px) translate(-50%, -50%)`;
-      el.style.clipPath = wipe(pose.dims);
-    }
-  };
+  // ---- scroll → progress: the train rolls in as the stage comes up the window and stands once it is half way
+  const observeT = track(onScroll({ target: stageT, enter: "bottom top", leave: "center center", sync: SMOOTH }));
+  const driveT = animate(T, { p: [0, 1], ease: "linear", duration: 1000, autoplay: observeT });
 
-  engine.addView("anatomy", {
-    el: stageA,
-    bleed: true,
-    update: ({ camera: cam, rect, aspect, quality, night: isNight }) => {
-      const pose = anatomyPose(A.p, aspect);
-      poseA = pose;
-      rectA = rect;
-      engine.live(pose, quality, isNight);
-      if (!zone) return;
-      const pr = pin.getBoundingClientRect();
-      target.set(...pose.target);
-      // the sides hold while the list stands beside the drawing (and let go as the train pulls away), or while the
-      // labels flank it
-      const across = labels.beside() ? 1 - smoothstep(0, 3, pose.drive) : smoothstep(0, 0.6, pose.explode);
-      engine.fit.apply(cam, rect, { l: pr.left + zone.l, r: pr.left + zone.r, t: pr.top + zone.t, b: pr.top + zone.b }, { across, panto: pose.panto, target, center: labels.listMode() ? 1 : 0 });
-    },
-    after: placeOverlay,
-  });
-  if (stageT) {
-    engine.addView("terminus", { el: stageT, bleed: true, update: ({ aspect, quality, night: isNight }) => engine.live(terminusPose(T.p, aspect), quality, isNight) });
-  }
-
-  // ---- scroll → progress; the departure is a moment on it
-  let prev = 0;
-  const onA = () => {
-    if (prev < 0.88 && A.p >= 0.88) emit(DEPART_EVENT);
-    prev = A.p;
-  };
-  // progress starts the moment the pin takes hold (its sticky top differs in the list layout)
-  const enterAt = () => {
-    const stick = Math.round(Number.parseFloat(getComputedStyle(pin).top)) || 0;
-    return stick >= 0 ? `top+=${stick} top` : `top-=${-stick} top`;
-  };
-  const observeA = track(onScroll({ target: section, enter: enterAt, leave: "bottom bottom", sync: SMOOTH }));
-  const driveA = animate(A, { p: [0, 1], ease: "linear", duration: 1000, onUpdate: onA, autoplay: observeA });
-  const observeT = stageT ? track(onScroll({ target: stageT, enter: "bottom top", leave: "center center", sync: SMOOTH })) : null;
-  const driveT = observeT ? animate(T, { p: [0, 1], ease: "linear", duration: 1000, autoplay: observeT }) : null;
-
-  // ---- quality: frame intervals while drawing steer the resolution, the coaches and the Night effects
+  // ---- quality: frame intervals while drawing steer the resolution, the coaches and the headlight
   const governor = createGovernor({
     levels: QUALITY.length,
     start: startLevel(storedQuality(), QUALITY.length),
@@ -236,42 +132,37 @@ function startLive(engine: Engine, ask: Ask): Teardown {
   });
   engine.setQuality(governor.level());
 
-  // ---- draw only while a stage is on (or about to come on) screen, and only when something changed
-  // anime's scroll sync stays awake for 500 ms of its clock after each scroll event, so one long frame (a slow phone's
-  // stall) can spend that in a single tick and leave the drawing short of the page until the reader scrolls again. A
-  // frame with nothing to draw while a progress still disagrees with its scroll wakes the sync, so it catches up.
-  const behind = (observer: ScrollObserver | null, p: number): boolean => observer !== null && Math.abs(observer.progress - p) > 1e-4;
-  const onScreen = new Set<Element>();
+  // ---- draw only while the stage is on (or about to come on) screen, and only when something changed. anime's scroll
+  // sync stays awake for 500 ms of its clock after each scroll event, so one long frame (a slow phone's stall) can spend
+  // that in a single tick and leave the drawing short of the page: a frame with nothing to draw while the progress still
+  // disagrees with its scroll wakes the sync, so it catches up.
+  const behind = (observer: ScrollObserver, p: number): boolean => Math.abs(observer.progress - p) > 1e-4;
+  let onScreen = false;
   let raf = 0;
   const loop = (now: number) => {
-    const key = `${A.p}|${T.p}|${stageA.getBoundingClientRect().top}|${stageT?.getBoundingClientRect().top ?? 0}|${window.innerWidth}`;
+    const key = `${T.p}|${stageT.getBoundingClientRect().top}|${window.innerWidth}`;
     if (key !== drawnKey) {
       drawnKey = key;
       engine.frame();
       governor.drew(now);
     } else {
       governor.idle();
-      if (behind(observeA, A.p)) observeA.container.handleScroll();
-      else if (observeT && behind(observeT, T.p)) observeT.container.handleScroll();
+      if (behind(observeT, T.p)) observeT.container.handleScroll();
     }
-    raf = nextFrame(onScreen.size > 0, governor, () => requestAnimationFrame(loop));
+    raf = nextFrame(onScreen, governor, () => requestAnimationFrame(loop));
   };
   // a long gap the page scrolled through is a slow frame of the gesture, not a new one (governor.ts)
   const onPageScroll = () => governor.scrolled();
   window.addEventListener("scroll", onPageScroll, { passive: true });
   const io = new IntersectionObserver(
     (entries) => {
-      for (const e of entries) {
-        if (e.isIntersecting) onScreen.add(e.target);
-        else onScreen.delete(e.target);
-      }
-      if (onScreen.size && !raf) raf = requestAnimationFrame(loop);
-      if (!onScreen.size) engine.frame();
+      for (const e of entries) onScreen = e.isIntersecting;
+      if (onScreen && !raf) raf = requestAnimationFrame(loop);
+      if (!onScreen) engine.frame();
     },
     { rootMargin: "20% 0px" },
   );
-  io.observe(stageA);
-  if (stageT) io.observe(stageT);
+  io.observe(stageT);
 
   // ---- theme: re-read the tokens and draw at once (J5-9); tt:theme is Night falls' synchronous redraw (J6)
   const onTheme = () => {
@@ -285,55 +176,18 @@ function startLive(engine: Engine, ask: Ask): Teardown {
   const forced = window.matchMedia(FORCED);
   forced.addEventListener("change", onTheme);
   window.addEventListener(THEME_EVENT, onTheme);
-
-  // ---- layout: the labels, and the zone the drawing keeps to; a chapter that cannot fit even as a list draws still
-  let layoutFrame = 0;
-  const relayout = () => {
-    layoutFrame = 0;
-    if (!alive) return;
-    zone = labels.layout();
-    if (!zone) {
-      // asked after this start has returned, never inside it (drawing.ts is still pinning)
-      queueMicrotask(() => {
-        if (alive) ask.still("fit");
-      });
-      return;
-    }
+  const redraw = () => {
     drawnKey = "";
     engine.frame();
   };
-  const soon = () => {
-    if (!layoutFrame) layoutFrame = requestAnimationFrame(relayout);
-  };
-  const ro = new ResizeObserver(soon);
-  ro.observe(pin);
-  for (const l of labels.labels) ro.observe(l);
-  // drawing.ts answers a resize from the layout the labels then take, asking for it from its own "resize" listener,
-  // heard before this one: laid out once for that resize, not again here in the same frame.
-  let answered = false;
-  const onResize = () => {
-    if (!answered) relayout();
-  };
-  const forgetRelay = relayWith(pin, () => {
-    relayout();
-    answered = true;
-    requestAnimationFrame(() => {
-      answered = false;
-    });
-  });
-  window.addEventListener(LAYOUT_EVENT, relayout);
-  window.addEventListener("resize", onResize);
-  void document.fonts.ready.then(soon);
-  relayout();
+  window.addEventListener(LAYOUT_EVENT, redraw);
   engine.frame();
 
   if (process.env.NODE_ENV !== "production") {
     window.__ttJourney = {
-      anatomy: () => A.p,
       terminus: () => T.p,
       quality: () => engine.quality(),
       night: () => engine.night(),
-      box: () => (poseA && rectA ? engine.fit.screenBox(camera, rectA, poseA.panto) : null),
       inked: (selector) => {
         const el = document.querySelector(selector);
         return el ? engine.inked(el) : 0;
@@ -342,32 +196,15 @@ function startLive(engine: Engine, ask: Ask): Teardown {
   }
 
   return () => {
-    alive = false;
-    driveA.revert();
-    observeA.revert();
-    driveT?.revert();
-    observeT?.revert();
+    driveT.revert();
+    observeT.revert();
     io.disconnect();
     cancelAnimationFrame(raf);
     window.removeEventListener("scroll", onPageScroll);
-    ro.disconnect();
-    cancelAnimationFrame(layoutFrame);
     themeWatch.disconnect();
     forced.removeEventListener("change", onTheme);
     window.removeEventListener(THEME_EVENT, onTheme);
-    window.removeEventListener(LAYOUT_EVENT, relayout);
-    window.removeEventListener("resize", onResize);
-    forgetRelay();
-    stageA.removeEventListener("pointermove", onStageMove);
-    stageA.removeEventListener("pointerleave", onStageLeave);
-    for (const stop of pointing) stop();
-    setHot(null);
-    labels.clear();
-    for (const el of dims) {
-      el.style.removeProperty("transform");
-      el.style.removeProperty("clip-path");
-    }
-    engine.removeView("anatomy");
+    window.removeEventListener(LAYOUT_EVENT, redraw);
     engine.removeView("terminus");
     engine.frame(); // nothing left on screen: clears the canvas
     engine.canvas.hidden = true;

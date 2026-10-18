@@ -25,5 +25,5 @@ test("a PNR copied from the booking SMS pastes whole into the cells", async ({ p
   await page.keyboard.press("ControlOrMeta+V");
   await expect(plate.locator("[data-filled]")).toHaveCount(10);
   await expect(page.getByLabel("PNR number").first()).toHaveValue("234 567 8900");
-  await expect(plate.getByText("10 / 10")).toBeVisible();
+  await expect(plate.getByText("10 / 10").first()).toBeVisible();
 });

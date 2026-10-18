@@ -1,52 +1,31 @@
-import type { ChapterTrace } from "@/components/landing/specimen-data";
 import { messages } from "@/messages";
-import { ChaptersInstrument } from "./journey/chapters-instrument";
-import { PinPaper } from "./journey/pin-paper";
-import { TrainGlyph } from "./journey/train-glyph";
-import { BODY, H2, H3, SectionKicker } from "./sheet-type";
+import { BODY, H2, H3, SECTION, SectionKicker } from "./sheet-type";
 
-// The route line: twin rails with sleepers and three stops at origin, midway, and terminus.
-const STOPS = ["left-0", "left-[calc(50%-8px)]", "left-[calc(100%-16px)]"] as const;
-
-/**
- * 02 · How it works: the check drawn as a route with three stops. Drawn still it is a plain section; while the
- * journey runs with Motion on, and the stops fit the window, it pins and plays them inside the chapters
- * instrument (journey/chapters.ts, spec §3.A).
- */
-export function HowItWorks({ trace }: { readonly trace: ChapterTrace | null }) {
+/** 02 · How it works: three stops on one line — Origin, En route, Terminus (v4). */
+export function HowItWorks() {
   const m = messages.home.how;
   return (
-    <section id="how" aria-labelledby="how-title" className="chapters section-pad">
-      <div className="chapters-pin">
-        <div className="chapters-copy">
-          <SectionKicker rule="mb-3">{m.kicker}</SectionKicker>
-          <h2 id="how-title" className={H2}>
-            {m.title}
-          </h2>
-          <div aria-hidden="true" className="chapters-rail relative mt-[44px] h-6">
-            <div className="rail absolute inset-x-0 top-1.5 h-3" />
-            {STOPS.map((left) => (
-              <span key={left} className={`absolute top-1 flex size-4 items-center justify-center rounded-full border border-accent-text ground ${left}`}>
-                <span className="size-1.5 rounded-full bg-accent" />
-              </span>
-            ))}
-            <span className="rail-marker">
-              <TrainGlyph />
-            </span>
-          </div>
-          <ol className="chapters-steps">
-            {m.steps.map((step, i) => (
-              <li key={step.num} data-chapter={i} className="min-w-0">
-                <span className="font-display text-label font-semibold uppercase leading-normal tracking-caps text-accent-text tnum">{m.stepLabel(step.num, step.kicker)}</span>
-                <h3 className={`mt-2 ${H3}`}>{step.title}</h3>
-                <p className={`mt-2.5 ${BODY}`}>{step.detail}</p>
-              </li>
-            ))}
-          </ol>
-        </div>
-        {trace ? <ChaptersInstrument trace={trace} /> : null}
+    <section id="how" aria-labelledby="how-title" className={SECTION}>
+      <SectionKicker>{m.kicker}</SectionKicker>
+      <h2 id="how-title" className={H2}>
+        {m.title}
+      </h2>
+      {/* In px throughout, so the stops sit on the line's ends whatever the text size. */}
+      <div aria-hidden="true" className="relative mt-8 h-[24px]">
+        <div className="absolute inset-x-0 top-[11px] h-[2px] bg-edge" />
+        <span className="absolute left-0 top-[4px] size-[16px] rounded-full border-2 border-edge bg-accent" />
+        <span className="absolute left-[calc(50%-8px)] top-[4px] size-[16px] rounded-full border-2 border-edge bg-accent" />
+        <span className="absolute left-[calc(100%-16px)] top-[4px] size-[16px] rounded-full border-2 border-edge bg-accent" />
       </div>
-      <PinPaper />
+      <ol className="m-0 mt-6 grid list-none grid-cols-[repeat(auto-fit,minmax(min(100%,240px),1fr))] gap-6 p-0">
+        {m.steps.map((step) => (
+          <li key={step.num} className="min-w-0">
+            <span className="legend text-link">{m.stepLabel(step.num, step.kicker)}</span>
+            <h3 className={`mt-2 ${H3}`}>{step.title}</h3>
+            <p className={`m-0 mt-2 ${BODY}`}>{step.detail}</p>
+          </li>
+        ))}
+      </ol>
     </section>
   );
 }

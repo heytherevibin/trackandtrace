@@ -1,33 +1,16 @@
-// Type roles of the landing sheet, transcribed from Landing Redesign B. Where the
-// drawing sets no line height, the page's 1.5 applies, so these say so explicitly.
-// Plain strings: these are composed with template literals, never merged.
+// Type roles of the landing sheet, as Neubrutal v4 draws them. Plain strings: composed with template literals.
 
-/** "02 · How it works": 13px condensed capitals in readable steel. */
-export const KICKER = "block font-display text-label font-semibold uppercase leading-normal tracking-caps text-accent-text";
-/** Section heading: 32/36 condensed capitals, hung optically. With text made larger it grows only while the column
- * holds its longest word whole (heading-fit, utilities.css), so no word breaks down to a 280px window at 200% text.
- * Only a word wider than the whole column at the drawn 32px (a window under about 260px at 200% text) still breaks,
- * rather than running past the window. */
-export const H2 = "optical-hang heading-fit tracking-head wrap-anywhere";
-/** Card and step heading: 22/24 condensed capitals. */
-export const H3 = "text-2xl leading-6 tracking-head";
-/** Body copy: 15/24 at 78%. */
-export const BODY = "text-body leading-6 text-ink-1/78";
-/** Condensed 13px capitals, as the feature links draw them. */
-export const SHEET_LINK = "font-display text-label font-semibold uppercase leading-normal tracking-caps no-underline";
-/** 13px condensed figures in steel: row numbers. */
-export const ROW_NUM = "font-display text-label font-semibold leading-normal tracking-caps text-accent-text tnum";
-/** 11px table heads. */
-export const TABLE_HEAD = "font-display text-2xs font-semibold uppercase leading-normal tracking-caps text-ink-1/70";
+/** "02 · How it works": a Space Mono legend in the link blue. */
+export const KICKER = "legend m-0 mb-3 block text-link";
+/** A section's h2: Archivo Black caps, 24–40px, with the yellow hard shadow. */
+export const H2 = "nb-section nb-shadow-yellow m-0";
+/** A step's or a card's heading: Archivo Black 20/28. */
+export const H3 = "m-0 text-xl leading-7";
+/** Body copy beside a heading: 14/20 in ink-2. */
+export const BODY = "text-sm leading-5 text-ink-2";
+/** A section of the landing: 48px above, 64px below, ruled off with the 2px edge (24/32 on a phone). */
+export const SECTION = "border-t-2 border-edge pb-16 pt-12 max-sm:pb-8 max-sm:pt-6";
 
-/** The kicker and its hairline rule; the rule's bottom margin varies by section as drawn. */
-export function SectionKicker({ children, rule }: { readonly children: string; readonly rule: "mb-3" | "mb-6" | "mb-8" }) {
-  return (
-    <>
-      <span data-flap="" className={`mb-3 ${KICKER}`}>
-        {children}
-      </span>
-      <hr className={`h-px border-0 bg-line ${rule}`} />
-    </>
-  );
+export function SectionKicker({ children }: { readonly children: string }) {
+  return <p className={KICKER}>{children}</p>;
 }

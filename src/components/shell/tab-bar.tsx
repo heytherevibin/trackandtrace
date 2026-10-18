@@ -49,7 +49,9 @@ function SignKey({ onChoose }: { readonly onChoose: () => void }) {
   );
 }
 
-export function TabBar() {
+/** The menu drawer (v4 nav[aria-label=Menu]), opened by `trigger`: the tab bar's Menu on a phone, or the masthead's Menu
+ *  key where text made larger leaves the masthead no room for its nav keys. */
+export function MenuDrawer({ trigger }: { readonly trigger: (Trigger: typeof Drawer.Trigger) => ReactNode }) {
   const pathname = usePathname();
   const m = messages.shell.nav;
   const [open, setOpen] = useState(false);
@@ -73,23 +75,7 @@ export function TabBar() {
 
   return (
     <Drawer.Root open={open} onOpenChange={setOpen} onOpenChangeComplete={afterClose} swipeDirection="left">
-      <nav aria-label={m.tabsLabel} className="tab-bar fixed inset-x-0 bottom-0 z-nav grid grid-cols-[repeat(4,minmax(0,1fr))] border-t-2 border-edge ground pb-(--safe-bottom) sm:hidden">
-        {TABS.map((tab) => {
-          const active = isActive(pathname, tab.href);
-          const target = navTarget(pathname, tab.href);
-          return (
-            <Link key={tab.href} href={target} aria-current={active ? "page" : undefined} className={cn(TAB, active && TAB_ON)}>
-              {GLYPH[tab.key]}
-              {tab.label}
-              {tab.key === "watchlist" ? <WatchCountChip className={TAB_COUNT} /> : null}
-            </Link>
-          );
-        })}
-        <Drawer.Trigger className={cn(TAB, "cursor-pointer")}>
-          {GLYPH.menu}
-          {messages.shell.tabs.menu}
-        </Drawer.Trigger>
-      </nav>
+      {trigger(Drawer.Trigger)}
       <Drawer.Portal>
         <Drawer.Backdrop className="fixed inset-0 z-sheet bg-backdrop transition-opacity duration-(--duration-base) data-[ending-style]:opacity-0 data-[starting-style]:opacity-0" />
         <Drawer.Viewport className="fixed inset-0 z-sheet flex justify-start">
@@ -137,5 +123,34 @@ export function TabBar() {
         </Drawer.Viewport>
       </Drawer.Portal>
     </Drawer.Root>
+  );
+}
+
+export function TabBar() {
+  const pathname = usePathname();
+  return (
+    // left-0 w-screen, not inset-x-0: 100vw is the window's own width, where inset-x-0 takes the layout viewport's, which
+    // a phone browser widens to anything that overflowed for a moment and which this bar would then hold wide for good.
+    <nav aria-label={messages.shell.nav.tabsLabel} className="tab-bar fixed bottom-0 left-0 z-nav grid w-screen grid-cols-[repeat(4,minmax(0,1fr))] border-t-2 border-edge ground pb-(--safe-bottom) sm:hidden">
+      {TABS.map((tab) => {
+        const active = isActive(pathname, tab.href);
+        const target = navTarget(pathname, tab.href);
+        return (
+          <Link key={tab.href} href={target} aria-current={active ? "page" : undefined} className={cn(TAB, active && TAB_ON)}>
+            {GLYPH[tab.key]}
+            {tab.label}
+            {tab.key === "watchlist" ? <WatchCountChip className={TAB_COUNT} /> : null}
+          </Link>
+        );
+      })}
+      <MenuDrawer
+        trigger={(Trigger) => (
+          <Trigger className={cn(TAB, "cursor-pointer")}>
+            {GLYPH.menu}
+            {messages.shell.tabs.menu}
+          </Trigger>
+        )}
+      />
+    </nav>
   );
 }

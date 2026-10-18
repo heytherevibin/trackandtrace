@@ -1,4 +1,4 @@
-import { Color, LineSegments, Mesh, PerspectiveCamera, Sprite, Texture, type Object3D } from "three";
+import { AdditiveBlending, Color, LineSegments, Mesh, NormalBlending, ShaderMaterial, PerspectiveCamera, Sprite, Texture, type Object3D } from "three";
 import { describe, expect, it, vi } from "vitest";
 import { STILL_ANATOMY, anatomyPose } from "@/components/landing/journey/pose";
 import { createBeam } from "@/components/landing/journey/scene/beam";
@@ -60,6 +60,20 @@ describe("the line side (v3's scene/departure.js)", () => {
   });
 });
 
+describe("the headlight's light by face (Neubrutal v4: a yellow lamp, Day and Night)", () => {
+  it("adds its light to the dark by Night and lays it on by Day, where adding would not show on cream", async () => {
+    const { AdditiveBlending, NormalBlending } = await import("three");
+    const own = buildRig(style, { coaches: 1 });
+    const glow = createGlow(own, new Texture());
+    const sprite = own.cabFront.children.find((c): c is Sprite => c instanceof Sprite);
+    if (!sprite) throw new Error("no glow sprite");
+    glow.setNight(true);
+    expect(sprite.material.blending).toBe(AdditiveBlending);
+    glow.setNight(false);
+    expect(sprite.material.blending).toBe(NormalBlending);
+  });
+});
+
 describe("the Night glow and the headlight beam", () => {
   it("hangs the glow on the headlight and on the raised pantograph's head", () => {
     const glow = createGlow(rig, new Texture());
@@ -95,5 +109,25 @@ describe("the Night glow and the headlight beam", () => {
     beam.set(false, 1);
     expect(beam.group.visible).toBe(false);
     expect(createFit(rig).screenBox(camera, rect, 0)).toEqual(before);
+  });
+});
+
+describe("the headlight beam by Day and by Night", () => {
+  it("adds its light to the dark by Night, and by Day lays the yellow on the cream, faded by alpha, never a dark wedge", () => {
+    const own = buildRig(style, { coaches: 1 });
+    const beam = createBeam(own, new Texture());
+    let cone: Mesh | undefined;
+    beam.group.traverse((o) => {
+      if (o instanceof Mesh && o.material instanceof ShaderMaterial) cone = o;
+    });
+    if (!cone) throw new Error("no beam cone");
+    const material = cone.material as ShaderMaterial;
+    beam.setNight(true);
+    expect(material.blending).toBe(AdditiveBlending);
+    expect(material.uniforms.laid?.value).toBe(0);
+    beam.setNight(false);
+    expect(material.blending).toBe(NormalBlending);
+    expect(material.uniforms.laid?.value).toBe(1);
+    expect(material.fragmentShader).toContain("vec4(color, light)");
   });
 });

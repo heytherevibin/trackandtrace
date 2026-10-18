@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { JOURNEY_CHUNK_MARK } from "@/components/landing/journey/journey-mark";
-import { HUD_CHUNK_MARK } from "@/components/landing/journey/hud-mark";
 import { SCENE_CHUNK_MARK } from "@/components/landing/journey/scene/scene-mark";
 import { BUDGETS, MARKS, measure } from "../../../scripts/journey-budgets.mjs";
 
@@ -13,7 +12,8 @@ describe("the journey's chunk budgets (spec §3.H; J5-15)", () => {
   it("finds the chunks by the same marks the app carries", () => {
     expect(MARKS.journey).toBe(JOURNEY_CHUNK_MARK);
     expect(MARKS.scene).toBe(SCENE_CHUNK_MARK);
-    expect(MARKS.hud).toBe(HUD_CHUNK_MARK);
+    // The frame meter went with the journey (2026-10-18); its mark is still refused if a chunk ever carries it.
+    expect(MARKS.hud).toBe("tt-hud-chunk");
     expect(BUDGETS).toEqual({ journey: 70 * 1024, scene: 240 * 1024 });
   });
 

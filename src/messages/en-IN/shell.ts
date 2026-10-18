@@ -17,7 +17,7 @@ export const shell = {
     cta: "Check a PNR",
     sections: {
       how: "How it works",
-      record: "The record",
+      reliability: "Reliability",
       roadmap: "Roadmap",
       faq: "FAQ",
     },
@@ -54,8 +54,10 @@ export const shell = {
   },
   install: {
     title: "Install Trakline",
-    detail: "Keep the check one tap away.",
+    meta: "PWA",
+    detail: "Keep the check one tap away for the days you re-check the same ticket before the chart.",
     action: "Install",
+    later: "Not now",
     iosHint: "On iPhone: Share, then Add to Home Screen.",
   },
   /** Notices.dc.html, SITE NOTICE STRIP. The text itself is the console's. */

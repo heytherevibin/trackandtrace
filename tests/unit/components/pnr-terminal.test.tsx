@@ -7,7 +7,7 @@ import { RECENT_KEY, recentStore } from "@/services/stores/recent-store";
 const fetchPnr = vi.fn<(pnr: string) => Promise<PnrFetchResult>>();
 vi.mock("@/services/pnr-source", () => ({ fetchPnr: (pnr: string) => fetchPnr(pnr) }));
 
-const { PnrTerminal, PnrClosingTerminal } = await import("@/components/pnr/pnr-terminal");
+const { PnrTerminal } = await import("@/components/pnr/pnr-terminal");
 
 const NOW = new Date("2026-09-17T06:30:00.000Z");
 
@@ -39,7 +39,9 @@ describe("PnrTerminal", () => {
     expect(screen.getByText("0 / 10")).toBeInTheDocument();
     expect(container.querySelectorAll("[data-cell]")).toHaveLength(10);
     expect(screen.getByText("Standing by")).toBeInTheDocument();
-    expect(screen.getByText(/Try a sample: 2345678909\./)).toBeInTheDocument();
+    // v4: in sample mode the fixture's PNRs are their own row on the plate, and the hint stays the ticket's.
+    expect(screen.getByText("The 10 digits printed top-left on your ticket, or in your booking SMS.")).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Sample PNRs from the development fixture" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Clear" })).not.toBeInTheDocument();
   });
 
@@ -89,7 +91,39 @@ describe("PnrTerminal", () => {
     expect(within(screen.getByTestId("recent-strip")).getByTestId("recent-item")).toHaveTextContent("234 567 8909");
 
     fireEvent.click(screen.getByRole("button", { name: "Check another PNR" }));
-    expect(screen.getByText("0 / 10")).toBeInTheDocument();
+    // Back to an empty entry, the caret in it (the phone's pinned Run bar repeats the counter while it has focus).
+    expect(screen.getByLabelText("PNR number")).toHaveValue("");
+    expect(screen.getByLabelText("PNR number")).toHaveFocus();
+  });
+
+  it("draws v4's Next box and eight facts in place, and offers Save and Share", async () => {
+    fetchPnr.mockResolvedValue(fixture("2345678905"));
+    render(<PnrTerminal sampleMode />);
+    fireEvent.change(screen.getByLabelText("PNR number"), { target: { value: "2345678905" } });
+    fireEvent.click(screen.getByRole("button", { name: "Run" }));
+    await settle();
+    const result = await screen.findByTestId("terminal-result");
+    expect(within(result).getByText(/^Save and re-check before \d\d:\d\d IST, when the first chart decides this ticket\.$/)).toBeInTheDocument();
+    const terms = result.querySelectorAll("dl dt");
+    expect([...terms].map((t) => t.textContent)).toEqual(["Train", "Route", "Journey", "Departs", "Class · quota", "Distance", "Chart", "Coach · berth"]);
+    expect(within(result).getByRole("button", { name: "Save to watchlist" })).toBeInTheDocument();
+    expect(within(result).getByRole("button", { name: "Share link" })).toBeInTheDocument();
+  });
+
+  it("runs a sample PNR at once from the sample row", async () => {
+    fetchPnr.mockResolvedValue(fixture("2345678900"));
+    render(<PnrTerminal sampleMode />);
+    fireEvent.click(within(screen.getByTestId("sample-strip")).getByRole("button", { name: /No record/ }));
+    await settle();
+    expect(fetchPnr).toHaveBeenCalledWith("2345678900");
+    const result = await screen.findByTestId("terminal-result");
+    expect(within(result).getByText("No record")).toBeInTheDocument();
+    expect(within(result).getByRole("button", { name: "Edit the digits" })).toBeInTheDocument();
+  });
+
+  it("offers no sample row outside sample mode", () => {
+    render(<PnrTerminal sampleMode={false} />);
+    expect(screen.queryByTestId("sample-strip")).not.toBeInTheDocument();
   });
 
   it("fails closed when the source is silent", async () => {
@@ -109,7 +143,8 @@ describe("PnrTerminal", () => {
     recentStore.push({ pnr: "2345678903", status: "RAC", position: 1, checkedAt: NOW.toISOString() });
     render(<PnrTerminal sampleMode />);
     const strip = screen.getByTestId("recent-strip");
-    expect(within(strip).getByText("Recent on this device")).toBeInTheDocument();
+    expect(strip).toHaveAccessibleName("Recent checks on this device");
+    expect(within(strip).getByText("Recent")).toBeInTheDocument();
     const chip = within(strip).getByTestId("recent-item");
     expect(chip).toHaveTextContent("234 567 8903");
     expect(chip).toHaveTextContent("RAC 1");
@@ -117,24 +152,6 @@ describe("PnrTerminal", () => {
     expect(screen.getByLabelText("PNR number")).toHaveValue("234 567 8903");
     expect(screen.getByText("10 / 10")).toBeInTheDocument();
     fireEvent.click(within(strip).getByRole("button", { name: "Clear" }));
-    expect(screen.queryByTestId("recent-strip")).not.toBeInTheDocument();
-  });
-});
-
-describe("PnrClosingTerminal", () => {
-  it("draws the compact entry and renders the result subset", async () => {
-    fetchPnr.mockResolvedValue(fixture("2345678901"));
-    const { container } = render(<PnrClosingTerminal sampleMode title="Got a ticket? Run a check" meta="No sign-up" lead="Only what the railway returned." />);
-    expect(screen.getByText("Got a ticket? Run a check")).toBeInTheDocument();
-    expect(screen.getByText("No sign-up")).toBeInTheDocument();
-    expect(container.querySelectorAll("[data-cell]")).toHaveLength(10);
-    fireEvent.change(screen.getByLabelText("PNR number"), { target: { value: "2345678901" } });
-    fireEvent.keyDown(screen.getByLabelText("PNR number"), { key: "Enter" });
-    expect(screen.getByRole("button", { name: "Running…" })).toBeInTheDocument();
-    await settle();
-    expect(await screen.findByText("Confirmed: a berth is allotted.")).toBeInTheDocument();
-    expect(screen.queryByRole("table")).not.toBeInTheDocument();
-    expect(screen.queryByText("SBC → NDLS")).not.toBeInTheDocument();
     expect(screen.queryByTestId("recent-strip")).not.toBeInTheDocument();
   });
 });

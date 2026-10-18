@@ -75,17 +75,10 @@ describe("JourneyLoader", () => {
     expect(live).toBe(1);
   });
 
-  it("tells the journey whether the frame meter is allowed", async () => {
-    const startJourney = vi.fn(() => () => {});
-    render(<JourneyLoader load={async () => ({ startJourney })} hud />);
-    await vi.advanceTimersByTimeAsync(1);
-    expect(startJourney).toHaveBeenCalledWith({ hud: true });
-  });
-
-  it("tells the journey the frame meter is not allowed unless the page says so", async () => {
+  it("starts the journey with no options", async () => {
     const startJourney = vi.fn(() => () => {});
     render(<JourneyLoader load={async () => ({ startJourney })} />);
     await vi.advanceTimersByTimeAsync(1);
-    expect(startJourney).toHaveBeenCalledWith({ hud: false });
+    expect(startJourney).toHaveBeenCalledWith();
   });
 });

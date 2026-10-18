@@ -35,7 +35,7 @@ export async function hydrated(page: Page): Promise<void> {
  * frame after the stall is its last). No reading of the morph's frames means anything unless the page is past it. */
 async function settled(page: Page): Promise<void> {
   await waitForJourney(page);
-  await page.locator('html[data-drawing="still"], #anatomy.is-live').first().waitFor({ state: "attached", timeout: 25_000 });
+  await page.locator('html[data-drawing="still"], html[data-drawing="live"]').first().waitFor({ state: "attached", timeout: 25_000 });
   await frames(page, 2);
 }
 

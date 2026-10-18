@@ -20,7 +20,7 @@ const S = stackedTable("sm");
 const EDGE = "px-3.5 first:pl-5 last:pr-5";
 const HEAD = cn("legend-sm border-b border-line py-2 text-left", EDGE);
 const CELL = cn("border-b border-line py-2 align-top sm:px-3.5 sm:first:pl-5 sm:last:pr-5", S.cell);
-const TAG = "inline-flex items-center gap-1.5 whitespace-nowrap px-2.5 py-[3px] text-2xs leading-normal tracking-head";
+const TAG = "inline-flex max-w-full items-center gap-1.5 whitespace-nowrap max-sm:whitespace-normal px-2.5 py-[3px] text-2xs leading-normal tracking-head";
 
 const m = messages.booking.availability;
 
@@ -120,14 +120,14 @@ export function AvailabilityPlate({
             <h2 id="tl02-avail" className={`font-display text-label font-semibold uppercase leading-6 tracking-caps text-pretty min-w-[min(14ch,100%)] flex-1 px-5 py-2.5 ${PLATE_TITLE_STACK}`}>
               {m.title}
             </h2>
-            <span className={cn("font-display text-label font-semibold uppercase leading-6 tracking-caps whitespace-nowrap border-l border-line px-5 py-2.5 text-ink-1/70", plateCellClass(0))}>
+            <span className={cn("font-display text-label font-semibold uppercase leading-6 tracking-caps whitespace-nowrap max-sm:whitespace-normal max-sm:wrap-anywhere border-l border-line px-5 py-2.5 text-ink-1/70", plateCellClass(0))}>
               {m.retrieved(retrievedAt)}
             </span>
             {/* A sample answer always says so — the product's rule everywhere an answer is shown. */}
             {sampleData ? (
               <span
                 title={messages.common.sampleDataHint}
-                className={cn("font-display text-label font-semibold uppercase leading-6 tracking-caps whitespace-nowrap border-l border-line px-5 py-2.5 text-ink-1/70", plateCellClass(1))}
+                className={cn("font-display text-label font-semibold uppercase leading-6 tracking-caps whitespace-nowrap max-sm:whitespace-normal max-sm:wrap-anywhere border-l border-line px-5 py-2.5 text-ink-1/70", plateCellClass(1))}
               >
                 {messages.common.sampleData}
               </span>

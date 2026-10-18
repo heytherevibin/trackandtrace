@@ -6,7 +6,7 @@ test("the check plate is above the fold beside the promise and its four tags", a
   await expect(page.getByTestId("hero-instrument")).toBeInViewport();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(/Your PNR,\s*as the railway records it\./i);
   const hero = page.locator("section", { has: page.getByRole("heading", { level: 1 }) });
-  for (const tag of ["Free", "No account needed", "PNR never logged", "Fails closed"]) {
+  for (const tag of ["Free", "No account", "PNR never logged", "Fails closed"]) {
     await expect(hero.getByText(tag, { exact: true })).toBeVisible();
   }
   await expect(page.getByTestId("hero-instrument").getByText("PNR check — live request")).toBeVisible();
@@ -18,10 +18,9 @@ test("the sheet carries the operating principles, every anchored section, and no
   for (const claim of ["Fields shown beyond the source response", "Confirmation odds invented", "Account required to check", "PNRs and names written to logs"]) {
     await expect(principles.getByText(claim)).toBeAttached();
   }
-  for (const id of ["how", "record", "reliability", "roadmap", "faq", "terminal"]) {
+  for (const id of ["principles", "how", "reliability", "roadmap", "faq", "terminus", "terminal"]) {
     await expect(page.locator(`#${id}`)).toBeAttached();
   }
-  await expect(page.getByText("Specimen record", { exact: true })).toBeAttached();
   // No social proof and no invented odds. ("Predict" appears only in the refusals to predict.)
   await expect(page.getByText(/testimonial|trusted by|\d+\s?%\s?(chance|likely|confirm)|chance of confirmation is/i)).toHaveCount(0);
   await expectAxeClean(page);
@@ -35,6 +34,8 @@ test("a check renders the record in place, then opens the full record", async ({
   await plate.getByRole("button", { name: "Run", exact: true }).click();
   await expect(plate.getByText("CNF · RAC · WL — party of three")).toBeVisible({ timeout: 20_000 });
   await expect(plate.getByRole("cell", { name: "RAC 4" })).toBeVisible();
+  // v4's Next box: one instruction, with the chart time as the source gave it.
+  await expect(plate.getByText(/^Save and re-check before \d\d:\d\d IST, when the first chart decides the two still waiting\.$/)).toBeVisible();
   await expect(plate.getByText("Sample data")).toBeVisible();
   await expect(page).toHaveURL(/\/$/);
   await expectAxeClean(page);

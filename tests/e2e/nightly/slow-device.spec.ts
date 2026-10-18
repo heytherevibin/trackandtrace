@@ -1,5 +1,5 @@
 import { expect, test } from "../fixtures";
-import { scrollIntoChapter, waitForLive } from "../journey/journey-helpers";
+import { scrollToTerminus, waitForLive } from "../journey/journey-helpers";
 
 // Nightly (spec §4, §5): a device too slow to draw. Its frames run past the governor's 120 ms gesture gap, which it once
 // took for a new gesture every frame, so it never stepped (the nightly's 10× run on Linux, J6). Nightly, not per PR: at
@@ -26,7 +26,7 @@ test("a device too slow to draw steps quality down as the reader scrolls, then d
   });
   await page.goto("/");
   await waitForLive(page);
-  await scrollIntoChapter(page, 0.2);
+  await scrollToTerminus(page);
   const cdp = await page.context().newCDPSession(page);
   await cdp.send("Emulation.setCPUThrottlingRate", { rate: RATE });
   const gaps = await page.evaluate(

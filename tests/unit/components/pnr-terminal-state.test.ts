@@ -22,26 +22,26 @@ describe("fieldStatus", () => {
 });
 
 describe("hintFor", () => {
-  it("offers the sample PNR only when the fixture is serving", () => {
-    expect(hintFor("idle", "", true)).toBe("The 10 digits printed top-left on your ticket, or in your booking SMS. Try a sample: 2345678909.");
-    expect(hintFor("idle", "", false)).toBe("The 10 digits printed top-left on your ticket, or in your booking SMS.");
+  it("keeps the ticket's hint in sample mode too: v4 gives the samples a row of their own", () => {
+    expect(hintFor("idle", "")).toBe("The 10 digits printed top-left on your ticket, or in your booking SMS.");
+    expect(hintFor("idle", "")).toBe("The 10 digits printed top-left on your ticket, or in your booking SMS.");
   });
 
   it("counts, readies, refuses, and runs with the drawn copy", () => {
-    expect(hintFor("partial", "2345", false)).toBe("4 of 10 digits");
-    expect(hintFor("ready", "2345678901", false)).toBe("Ready. Press Run — one live request, made the moment you press it.");
-    expect(hintFor("invalid", "234", false)).toBe("Enter all 10 digits.");
-    expect(hintFor("running", "2345678901", false)).toBe("Running · validate → source → result");
+    expect(hintFor("partial", "2345")).toBe("4 of 10 digits");
+    expect(hintFor("ready", "2345678901")).toBe("Ready. Press Run: one live request, made the moment you press it.");
+    expect(hintFor("invalid", "234")).toBe("Enter all 10 digits.");
+    expect(hintFor("running", "2345678901")).toBe("Running · validate → source → result");
   });
 });
 
 describe("lampFor and caretIndex", () => {
-  it("lights the lamp steel when ready and light steel while running", () => {
+  it("lights the lamp when ready, blinks it while running, and turns it red when refused (v4)", () => {
     expect(lampFor("idle")).toEqual({ state: "off", label: "Standing by" });
     expect(lampFor("partial")).toEqual({ state: "off", label: "Standing by" });
     expect(lampFor("ready")).toEqual({ state: "lit", label: "Ready to run" });
     expect(lampFor("running")).toEqual({ state: "busy", label: "Requesting source" });
-    expect(lampFor("invalid")).toEqual({ state: "off", label: "Check the digits" });
+    expect(lampFor("invalid")).toEqual({ state: "alert", label: "Check the digits" });
   });
 
   it("parks the caret on the next empty cell and hides it when ready or running", () => {
@@ -61,20 +61,22 @@ describe("statusCode", () => {
 });
 
 describe("result view", () => {
-  it("frames a single confirmed passenger with the drawn facts", () => {
+  it("frames a single confirmed passenger with v4's eight facts", () => {
     const result = okResult("2345678901");
     expect(statusBigFor(result)).toBe("Confirmed");
     const facts = factsFor(result);
-    expect(facts.map((f) => f.label)).toEqual(["Train", "Route", "Journey", "Class · quota", "Departs", "Coach · berth", "Chart"]);
+    expect(facts.map((f) => f.label)).toEqual(["Train", "Route", "Journey", "Departs", "Class · quota", "Distance", "Chart", "Coach · berth"]);
+    expect(facts.find((f) => f.label === "Train")?.value).toBe("12627 · Karnataka Express");
     expect(facts.find((f) => f.label === "Route")?.value).toBe("SBC → NDLS");
+    expect(facts.find((f) => f.label === "Distance")?.value).toBe("2,444 km");
     expect(facts.find((f) => f.label === "Departs")?.value).toBe("19:20 IST");
     expect(facts.find((f) => f.label === "Coach · berth")?.value).toBe("B2 · 19 UB");
     expect(facts.find((f) => f.label === "Chart")?.value).toBe("~15:20 IST");
   });
 
-  it("omits coach and berth when the lead has none", () => {
+  it("says Not allocated where the lead has no coach and berth, as v4 draws it", () => {
     const facts = factsFor(okResult("2345678903"));
-    expect(facts.map((f) => f.label)).not.toContain("Coach · berth");
+    expect(facts.find((f) => f.label === "Coach · berth")?.value).toBe("Not allocated");
   });
 
   it("derives the party line and rows from the passengers, never inventing one", () => {
@@ -102,7 +104,14 @@ describe("result view", () => {
     expect(view.pnrLabel).toBe("PNR 234 567 8909");
     expect(view.provenance).toBe("Retrieved 12:00 IST from the development fixture · every field as returned, none invented");
     expect(view.pax).toHaveLength(3);
+    expect(view.routeNames).toBe("Bengaluru → New Delhi");
+    expect(view.record).not.toBeNull();
     expect(view.recent).toMatchObject({ pnr: "2345678909", status: "CNF", position: null, label: "12627 · SBC→NDLS · Sat, 19 Sept" });
+  });
+
+  it("lists a lone passenger too, as v4's table always does", () => {
+    const view = terminalResult({ ok: true, result: okResult("2345678901") }, { pnr: "2345678901", attemptedAt: NOW, sampleMode: true });
+    expect(view.pax).toHaveLength(1);
   });
 
   it("names Trakline for a real result", () => {
@@ -128,6 +137,8 @@ describe("result view", () => {
     const facts = Object.fromEntries(factsFor(bare).map((f) => [f.label, f.value]));
     expect(facts["Departs"]).toBe("Not returned");
     expect(facts["Chart"]).toBe("Not returned");
+    expect(facts["Train"]).toBe("12658");
+    expect(facts["Distance"]).toBe("Not returned");
     const prepared = Object.fromEntries(factsFor({ ...bare, snapshot: { ...bare.snapshot, chartPrepared: true } }).map((f) => [f.label, f.value]));
     expect(prepared["Chart"]).toBe("Prepared");
   });
@@ -150,6 +161,8 @@ describe("result view", () => {
     expect(view).toMatchObject({ kind: "notfound", sample: true, statusShort: "Not found", statusBig: "No record at the source", provenance: "Retrieved 12:00 IST from the development fixture" });
     expect(view.statusLong).toBe("The source returned no reservation record for this PNR. Check the digits against your ticket or booking SMS.");
     expect(view.facts).toEqual([]);
+    expect(view.record).toBeNull();
+    expect(view.failResponse).toBe("No record");
     expect(view.recent).toMatchObject({ pnr: "2345678900", status: "NOT_FOUND" });
   });
 
@@ -159,6 +172,7 @@ describe("result view", () => {
     expect(view.statusLong).toBe("No verified railway source is connected right now, so this product makes no claim about this PNR. It fails closed: no source, no invented result.");
     expect(view.recent.status).toBeUndefined();
     expect(view.recent.label).toBe("Source silent");
+    expect(view.failResponse).toBe("Not received");
   });
 
   it("says plainly when the request was held back by the rate limit", () => {
@@ -167,6 +181,8 @@ describe("result view", () => {
     expect(view.statusBig).toBe("Too many checks");
     expect(view.statusLong).toContain("Retry in 42 s.");
     expect(view.provenance).toBe("Attempted 12:00 IST · held back, nothing sent to the source");
+    expect(view.failResponse).toBe("Held back");
+    expect(view.retryAfter).toBe(42);
   });
 
   it("carries the source's own chart time on an ok result, and none otherwise", () => {

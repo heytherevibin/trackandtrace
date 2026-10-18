@@ -8,13 +8,13 @@ import { Corners } from "./corners";
 // sit to its right behind hairlines. Plates do not nest.
 
 export type PlatePadding = "none" | "sm" | "md" | "lg";
-/** Header cell padding as the sheets draw it: tight 10×20, regular 12×20, wide 12×24. */
-export type PlateCells = "tight" | "regular" | "wide";
+/** Header cell padding as the sheets draw it: tight 10×20, regular 12×20, wide 12×24; `phone` is regular, then 8×12 below sm (v4 .tl .hd). */
+export type PlateCells = "tight" | "regular" | "wide" | "phone";
 
 const PAD: Record<PlatePadding, string> = { none: "", sm: "p-4", md: "p-5", lg: "p-6" };
 // Never wider than the plate itself: with the text at 200% in a 280px window, 16ch of a title is wider than the page.
 const MIN_CH = { 12: "min-w-[min(12ch,100%)]", 14: "min-w-[min(14ch,100%)]", 16: "min-w-[min(16ch,100%)]" } as const;
-const CELL: Record<PlateCells, string> = { tight: "px-5 py-2.5", regular: "px-5 py-3", wide: "px-6 py-3" };
+const CELL: Record<PlateCells, string> = { tight: "px-5 py-2.5", regular: "px-5 py-3", wide: "px-6 py-3", phone: "px-5 py-3 nb:max-sm:px-3 nb:max-sm:py-2" };
 
 /** Below sm a title that has cells beside it takes the header's whole first row, never squeezed by them. */
 export const PLATE_TITLE_STACK = "max-sm:basis-full";
@@ -26,7 +26,8 @@ export function plateCellClass(index: number): string {
 
 // Neubrutal v4 .hd (nb:): the title block is ruled with the 2px edge; its cells are Space Mono 700 12/16 caps,
 // 12px × 16px, the title in ink and the meta in ink-3.
-const NB_CELL = "nb:font-figure nb:font-bold nb:text-xs nb:tracking-wide nb:px-4 nb:py-3";
+// A meta cell keeps to one line as drawn, and wraps (anywhere) only where it could not fit: text made larger on a phone.
+const NB_CELL = "nb:font-figure nb:font-bold nb:text-xs nb:tracking-wide nb:px-4 nb:py-3 nb:whitespace-normal nb:wrap-anywhere";
 
 export interface PlateProps extends Omit<HTMLAttributes<HTMLElement>, "title"> {
   readonly as?: "section" | "div" | "article" | "aside" | "figure";

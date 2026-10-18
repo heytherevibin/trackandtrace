@@ -1,7 +1,7 @@
 import { statSync } from "node:fs";
 import type { Page } from "@playwright/test";
 import { expect, test } from "../fixtures";
-import { frames, scrollIntoChapter, scrollIntoRun, scrollToId, waitForLive } from "../journey/journey-helpers";
+import { frames, scrollToId, scrollToTerminus, waitForLive } from "../journey/journey-helpers";
 
 // Nightly (spec §5): every chapter of the landing photographed in Day, Night and on a phone, kept as the run's artifact
 // for a person to look at. It asserts only that each place was reached and photographed; the pictures are the evidence.
@@ -38,20 +38,12 @@ type Place = readonly [name: string, go: (page: Page) => Promise<void>];
 const at = (id: string, offset = 40) => (page: Page) => scrollToId(page, id, offset);
 const PLACES: readonly Place[] = [
   ["01-top", (page) => page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }))],
-  ["02-drawing-scan", (page) => scrollIntoChapter(page, 0.05)],
-  ["03-drawing-apart", (page) => scrollIntoChapter(page, 0.4)],
-  ["04-drawing-dimensions", (page) => scrollIntoChapter(page, 0.65)],
-  ["05-drawing-departing", (page) => scrollIntoChapter(page, 0.93)],
-  ["06-principles", at("principles")],
-  ["07-how", at("how", -200)],
-  ["08-record", at("record")],
-  ["09-reliability", at("reliability")],
-  ["10-roadmap", at("roadmap")],
-  ["11-run-start", (page) => scrollIntoRun(page, 0)],
-  ["12-run-middle", (page) => scrollIntoRun(page, 0.5)],
-  ["13-run-end", (page) => scrollIntoRun(page, 1)],
-  ["14-faq", at("faq")],
-  ["15-terminus", at("terminus")],
+  ["02-principles", at("principles")],
+  ["03-how", at("how")],
+  ["04-reliability", at("reliability")],
+  ["05-roadmap", at("roadmap")],
+  ["06-faq", at("faq")],
+  ["07-terminus", (page) => scrollToTerminus(page)],
 ];
 
 const FACES = [

@@ -1,7 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { JOURNEY_CHUNK_MARK } from "@/components/landing/journey/journey-mark";
 import { SCENE_CHUNK_MARK } from "@/components/landing/journey/scene/scene-mark";
-import { APART_MS } from "@/components/landing/journey/keep-place";
 
 /** The journey marks <html data-journey="on"> as it takes the page over, then starts its modules a turn at a time;
  * outside production it says when the last has started and the page has settled (window.__ttJourneyStarted), and
@@ -37,13 +36,24 @@ export async function blockChunk(page: Page, mark: string): Promise<void> {
 /** Aborts the journey chunk. */
 export const blockJourneyChunk = (page: Page): Promise<void> => blockChunk(page, JOURNEY_CHUNK_MARK);
 
-/** The drawing is live and pinned: the scene loaded, the engine built, the chapter began. Where the browser cannot draw
+/** The terminus is drawn live: the scene loaded, the engine built, its canvas showing. Where the browser cannot draw
  * it at all (a WebKit with no WebGL 2), the test skips there, saying so (skipWithoutWebgl2). */
 export async function waitForLive(page: Page): Promise<void> {
   await waitForJourney(page);
   await skipWithoutWebgl2(page);
-  await expect(page.locator("#anatomy")).toHaveClass(/is-live/, { timeout: 25_000 });
-  await expect(page.locator("html")).toHaveAttribute("data-drawing", "live");
+  await expect(page.locator("html")).toHaveAttribute("data-drawing", "live", { timeout: 25_000 });
+  await expect(page.locator("#journey-canvas")).toBeVisible({ timeout: 25_000 });
+}
+
+/** Scrolls the terminus's stage to the middle of the window, where the arriving train has come to a stand. */
+export async function scrollToTerminus(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const stage = document.querySelector(".terminus-stage");
+    if (!stage) throw new Error(".terminus-stage is missing");
+    const r = stage.getBoundingClientRect();
+    window.scrollTo({ top: r.top + window.scrollY + r.height / 2 - window.innerHeight / 2, behavior: "instant" });
+  });
+  await frames(page, 2);
 }
 
 /** WebKit on a GPU-less Linux runner (the nightly's webkit projects, J6-12) may have no WebGL 2: there the live drawing
@@ -68,68 +78,6 @@ export async function dismissInstall(page: Page): Promise<void> {
 /** Holds the page to the still drawing for its session, as the quality floor does (J5-12): for specs about the still. */
 export async function drawStill(page: Page): Promise<void> {
   await page.addInitScript(() => window.sessionStorage.setItem("tt.q", "still"));
-}
-
-/** Scrolls the pinned chapter to progress p (0–1): 0 as the pin takes hold, 1 as the chapter's foot reaches the
- * window's. Waits for the drawing to follow (its progress trails the scroll a little, by design, and a software GPU
- * under a parallel run draws few frames a second, so the wait is generous). */
-export async function scrollIntoChapter(page: Page, p: number): Promise<void> {
-  await page.evaluate((at) => {
-    const section = document.getElementById("anatomy");
-    const pin = section?.querySelector(".anatomy-pin");
-    if (!section || !pin) throw new Error("#anatomy is missing");
-    const stick = Number.parseFloat(getComputedStyle(pin).top) || 0;
-    const start = section.getBoundingClientRect().top + window.scrollY - stick;
-    const run = section.offsetHeight - window.innerHeight + stick;
-    window.scrollTo({ top: start + run * at, behavior: "instant" });
-  }, p);
-  await expect.poll(() => page.evaluate(() => window.__ttJourney?.anatomy() ?? -1), { timeout: 20_000 }).toBeCloseTo(p, 1);
-}
-
-/** Scrolls the pinned run to progress p (0 as the pin takes hold, 1 at its end), then lets the page draw. Its place is
- * measured, never assumed: everything above it (the live drawing's 520vh pin, 02's 330vh) moves it. */
-export async function scrollIntoRun(page: Page, p: number): Promise<void> {
-  await page.evaluate((at) => {
-    const run = document.getElementById("run");
-    const pin = run?.querySelector<HTMLElement>(".run-pin");
-    if (!run || !pin) throw new Error("#run is missing");
-    const head = document.querySelector("header")?.getBoundingClientRect().bottom ?? 0;
-    const start = run.getBoundingClientRect().top + window.scrollY - head;
-    window.scrollTo({ top: start + (run.offsetHeight - pin.offsetHeight) * at, behavior: "instant" });
-  }, p);
-  await frames(page, 2);
-}
-
-/** What happens two frames after a Tab stop takes focus, mid-glide: the drawing above falls to the still (the GPU drops
- * its context), or the reader leaves by a drag, an instant scroll to 01's top 100px down the window, which sends no
- * wheel, touch or key. */
-export type MidGlide = "lost" | "away";
-
-/** Readies a keyboard move onto the link named `name` inside `within`: its preceding Tab stop takes focus without
- * scrolling, so the next Tab lands on the link as a reader's would; `then` happens two frames after it does. */
-export async function readyTab(page: Page, within: string, name: string, then?: MidGlide): Promise<void> {
-  await page.evaluate(
-    ([scope, text, mid]) => {
-      const stops = [...document.querySelectorAll<HTMLElement>("a[href], button:not([disabled]), input:not([disabled]):not([type='hidden']), select, textarea, [tabindex]")].filter(
-        (el) => el.tabIndex >= 0 && el.checkVisibility(),
-      );
-      const target = [...document.querySelectorAll<HTMLElement>(`${scope} a`)].find((a) => a.textContent?.includes(text));
-      const before = target ? stops[stops.indexOf(target) - 1] : undefined;
-      if (!target || !before) throw new Error(`no Tab stop before "${text}" in ${scope}`);
-      before.focus({ preventScroll: true });
-      if (!mid) return;
-      const act = () => {
-        if (mid === "lost") window.dispatchEvent(new CustomEvent("tt:webgl", { detail: "lost" }));
-        else {
-          const principles = document.getElementById("principles");
-          if (!principles) throw new Error("#principles is missing");
-          window.scrollTo({ top: principles.getBoundingClientRect().top + window.scrollY - 100, behavior: "instant" });
-        }
-      };
-      target.addEventListener("focus", () => requestAnimationFrame(() => requestAnimationFrame(act)), { once: true });
-    },
-    [within, name, then ?? null] as const,
-  );
 }
 
 /** Tab as the reader's browser takes it through links: Option-Tab (Alt+Tab) in WebKit on macOS, where a bare Tab skips
@@ -222,79 +170,6 @@ export async function frames(page: Page, n = 2): Promise<void> {
   );
 }
 
-// WebKit lays a resize out in steps, a frame or more apart and in any order: what 100vh sizes (02's 330vh), and what
-// 100svh and 100lvh size (the still's columns, the run's pin, the window every timeline ends at), mostly those two
-// together, innerHeight the new window's throughout (the nightly config's WebKit, 2026-09-30: split in 7 of 2,448
-// resizes under load). Held here, deterministically in every engine: the step named stays at the old window's size
-// until released.
-/** Holds what the `late` step sizes at the size it has now. "small and large": the still's columns and the run's pin
- * (100svh), and every probe of the window that asks for 100lvh or 100svh; "small" (100svh has landed a step of its own
- * too): the same less the 100lvh probes; each let go by the first place-keeping jump (the step lands just after a piece
- * answered the first, before that jump's own "scroll" event), or by `release`. "default": 02's pinned height, the live
- * drawing's, and every probe that asks for 100vh; "default and large": the same and the 100lvh probes, 100svh moving
- * alone (a browser that resizes one unit by itself); each let go by `release`. */
-export async function holdLate(page: Page, late: "small and large" | "small" | "default" | "default and large"): Promise<void> {
-  await page.evaluate((which) => {
-    const px = (el: Element | null) => (el ? `${el.getBoundingClientRect().height}px` : "auto");
-    const h = `${window.innerHeight}px`;
-    const rules =
-      which === "default" || which === "default and large"
-        ? [
-            `#how.is-pinned { height: ${px(document.getElementById("how"))} !important; }`,
-            `#anatomy.is-live { height: ${px(document.getElementById("anatomy"))} !important; }`,
-            `div[style*="height: 100vh"] { height: ${h} !important; }`,
-            ...(which === "default" ? [] : [`div[style*="height: 100lvh"] { height: ${h} !important; }`]),
-          ]
-        : [
-            `.anatomy-pin.is-columns { height: ${px(document.querySelector(".anatomy-pin"))} !important; }`,
-            `#run.is-running .run-pin { height: ${px(document.querySelector("#run .run-pin"))} !important; }`,
-            `div[style*="height: 100svh"] { height: ${h} !important; }`,
-            ...(which === "small" ? [] : [`div[style*="height: 100lvh"] { height: ${h} !important; }`]),
-          ];
-    const sheet = new CSSStyleSheet();
-    sheet.replaceSync(rules.join("\n"));
-    document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
-    // how long the split stood: from "resize", as the new window lays out, to the late step's landing
-    const held = { at: 0, for: -1, resized: false };
-    Reflect.set(window, "__ttHeld", held);
-    window.addEventListener(
-      "resize",
-      () => {
-        held.resized = true;
-        held.at = performance.now();
-      },
-      { once: true },
-    );
-    const release = () => {
-      if (held.for < 0) held.for = held.resized ? performance.now() - held.at : 0;
-      document.adoptedStyleSheets = document.adoptedStyleSheets.filter((s) => s !== sheet);
-      window.removeEventListener("tt:jump", release);
-    };
-    Reflect.set(window, "__ttRelease", release);
-    if (which === "small and large" || which === "small") window.addEventListener("tt:jump", release);
-  }, late);
-}
-
-/** The first step has landed: "resize" has been heard since the hold, and two frames have been drawn after it for whatever
- * answers it. A state wait: frames counted from the resize take over a second on a slow runner (SwiftShader, CI's
- * cores), and a split held that long is no longer one (see release). */
-export async function firstStep(page: Page): Promise<void> {
-  await page.waitForFunction(() => (Reflect.get(window, "__ttHeld") as { resized: boolean } | undefined)?.resized === true);
-  await frames(page, 2);
-}
-
-/** Lets the held step land. The split must have been held for less than APART_MS: WebKit's last well under it (about
- * 60 ms under load), and measures that stand apart that long are taken as the page's own (keep-place.ts, laidOut), so a
- * longer hold would test that instead. A runner too slow to keep it shorter fails here, saying so, rather than in the
- * place it then keeps (CI run 36732137834: a hold of eight frames outlasted it on SwiftShader). */
-export async function release(page: Page): Promise<void> {
-  const held = await page.evaluate(() => {
-    (Reflect.get(window, "__ttRelease") as () => void)();
-    return (Reflect.get(window, "__ttHeld") as { for: number }).for;
-  });
-  expect(held, `the split held ${Math.round(held)} ms, APART_MS ${APART_MS}: no longer a split`).toBeLessThan(APART_MS);
-}
-
 /** From before the page's first script: every frame, whether anything matching `selector` stands off its rest (any
  * transform but none), counted in window.__ttMoved, so a spec can tell whether an entrance played while it could not
  * be watching (at load, as the journey starts). Read it with movedFrames; zero it with resetMoved. */
@@ -320,64 +195,3 @@ export const movedFrames = (page: Page): Promise<number> => page.evaluate(() => 
 /** Zeroes watchMotion's count. */
 export const resetMoved = (page: Page): Promise<void> => page.evaluate(() => void Reflect.set(window, "__ttMoved", 0));
 
-// The window-seat run's own measures, shared by run.spec.ts and link-glide.spec.ts.
-/** How far station i's centre stands from the train's: 0 when it is at the window. */
-export function offTrain(page: Page, i: number): Promise<number> {
-  return page.evaluate((k) => {
-    const station = document.querySelectorAll("#run [data-station]")[k];
-    const train = document.querySelector("#run .run-train");
-    if (!station || !train) throw new Error("no such station, or no train");
-    const s = station.getBoundingClientRect();
-    const t = train.getBoundingClientRect();
-    return Math.abs(Math.round(s.left + s.width / 2 - (t.left + t.width / 2)));
-  }, i);
-}
-export const stationOf = (page: Page, selector: string) => page.locator("#run [data-station]").evaluateAll((els, sel) => els.findIndex((el) => el.matches(sel) || el.querySelector(sel) !== null || el.closest(sel) !== null), selector);
-export const running = (page: Page) => expect(page.locator("#run")).toHaveClass(/is-running/);
-/** The longest the rest wait lasts before it gives up and the place is judged anyway: it then fails with the train's
- * distance from the station and says it was still moving, never as a bare test timeout (nightly review, I-2). */
-export const REST_MS = 20_000;
-/** The page and the run's track have both held still for ten frames: the scroll has landed (a glide down to the run
- * leaves the track still until it gets there) and the track's smoothing has come to rest, however long that took, up to
- * REST_MS. Anime eases it a fixed share of the way each frame, so the time to settle is the machine's: on the nightly's
- * GPU-less WebKit runner (about 8 frames a second as the page loads) a jump across the run took about 7 s, still closing
- * in when a 5 s poll gave up (1,864 px, then 1,015, 385, 115 and 28 at the cutoff; run 36406365173). A state wait, then
- * the place is judged. True once at rest; false when it gave up still moving. */
-export const trackAtRest = (page: Page): Promise<boolean> =>
-  page.evaluate(
-    (limit) =>
-      new Promise<boolean>((done) => {
-        const until = performance.now() + limit;
-        let last = "";
-        let held = 0;
-        const tick = () => {
-          const now = `${window.scrollY} ${document.querySelector<HTMLElement>("#run .run-track")?.style.transform ?? ""}`;
-          held = now === last ? held + 1 : 0;
-          last = now;
-          if (held >= 10) done(true);
-          else if (performance.now() > until) done(false);
-          else requestAnimationFrame(tick);
-        };
-        requestAnimationFrame(tick);
-      }),
-    REST_MS,
-  );
-/** Station i at the window once the track has come to rest: within 3 px of the train. A track still moving after REST_MS
- * fails here, saying how far off it was. A test that waits on it more than once sets its own timeout (up to REST_MS a
- * wait, plus its pages' own loads). */
-export const atTheWindow = async (page: Page, i: number) => {
-  const rested = await trackAtRest(page);
-  const off = await offTrain(page, i);
-  expect(off, `station ${i} ${off}px off the train, ${rested ? "at rest" : `still moving after ${REST_MS / 1000} s`}`).toBeLessThanOrEqual(3);
-  expect(rested, `the run's track still moving after ${REST_MS / 1000} s, station ${i} ${off}px off the train`).toBe(true);
-};
-/** How far 07's top stands from the masthead's foot, read as place-memory reads it (J6-9): where run.ts says it stands
- * while the run is pinned (data-run-at), its own box otherwise. 0 when the reader is at 07. */
-export const from07 = (page: Page) =>
-  page.evaluate(() => {
-    const use = document.getElementById("use");
-    if (!use) throw new Error("#use is missing");
-    const foot = document.querySelector("header")?.getBoundingClientRect().bottom ?? 0;
-    const top = use.dataset.runAt === undefined ? use.getBoundingClientRect().top : Number(use.dataset.runAt) - window.scrollY;
-    return Math.abs(Math.round(top - foot));
-  });

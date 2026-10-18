@@ -1,50 +1,39 @@
 import Link from "next/link";
 import { IstClock } from "@/components/shell/ist-clock";
 import { buttonClassName } from "@/components/ui/button";
-import { Corners } from "@/components/ui/corners";
-import { Led } from "@/components/ui/led";
 import { messages } from "@/messages";
 import type { ComponentState } from "@/services/service-status";
-import { StationClock } from "@/components/landing/journey/station-clock";
-import { BODY, H2, SectionKicker } from "./sheet-type";
+import { cn } from "@/utils/cn";
+import { BODY, H2, SECTION, SectionKicker } from "./sheet-type";
 
-/**
- * 04 · Reliability: what every result promises, in three plates, and one status line. It replaces the
- * sources board: travellers see what the service guarantees, never how it is wired.
- */
+/** 04 · Reliability: what every result promises, in one plate of three, and the status line (v4). */
 export function ReliabilityBand({ checks }: { readonly checks: ComponentState }) {
   const m = messages.home.reliability;
   return (
-    <section id="reliability" aria-labelledby="reliability-title" className="section-pad">
-      <SectionKicker rule="mb-6">{m.kicker}</SectionKicker>
-      <div className="rel-head">
-        <div className="max-w-[56ch]">
-          <h2 id="reliability-title" className={H2}>
-            {m.title}
-          </h2>
-          <p className={`mt-3.5 ${BODY}`}>{m.lead}</p>
-        </div>
-        <StationClock />
+    <section id="reliability" aria-labelledby="reliability-title" className={SECTION}>
+      <SectionKicker>{m.kicker}</SectionKicker>
+      <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
+        <h2 id="reliability-title" className={H2}>
+          {m.title}
+        </h2>
+        <p className={`m-0 max-w-[44ch] ${BODY}`}>{m.lead}</p>
       </div>
-      <dl className="blueprint mt-8 grid grid-cols-1 md:grid-cols-3">
-        <Corners />
+      <dl className="blueprint mt-8 grid grid-cols-[repeat(auto-fit,minmax(min(100%,260px),1fr))]">
         {m.facts.map((fact, index) => (
-          <div key={fact.legend} className={`min-w-0 px-5 py-[18px] ${index > 0 ? "border-t border-line md:border-t-0 md:border-l" : ""}`}>
-            <dt className="font-display text-label font-semibold uppercase leading-normal tracking-caps text-accent-text">{fact.legend}</dt>
-            <dd className="mt-2">
-              <span className="block font-display text-xl font-semibold leading-snug tracking-head">{fact.title}</span>
-              <span className="mt-1.5 block text-sm leading-[22px] text-ink-1/74">{fact.detail}</span>
+          <div key={fact.legend} className={cn("min-w-0 px-4 py-6", index > 0 && "border-l-2 border-edge max-[608px]:border-l-0 max-[608px]:border-t-2")}>
+            <dt className="legend text-link">{fact.legend}</dt>
+            <dd className="m-0 mt-2">
+              <span className="block font-display text-xl uppercase leading-7 wrap-break-word">{fact.title}</span>
+              <span className={`mt-2 block ${BODY}`}>{fact.detail}</span>
             </dd>
           </div>
         ))}
       </dl>
-      {/* a container in rem, below sm only (as the board's, journey.css): the status line wraps its pieces only where
-          text grown past the width (200% on a phone) would run them past the window; at 100% it is one line */}
-      <div className="max-sm:@container mt-5 flex flex-wrap items-center justify-between gap-4">
-        <p className="m-0 inline-flex items-center gap-2.5 @max-[11rem]:flex-wrap font-display text-label font-semibold uppercase tracking-caps text-ink-1/78">
-          <Led lit={checks === "operational"} size="sm" />
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
+        <p className="legend m-0 inline-flex flex-wrap items-center gap-2.5 text-ink-2">
+          <span aria-hidden="true" className={cn("size-2 rounded-full border-2 border-edge", checks === "operational" ? "bg-lime" : "bg-red")} />
           <span>{messages.service.checksLine[checks]}</span>
-          <span aria-hidden="true" className="text-ink-1/40">·</span>
+          <span aria-hidden="true">·</span>
           <IstClock />
         </p>
         <Link href="/accuracy" className={buttonClassName({ variant: "secondary" })}>

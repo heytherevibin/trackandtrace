@@ -135,12 +135,12 @@ test("the wait before each check holds for a focus scroll that starts late, as o
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/");
   await waitForJourney(page);
-  // At the top of the page the board's "On the roadmap" link rests just below a 900px window's fold, so focusing
+  // At the top of the page Reliability's "Read the data policy" link rests well below a 900px window's fold, so focusing
   // it takes the browser's smooth scroll. Focus moves here with no scroll, and the browser's own focus scroll only
   // starts 250 ms later: a runner that draws no frame for that long after the Tab. Until then the link is below
-  // the window, and the check, sampling the window's last row, would find its own table cell over it.
+  // the window.
   const below = await page.evaluate(() => {
-    const link = document.querySelector<HTMLElement>('#departures a[href="#roadmap"]')!;
+    const link = document.querySelector<HTMLElement>('#reliability a[href="/accuracy"]')!;
     link.focus({ preventScroll: true });
     setTimeout(() => {
       link.blur();

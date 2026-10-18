@@ -99,7 +99,7 @@ for (const [width, height] of SIZES) {
         await gotoReady(page, "/");
         await waitForJourney(page);
         // the drawing has decided: pinned live, or the still
-        await expect(page.locator('html[data-drawing="still"], #anatomy.is-live')).not.toHaveCount(0, { timeout: 25_000 });
+        await expect(page.locator('html[data-drawing="still"], html[data-drawing="live"]')).not.toHaveCount(0, { timeout: 25_000 });
         expect(await mastheadOverPins(page)).toEqual([]);
         expect(await mastheadRows(page)).toEqual([]);
         expect(await cutText(page), "text cut off").toEqual([]);

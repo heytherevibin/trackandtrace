@@ -1,36 +1,42 @@
-import { HeroDial } from "@/components/landing/journey/hero-dial";
-import { PnrTerminal } from "@/components/pnr/pnr-terminal";
-import { SheetTag } from "@/components/pnr/pnr-terminal-tags";
+import { Badge } from "@/components/ui/badge";
 import { messages } from "@/messages";
+import { HeroCheck } from "./hero-check";
 
-/** Hero, as drawn: the promise in hero capitals with four outline tags on the left, the live check plate on the right. */
+/** v4's punched ticket over the promise: a yellow stub with three printed lines and a striped pink counterfoil. */
+function Ticket() {
+  return (
+    <div aria-hidden="true" className="nb-ticket mb-[28px] ml-1 max-sm:hidden">
+      <span className="nb-ticket-l1" />
+      <span className="nb-ticket-l2" />
+      <span className="nb-ticket-l3" />
+      <span className="nb-ticket-stub" />
+    </div>
+  );
+}
+
+/** Hero, as Neubrutal v4 draws it: the ticket, the kicker, the promise in Archivo capitals over a pink shadow, the lead
+ *  and four tags on the left; the live check plate on the right (on a phone, the plate first). */
 export function Hero({ sampleMode, connected = false }: { readonly sampleMode: boolean; readonly connected?: boolean }) {
   const m = messages.home.hero;
   const tags = [m.tags.free, m.tags.noAccount, m.tags.notLogged, m.tags.failsClosed];
   return (
-    <section
-      aria-labelledby="hero-title"
-      className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] items-start gap-x-[clamp(24px,4vw,64px)] gap-y-12 pb-[72px] pt-[clamp(48px,7vw,96px)] lg:overflow-y-clip"
-    >
-      <div className="min-w-0">
-        <h1 id="hero-title" className="optical-hang text-hero tracking-display text-balance">
-          <span className="block">{m.lineOne}</span>
-          <span className="block">{m.lineTwo}</span>
-        </h1>
-        <p className="mt-[28px] max-w-[56ch] text-lead text-ink-1/82">{m.lead}</p>
-        <div className="mt-[28px] flex flex-wrap gap-2.5">
-          {tags.map((tag) => (
-            <SheetTag key={tag} variant="outline">
+    <HeroCheck sampleMode={sampleMode} connected={connected}>
+      <Ticket />
+      <p className="legend m-0 mb-4">{m.kicker}</p>
+      <h1 id="hero-title" className="nb-hero nb-shadow-pink m-0">
+        <span className="block">{m.lineOne}</span>
+        <span className="block">{m.lineTwo}</span>
+      </h1>
+      <p className="m-0 mt-6 max-w-[52ch] text-base leading-6 text-ink-2 max-sm:mt-3 max-sm:text-sm max-sm:leading-5">{m.lead}</p>
+      <ul className="m-0 mt-6 flex list-none flex-wrap gap-2 p-0 max-sm:mt-4">
+        {tags.map((tag) => (
+          <li key={tag}>
+            <Badge variant="outline" className="max-w-full whitespace-normal">
               {tag}
-            </SheetTag>
-          ))}
-        </div>
-      </div>
-      <div className="dial-host">
-        <HeroDial />
-        <PnrTerminal sampleMode={sampleMode} connected={connected} />
-        <p className="dial-readout" aria-hidden="true" />
-      </div>
-    </section>
+            </Badge>
+          </li>
+        ))}
+      </ul>
+    </HeroCheck>
   );
 }

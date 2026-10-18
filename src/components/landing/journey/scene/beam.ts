@@ -1,4 +1,4 @@
-import { AdditiveBlending, Color, ConeGeometry, DoubleSide, Group, Mesh, MeshBasicMaterial, PlaneGeometry, ShaderMaterial, UniformsLib, UniformsUtils, type Texture } from "three";
+import { AdditiveBlending, NormalBlending, Color, ConeGeometry, DoubleSide, Group, Mesh, MeshBasicMaterial, PlaneGeometry, ShaderMaterial, UniformsLib, UniformsUtils, type Texture } from "three";
 import { radialTexture } from "./glow";
 import type { Rig } from "./rig";
 
@@ -27,6 +27,7 @@ const vertex = /* glsl */ `
 const fragment = /* glsl */ `
   uniform vec3 color;
   uniform float strength;
+  uniform float laid; // 0 by Night (added to the dark), 1 by Day (laid on the cream as yellow, faded by alpha)
   varying float vAlong;
   varying float vRim;
   #include <common>
@@ -34,7 +35,8 @@ const fragment = /* glsl */ `
   void main() {
     float along = pow(vAlong, 1.6);          // brightest at the lens, gone at the far end
     float body = smoothstep(0.0, 0.85, vRim); // soft toward the silhouette
-    gl_FragColor = vec4(color * along * body * strength, 1.0);
+    float light = along * body * strength;
+    gl_FragColor = mix(vec4(color * light, 1.0), vec4(color, light), laid);
     #include <fog_fragment>
   }
 `;
@@ -50,9 +52,11 @@ export function poolTexture(): Texture {
 
 export interface Beam {
   readonly group: Group;
-  /** On at Night at full quality, while the headlight is lit (the pantograph at the wire). */
+  /** On at full quality, while the headlight is lit (the pantograph at the wire). */
   set(on: boolean, lit: number): void;
   setColor(color: Color): void;
+  /** Light adds to the dark by Night; by Day (Neubrutal's cream page) it is laid on, or it would not show at all. */
+  setNight(night: boolean): void;
 }
 
 export function createBeam(rig: Rig, pool: Texture): Beam {
@@ -66,8 +70,9 @@ export function createBeam(rig: Rig, pool: Texture): Beam {
   cone.rotateZ(Math.PI / 2);
   const color = { value: new Color(1, 1, 1) };
   const strength = { value: 0.32 };
+  const laid = { value: 0 };
   const material = new ShaderMaterial({
-    uniforms: { ...UniformsUtils.clone(UniformsLib.fog), color, strength },
+    uniforms: { ...UniformsUtils.clone(UniformsLib.fog), color, strength, laid },
     vertexShader: vertex,
     fragmentShader: fragment,
     transparent: true,
@@ -101,6 +106,14 @@ export function createBeam(rig: Rig, pool: Texture): Beam {
     setColor(c) {
       color.value.copy(c);
       poolMaterial.color.copy(c);
+    },
+    setNight(night) {
+      const blending = night ? AdditiveBlending : NormalBlending;
+      material.blending = blending;
+      laid.value = night ? 0 : 1;
+      poolMaterial.blending = blending;
+      material.needsUpdate = true;
+      poolMaterial.needsUpdate = true;
     },
   };
 }

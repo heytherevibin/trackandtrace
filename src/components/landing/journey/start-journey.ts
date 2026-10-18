@@ -1,39 +1,22 @@
 import { MOTION_EVENT } from "@/components/motion/use-motion";
-import { startArrivals } from "./arrivals";
-import { startBerths } from "./berths";
-import { startBoard } from "./board";
-import { startChapters, startPlaceGuard } from "./chapters";
-import { startClock } from "./clock";
 import { startDrawing } from "./drawing";
-import { startFocusGlide } from "./focus-glide";
-import { startHero } from "./hero";
-import { introWanted, startIntro } from "./intro";
-import { LAYOUT_EVENT, REBUILD_EVENT, type ResultDetail } from "./journey-events";
+import { LAYOUT_EVENT, REBUILD_EVENT } from "./journey-events";
 import { JOURNEY_CHUNK_MARK } from "./journey-mark";
-import { dropViewProbes } from "./keep-place";
 import { refreshAll, untrackAll } from "./observers";
 import { pause } from "./pause";
-import { startPlaceMemory } from "./place-memory";
-import { startRoute } from "./route";
-import { startRun } from "./run";
 import type { Engine } from "./scene/engine";
-import { startSound } from "./sound";
-import { startStationProgress } from "./station-progress";
-import { startStill } from "./still";
 
-// The journey chunk's entry (spec §3.B). JourneyLoader imports this file after hydration, when the page is
-// idle, and calls startJourney(). It marks <html data-journey="on"> and starts every module on the server's
-// markup, a module at a time, letting the page have a turn between them (spec §3.H: no journey task at load over
-// 120 ms at 4× CPU); each returns a teardown that puts the markup back. The Motion switch and a fit change rebuild
-// them all at once, idempotently; leaving "/" stops them.
+// The journey chunk's entry (spec §3.B), cut down to the one piece Neubrutal v4 keeps (the owner, 2026-10-18): the
+// train's live arrival at the terminus, above the closing plate. JourneyLoader imports this file after hydration, when
+// the page is idle, and calls startJourney(). It marks <html data-journey="on"> and starts the drawing on the server's
+// markup; its teardown puts the markup back. The Motion switch rebuilds it; leaving "/" stops it.
 
 export { JOURNEY_CHUNK_MARK };
 
 declare global {
   interface Window {
-    /** Outside production builds only: false while the first build is still starting its modules a turn at a time,
-     * true once every module has started and the page has settled (its first layout pass and the place restore, two
-     * frames later): what the e2e specs wait on before they act. */
+    /** Outside production builds only: false while the build is still starting, true once it has started and the page
+     * has settled (two frames later): what the e2e specs wait on before they act. */
     __ttJourneyStarted?: boolean;
   }
 }
@@ -78,57 +61,29 @@ export function lifetime(): Lifetime {
   };
 }
 
-/** The pin's columns state and the height the reader last actually saw it settle on (still.ts). */
-export interface StillPlace {
-  readonly columns: boolean;
-  readonly height: number | null;
-}
-
 export interface JourneyContext {
-  /** Motion on: things may move. Off: only true readings update, drawn still. */
+  /** Motion on: things may move. Off: drawn still. */
   readonly motion: boolean;
-  /** True only in the build that plays the once-per-visit intro. */
-  readonly intro: boolean;
-  /** The hero plate's last result while it still shows it: its chart face is a true reading, so each build redraws it. */
-  readonly result: Kept<ResultDetail | null>;
-  /** still.ts's own place, kept for this startJourney's whole lifetime, across every rebuild — never reset by a
-   * teardown within that lifetime. A new startJourney (a fresh client navigation back to the page) starts fresh. */
-  readonly still: Kept<StillPlace>;
   /** The live drawing's engine, kept for this startJourney's whole lifetime and reused by every rebuild (J5-4). */
   readonly scene: Kept<Promise<Engine> | null>;
-  /** The entrances already played in this page load (the section entrances and the berth plan), by key (observers.ts's
-   * watchEntrances): kept here, across every rebuild, so a Motion toggle never plays one again; a teardown never
-   * clears it. It dies with this startJourney, so a reload, or a fresh client navigation back to "/" (a new page from
-   * the server), plays them again. */
-  readonly played: Kept<ReadonlySet<string>>;
   /** Runs `stop` once when this startJourney ends, never on a rebuild; at once if it has already ended. */
   readonly atEnd: (stop: Teardown) => void;
 }
 export type Teardown = () => void;
 export type JourneyModule = (ctx: JourneyContext) => Teardown;
 
-export interface JourneyOptions {
-  /** The frame meter is allowed here (preview deployments and development, J5-10). */
-  readonly hud?: boolean;
-}
+/** The journey's modules, in start order: the terminus drawing alone. */
+export const MODULES: readonly JourneyModule[] = [startDrawing];
 
-/** In start order; a rebuild tears them down in reverse. The run (06–07) is last, so it is torn down first: its unpin
- * is measured on the page the reader sees, before the still's and the drawing's teardowns change the layout above it
- * for a moment (J6-7). Later tasks append their modules before it. */
-export const MODULES: readonly JourneyModule[] = [startArrivals, startBoard, startStationProgress, startHero, startChapters, startBerths, startClock, startRoute, startSound, startDrawing, startStill, startFocusGlide, startRun];
-
-export function startJourney(options: JourneyOptions = {}): Teardown {
+export function startJourney(): Teardown {
   const html = document.documentElement;
   let teardowns: Teardown[] = [];
-  let stops = 0; // counts stopAll(): a paced build that sees it change was stopped or replaced, and starts no more
+  let stops = 0;
   let ended = false;
   let resizeTimer = 0;
-  let introPlayed = false;
-  const result = keep<ResultDetail | null>(null);
-  const still = keep<StillPlace>({ columns: false, height: null });
+  let settleFrame = 0;
   const life = lifetime();
   const scene = keep<Promise<Engine> | null>(null);
-  const played = keep<ReadonlySet<string>>(new Set());
 
   const stopAll = () => {
     stops += 1;
@@ -136,24 +91,19 @@ export function startJourney(options: JourneyOptions = {}): Teardown {
     teardowns = [];
     untrackAll();
   };
-  /** Starts every module in order. With `pace` (the first build, at load) it waits for the page between modules,
-   * and a stop or a rebuild meanwhile ends it; without, it starts them all before it returns. A module that throws
-   * stops everything the build started and marks the journey failed. */
+  /** Starts every module in order, with `pace` between them on the first build; a module that throws stops everything
+   * the build started and marks the journey failed. */
   const build = async (pace?: () => Promise<void>): Promise<void> => {
     stopAll();
     const run = stops;
-    const motion = html.getAttribute("data-motion") !== "off";
-    const intro = !introPlayed && introWanted(motion);
-    introPlayed = true;
-    const ctx: JourneyContext = { motion, intro, result, still, scene, played, atEnd: life.atEnd };
-    const starts: ReadonlyArray<() => Teardown> = [...(intro ? [startIntro] : []), ...MODULES.map((start) => () => start(ctx))];
+    const ctx: JourneyContext = { motion: html.getAttribute("data-motion") !== "off", scene, atEnd: life.atEnd };
     try {
-      for (const [i, start] of starts.entries()) {
+      for (const [i, start] of MODULES.entries()) {
         if (pace && i > 0) {
           await pace();
           if (run !== stops) return;
         }
-        teardowns.push(start());
+        teardowns.push(start(ctx));
       }
     } catch (error) {
       stopAll();
@@ -164,8 +114,6 @@ export function startJourney(options: JourneyOptions = {}): Teardown {
   };
   const rebuild = () => {
     if (html.getAttribute("data-journey") !== "on") return;
-    // A rebuild that fails ends the journey exactly as a failed first build does (below): nothing stays running,
-    // the kept engine included, on a page marked "failed".
     build().catch((error: unknown) => {
       console.error(error);
       end();
@@ -176,16 +124,6 @@ export function startJourney(options: JourneyOptions = {}): Teardown {
     resizeTimer = window.setTimeout(() => window.dispatchEvent(new Event(LAYOUT_EVENT)), 150);
   };
 
-  // Started here, once, rather than by startChapters on every build: a Motion toggle rewrites <html
-  // data-motion> and collapses #how's pinned height by the CSS selector alone, before any module's own
-  // teardown or the next build's modules get a turn — this guard must already be watching when that
-  // happens, and must survive the rebuild it is reacting to, not be one of the things stopAll() tears down.
-  const stopPlaceGuard = startPlaceGuard();
-  // Back to "/": the reader's section, restored once this first build and its layout have settled (the pin, and
-  // the drawing's columns, a frame after build's own LAYOUT_EVENT), never the raw scrollY a pinned 02 left behind.
-  const memory = startPlaceMemory();
-  let settleFrame = 0;
-
   const end = () => {
     if (ended) return;
     ended = true;
@@ -195,12 +133,9 @@ export function startJourney(options: JourneyOptions = {}): Teardown {
     window.removeEventListener(LAYOUT_EVENT, refreshAll);
     window.clearTimeout(resizeTimer);
     cancelAnimationFrame(settleFrame);
-    memory.stop();
     stopAll();
     life.end();
     scene.set(null);
-    stopPlaceGuard();
-    dropViewProbes();
     if (html.getAttribute("data-journey") === "on") html.removeAttribute("data-journey");
     if (probed) delete window.__ttJourneyStarted;
   };
@@ -211,34 +146,20 @@ export function startJourney(options: JourneyOptions = {}): Teardown {
   window.addEventListener(REBUILD_EVENT, rebuild);
   window.addEventListener("resize", onResize);
   window.addEventListener(LAYOUT_EVENT, refreshAll);
-  // Web fonts still arriving as the journey starts: every piece that measured itself in the fallback's lines (02's fit,
-  // on a small phone too tall to pin) measures again once they land. Already loaded: nothing to announce.
-  if ("fonts" in document && document.fonts.status === "loading")
-    void document.fonts.ready.then(() => {
-      if (!ended) window.dispatchEvent(new Event(LAYOUT_EVENT));
-    });
   build(pause).then(
     () => {
       if (ended) return;
-      // The frame meter (J5-10): its own chunk, fetched only when allowed and asked for; it ends with the journey.
-      if (options.hud && new URLSearchParams(window.location.search).has("journey-hud")) {
-        void import("./hud").then(({ startHud }) => life.atEnd(startHud()), () => undefined);
-      }
       settleFrame = requestAnimationFrame(() => {
         settleFrame = requestAnimationFrame(() => {
           settleFrame = 0;
-          memory.restore();
           if (probed) window.__ttJourneyStarted = true;
         });
       });
     },
     (error: unknown) => {
-      // The first build failed (data-journey="failed"): everything started here stops here, the guard above all,
-      // which would otherwise keep moving a reader inside #how on a page marked "failed".
       console.error(error);
       end();
     },
   );
   return end;
 }
-

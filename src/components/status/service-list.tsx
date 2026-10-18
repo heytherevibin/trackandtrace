@@ -12,9 +12,9 @@ export function ServiceList({ status }: { readonly status: ServiceStatus }) {
   return (
     <ul aria-label={m.label} className="m-0 list-none p-0">
       {rows.map((row, index) => (
-        <li key={row.id} className={`flex items-center gap-4 px-5 py-4 ${index > 0 ? "border-t border-line" : ""}`}>
+        <li key={row.id} className={`flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-4 ${index > 0 ? "border-t border-line" : ""}`}>
           <span className="min-w-0 flex-1 font-display text-base font-semibold leading-normal tracking-head">{row.name}</span>
-          <span className="inline-flex items-center gap-2 font-display text-xs font-semibold uppercase tracking-caps text-ink-1/78">
+          <span className="inline-flex min-w-0 max-w-full items-center gap-2 font-display text-xs font-semibold uppercase tracking-caps text-ink-1/78 wrap-anywhere">
             <Led lit={row.state === "operational"} size="sm" />
             {m.states[row.state]}
           </span>

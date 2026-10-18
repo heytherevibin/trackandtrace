@@ -1,14 +1,13 @@
 "use client";
 
 import { useEffect } from "react";
-import type { JourneyOptions } from "./start-journey";
 
 /** How long the page waits for the journey before it stays still for good (spec §3.B). */
 export const WATCHDOG_MS = 15_000;
 /** The longest the import waits for the browser to be idle. */
 export const IDLE_TIMEOUT_MS = 1_500;
 
-export type LoadJourney = () => Promise<{ readonly startJourney: (options?: JourneyOptions) => () => void }>;
+export type LoadJourney = () => Promise<{ readonly startJourney: () => () => void }>;
 
 const loadJourney: LoadJourney = () => import("./start-journey");
 
@@ -26,7 +25,7 @@ function whenIdle(run: () => void): () => void {
  * or has not started after WATCHDOG_MS, <html data-journey="failed"> keeps the page as the server drew it: still,
  * static, whole. It never touches the reader's Motion choice.
  */
-export function JourneyLoader({ load = loadJourney, hud = false }: { readonly load?: LoadJourney; readonly hud?: boolean }) {
+export function JourneyLoader({ load = loadJourney }: { readonly load?: LoadJourney }) {
   useEffect(() => {
     const html = document.documentElement;
     let stop: (() => void) | null = null;
@@ -43,7 +42,7 @@ export function JourneyLoader({ load = loadJourney, hud = false }: { readonly lo
         settled = true;
         window.clearTimeout(watchdog);
         try {
-          stop = startJourney({ hud });
+          stop = startJourney();
         } catch {
           html.setAttribute("data-journey", "failed");
         }
@@ -57,6 +56,6 @@ export function JourneyLoader({ load = loadJourney, hud = false }: { readonly lo
       stop = null;
       if (html.getAttribute("data-journey") === "failed") html.removeAttribute("data-journey");
     };
-  }, [load, hud]);
+  }, [load]);
   return null;
 }

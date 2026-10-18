@@ -17,7 +17,8 @@ const VARIANT: Record<TagVariant, string> = {
   neutral: "bg-surface-1 text-ink-2 nb:bg-paper nb:text-ink-1",
   steel: "border border-accent-text text-accent-text nb:bg-paper nb:text-ink-1",
 };
-const NB_TAG = "nb:min-h-7 nb:gap-2 nb:border-2 nb:border-edge nb:rounded-control nb:px-2.5 nb:py-0 nb:font-figure nb:text-xs nb:font-normal nb:uppercase nb:tracking-wide";
+// One line wherever it fits; never wider than its line, so where it cannot fit (text made larger on a phone) it wraps.
+const NB_TAG = "nb:min-h-7 nb:max-w-full nb:gap-2 nb:border-2 nb:border-edge nb:rounded-control nb:px-2.5 nb:py-0 nb:font-figure nb:text-xs nb:font-normal nb:uppercase nb:tracking-wide nb:whitespace-normal nb:wrap-anywhere";
 
 export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   readonly variant?: TagVariant | "soft";

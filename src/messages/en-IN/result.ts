@@ -54,6 +54,8 @@ export const result = {
     refresh: "Refresh",
     refreshing: "Refreshing",
     share: "Share",
+    /** v4's share key: its words change for a moment once the link is copied. */
+    shareLink: "Share link",
     shared: "Shared",
     copied: "Link copied",
     shareHint: "Anyone with this link can check this PNR.",

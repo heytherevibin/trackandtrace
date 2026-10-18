@@ -1,5 +1,4 @@
 import { Suspense, type ReactNode } from "react";
-import { InstallPrompt } from "./install-prompt";
 import { OfflineBanner } from "./offline-banner";
 import { SiteNoticeSlot } from "./site-notice-slot";
 import { Footer } from "./footer";
@@ -28,7 +27,6 @@ export function AppShell({ children }: { readonly children: ReactNode }) {
       <UpdatesBand />
       <Footer />
       <TabBar />
-      <InstallPrompt />
     </div>
   );
 }

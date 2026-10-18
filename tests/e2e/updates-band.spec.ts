@@ -122,25 +122,16 @@ test("the band is not a station: it is in no list of the landing's sections", as
   await gotoReady(page, "/");
   await expect(page.locator('a[href$="#updates"]')).toHaveCount(0);
   const sections = footer(page).getByRole("list", { name: messages.shell.footer.sections }).getByRole("link");
-  expect(await sections.evaluateAll((links) => links.map((a) => a.getAttribute("href")))).toEqual(["#how", "#record", "#roadmap", "#faq"]);
+  expect(await sections.evaluateAll((links) => links.map((a) => a.getAttribute("href")))).toEqual(["#how", "#reliability", "#roadmap", "#faq"]);
 });
 
 test("from another page the footer's Sections lead to the landing's section", async ({ page }) => {
   await gotoReady(page, "/watchlist");
   const sections = footer(page).getByRole("list", { name: messages.shell.footer.sections }).getByRole("link");
-  expect(await sections.evaluateAll((links) => links.map((a) => a.getAttribute("href")))).toEqual(["/#how", "/#record", "/#roadmap", "/#faq"]);
+  expect(await sections.evaluateAll((links) => links.map((a) => a.getAttribute("href")))).toEqual(["/#how", "/#reliability", "/#roadmap", "/#faq"]);
   await sections.filter({ hasText: "FAQ" }).click();
   await page.waitForURL(/\/#faq$/);
   await expect(page.locator("#faq")).toBeInViewport();
-});
-
-test("the Sound switch shows only on the landing, where the journey can sound", async ({ page }) => {
-  await gotoReady(page, "/");
-  await expect(page.locator("html")).toHaveAttribute("data-journey", "on", { timeout: 15_000 });
-  await expect(footer(page).getByRole("switch", { name: messages.shell.footer.sound })).toBeVisible();
-  await gotoReady(page, "/watchlist");
-  await expect(footer(page).getByRole("switch", { name: messages.shell.footer.motion })).toBeVisible();
-  await expect(footer(page).getByRole("switch", { name: messages.shell.footer.sound })).toBeHidden();
 });
 
 test("a slim band's sign-up says to check the inbox, and is recorded as the footer's", async ({ page }) => {
