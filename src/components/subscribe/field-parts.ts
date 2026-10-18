@@ -5,10 +5,12 @@
 import { messages } from "@/messages";
 import type { SignupState } from "./use-signup";
 
-export const LABEL = "font-display text-xs font-semibold uppercase leading-normal tracking-caps text-accent-text";
-export const FIELD = "well h-11 min-h-9 w-full px-2.5 py-1.5 placeholder:text-ink-3";
+// Neubrutal v4 (the traveller site): the label is Space Grotesk 700 14/20 caps in ink; the field is v4's .field (44px,
+// 2px edge, paper, the control shadow, drawn by the well utility); a refusal is red.
+export const LABEL = "font-structure text-sm font-bold uppercase leading-5 tracking-wide text-ink-1";
+export const FIELD = "well h-11 min-h-11 w-full px-3 py-1.5 text-base placeholder:text-ink-3";
 /** The refusal under the field. */
-export const ALERT = "mt-0.5 text-label leading-normal text-accent-soft-ink";
+export const ALERT = "mt-0.5 text-sm leading-5 font-medium text-ink-alert";
 
 /** Which answers put a message under the field and leave the form standing. Everything but a sent link. */
 export const REFUSAL: Partial<Record<SignupState, string>> = {

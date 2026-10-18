@@ -17,13 +17,15 @@ export function MenuContent({ children, align = "end", className }: { readonly c
   return (
     <BaseMenu.Portal>
       <BaseMenu.Positioner sideOffset={4} align={align} className="z-popover outline-none">
-        <BaseMenu.Popup className={cn("popup-motion border border-line bg-surface-2 p-1 shadow-2 outline-none", POPUP_WIDTH, className)}>{children}</BaseMenu.Popup>
+        <BaseMenu.Popup className={cn("popup-motion border border-line bg-surface-2 p-1 shadow-2 outline-none nb:rounded-plate nb:border-2 nb:border-edge nb:bg-paper nb:shadow-plate", POPUP_WIDTH, className)}>{children}</BaseMenu.Popup>
       </BaseMenu.Positioner>
     </BaseMenu.Portal>
   );
 }
 
-const ITEM = "flex cursor-default select-none items-center gap-2 px-3 py-2 text-sm text-ink-1 no-underline outline-none data-[highlighted]:bg-accent-wash data-[highlighted]:text-ink-1 data-[disabled]:opacity-45";
+const ITEM =
+  "flex cursor-default select-none items-center gap-2 px-3 py-2 text-sm text-ink-1 no-underline outline-none data-[highlighted]:bg-accent-wash data-[highlighted]:text-ink-1 data-[disabled]:opacity-45 " +
+  "nb:min-h-11 nb:rounded-control nb:font-structure nb:font-bold nb:data-[highlighted]:bg-accent nb:data-[highlighted]:text-on-fill";
 
 export function MenuItem({ className, ...rest }: ComponentProps<typeof BaseMenu.Item>) {
   return <BaseMenu.Item className={cn(ITEM, className)} {...rest} />;
@@ -34,7 +36,7 @@ export function MenuLinkItem({ className, ...rest }: ComponentProps<typeof BaseM
 }
 
 export function MenuSeparator() {
-  return <BaseMenu.Separator className="my-1 border-t border-line" />;
+  return <BaseMenu.Separator className="my-1 border-t border-line nb:border-t-2" />;
 }
 
 export function MenuLabel({ children }: { readonly children: ReactNode }) {

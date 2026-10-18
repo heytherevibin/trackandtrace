@@ -59,11 +59,11 @@ export async function runCheck(page: Page, pnr: string): Promise<void> {
   }
 }
 
-/** Opens the masthead menu sheet on a phone; on desktop the nav row is already there. */
+/** Opens the menu drawer from the phone's tab bar (Neubrutal v4); on desktop the masthead's nav row is already there. */
 export async function openMasthead(page: Page, isMobile: boolean): Promise<Locator> {
   const banner = page.getByRole("banner");
   if (!isMobile) return banner.getByRole("navigation", { name: "Primary" });
-  await banner.getByRole("button", { name: "Open menu" }).click();
+  await page.getByRole("navigation", { name: "Sections" }).getByRole("button", { name: "Menu" }).click();
   const sheet = page.getByRole("dialog", { name: "Menu" });
   await expect(sheet).toBeVisible();
   return sheet.getByRole("navigation", { name: "Menu" });

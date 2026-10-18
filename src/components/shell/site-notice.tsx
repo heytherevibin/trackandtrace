@@ -28,15 +28,14 @@ export function SiteNoticeStrip({ text, version }: { readonly text: string; read
   }
 
   return (
-    <div role="region" aria-label={m.label} className="border-line bg-accent-wash border-b">
-      <div className="page-frame flex items-center gap-3">
-        <span aria-hidden="true" className="border-line bg-accent inline-block size-[9px] shrink-0 rounded-full border" />
-        <p className="text-ink-1 m-0 flex-1 py-3 text-sm leading-5">{text}</p>
+    <div role="region" aria-label={m.label} className="border-b-2 border-edge bg-accent text-on-fill">
+      <div className="page-frame flex items-center gap-4 py-2">
+        <p className="m-0 max-w-none flex-1 text-sm leading-5">{text}</p>
         <button
           type="button"
           aria-label={m.close}
           onClick={close}
-          className="press text-ink-2 hover:bg-accent/10 -mr-3 inline-flex size-11 shrink-0 cursor-pointer items-center justify-center border border-transparent bg-transparent"
+          className="nb-press tap-44 inline-flex min-h-8 shrink-0 cursor-pointer items-center justify-center rounded-control border-2 border-edge bg-paper px-2.5 text-ink-1 shadow-control hover:bg-pink hover:text-on-fill"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
             <path d="M3.5 3.5l9 9M12.5 3.5l-9 9" />

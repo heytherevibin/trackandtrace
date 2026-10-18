@@ -25,6 +25,14 @@ not a fork:
 - Type: Archivo Black 400 caps for display, Space Grotesk 700 for structure, Inter for copy, Space Mono for figures and
   legends (`siteFontVars`, fonts.ts). A colour may never share a name with a type size (`text-page` is a size).
 - One departure from v4, for AA: Night prints ink, not white, on red (`--on-red`; white on #ff6b6b is 2.78:1).
+- Grain: v4 keeps the film grain by Day (.04, on the cream page) and draws Night flat.
+- Shell (batch 2): the masthead (`top-nav.tsx`) is v4's `.mh` — edged mark and TRAKLINE, four 40px nav keys (current =
+  yellow primary, Watchlist with its saved count, `use-watch-count.ts`), the 40px two-state sun/moon key
+  (`theme/site-theme-key.tsx`; the console keeps the three-state `ThemeToggle`) and the 40px sign-in key (signed in: the
+  pink initial, which keeps the account menu). Below 640px the nav keys give way to the tab bar (`tab-bar.tsx`: Check,
+  Watchlist, Pre-booking, Menu → the left drawer with the product keys, sign in, the Day/Night row and the disclaimer).
+  The offline strip (red) and the site notice (yellow) sit under the masthead. The footer is v4's, plus the Motion
+  switch; the Updates by email band stays above it, restyled. The page margin is 16–64px, 12px on a phone.
 
 ## Direction contract
 

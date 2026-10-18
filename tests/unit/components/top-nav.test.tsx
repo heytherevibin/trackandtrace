@@ -1,108 +1,91 @@
 import { render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const nav = vi.hoisted(() => ({ pathname: "/" }));
+// The masthead, as Neubrutal v4 draws it (header.mh): the edged mark and TRAKLINE in Archivo Black; the four nav keys
+// (.btn, 40px, the current page the yellow primary, Watchlist carrying its saved count); then the 40px sun/moon theme
+// key and the 40px sign-in key. Below 640px the nav keys step aside for the phone tab bar (tab-bar.tsx).
+
+const nav = vi.hoisted(() => ({ pathname: "/", user: null as null | { id: string; email: string; name: string | null; avatarUrl: string | null } }));
 vi.mock("next/navigation", () => ({ usePathname: () => nav.pathname, useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
-vi.mock("@/components/session/session-provider", () => ({ useUser: () => null }));
+vi.mock("@/components/session/session-provider", () => ({ useUser: () => nav.user }));
+const count = vi.hoisted(() => ({ value: 0 }));
+vi.mock("@/components/shell/use-watch-count", () => ({ useWatchCount: () => count.value }));
 
 const { TopNav } = await import("@/components/shell/top-nav");
 
 describe("TopNav", () => {
   beforeEach(() => {
     nav.pathname = "/";
+    nav.user = null;
+    count.value = 0;
   });
 
-  it("lists Check a PNR with the product links on the landing, and sets Sign in apart on the right", () => {
+  it("draws the brand as the edged mark and TRAKLINE, linking home", () => {
+    render(<TopNav />);
+    const brand = screen.getByRole("link", { name: "Trakline, home" });
+    expect(brand).toHaveAttribute("href", "/");
+    expect(within(brand).getByText("Trakline")).toHaveClass("font-display");
+  });
+
+  it("lists the four product keys, the landing's Check a PNR jumping to the check plate", () => {
     render(<TopNav />);
     const primary = screen.getByRole("navigation", { name: "Primary" });
-    for (const name of ["How it works", "The record", "Roadmap", "FAQ", "Sign in"]) {
-      expect(within(primary).queryByRole("link", { name }), name).toBeNull();
-    }
-    for (const name of ["Check a PNR", "Watchlist", "Pre-booking", "Accuracy"]) {
-      const link = within(primary).getByRole("link", { name });
-      expect(link.querySelector("svg"), name).not.toBeNull();
-      expect(within(link).getByText(name), name).not.toHaveClass("sr-only");
-    }
+    const links = within(primary).getAllByRole("link");
+    expect(links.map((l) => l.textContent)).toEqual(["Check a PNR", "Watchlist", "Pre-booking", "Accuracy"]);
     const check = within(primary).getByRole("link", { name: "Check a PNR" });
     expect(check).toHaveAttribute("href", "#terminal");
     expect(check).toHaveAttribute("aria-current", "page");
-    const signIn = screen.getByTestId("sign-in");
-    expect(primary).not.toContainElement(signIn);
-    expect(signIn).toHaveClass("uppercase");
   });
 
-  it("draws every nav item as its own box, the current one tinted steel", () => {
+  it("draws the current page as the yellow primary key and the rest as secondary keys, 40px high", () => {
     nav.pathname = "/pre-booking";
     render(<TopNav />);
-    const links = within(screen.getByRole("navigation", { name: "Primary" })).getAllByRole("link");
-    expect(links).toHaveLength(4);
-    for (const link of links) expect(link).toHaveClass("border", "h-9", "text-label");
-    const current = within(screen.getByRole("navigation", { name: "Primary" })).getByRole("link", { name: "Pre-booking" });
-    expect(current).toHaveAttribute("aria-current", "page");
-    expect(current).toHaveClass("border-accent");
-  });
-
-  it("marks Watchlist with the eye icon", async () => {
-    const { PRIMARY_NAV } = await import("@/components/shell/nav-config");
-    const { EyeFilled } = await import("@/components/icons");
-    expect(PRIMARY_NAV.find((item) => item.href === "/watchlist")?.Icon).toBe(EyeFilled);
-  });
-
-  it("keeps the one theme icon button beside Sign in, outside the nav, at the nav boxes' height", () => {
-    nav.pathname = "/watchlist";
-    render(<TopNav />);
-    const theme = screen.getAllByRole("button", { name: /^Theme:/ });
-    expect(theme).toHaveLength(1);
-    expect(theme[0]).toHaveClass("size-9");
-    expect(screen.getByRole("navigation", { name: "Primary" })).not.toContainElement(theme[0]!);
-    expect(theme[0]!.parentElement).toContainElement(screen.getByTestId("sign-in"));
-    expect(screen.getByTestId("sign-in")).toHaveClass("h-9", "text-label");
-  });
-
-  it("marks the current app page and sets Sign in in capitals with its icon", () => {
-    nav.pathname = "/watchlist";
-    render(<TopNav />);
     const primary = screen.getByRole("navigation", { name: "Primary" });
-    for (const name of ["Check a PNR", "Watchlist", "Pre-booking", "Accuracy"]) {
-      expect(within(primary).getByRole("link", { name }).querySelector("svg"), name).not.toBeNull();
-    }
+    const current = within(primary).getByRole("link", { name: "Pre-booking" });
+    expect(current).toHaveAttribute("aria-current", "page");
+    expect(current).toHaveClass("bg-accent", "min-h-10");
+    const other = within(primary).getByRole("link", { name: "Watchlist" });
+    expect(other).not.toHaveAttribute("aria-current");
+    expect(other).toHaveClass("bg-paper", "min-h-10");
     expect(within(primary).getByRole("link", { name: "Check a PNR" })).toHaveAttribute("href", "/");
-    expect(within(primary).getByRole("link", { name: "Watchlist" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("hides the nav keys below 640px, where the tab bar takes over", () => {
+    render(<TopNav />);
+    expect(screen.getByRole("navigation", { name: "Primary" })).toHaveClass("max-sm:hidden");
+  });
+
+  it("shows the saved count on Watchlist without changing its name", () => {
+    count.value = 2;
+    render(<TopNav />);
+    const watch = within(screen.getByRole("navigation", { name: "Primary" })).getByRole("link", { name: "Watchlist" });
+    expect(watch).toHaveTextContent("Watchlist2");
+  });
+
+  it("keeps the theme key and the sign-in key, both 40px, on the right outside the nav", () => {
+    render(<TopNav />);
+    const theme = screen.getByRole("button", { name: /^Theme:/ });
     const signIn = screen.getByTestId("sign-in");
     expect(signIn).toHaveAccessibleName("Sign in");
-    expect(signIn).toHaveClass("uppercase");
-    expect(signIn.querySelector("svg")).not.toBeNull();
+    expect(signIn).toHaveAttribute("href", "/login");
+    for (const key of [theme, signIn]) {
+      expect(key).toHaveClass("size-10");
+      expect(screen.getByRole("navigation", { name: "Primary" })).not.toContainElement(key);
+    }
   });
 
-  it("below lg puts the hamburger on the left of the logo mark, the name shown from lg only", () => {
-    nav.pathname = "/watchlist";
-    render(<TopNav />);
-    const menu = screen.getByRole("button", { name: "Open menu" });
-    const brand = screen.getByRole("link", { name: "Trakline" });
-    // the nav opens from lg only where the masthead, a query container, is also 62rem wide: with text at 200% it is not
-    expect(screen.getByRole("banner").firstElementChild).toHaveClass("@container");
-    expect(menu).toHaveClass("lg:@min-[62rem]:hidden");
-    expect(menu.compareDocumentPosition(brand) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(brand.querySelector("svg")).not.toBeNull();
-    expect(within(brand).getByText("Trakline").parentElement).toHaveClass("hidden", "lg:flex");
-    expect(screen.getByRole("navigation", { name: "Primary" })).toHaveClass("hidden", "lg:@min-[62rem]:flex");
-  });
-
-  it("shows only the brand on sign in", () => {
+  it("is the full masthead on the sign-in page too, as v4 draws it", () => {
     nav.pathname = "/login";
     render(<TopNav />);
-    expect(screen.queryByRole("navigation", { name: "Primary" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Open menu" })).toBeNull();
-    expect(screen.queryByTestId("sign-in")).toBeNull();
-    expect(within(screen.getByRole("link", { name: "Trakline" })).getByText("Trakline").parentElement).not.toHaveClass("hidden");
+    expect(screen.getByRole("navigation", { name: "Primary" })).toBeInTheDocument();
   });
 
-  it("carries no route rail: the owner removed it, and the masthead takes no props for one", () => {
-    nav.pathname = "/";
-    const { unmount } = render(<TopNav />);
-    const banner = screen.getByRole("banner");
-    expect(screen.queryByRole("navigation", { name: "Route through this page" })).toBeNull();
-    expect(banner.querySelector(".phone-rail")).toBeNull();
-    unmount();
+  it("signed in, shows the initial in the pink key, which opens the account menu", () => {
+    nav.user = { id: "u1", email: "asha@example.in", name: null, avatarUrl: null };
+    render(<TopNav />);
+    const key = screen.getByTestId("account-menu");
+    expect(key).toHaveAccessibleName("Account");
+    expect(key).toHaveTextContent("A");
+    expect(key).toHaveClass("bg-pink", "size-10");
   });
 });

@@ -371,7 +371,8 @@ test("in forced colours the band's hairline is still drawn, as the footer's is",
   });
   expect(lines.forced, "forced colours are on").toBe(true);
   // A background is dropped in forced colours; a border is drawn in the system's own colour.
-  expect([lines.band.width, lines.band.style]).toEqual(["1px", "solid"]);
+  // v4 rules everything with the 2px edge.
+  expect([lines.band.width, lines.band.style]).toEqual(["2px", "solid"]);
   expect(lines.band.colour).toBe(lines.footer.colour);
   expect(lines.band.box, "the sheet's width").toBe(lines.frame);
 });

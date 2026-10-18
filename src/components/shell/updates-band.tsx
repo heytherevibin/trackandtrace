@@ -25,7 +25,7 @@ export function UpdatesBand() {
     <section id={UPDATES_BAND_ID} aria-labelledby={TITLE_ID} data-variant={variant}>
       <div className="page-frame">
         {/* A border, not a fill: forced colours drop backgrounds and keep borders, as the footer's own rule is kept. */}
-        <hr className="m-0 border-0 border-t border-line" />
+        <hr className="m-0 border-0 border-t-2 border-edge" />
         <div className={`grid grid-cols-1 gap-x-[clamp(32px,6vw,96px)] gap-y-5 md:grid-cols-[minmax(0,1fr)_minmax(0,min(30rem,50%))] md:items-start ${full ? "pb-[60px] pt-12" : "py-[28px]"}`}>
           <div data-rise="" className="min-w-0">
             <h2 id={TITLE_ID} className={full ? `m-0 ${H2}` : "m-0 text-2xl leading-6 tracking-head wrap-anywhere"}>

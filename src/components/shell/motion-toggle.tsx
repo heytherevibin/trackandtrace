@@ -28,10 +28,10 @@ export function MotionToggle() {
         >
           <BaseSwitch.Thumb className={SWITCH_THUMB} />
         </BaseSwitch.Root>
-        <span className="font-display text-xs font-semibold uppercase tracking-caps text-ink-1/70">{m.motion}</span>
+        <span className="legend">{m.motion}</span>
       </label>
       {deviceReduced ? (
-        <span id={noteId} className="text-label text-ink-3">
+        <span id={noteId} className="font-figure text-xs normal-case text-ink-3">
           {m.motionByDevice}
         </span>
       ) : null}
